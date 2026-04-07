@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 42% 7%;
+  --foreground: 200 24% 96%;
+  --card: 210 35% 10%;
+  --card-foreground: 200 24% 96%;
+  --border: 215 22% 18%;
+  --input: 215 22% 18%;
+  --ring: 184 89% 43%;
+  --primary: 184 89% 43%;
+  --primary-foreground: 210 42% 7%;
+  --muted: 213 26% 16%;
+  --muted-foreground: 210 14% 72%;
+  --accent: 191 65% 14%;
+  --accent-foreground: 200 24% 96%;
+}
+
+.dark {
+  --background: 210 42% 7%;
+  --foreground: 200 24% 96%;
+  --card: 210 35% 10%;
+  --card-foreground: 200 24% 96%;
+  --border: 215 22% 18%;
+  --input: 215 22% 18%;
+  --ring: 184 89% 43%;
+  --primary: 184 89% 43%;
+  --primary-foreground: 210 42% 7%;
+  --muted: 213 26% 16%;
+  --muted-foreground: 210 14% 72%;
+  --accent: 191 65% 14%;
+  --accent-foreground: 200 24% 96%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
+  overscroll-behavior: none;
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(11, 140, 153, 0.12), transparent 26%),
+    linear-gradient(180deg, rgba(3, 7, 12, 1), rgba(5, 11, 18, 1));
+  overscroll-behavior: none;
+}
+
+main,
+section,
+div {
+  overscroll-behavior: contain;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.25);
+}
