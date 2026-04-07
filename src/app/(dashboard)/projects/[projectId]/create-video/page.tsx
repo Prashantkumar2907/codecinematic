@@ -41,17 +41,19 @@ export default async function CreateVideoPage({
   const soundVolume = query.soundVolume ?? "0.30";
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-3">
-          <Badge>{session.plan} demo workflow</Badge>
-          <h1 className="text-4xl font-semibold tracking-tight">Create video</h1>
-          <p className="max-w-3xl text-muted-foreground">
-            This step turns the editor choices into export jobs. The response is plan-aware, so free users stay watermarked while paid users can store eligible exports later.
+    <main className="flex-1 flex flex-col min-h-0 w-full max-w-[100rem] mx-auto p-4 gap-2">
+      <div className="shrink-0 flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight">Create video</h1>
+            <Badge className="text-[10px] py-0 bg-secondary/50 text-secondary-foreground">{session.plan} demo workflow</Badge>
+          </div>
+          <p className="max-w-3xl text-xs text-muted-foreground">
+            This step turns the editor choices into export jobs. The response is plan-aware.
           </p>
         </div>
         <Link href={`/projects/${projectId}`}>
-          <Button variant="secondary">Back to editor</Button>
+          <Button variant="secondary" size="sm" className="h-8 text-xs">Back to editor</Button>
         </Link>
       </div>
 

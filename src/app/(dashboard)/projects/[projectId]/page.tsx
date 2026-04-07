@@ -12,13 +12,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const { projectId } = await params;
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
-      <div className="mb-8 space-y-3">
-        <Badge>{session.plan} demo workspace</Badge>
-        <h1 className="text-4xl font-semibold tracking-tight">Cinematic project editor</h1>
-        <p className="max-w-3xl text-muted-foreground">
-          This editor assumes users can choose any language, write explanations in comments, and rely on line-based constraints so the UI and exported video stay readable.
-        </p>
+    <main className="flex-1 flex flex-col min-h-0 w-full max-w-[100rem] mx-auto p-4 gap-2">
+      <div className="shrink-0 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Cinematic project editor</h1>
+          <p className="max-w-3xl text-xs text-muted-foreground mt-1">
+            Build syntax-aware videos using deterministic line scrolling.
+          </p>
+        </div>
+        <Badge className="text-[10px] py-0 bg-secondary/50 text-secondary-foreground">{session.plan} demo workspace</Badge>
       </div>
       <ProjectEditor plan={session.plan} projectId={projectId} />
     </main>

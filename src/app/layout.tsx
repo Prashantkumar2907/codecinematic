@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "@/app/globals.css";
 
 import { SiteHeader } from "@/components/layout/site-header";
+import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
   title: "CodeCinematic",
@@ -12,9 +13,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground antialiased">
-        <SiteHeader />
-        {children}
+      <body className="h-screen overflow-hidden flex flex-col bg-background text-foreground antialiased transition-colors duration-200">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <SiteHeader />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

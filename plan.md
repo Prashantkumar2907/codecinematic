@@ -49,16 +49,16 @@ This plan has been updated to reflect the current application scaffold in this r
   - syntax-colored code drawing
   - character-by-character typing within the active line
   - ratio-aware line wrapping
+  - wrapped segments behave as continuations of the same source line
   - separate timing for focused and non-focused lines
   - per-character speed consistency for focused and non-focused lines
   - synthesized typing audio
   - per-character insertion sound timing
   - richer coloring for comments, keywords, strings, numbers, braces, and punctuation
   - render duration scales with actual content length instead of stopping at a hard short-video cap
-
-### Known product-quality issues to think about every time
-- multiline code should never be passed only through URL params for rendering
-- a line that fits in the editor can still overflow in the video frame if render-specific wrapping is missing
+  - browser rendering with safe zones for TikTok/Reels (9:16)
+  - improved editor-frame styling with separate gutter, line numbers, and high density (gap-2) spacing
+  - optimized for zero global page scroll using native overflow bounds
 - “show full line at once” feels wrong for typing animation; reveal should be character-based
 - `9:16` and `16:9` need different visible-width rules, not just different canvas sizes
 - focus maps should show all non-empty lines, not only auto-detected important ones
@@ -73,6 +73,8 @@ This plan has been updated to reflect the current application scaffold in this r
 - low-end speed multipliers need much slower timing than naive preset-based mappings
 - hard render-duration caps can silently cut off longer code samples before completion
 - fixed-duration line timing makes equally focused lines feel inconsistent when line lengths differ
+- wrapped lines should not repeat the same visible line number on every continuation row
+- `16:9` should use more horizontal space before wrapping than `9:16`
 
 ## 1. Product Direction
 
@@ -1259,6 +1261,7 @@ Recommendation:
 - use very short audio envelopes for per-character insertion sound so clicks stay crisp
 - avoid arbitrary short maximum render durations when the content itself is longer
 - base render timing on character count so the same speed setting feels consistent across lines
+- treat wrapped rows as continuations in the gutter and highlighting logic
 
 ### Storage
 - upload succeeds but DB update fails

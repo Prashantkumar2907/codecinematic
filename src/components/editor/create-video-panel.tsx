@@ -23,8 +23,8 @@ type RenderedVideo = {
 };
 
 const aspectDimensions: Record<string, { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number }> = {
-  "9:16": { width: 720, height: 1280, maxVisibleLines: 12, fontSize: 24, maxCharsPerLine: 30 },
-  "16:9": { width: 1280, height: 720, maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 54 }
+  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 34 },
+  "16:9": { width: 1280, height: 720, maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 72 }
 };
 
 export function CreateVideoPanel({
@@ -176,94 +176,99 @@ export function CreateVideoPanel({
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-      <Card className="bg-white/5">
-        <CardHeader>
-          <CardTitle>Create video</CardTitle>
-          <CardDescription>This is the next workflow step after the editor. It uses your demo account plan to create export jobs.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-2">
-            <Meta label="Project" value={title} />
-            <Meta label="Language" value={language} />
-            <Meta label="Aspect mode" value={aspect} />
-            <Meta label="Normal line speed" value={formatMultiplier(resolvedNormalSpeed)} />
-            <Meta label="Focused line speed" value={formatMultiplier(resolvedFocusSpeed)} />
-            <Meta label="Typing sound" value={resolvedSound} />
-            <Meta label="Insertion volume" value={`${Math.round(Number(resolvedSoundVolume) * 100)}%`} />
-            <Meta label="Focus lines" value={resolvedFocus.length ? resolvedFocus.join(", ") : "None"} />
-            <Meta label="Render source lines" value={`${renderLineCount}`} />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {aspectRatios.map((ratio) => (
-              <Badge key={ratio}>{ratio}</Badge>
-            ))}
-          </div>
-
-          <Button onClick={handleCreateAndRender} disabled={loading || rendering || renderLineCount === 0}>
-            {loading || rendering ? "Creating video..." : "Create video"}
-          </Button>
-          <Button onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || renderLineCount === 0} variant="secondary">
-            {rendering ? "Rendering videos..." : "Render again"}
-          </Button>
-          {renderLineCount === 0 ? (
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-              No code payload reached this step yet. Go back to the editor and continue again.
+    <div className="flex-1 flex flex-col min-h-0 space-y-2">
+      <div className="flex-1 min-h-0 grid gap-2 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card className="flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
+          <CardHeader className="py-2 px-3">
+            <CardTitle className="text-base">Create video</CardTitle>
+            <CardDescription className="text-xs">This is the next workflow step after the editor. It uses your demo account plan to create export jobs.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
+            <div className="grid gap-2 md:grid-cols-2">
+              <Meta label="Project" value={title} />
+              <Meta label="Language" value={language} />
+              <Meta label="Aspect mode" value={aspect} />
+              <Meta label="Normal line speed" value={formatMultiplier(resolvedNormalSpeed)} />
+              <Meta label="Focused line speed" value={formatMultiplier(resolvedFocusSpeed)} />
+              <Meta label="Typing sound" value={resolvedSound} />
+              <Meta label="Insertion volume" value={`${Math.round(Number(resolvedSoundVolume) * 100)}%`} />
+              <Meta label="Focus lines" value={resolvedFocus.length ? resolvedFocus.join(", ") : "None"} />
+              <Meta label="Render source lines" value={`${renderLineCount}`} />
             </div>
-          ) : null}
-          {error ? <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100">{error}</div> : null}
-        </CardContent>
-      </Card>
 
-      <Card className="bg-white/5">
-        <CardHeader>
-          <CardTitle>Export jobs</CardTitle>
-          <CardDescription>The demo route returns plan-aware export jobs so all four demo accounts can complete the workflow.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {jobs.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-muted-foreground">
-              No export jobs created yet. Use the button on the left to generate the vertical, landscape, or dual-format job list.
+            <div className="flex flex-wrap gap-1">
+              {aspectRatios.map((ratio) => (
+                <Badge key={ratio} className="text-[10px] bg-secondary/50 text-secondary-foreground">{ratio}</Badge>
+              ))}
             </div>
-          ) : null}
 
-          {jobs.map((job) => (
-            <div key={job.exportId} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-medium">{job.aspectRatio} export</p>
-                <div className="flex gap-2">
-                  <Badge>{job.format}</Badge>
-                  <Badge>{job.watermarked ? "watermarked" : "clean"}</Badge>
-                  <Badge>{job.storageAllowed ? "stored allowed" : "download only"}</Badge>
+            <div className="flex gap-2">
+              <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleCreateAndRender} disabled={loading || rendering || renderLineCount === 0}>
+                {loading || rendering ? "Creating video..." : "Create video"}
+              </Button>
+              <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || renderLineCount === 0} variant="secondary">
+                {rendering ? "Rendering videos..." : "Render again"}
+              </Button>
+            </div>
+            
+            {renderLineCount === 0 ? (
+              <div className="rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+                No code payload reached this step yet. Go back to the editor and continue again.
+              </div>
+            ) : null}
+            {error ? <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive-foreground">{error}</div> : null}
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
+          <CardHeader className="py-2 px-3">
+            <CardTitle className="text-base">Export jobs</CardTitle>
+            <CardDescription className="text-xs">The demo route returns plan-aware export jobs so all four demo accounts can complete the workflow.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
+            {jobs.length === 0 ? (
+              <div className="rounded-md border border-border bg-card p-3 text-xs text-muted-foreground text-center">
+                No export jobs created yet. Use the button on the left to generate the vertical, landscape, or dual-format job list.
+              </div>
+            ) : null}
+
+            {jobs.map((job) => (
+              <div key={job.exportId} className="rounded-md border border-border bg-card shadow-sm p-3 hover:border-primary/50 transition-colors">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">{job.aspectRatio} export</p>
+                  <div className="flex gap-1">
+                    <Badge className="text-[10px] py-0 border border-border bg-transparent text-foreground">{job.format}</Badge>
+                    <Badge className={`text-[10px] py-0 ${job.watermarked ? 'bg-secondary/50 text-secondary-foreground' : 'bg-primary text-primary-foreground'}`}>{job.watermarked ? "watermarked" : "clean"}</Badge>
+                    <Badge className="text-[10px] py-0 border border-border bg-transparent text-foreground">{job.storageAllowed ? "stored allowed" : "download only"}</Badge>
+                  </div>
                 </div>
+                <p className="mt-1 text-[10px] text-muted-foreground font-mono truncate">{job.exportId}</p>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">{job.exportId}</p>
-            </div>
-          ))}
+            ))}
 
-          {videos.map((video) => (
-            <div key={video.exportId} className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="font-medium">{video.aspectRatio} video ready</p>
-                <a href={video.url} download={video.filename}>
-                  <Button size="sm">Download .webm</Button>
-                </a>
+            {videos.map((video) => (
+              <div key={video.exportId} className="rounded-md border border-primary/30 bg-primary/5 p-3 shadow-sm">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-primary">{video.aspectRatio} video ready</p>
+                  <a href={video.url} download={video.filename}>
+                    <Button size="sm" className="h-6 text-[10px] px-2">Download .webm</Button>
+                  </a>
+                </div>
+                <video src={video.url} controls playsInline className="w-full rounded-md border border-border/50 bg-black shadow-inner" />
               </div>
-              <video src={video.url} controls playsInline className="w-full rounded-2xl border border-white/10 bg-black/40" />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-sm font-medium text-foreground">{value}</p>
+    <div className="rounded-md border border-border bg-card shadow-sm p-2">
+      <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xs font-semibold text-foreground truncate max-w-full">{value}</p>
     </div>
   );
 }
@@ -372,7 +377,7 @@ async function renderVideoBlob({
       const renderState = getRenderState(safeElapsed, lines, lineSchedule, preset.maxCharsPerLine);
 
       paintFrame({
-        context,
+        context: context!,
         width: preset.width,
         height: preset.height,
         title,
@@ -495,13 +500,15 @@ function getRenderState(
   const activeProgress = Math.min(1, localElapsed / currentDuration);
   const activeRawLine = lines[activeIndex];
 
-  const visibleLines: Array<{ number: number; content: string }> = [];
+  const visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean }> = [];
 
   lines.slice(0, activeIndex).forEach((line) => {
     wrapLine(line.content, maxCharsPerLine).forEach((segment, index) => {
       visibleLines.push({
-        number: index === 0 ? line.number : line.number,
-        content: segment
+        number: line.number,
+        content: segment,
+        lineNumberLabel: index === 0 ? String(line.number).padStart(2, " ") : "  ",
+        continuation: index > 0
       });
     });
   });
@@ -509,10 +516,12 @@ function getRenderState(
   if (activeRawLine) {
     const revealedCharacters = Math.max(1, Math.ceil(activeRawLine.content.length * activeProgress));
     const partial = activeRawLine.content.slice(0, revealedCharacters);
-    wrapLine(partial, maxCharsPerLine).forEach((segment) => {
+    wrapLine(partial, maxCharsPerLine).forEach((segment, index) => {
       visibleLines.push({
         number: activeRawLine.number,
-        content: segment
+        content: segment,
+        lineNumberLabel: index === 0 ? String(activeRawLine.number).padStart(2, " ") : "  ",
+        continuation: index > 0
       });
     });
   }
@@ -614,7 +623,7 @@ function paintFrame({
   height: number;
   title: string;
   language: string;
-  visibleLines: Array<{ number: number; content: string }>;
+  visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean }>;
   activeLine: number;
   maxVisibleLines: number;
   fontSize: number;
@@ -624,75 +633,98 @@ function paintFrame({
   context.clearRect(0, 0, width, height);
 
   const gradient = context.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#07111b");
-  gradient.addColorStop(1, "#041019");
+  gradient.addColorStop(0, "#08101a");
+  gradient.addColorStop(1, "#03080d");
   context.fillStyle = gradient;
   context.fillRect(0, 0, width, height);
 
-  context.fillStyle = "rgba(24, 190, 198, 0.08)";
+  // Deep subtle atmospheric light
+  context.fillStyle = "rgba(45, 212, 191, 0.05)";
   context.beginPath();
-  context.arc(width * 0.2, height * 0.12, Math.min(width, height) * 0.18, 0, Math.PI * 2);
+  context.arc(width * 0.3, height * 0.2, Math.min(width, height) * 0.25, 0, Math.PI * 2);
+  context.fill();
+  context.filter = "none";
+
+  const isVertical = width < height;
+  const frameW = isVertical ? width * 0.9 : width * 0.84;
+  const frameH = isVertical ? height - 360 : height * 0.84; // Leave room top and bottom for TikTok UI
+  const frameX = (width - frameW) / 2;
+  const frameY = isVertical ? 160 : (height - frameH) / 2;
+
+  context.shadowColor = "rgba(0, 0, 0, 0.8)";
+  context.shadowBlur = 50;
+  context.shadowOffsetY = 25;
+
+  roundRect(context, frameX, frameY, frameW, frameH, 20);
+  context.fillStyle = "rgba(10, 16, 24, 0.75)";
   context.fill();
 
-  const frameX = width * 0.08;
-  const frameY = height * 0.08;
-  const frameW = width * 0.84;
-  const frameH = height * 0.84;
+  context.shadowColor = "transparent";
+  context.shadowBlur = 0;
+  context.shadowOffsetY = 0;
 
-  roundRect(context, frameX, frameY, frameW, frameH, 28);
-  context.fillStyle = "rgba(7, 17, 27, 0.86)";
-  context.fill();
-  context.strokeStyle = "rgba(255,255,255,0.08)";
+  context.strokeStyle = "rgba(255,255,255,0.12)";
   context.lineWidth = 1;
   context.stroke();
 
-  context.fillStyle = "rgba(255,255,255,0.05)";
-  roundRect(context, frameX + 18, frameY + 18, frameW - 36, 48, 16);
+  // Header Title Bar
+  context.fillStyle = "rgba(255,255,255,0.03)";
+  roundRect(context, frameX + 12, frameY + 12, frameW - 24, 44, 12);
   context.fill();
 
-  const dots = ["#ff6b6b", "#ffd166", "#06d6a0"];
+  // Glass gutter
+  context.fillStyle = "rgba(0, 0, 0, 0.3)";
+  roundRect(context, frameX + 12, frameY + 68, 54, frameH - 80, 12);
+  context.fill();
+
+  const dots = ["#ef4444", "#f59e0b", "#10b981"];
   dots.forEach((color, index) => {
     context.fillStyle = color;
     context.beginPath();
-    context.arc(frameX + 42 + index * 22, frameY + 42, 6, 0, Math.PI * 2);
+    context.arc(frameX + 32 + index * 18, frameY + 34, 5, 0, Math.PI * 2);
     context.fill();
   });
 
-  context.fillStyle = "#d9f7f8";
-  context.font = "600 20px ui-sans-serif, system-ui";
-  context.fillText(title, frameX + 120, frameY + 48);
+  context.fillStyle = "#e2e8f0";
+  context.font = "600 16px ui-sans-serif, system-ui";
+  context.fillText(title, frameX + 100, frameY + 39);
 
-  context.fillStyle = "rgba(173, 224, 227, 0.7)";
-  context.font = "500 14px ui-sans-serif, system-ui";
-  context.fillText(language, frameX + frameW - 90, frameY + 48);
+  context.fillStyle = "rgba(148, 163, 184, 0.8)";
+  context.font = "500 12px ui-sans-serif, system-ui";
+  context.fillText(language, frameX + frameW - 80, frameY + 38);
 
-  const lineHeight = fontSize * 1.65;
+  const lineHeight = fontSize * 1.55;
   const startIndex = Math.max(0, visibleLines.length - maxVisibleLines);
   const viewportLines = visibleLines.slice(startIndex);
-  let y = frameY + 100;
+  let y = frameY + 85 + fontSize;
 
   viewportLines.forEach((line) => {
     const isActive = line.number === activeLine;
     const isFocused = focusSet.has(line.number);
 
     if (isActive || isFocused) {
-      context.fillStyle = isActive ? "rgba(24, 190, 198, 0.16)" : "rgba(255, 255, 255, 0.05)";
-      roundRect(context, frameX + 24, y - lineHeight + 8, frameW - 48, lineHeight, 12);
+      context.fillStyle = isActive ? "rgba(45, 212, 191, 0.15)" : "rgba(255, 255, 255, 0.04)";
+      roundRect(context, frameX + 78, y - lineHeight + 6, frameW - 90, lineHeight, 8);
       context.fill();
     }
 
-    context.fillStyle = "rgba(148, 163, 184, 0.9)";
+    context.fillStyle = line.continuation ? "rgba(100, 116, 139, 0.7)" : "rgba(148, 163, 184, 0.9)";
     context.font = `${fontSize - 4}px ui-monospace, SFMono-Regular, monospace`;
-    context.fillText(String(line.number).padStart(2, " "), frameX + 32, y);
+    context.fillText(line.lineNumberLabel, frameX + 22, y);
 
-    drawHighlightedCode(context, line.content, frameX + 80, y, fontSize);
+    if (line.continuation) {
+      context.fillStyle = "rgba(45, 212, 191, 0.6)";
+      context.fillText(">", frameX + 50, y);
+    }
+
+    drawHighlightedCode(context, line.content, frameX + 88, y, fontSize);
     y += lineHeight;
   });
 
   if (watermarked) {
-    context.fillStyle = "rgba(255,255,255,0.14)";
-    context.font = "600 18px ui-sans-serif, system-ui";
-    context.fillText("CodeCinematic Free", frameX + frameW - 210, frameY + frameH - 28);
+    context.fillStyle = "rgba(255,255,255,0.18)";
+    context.font = "600 14px ui-sans-serif, system-ui";
+    context.fillText("CodeCinematic", frameX + frameW - 120, frameY + frameH + 30);
   }
 }
 

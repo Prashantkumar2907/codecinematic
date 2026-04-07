@@ -17,26 +17,29 @@ export default async function DashboardPage() {
   const plan = PLAN_CONFIG[session.plan];
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
-          <Badge>{session.plan} plan</Badge>
-          <h1 className="text-4xl font-semibold tracking-tight">Welcome, {session.name}</h1>
-          <p className="text-muted-foreground">This dashboard reflects the current plan limits that the app and SQL schema are designed to enforce.</p>
+    <main className="flex-1 overflow-y-auto w-full">
+      <div className="mx-auto max-w-7xl px-4 py-8 space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">Welcome, {session.name}</h1>
+              <Badge className="text-[10px] bg-secondary/50 text-secondary-foreground">{session.plan} plan</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">This dashboard reflects the current plan limits that the app and SQL schema are designed to enforce.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <form action="/api/auth/logout" method="post">
+              <Button type="submit" variant="secondary" size="sm" className="h-8 text-xs">
+                Logout
+              </Button>
+            </form>
+            <Link href="/projects/demo-project">
+              <Button size="sm" className="h-8 text-xs">Open editor</Button>
+            </Link>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <form action="/api/auth/logout" method="post">
-            <Button type="submit" variant="secondary">
-              Logout
-            </Button>
-          </form>
-          <Link href="/projects/demo-project">
-            <Button>Open editor</Button>
-          </Link>
-        </div>
-      </div>
 
-      <div className="mb-8 grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         <Metric title="Stored exports" value={`${plan.maxStoredExports}`} />
         <Metric title="Daily downloads" value={`${plan.maxDailyDownloads}`} />
         <Metric title="Max code lines" value={`${plan.maxCodeLines}`} />
@@ -45,29 +48,30 @@ export default async function DashboardPage() {
 
       <PlanGrid />
 
-      <Card className="mt-8 bg-white/5">
-        <CardHeader>
-          <CardTitle>Application modules</CardTitle>
-          <CardDescription>The scaffold includes the product surface you asked for, with browser-first rendering and Supabase-backed data design.</CardDescription>
+      <Card className="border-white/5 bg-background shadow-sm dark:bg-card">
+        <CardHeader className="py-4">
+          <CardTitle className="text-lg">Application modules</CardTitle>
+          <CardDescription className="text-xs">The scaffold includes the product surface you asked for, with browser-first rendering and Supabase-backed data design.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {["Landing page", "Social login", "Demo plan auth", "Supabase SQL bootstrap"].map((item) => (
-            <div key={item} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-muted-foreground">
+            <div key={item} className="rounded-md border border-border bg-card p-3 text-xs text-muted-foreground shadow-sm">
               {item}
             </div>
           ))}
         </CardContent>
       </Card>
+      </div>
     </main>
   );
 }
 
 function Metric({ title, value }: { title: string; value: string }) {
   return (
-    <Card className="bg-white/5">
-      <CardContent className="p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{title}</p>
-        <p className="mt-2 text-2xl font-semibold">{value}</p>
+    <Card className="border-border bg-card shadow-sm">
+      <CardContent className="p-4">
+        <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{title}</p>
+        <p className="mt-1 text-xl font-semibold">{value}</p>
       </CardContent>
     </Card>
   );
