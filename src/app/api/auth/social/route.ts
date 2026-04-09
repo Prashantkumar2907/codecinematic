@@ -8,20 +8,28 @@ export async function GET(request: Request) {
   const provider = url.searchParams.get("provider");
 
   if (!provider || (provider !== "google" && provider !== "github")) {
-    return NextResponse.redirect(new URL("/login?error=provider", request.url));
+    return NextResponse.redirect(new URL("/login?error=invalid-provider", request.url));
   }
 
   if (!hasSupabaseEnv()) {
-    return NextResponse.redirect(new URL("/login?error=configure-supabase", request.url));
+    return NextResponse.redirect(
+      new URL("/login?error=supabase-not-configured", request.url)
+    );
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
-    }
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dashboard`,
+    },
   });
+
+  if (error || !data.url) {
+    return NextResponse.redirect(
+      new URL("/login?error=oauth-failed", request.url)
+    );
+  }
 
   return NextResponse.redirect(data.url);
 }

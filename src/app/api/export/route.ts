@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getDemoSession } from "@/lib/demo-auth";
+import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG } from "@/lib/plans";
 
 const exportSchema = z.object({
@@ -13,7 +13,7 @@ const exportSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await getDemoSession();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

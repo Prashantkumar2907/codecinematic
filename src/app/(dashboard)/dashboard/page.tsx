@@ -1,78 +1,80 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { Download, FileCode2, Film, Layers, MessageSquareText, Ruler, Sparkles, Volume2 } from "lucide-react";
 
-import { PlanGrid } from "@/components/dashboard/plan-grid";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDemoSession } from "@/lib/demo-auth";
+import { Card, CardContent } from "@/components/ui/card";
+import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG } from "@/lib/plans";
 
 export default async function DashboardPage() {
-  const session = await getDemoSession();
+  const session = await getSession();
   if (!session) {
     redirect("/login");
   }
 
   const plan = PLAN_CONFIG[session.plan];
 
+  const metrics = [
+    { icon: Layers, label: "Stored exports", value: String(plan.maxStoredExports) },
+    { icon: Download, label: "Daily downloads", value: String(plan.maxDailyDownloads) },
+    { icon: FileCode2, label: "Max code lines", value: String(plan.maxCodeLines) },
+    { icon: Ruler, label: "Max chars / line", value: String(plan.maxLineLength) },
+  ];
+
+  const quickLinks = [
+    { label: "Code Studio", desc: "Write code in the editor and render a cinematic video", href: "/projects/new-project?tab=editor", icon: Film },
+    { label: "AI Narration", desc: "Generate a voice-over script with Google Gemini", href: "/projects/new-project?tab=narration", icon: MessageSquareText },
+    { label: "Audio Studio", desc: "Convert narration to speech with Sarvam AI", href: "/projects/new-project?tab=tts", icon: Volume2 },
+    { label: "Auto Pipeline", desc: "Code → narration → audio → video in one click", href: "/projects/new-project?tab=pipeline", icon: Sparkles },
+  ];
+
   return (
-    <main className="flex-1 overflow-y-auto w-full">
-      <div className="mx-auto max-w-7xl px-4 py-8 space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">Welcome, {session.name}</h1>
-              <Badge className="text-[10px] bg-secondary/50 text-secondary-foreground">{session.plan} plan</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">This dashboard reflects the current plan limits that the app and SQL schema are designed to enforce.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <form action="/api/auth/logout" method="post">
-              <Button type="submit" variant="secondary" size="sm" className="h-8 text-xs">
-                Logout
-              </Button>
-            </form>
-            <Link href="/projects/demo-project">
-              <Button size="sm" className="h-8 text-xs">Open editor</Button>
-            </Link>
-          </div>
+    <main className="flex-1 overflow-y-auto">
+      <div className="w-full px-4 sm:px-6 lg:px-10 py-10 space-y-10">
+        {/* Greeting */}
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Welcome back, {session.name}</h1>
+          <p className="text-xs text-muted-foreground mt-1">Pick a workflow or check your plan limits below.</p>
         </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Metric title="Stored exports" value={`${plan.maxStoredExports}`} />
-        <Metric title="Daily downloads" value={`${plan.maxDailyDownloads}`} />
-        <Metric title="Max code lines" value={`${plan.maxCodeLines}`} />
-        <Metric title="Max chars / line" value={`${plan.maxLineLength}`} />
-      </div>
-
-      <PlanGrid />
-
-      <Card className="border-white/5 bg-background shadow-sm dark:bg-card">
-        <CardHeader className="py-4">
-          <CardTitle className="text-lg">Application modules</CardTitle>
-          <CardDescription className="text-xs">The scaffold includes the product surface you asked for, with browser-first rendering and Supabase-backed data design.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {["Landing page", "Social login", "Demo plan auth", "Supabase SQL bootstrap"].map((item) => (
-            <div key={item} className="rounded-md border border-border bg-card p-3 text-xs text-muted-foreground shadow-sm">
-              {item}
-            </div>
+        {/* Quick links */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {quickLinks.map((f) => (
+            <Link key={f.label} href={f.href as Route}>
+              <Card className="group h-full border-white/[0.06] bg-white/[0.02] hover:border-primary/30 hover:bg-white/[0.04] hover:shadow-lg hover:shadow-primary/[0.03] transition-all duration-200 cursor-pointer">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/[0.08] group-hover:bg-primary/[0.12] transition-colors">
+                    <f.icon className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors" />
+                  </div>
+                  <p className="text-sm font-semibold group-hover:text-foreground transition-colors">{f.label}</p>
+                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{f.desc}</p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Plan limits */}
+        <div>
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mb-4">Your plan limits</h2>
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            {metrics.map((m) => (
+              <Card key={m.label} className="border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] transition-colors">
+                <CardContent className="p-5 flex items-center gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/[0.06]">
+                    <m.icon className="h-4 w-4 text-primary/70" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-0.5">{m.label}</p>
+                    <p className="text-xl font-bold tabular-nums">{m.value}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     </main>
-  );
-}
-
-function Metric({ title, value }: { title: string; value: string }) {
-  return (
-    <Card className="border-border bg-card shadow-sm">
-      <CardContent className="p-4">
-        <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{title}</p>
-        <p className="mt-1 text-xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
   );
 }

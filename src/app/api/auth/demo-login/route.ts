@@ -1,23 +1,66 @@
 import { NextResponse } from "next/server";
 
-import { DEMO_SESSION_COOKIE, encodeDemoSession, validateDemoLogin } from "@/lib/demo-auth";
+import { SESSION_COOKIE, isAdminLogin, buildAdminSession, encodeSession } from "@/lib/auth";
+import { hasSupabaseEnv } from "@/lib/env";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const account = validateDemoLogin(email, password);
 
-  if (!account) {
-    return NextResponse.redirect(new URL("/login?error=invalid-demo", request.url));
+  // Admin bypass — no database needed
+  if (isAdminLogin(email, password)) {
+    const session = buildAdminSession();
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(SESSION_COOKIE, encodeSession(session), {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+    return response;
   }
 
-  const response = NextResponse.redirect(new URL("/dashboard", request.url));
-  response.cookies.set(DEMO_SESSION_COOKIE, encodeDemoSession(account), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/"
-  });
+  // Regular Supabase email/password login
+  if (!hasSupabaseEnv()) {
+    return NextResponse.json(
+      { ok: false, error: "Supabase is not configured" },
+      { status: 400 }
+    );
+  }
 
-  return response;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
+    // Build a session from Supabase user
+    const session = {
+      email: data.user.email ?? email,
+      plan: "free" as const,
+      name: data.user.user_metadata?.full_name ?? email.split("@")[0],
+      isAdmin: false,
+    };
+
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(SESSION_COOKIE, encodeSession(session), {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+    return response;
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Unexpected error" },
+      { status: 500 }
+    );
+  }
 }

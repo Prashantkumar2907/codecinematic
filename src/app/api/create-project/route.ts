@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getDemoSession } from "@/lib/demo-auth";
+import { getSession } from "@/lib/auth";
 import { validateCodePayload } from "@/lib/quotas/limits";
 
 const projectSchema = z.object({
@@ -14,7 +14,7 @@ const projectSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await getDemoSession();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

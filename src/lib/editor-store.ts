@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+import type { Narration } from "@/lib/narration";
+
 export type EditorDraft = {
   title: string;
   language: string;
@@ -13,6 +15,7 @@ export type EditorDraft = {
   soundVolume: string;
   code: string;
   focus: number[];
+  narration: Narration | null;
 };
 
 type EditorStore = {
@@ -41,7 +44,8 @@ function createGateway() {
 }
 
 app.use("/api", createGateway().middleware())`,
-  focus: []
+  focus: [],
+  narration: null,
 };
 
 export const useEditorStore = create<EditorStore>()(

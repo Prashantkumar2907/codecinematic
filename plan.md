@@ -1,53 +1,123 @@
 # CodeCinematic SaaS Application Plan
 
-## 0. Implementation Update
+## 0. Implementation Update (Latest)
 
-This plan has been updated to reflect the current application scaffold in this repository.
+> Last updated: Session 7 of iterative development.
 
-### Added product constraints
-- users can select any programming language per project or per scene
-- explanations should be authored inside the codebase as comments so they animate naturally with the code
-- important lines must be highlighted with strong syntax-aware coloring and focus metadata
-- the app includes a marketing landing page and a login page with social auth entry points
-- free and paid limits should prioritize line count and max characters per line, not just total characters
-- the UI and video renderer must reject overly long lines because they become unreadable in preview and export
-- the experience should avoid overscroll bounce / scroll stretch behavior
-- export flow should use one aspect ratio per render path so visibility and wrapping rules stay deterministic
-- long code lines should wrap visually based on the selected aspect ratio instead of disappearing outside the frame
-- typing animation should reveal code character-by-character within a logical line before moving to the next line
-- editor and export workflow state should persist across navigation so going back does not reset the draft
-- use Zustand for client-side draft state management in the editor/export flow
+### Architecture
+- **Framework**: Next.js 15.3.0 (App Router) + React 19.1.0
+- **Styling**: Tailwind CSS 3.4.17, dark-first theme with CSS variables
+- **State**: Zustand 5.0.6 with sessionStorage persistence
+- **Animation**: framer-motion (nav bubble, profile menu, page transitions)
+- **Auth**: Admin bypass (demo) + Supabase social login
+- **Payments**: Stripe + @stripe/stripe-js
+- **Email**: Resend
+- **AI Narration**: Google Gemini API (`gemini-2.0-flash-lite`)
+- **TTS**: Sarvam AI (`bulbul:v2` model, `https://api.sarvam.ai/text-to-speech`)
+- **Video**: Browser Canvas + MediaRecorder (client-side rendering)
+- **Database**: Supabase (Postgres + Storage)
 
-### Added application deliverables
-- `.env` placeholder file
-- `supabase/update_001.sql` bootstrap schema
-- `deployment.md` step-by-step setup guide
-- four local demo accounts that represent `free`, `basic`, `medium`, and `high` plans without hitting the database
+### File Structure Reference
 
-### Current application features
-- landing page and pricing page
-- login page with demo plan accounts
-- Google and GitHub social login entry points
-- dashboard with plan-aware limit cards
-- cinematic project editor with:
-  - language selection
-  - single aspect-ratio selection
-  - code/comment authoring
-  - focus-map line toggling
-  - separate normal-line and focused-line speed sliders
-  - speed range from `0.05x` to `1.50x`
-  - optional typing sound profile
-  - insertion volume slider
-  - persisted draft state with Zustand
-- create-video flow with:
-  - browser-side video generation
-  - downloadable `.webm` output
-  - free-plan watermarking
-  - plan-aware export job metadata
-  - reads the same persisted draft state used by the editor
-- browser renderer with:
-  - syntax-colored code drawing
-  - character-by-character typing within the active line
+#### Pages (src/app/)
+| Route | File | Purpose |
+|-------|------|---------|
+| `/` | `(marketing)/page.tsx` | Marketing landing page with hero |
+| `/pricing` | `(marketing)/pricing/page.tsx` | Pricing tiers |
+| `/login` | `(auth)/login/page.tsx` | Login with demo accounts + social |
+| `/dashboard` | `(dashboard)/dashboard/page.tsx` | User dashboard with quick links |
+| `/projects/[id]` | `(dashboard)/projects/[projectId]/page.tsx` | Project workspace (tabs) |
+| `/projects/[id]/create-video` | `(dashboard)/projects/[projectId]/create-video/page.tsx` | Direct video creation |
+
+#### API Routes (src/app/api/)
+| Route | Purpose |
+|-------|---------|
+| `/api/auth/demo-login` | Admin bypass login (JSON response) |
+| `/api/auth/logout` | Session cookie removal |
+| `/api/auth/social` | Supabase social auth redirect |
+| `/api/create-project` | Create new project |
+| `/api/export` | Create export jobs with plan-aware watermarking |
+| `/api/history` | Export history |
+| `/api/ai/commentary` | Gemini AI narration generation |
+| `/api/tts/generate` | Sarvam AI text-to-speech |
+
+#### Components (src/components/)
+| Component | Purpose |
+|-----------|---------|
+| `layout/site-header.tsx` | Global header (server) with CSS grid 3-col layout |
+| `layout/nav-links.tsx` | Client nav tabs with framer-motion bubble animation |
+| `layout/profile-menu.tsx` | Profile dropdown with plan badge + sign out |
+| `editor/project-workspace.tsx` | Tab router (editor, narration, tts, pipeline) |
+| `editor/project-editor.tsx` | Code Studio: code input + settings + focus map |
+| `editor/narration-panel.tsx` | AI Narration: generate narration from code |
+| `editor/tts-panel.tsx` | Audio Studio: Sarvam AI TTS with speaker/language |
+| `editor/pipeline-panel.tsx` | Auto Pipeline: Code→Video→Narration→TTS→Merge |
+| `editor/create-video-panel.tsx` | Direct video rendering with Canvas |
+| `editor/render-utils.tsx` | Pipeline render function (renderVideoBlobFromPipeline) |
+| `marketing/hero.tsx` | Landing page hero section |
+| `dashboard/plan-grid.tsx` | Plan limits display grid |
+| `ui/*` | Shadcn/ui primitives (button, card, input, textarea, badge) |
+
+#### Libraries (src/lib/)
+| File | Purpose |
+|------|---------|
+| `auth.ts` | Session management: admin bypass + Supabase fallback |
+| `editor-store.ts` | Zustand store for editor drafts (persisted) |
+| `plans.ts` | Plan configs: Free, Starter, Pro, Enterprise |
+| `narration.ts` | Types: NarrationSegment, Narration |
+| `env.ts` | Environment variable helpers |
+| `cn.ts` | Tailwind class merge utility |
+| `quotas/limits.ts` | Plan limit validation (line count, line length) |
+| `render/presets.ts` | Rendering presets |
+| `render/smart-focus.ts` | Auto-detect important code lines |
+| `supabase/browser.ts` | Supabase browser client |
+| `supabase/server.ts` | Supabase server client |
+
+### Feature Flow
+1. **Code Studio** (editor tab): Write code, set title/language/aspect/speed/sound
+2. **AI Narration** (narration tab): Generate narration script from code via Gemini
+3. **Audio Studio** (tts tab): Convert narration to speech via Sarvam AI
+4. **Auto Pipeline** (pipeline tab): All-in-one: Code→Video→Narration→TTS→Merge A/V
+
+### Navigation
+- Centered nav bar with framer-motion animated bubble (layoutId)
+- Links: Pricing | Dashboard | Code Studio | AI Narration | Audio Studio | Auto Pipeline
+- Profile dropdown (right): email, plan badge, admin badge, sign out
+- Horizontally scrollable on mobile (scrollbar-none utility)
+
+### Plans
+| Code | Display Name | Max Lines | Max Line Length |
+|------|-------------|-----------|-----------------|
+| free | Free | 30 | 80 |
+| basic | Starter | 60 | 120 |
+| medium | Pro | 100 | 160 |
+| high | Enterprise | 200 | 200 |
+
+### Environment Variables
+```
+NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+STRIPE_PRICE_BASIC, STRIPE_PRICE_MEDIUM, STRIPE_PRICE_HIGH
+RESEND_API_KEY, RESEND_FROM_EMAIL
+GOOGLE_AI_API_KEY
+SARVAM_API_KEY
+```
+
+### Recent Changes (Session 7)
+- Fixed code line numbers alignment (h-6 flex items with leading-6)
+- Added bottom padding to code input for visual comfort
+- Made code input scrollable with synced line numbers
+- Improved appbar with gradient background and shadow
+- Made nav tabs horizontally scrollable on mobile (removed md:hidden)
+- Fixed pipeline video to max-height 60vh with object-contain
+- Fixed pipeline audio merge: decode each WAV chunk separately then concatenate AudioBuffers
+- Added overflow-y-auto to workspace and editor for mobile scroll
+- Added min-height 300px for code card on mobile
+- Added scrollbar-none CSS utility class
+- Updated plan.md with comprehensive codebase reference
   - ratio-aware line wrapping
   - wrapped segments behave as continuations of the same source line
   - separate timing for focused and non-focused lines

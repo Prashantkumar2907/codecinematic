@@ -62,13 +62,6 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    overscroll-behavior: none;
-  }
-
-  main,
-  section,
-  div {
-    overscroll-behavior: contain;
   }
 
   ::-webkit-scrollbar {
@@ -87,5 +80,15 @@
 
   ::selection {
     @apply bg-primary/25;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }

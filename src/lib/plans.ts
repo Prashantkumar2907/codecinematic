@@ -24,7 +24,7 @@ export const PLAN_CONFIG: Record<
     watermark: true
   },
   basic: {
-    name: "Basic",
+    name: "Starter",
     price: "$19",
     badge: "3 stored exports",
     maxStoredExports: 3,
@@ -34,7 +34,7 @@ export const PLAN_CONFIG: Record<
     watermark: false
   },
   medium: {
-    name: "Medium",
+    name: "Pro",
     price: "$39",
     badge: "10 stored exports",
     maxStoredExports: 10,
@@ -44,7 +44,7 @@ export const PLAN_CONFIG: Record<
     watermark: false
   },
   high: {
-    name: "High",
+    name: "Enterprise",
     price: "$79",
     badge: "25 stored exports",
     maxStoredExports: 25,

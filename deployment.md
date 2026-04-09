@@ -1,34 +1,47 @@
-# Deployment Guide
+# Deployment Guide — CodeCinematic
 
-## 1. Create the project files locally
+## 1. Prerequisites
 
-This repository already contains:
-- the Next.js app scaffold
-- `.env` placeholders
-- `supabase/update_001.sql`
-- local demo logins for `free`, `basic`, `medium`, and `high`
+- Node.js 18+ installed
+- A Supabase project (free tier works)
+- A Stripe account (for paid subscriptions)
+- A Resend account (for transactional emails, free tier: 100 emails/day)
+- A Vercel account (recommended deployment target)
 
-## 2. Fill environment variables
+## 2. Environment variables
 
-Open `.env` and replace all placeholder values:
+Copy `.env.example` to `.env` and fill in your values:
 
-- `NEXT_PUBLIC_APP_URL`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+```bash
+cp .env.example .env
+```
 
-You can also replace the four demo email/password pairs if you want different credentials.
+Required variables:
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | Your public URL, e.g. `https://codecinematic.vercel.app` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
+| `STRIPE_SECRET_KEY` | Stripe secret key (`sk_live_...` or `sk_test_...`) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (`pk_live_...` or `pk_test_...`) |
+| `STRIPE_PRICE_BASIC` | Stripe Price ID for Basic plan |
+| `STRIPE_PRICE_MEDIUM` | Stripe Price ID for Medium plan |
+| `STRIPE_PRICE_HIGH` | Stripe Price ID for High plan |
+| `RESEND_API_KEY` | Resend API key (`re_...`) |
+| `RESEND_FROM_EMAIL` | From address for emails |
+
+### Admin account
+
+The built-in admin account `admin@example.com` / `admin123` is hardcoded and bypasses Supabase auth. It gets full premium (High plan) access with all features unlocked. Change these credentials in `src/lib/auth.ts` before going to production.
 
 ## 3. Install dependencies
-
-Run:
 
 ```bash
 npm install
@@ -36,123 +49,80 @@ npm install
 
 ## 4. Create a Supabase project
 
-Inside Supabase:
-
-1. Create a new project.
-2. Copy the project URL and anon key into `.env`.
-3. Copy the service role key into `.env`.
+1. Go to [supabase.com](https://supabase.com) and create a new project.
+2. Copy the project URL, anon key, and service role key into `.env`.
 
 ## 5. Run the SQL bootstrap
 
-Open the Supabase SQL editor and run:
+Open the Supabase SQL Editor and execute the contents of:
 
-`supabase/update_001.sql`
+```
+supabase/update_001.sql
+```
 
-This file creates:
-- profiles
-- plans
-- plan_features
-- subscriptions
-- usage_counters
-- usage_events
-- feature_overrides
-- projects
-- project_scenes
-- important_line_rules
-- exports
-- project_assets
-- audio_generations
-- video_analysis_jobs
-- helper indexes
-- RLS policies
-- seed plan data
+This creates all required tables, indexes, RLS policies, triggers, and seed data.
 
 ## 6. Create storage buckets
 
-Create these buckets in Supabase Storage:
+In Supabase Storage, create:
 
-1. `cc-project-assets`
-   - private
-   - used for uploaded videos, thumbnails, subtitles, and audio
-
-2. `cc-project-exports`
-   - private
-   - used for saved paid-plan exports
-
-3. `cc-public-previews`
-   - public optional
-   - use only if you later want public landing-page examples
+| Bucket | Access | Purpose |
+|---|---|---|
+| `cc-project-assets` | Private | Uploaded videos, thumbnails, audio |
+| `cc-project-exports` | Private | Stored paid-plan exports |
 
 ## 7. Configure auth providers
 
-In Supabase Auth:
+In Supabase Auth settings:
 
-1. Enable Email auth if you want regular email/password accounts.
-2. Enable Google provider and paste the Google client id/secret.
-3. Enable GitHub provider and paste the GitHub client id/secret.
-4. Add your local and production callback URLs.
+1. Enable Email auth.
+2. Enable Google provider with your client ID/secret.
+3. Enable GitHub provider with your client ID/secret.
+4. Add redirect URLs:
+   - `http://localhost:3000/dashboard`
+   - `https://your-domain.com/dashboard`
 
-Recommended redirect URLs:
+## 8. Set up Stripe
 
-- `http://localhost:3000/dashboard`
-- `https://your-domain.com/dashboard`
+1. Create three subscription products in Stripe with monthly prices:
+   - Basic ($19/mo)
+   - Medium ($39/mo)
+   - High ($79/mo)
+2. Copy each Price ID into `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_MEDIUM`, `STRIPE_PRICE_HIGH`.
+3. Create a webhook endpoint pointing to `https://your-domain.com/api/billing/webhook`.
+4. Select events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
+5. Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
 
-## 8. Run the app locally
+## 9. Set up Resend
 
-Run:
+1. Sign up at [resend.com](https://resend.com).
+2. Add and verify your sending domain (or use the free sandbox domain for testing).
+3. Create an API key and add it to `RESEND_API_KEY`.
+4. Set `RESEND_FROM_EMAIL` to your verified sender address.
+
+## 10. Run locally
 
 ```bash
 npm run dev
 ```
 
-Open:
+Open `http://localhost:3000`.
 
-`http://localhost:3000`
-
-## 9. Test local demo plan accounts
-
-Go to `/login` and use any of these local accounts:
-
-- free: `free@codecinematic.demo` / `FreePlan123!`
-- basic: `basic@codecinematic.demo` / `BasicPlan123!`
-- medium: `medium@codecinematic.demo` / `MediumPlan123!`
-- high: `high@codecinematic.demo` / `HighPlan123!`
-
-These work without hitting the database. They use a local cookie-based demo session.
-
-## 10. Production deployment
-
-Recommended deployment target:
-- Vercel for the Next.js app
-- Supabase for auth, Postgres, and storage
-
-Production steps:
+## 11. Deploy to Vercel
 
 1. Push this repository to GitHub.
 2. Import the repo into Vercel.
-3. Add the same `.env` values in Vercel project settings.
+3. Add all `.env` variables in Vercel project settings (Settings → Environment Variables).
 4. Set `NEXT_PUBLIC_APP_URL` to your production URL.
-5. In Supabase auth provider settings, add the production redirect URLs.
+5. Update Supabase auth redirect URLs with your production domain.
 6. Deploy.
 
-## 11. What is already browser-first
+## 12. Post-deployment checklist
 
-The current scaffold is designed for:
-- browser preview rendering
-- browser export flow
-- Supabase-backed auth and data later
-- line-based plan limits
-- comment-based explanation flow
-
-## 12. What you should implement next
-
-After the base app boots successfully, build in this order:
-
-1. real create-project insert into Supabase
-2. real project list / history queries
-3. syntax-highlighted editor preview using Shiki
-4. browser export using `MediaRecorder`
-5. Stripe checkout + webhook sync for subscriptions
-6. upload paid exports into `cc-project-exports`
-7. text-to-audio route
-8. video-to-text timeline route
+- [ ] Verify admin login works
+- [ ] Verify Google/GitHub social login works
+- [ ] Test project editor and video export
+- [ ] Test Stripe checkout flow
+- [ ] Verify webhook events reach `/api/billing/webhook`
+- [ ] Send a test email via the API
+- [ ] Update admin credentials for production

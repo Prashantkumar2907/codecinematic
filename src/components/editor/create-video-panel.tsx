@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
+import type { Narration, NarrationSegment } from "@/lib/narration";
 
 type Job = {
   exportId: string;
@@ -23,8 +24,8 @@ type RenderedVideo = {
 };
 
 const aspectDimensions: Record<string, { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number }> = {
-  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 34 },
-  "16:9": { width: 1280, height: 720, maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 72 }
+  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 28 },
+  "16:9": { width: 1280, height: 720, maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 65 }
 };
 
 export function CreateVideoPanel({
@@ -66,7 +67,8 @@ export function CreateVideoPanel({
     sound: sound as "off" | "soft" | "typewriter",
     soundVolume,
     focus: focus.map((line) => Number(line)).filter((line) => !Number.isNaN(line)),
-    code
+    code,
+    narration: null as Narration | null,
   };
   const resolvedCode = resolvedDraft.code;
   const resolvedFocus = resolvedDraft.focus.map((line) => String(line));
@@ -74,9 +76,10 @@ export function CreateVideoPanel({
   const resolvedFocusSpeed = resolvedDraft.focusSpeed;
   const resolvedSound = resolvedDraft.sound;
   const resolvedSoundVolume = resolvedDraft.soundVolume;
+  const resolvedNarration = resolvedDraft.narration;
   const aspectRatios = [aspect];
   const renderLineCount = useMemo(
-    () => resolvedCode.split("\n").filter((line) => line.trim().length > 0).length,
+    () => resolvedCode.split("\n").length,
     [resolvedCode]
   );
 
@@ -136,7 +139,8 @@ export function CreateVideoPanel({
           normalSpeed: resolvedNormalSpeed,
           focusSpeed: resolvedFocusSpeed,
           sound: resolvedSound,
-          soundVolume: resolvedSoundVolume
+          soundVolume: resolvedSoundVolume,
+          narration: resolvedNarration,
         });
 
         const url = URL.createObjectURL(blob);
@@ -181,7 +185,7 @@ export function CreateVideoPanel({
         <Card className="flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
           <CardHeader className="py-2 px-3">
             <CardTitle className="text-base">Create video</CardTitle>
-            <CardDescription className="text-xs">This is the next workflow step after the editor. It uses your demo account plan to create export jobs.</CardDescription>
+            <CardDescription className="text-xs">Generate and export your code video with the settings from the editor.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
             <div className="grid gap-2 md:grid-cols-2">
@@ -194,6 +198,7 @@ export function CreateVideoPanel({
               <Meta label="Insertion volume" value={`${Math.round(Number(resolvedSoundVolume) * 100)}%`} />
               <Meta label="Focus lines" value={resolvedFocus.length ? resolvedFocus.join(", ") : "None"} />
               <Meta label="Render source lines" value={`${renderLineCount}`} />
+              <Meta label="Narration" value={resolvedNarration ? `${resolvedNarration.segments.length} segments` : "None"} />
             </div>
 
             <div className="flex flex-wrap gap-1">
@@ -223,7 +228,7 @@ export function CreateVideoPanel({
         <Card className="flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
           <CardHeader className="py-2 px-3">
             <CardTitle className="text-base">Export jobs</CardTitle>
-            <CardDescription className="text-xs">The demo route returns plan-aware export jobs so all four demo accounts can complete the workflow.</CardDescription>
+            <CardDescription className="text-xs">Plan-aware export jobs with format and watermark settings.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
             {jobs.length === 0 ? (
@@ -291,7 +296,8 @@ async function renderVideoBlob({
   normalSpeed,
   focusSpeed,
   sound,
-  soundVolume
+  soundVolume,
+  narration,
 }: {
   title: string;
   language: string;
@@ -303,6 +309,7 @@ async function renderVideoBlob({
   focusSpeed: string;
   sound: string;
   soundVolume: string;
+  narration: Narration | null;
 }) {
   if (typeof window === "undefined") {
     throw new Error("Rendering is only available in the browser.");
@@ -316,10 +323,11 @@ async function renderVideoBlob({
   const canvas = document.createElement("canvas");
   canvas.width = preset.width;
   canvas.height = preset.height;
-  const context = canvas.getContext("2d");
-  if (!context) {
+  const ctxRaw = canvas.getContext("2d");
+  if (!ctxRaw) {
     throw new Error("Canvas rendering is unavailable.");
   }
+  const context: CanvasRenderingContext2D = ctxRaw;
 
   const videoStream = canvas.captureStream(30);
   const audioContext = typeof AudioContext !== "undefined" ? new AudioContext() : null;
@@ -339,8 +347,7 @@ async function renderVideoBlob({
 
   const lines = code
     .split("\n")
-    .map((line, index) => ({ number: index + 1, content: line }))
-    .filter((line) => line.content.trim().length > 0);
+    .map((line, index) => ({ number: index + 1, content: line }));
 
   const focusSet = new Set(focusLines);
   const lineSchedule = buildLineSchedule(lines, focusSet, normalSpeed, focusSpeed);
@@ -370,14 +377,24 @@ async function renderVideoBlob({
     volume: Number(soundVolume)
   });
 
+  // Schedule TTS narration using SpeechSynthesis if narration is available
+  const ttsCleanup = narration
+    ? scheduleNarrationTTS(narration, lines, lineSchedule)
+    : null;
+
   await new Promise<void>((resolve) => {
     function draw(now: number) {
       const elapsed = now - startTime;
       const safeElapsed = Math.min(elapsed, durationMs);
       const renderState = getRenderState(safeElapsed, lines, lineSchedule, preset.maxCharsPerLine);
 
+      // Find the current narration segment based on active line
+      const currentNarrationText = narration
+        ? getCurrentNarrationText(narration, renderState.activeLine)
+        : null;
+
       paintFrame({
-        context: context!,
+        context,
         width: preset.width,
         height: preset.height,
         title,
@@ -387,12 +404,14 @@ async function renderVideoBlob({
         maxVisibleLines: preset.maxVisibleLines,
         fontSize: preset.fontSize,
         focusSet,
-        watermarked
+        watermarked,
+        subtitleText: currentNarrationText,
       });
 
       if (safeElapsed < durationMs) {
         requestAnimationFrame(draw);
       } else {
+        if (ttsCleanup) ttsCleanup();
         window.setTimeout(() => {
           recorder.stop();
           resolve();
@@ -404,6 +423,87 @@ async function renderVideoBlob({
   });
 
   return stopPromise;
+}
+
+/**
+ * Schedule narration speech using the browser SpeechSynthesis API.
+ * Speaks each segment's text when the corresponding lines start typing.
+ * Returns a cleanup function to cancel any pending speech.
+ */
+function scheduleNarrationTTS(
+  narration: Narration,
+  lines: Array<{ number: number; content: string }>,
+  lineSchedule: { cumulativeDurations: number[]; totalDurationMs: number }
+): () => void {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return () => {};
+  }
+
+  const synth = window.speechSynthesis;
+  const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+  // Speak intro immediately
+  if (narration.intro) {
+    const utterance = new SpeechSynthesisUtterance(narration.intro);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.9;
+    synth.speak(utterance);
+  }
+
+  // Build a map from line number to line index
+  const lineIndexMap = new Map<number, number>();
+  lines.forEach((line, idx) => lineIndexMap.set(line.number, idx));
+
+  // Schedule each segment to start speaking when its first line starts typing
+  for (const segment of narration.segments) {
+    const lineIdx = lineIndexMap.get(segment.lineStart);
+    if (lineIdx === undefined) continue;
+
+    // Time when this line begins = cumulative of all previous lines
+    const startMs = lineIdx === 0 ? 0 : lineSchedule.cumulativeDurations[lineIdx - 1] ?? 0;
+    // Add a small buffer for intro to finish
+    const delayMs = Math.max(0, startMs + (narration.intro ? 2000 : 0));
+
+    const tid = setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(segment.text);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.9;
+      synth.speak(utterance);
+    }, delayMs);
+
+    timeouts.push(tid);
+  }
+
+  // Schedule outro after all code is typed
+  if (narration.outro) {
+    const tid = setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(narration.outro);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.9;
+      synth.speak(utterance);
+    }, lineSchedule.totalDurationMs - 500);
+    timeouts.push(tid);
+  }
+
+  return () => {
+    timeouts.forEach(clearTimeout);
+    synth.cancel();
+  };
+}
+
+/**
+ * Find the narration text for the current active line.
+ */
+function getCurrentNarrationText(narration: Narration, activeLine: number): string | null {
+  for (const seg of narration.segments) {
+    if (activeLine >= seg.lineStart && activeLine <= seg.lineEnd) {
+      return seg.text;
+    }
+  }
+  return null;
 }
 
 function getSupportedMimeType() {
@@ -500,30 +600,30 @@ function getRenderState(
   const activeProgress = Math.min(1, localElapsed / currentDuration);
   const activeRawLine = lines[activeIndex];
 
-  const visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean }> = [];
+  const visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean; fullLineContent: string; charOffset: number }> = [];
 
-  lines.slice(0, activeIndex).forEach((line) => {
-    wrapLine(line.content, maxCharsPerLine).forEach((segment, index) => {
+  function addWrapped(lineContent: string, lineNum: number, limit?: number) {
+    const text = limit !== undefined ? Array.from(lineContent).slice(0, limit).join("") : lineContent;
+    const segs = wrapLine(text, maxCharsPerLine);
+    let offset = 0;
+    segs.forEach((s, si) => {
       visibleLines.push({
-        number: line.number,
-        content: segment,
-        lineNumberLabel: index === 0 ? String(line.number).padStart(2, " ") : "  ",
-        continuation: index > 0
+        number: lineNum,
+        content: s,
+        lineNumberLabel: si === 0 ? String(lineNum).padStart(2, " ") : "  ",
+        continuation: si > 0,
+        fullLineContent: lineContent,
+        charOffset: offset,
       });
+      offset += Array.from(s).length;
     });
-  });
+  }
+
+  lines.slice(0, activeIndex).forEach((line) => addWrapped(line.content, line.number));
 
   if (activeRawLine) {
-    const revealedCharacters = Math.max(1, Math.ceil(activeRawLine.content.length * activeProgress));
-    const partial = activeRawLine.content.slice(0, revealedCharacters);
-    wrapLine(partial, maxCharsPerLine).forEach((segment, index) => {
-      visibleLines.push({
-        number: activeRawLine.number,
-        content: segment,
-        lineNumberLabel: index === 0 ? String(activeRawLine.number).padStart(2, " ") : "  ",
-        continuation: index > 0
-      });
-    });
+    const revealedCharacters = Math.max(1, Math.ceil(Array.from(activeRawLine.content).length * activeProgress));
+    addWrapped(activeRawLine.content, activeRawLine.number, revealedCharacters);
   }
 
   return {
@@ -533,25 +633,42 @@ function getRenderState(
 }
 
 function wrapLine(content: string, maxCharsPerLine: number) {
-  if (content.length <= maxCharsPerLine) {
+  const chars = Array.from(content);
+  if (chars.length <= maxCharsPerLine) {
     return [content];
   }
 
   const segments: string[] = [];
-  let remaining = content;
+  let remChars = chars;
+  const max = maxCharsPerLine;
 
-  while (remaining.length > maxCharsPerLine) {
-    let cut = remaining.lastIndexOf(" ", maxCharsPerLine);
-    if (cut <= 0) {
-      cut = maxCharsPerLine;
+  while (remChars.length > max) {
+    let cut = -1;
+    // First try space within first `max` characters
+    for (let i = max; i >= 0; i--) {
+      if (remChars[i] === " ") { cut = i; break; }
     }
+    // If no space or too early, try symbol boundaries
+    if (cut <= Math.max(max * 0.3, 4)) {
+      for (let i = max; i > Math.max(max * 0.3, 4); i--) {
+        const ch = remChars[i];
+        if (ch === "." || ch === "(" || ch === "," || ch === "[" || ch === "{" || ch === "=" || ch === ">" || ch === "|" || ch === "&" || ch === "+" || ch === "-") {
+          cut = i;
+          break;
+        }
+      }
+    }
+    if (cut <= Math.max(max * 0.3, 4)) cut = max;
 
-    segments.push(remaining.slice(0, cut));
-    remaining = remaining.slice(cut).trimStart();
+    segments.push(remChars.slice(0, cut).join(""));
+    remChars = remChars.slice(cut);
+    if (remChars[0] === " ") {
+      while (remChars.length > 0 && remChars[0] === " ") remChars = remChars.slice(1);
+    }
   }
 
-  if (remaining.length > 0) {
-    segments.push(remaining);
+  if (remChars.length > 0) {
+    segments.push(remChars.join(""));
   }
 
   return segments;
@@ -616,142 +733,257 @@ function paintFrame({
   maxVisibleLines,
   fontSize,
   focusSet,
-  watermarked
+  watermarked,
+  subtitleText,
 }: {
   context: CanvasRenderingContext2D;
   width: number;
   height: number;
   title: string;
   language: string;
-  visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean }>;
+  visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean; fullLineContent?: string; charOffset?: number }>;
   activeLine: number;
   maxVisibleLines: number;
   fontSize: number;
   focusSet: Set<number>;
   watermarked: boolean;
+  subtitleText?: string | null;
 }) {
-  context.clearRect(0, 0, width, height);
+  const ctx = context;
+  const w = width;
+  const h = height;
+  const vert = w < h;
+  ctx.clearRect(0, 0, w, h);
 
-  const gradient = context.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#08101a");
-  gradient.addColorStop(1, "#03080d");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, width, height);
+  // Rich dark background
+  const bg = ctx.createLinearGradient(0, 0, w * 0.4, h);
+  bg.addColorStop(0, "#0f1318"); bg.addColorStop(0.4, "#0c1015"); bg.addColorStop(1, "#090d12");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
 
-  // Deep subtle atmospheric light
-  context.fillStyle = "rgba(45, 212, 191, 0.05)";
-  context.beginPath();
-  context.arc(width * 0.3, height * 0.2, Math.min(width, height) * 0.25, 0, Math.PI * 2);
-  context.fill();
-  context.filter = "none";
+  // Dot grid texture
+  ctx.fillStyle = "rgba(255,255,255,0.012)";
+  for (let dx = 20; dx < w; dx += 24) for (let dy = 20; dy < h; dy += 24) { ctx.beginPath(); ctx.arc(dx, dy, 0.8, 0, Math.PI * 2); ctx.fill(); }
 
-  const isVertical = width < height;
-  const frameW = isVertical ? width * 0.9 : width * 0.84;
-  const frameH = isVertical ? height - 360 : height * 0.84; // Leave room top and bottom for TikTok UI
-  const frameX = (width - frameW) / 2;
-  const frameY = isVertical ? 160 : (height - frameH) / 2;
+  // Ambient glows
+  const g1 = ctx.createRadialGradient(w * 0.2, h * 0.12, 0, w * 0.2, h * 0.12, Math.min(w, h) * 0.35);
+  g1.addColorStop(0, "rgba(56,189,248,0.04)"); g1.addColorStop(1, "rgba(56,189,248,0)");
+  ctx.fillStyle = g1; ctx.fillRect(0, 0, w, h);
+  const g2 = ctx.createRadialGradient(w * 0.85, h * 0.75, 0, w * 0.85, h * 0.75, Math.min(w, h) * 0.25);
+  g2.addColorStop(0, "rgba(139,92,246,0.03)"); g2.addColorStop(1, "rgba(139,92,246,0)");
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, w, h);
 
-  context.shadowColor = "rgba(0, 0, 0, 0.8)";
-  context.shadowBlur = 50;
-  context.shadowOffsetY = 25;
+  const fw = vert ? w * 0.94 : w * 0.88;
+  const fh = vert ? h - 300 : h * 0.86;
+  const fx = (w - fw) / 2;
+  const fy = vert ? 120 : (h - fh) / 2;
 
-  roundRect(context, frameX, frameY, frameW, frameH, 20);
-  context.fillStyle = "rgba(10, 16, 24, 0.75)";
-  context.fill();
+  // Outer glow
+  ctx.shadowColor = "rgba(56,189,248,0.05)"; ctx.shadowBlur = 60; ctx.shadowOffsetY = 0;
+  roundRect(ctx, fx - 2, fy - 2, fw + 4, fh + 4, 16);
+  ctx.strokeStyle = "rgba(56,189,248,0.06)"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
 
-  context.shadowColor = "transparent";
-  context.shadowBlur = 0;
-  context.shadowOffsetY = 0;
+  // Frame shadow
+  ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
+  roundRect(ctx, fx, fy, fw, fh, 12);
+  ctx.fillStyle = "#0d1117"; ctx.fill();
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 
-  context.strokeStyle = "rgba(255,255,255,0.12)";
-  context.lineWidth = 1;
-  context.stroke();
+  // Frame border
+  roundRect(ctx, fx, fy, fw, fh, 12);
+  ctx.strokeStyle = "rgba(48,54,64,0.6)"; ctx.lineWidth = 1; ctx.stroke();
 
-  // Header Title Bar
-  context.fillStyle = "rgba(255,255,255,0.03)";
-  roundRect(context, frameX + 12, frameY + 12, frameW - 24, 44, 12);
-  context.fill();
+  // Title bar
+  const tbH = vert ? 40 : 44;
+  ctx.save();
+  roundRect(ctx, fx, fy, fw, tbH, 12); ctx.clip();
+  const tb = ctx.createLinearGradient(fx, fy, fx, fy + tbH);
+  tb.addColorStop(0, "#161b22"); tb.addColorStop(1, "#12161d");
+  ctx.fillStyle = tb; ctx.fillRect(fx, fy, fw, tbH);
+  ctx.restore();
+  ctx.strokeStyle = "rgba(48,54,64,0.45)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(fx, fy + tbH); ctx.lineTo(fx + fw, fy + tbH); ctx.stroke();
 
-  // Glass gutter
-  context.fillStyle = "rgba(0, 0, 0, 0.3)";
-  roundRect(context, frameX + 12, frameY + 68, 54, frameH - 80, 12);
-  context.fill();
-
-  const dots = ["#ef4444", "#f59e0b", "#10b981"];
-  dots.forEach((color, index) => {
-    context.fillStyle = color;
-    context.beginPath();
-    context.arc(frameX + 32 + index * 18, frameY + 34, 5, 0, Math.PI * 2);
-    context.fill();
+  // Traffic lights
+  const dotR = vert ? 4.5 : 5.5;
+  const dotGap = vert ? 16 : 20;
+  [["#ff5f57","#e0443e"],["#febc2e","#dea123"],["#28c840","#1aab29"]].forEach(([c, g], i) => {
+    const cx = fx + 16 + i * dotGap; const cy = fy + tbH / 2;
+    ctx.fillStyle = c!; ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = g!; ctx.beginPath(); ctx.arc(cx, cy + 0.3, dotR - 1, 0, Math.PI * 2); ctx.fill();
   });
 
-  context.fillStyle = "#e2e8f0";
-  context.font = "600 16px ui-sans-serif, system-ui";
-  context.fillText(title, frameX + 100, frameY + 39);
+  // File tab
+  ctx.font = `500 ${vert ? 11 : 12}px ui-sans-serif,system-ui`;
+  const tabX = fx + (vert ? 64 : 88);
+  const tabW = Math.min(ctx.measureText(title).width + 32, fw * 0.45);
+  ctx.fillStyle = "#0d1117";
+  roundRect(ctx, tabX, fy + 4, tabW, tbH - 4, 8); ctx.fill();
+  ctx.fillStyle = "rgba(56,189,248,0.6)";
+  ctx.fillRect(tabX + 6, fy + 4, tabW - 12, 2);
+  ctx.fillStyle = "#e6edf3";
+  ctx.fillText(title, tabX + 12, fy + tbH / 2 + 4);
 
-  context.fillStyle = "rgba(148, 163, 184, 0.8)";
-  context.font = "500 12px ui-sans-serif, system-ui";
-  context.fillText(language, frameX + frameW - 80, frameY + 38);
+  // Language badge
+  ctx.font = `500 ${vert ? 9 : 10}px ui-sans-serif,system-ui`;
+  const langTxt = language.toUpperCase();
+  const lw = ctx.measureText(langTxt).width + 12;
+  ctx.fillStyle = "rgba(56,189,248,0.1)";
+  roundRect(ctx, fx + fw - lw - 10, fy + tbH / 2 - 8, lw, 16, 4); ctx.fill();
+  ctx.fillStyle = "rgba(56,189,248,0.65)";
+  ctx.fillText(langTxt, fx + fw - lw - 4, fy + tbH / 2 + 3);
 
-  const lineHeight = fontSize * 1.55;
+  // Activity bar — landscape only
+  const abW = vert ? 0 : 32;
+  if (!vert) {
+    ctx.fillStyle = "rgba(13,17,23,0.5)";
+    ctx.fillRect(fx, fy + tbH, abW, fh - tbH);
+    ctx.strokeStyle = "rgba(48,54,64,0.3)"; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(fx + abW, fy + tbH); ctx.lineTo(fx + abW, fy + fh); ctx.stroke();
+    [0.2, 0.32, 0.44, 0.56].forEach((r) => {
+      const iy = fy + tbH + (fh - 60) * r;
+      ctx.fillStyle = "rgba(100,116,139,0.2)";
+      roundRect(ctx, fx + 8, iy, 16, 16, 3); ctx.fill();
+    });
+  }
+
+  // Line gutter
+  const gutterW = vert ? 36 : 42;
+  const gutterX = fx + abW;
+  ctx.fillStyle = "rgba(13,17,23,0.3)";
+  ctx.fillRect(gutterX, fy + tbH, gutterW, fh - tbH);
+  ctx.strokeStyle = "rgba(48,54,64,0.25)"; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(gutterX + gutterW, fy + tbH); ctx.lineTo(gutterX + gutterW, fy + fh); ctx.stroke();
+
+  // Code area (clipped)
+  const codeLeft = gutterX + gutterW + 10;
+  const codeRight = fx + fw - 16;
+  const codeMaxW = codeRight - codeLeft;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(fx, fy + tbH, fw, fh - tbH - 24);
+  ctx.clip();
+
+  const lineHeight = fontSize * 1.5;
   const startIndex = Math.max(0, visibleLines.length - maxVisibleLines);
   const viewportLines = visibleLines.slice(startIndex);
-  let y = frameY + 85 + fontSize;
+  let y = fy + tbH + 10 + fontSize;
 
   viewportLines.forEach((line) => {
     const isActive = line.number === activeLine;
     const isFocused = focusSet.has(line.number);
 
     if (isActive || isFocused) {
-      context.fillStyle = isActive ? "rgba(45, 212, 191, 0.15)" : "rgba(255, 255, 255, 0.04)";
-      roundRect(context, frameX + 78, y - lineHeight + 6, frameW - 90, lineHeight, 8);
-      context.fill();
+      ctx.fillStyle = isActive ? "rgba(56,189,248,0.06)" : "rgba(255,255,255,0.02)";
+      ctx.fillRect(gutterX, y - lineHeight + 6, fx + fw - gutterX, lineHeight);
+      if (isActive) {
+        ctx.fillStyle = "rgba(56,189,248,0.45)";
+        ctx.fillRect(gutterX + gutterW, y - lineHeight + 6, 2, lineHeight);
+      }
     }
 
-    context.fillStyle = line.continuation ? "rgba(100, 116, 139, 0.7)" : "rgba(148, 163, 184, 0.9)";
-    context.font = `${fontSize - 4}px ui-monospace, SFMono-Regular, monospace`;
-    context.fillText(line.lineNumberLabel, frameX + 22, y);
+    ctx.fillStyle = line.continuation ? "rgba(100,116,139,0.25)" : (isActive ? "rgba(56,189,248,0.55)" : "rgba(100,116,139,0.4)");
+    ctx.font = `${fontSize - 4}px ui-monospace, SFMono-Regular, monospace`;
+    ctx.textAlign = "right";
+    ctx.fillText(line.lineNumberLabel, gutterX + gutterW - 6, y);
+    ctx.textAlign = "start";
 
     if (line.continuation) {
-      context.fillStyle = "rgba(45, 212, 191, 0.6)";
-      context.fillText(">", frameX + 50, y);
+      ctx.fillStyle = "rgba(56,189,248,0.3)";
+      ctx.font = `${fontSize - 6}px ui-monospace, SFMono-Regular, monospace`;
+      ctx.textAlign = "right";
+      ctx.fillText("\u21B3", gutterX + gutterW - 6, y);
+      ctx.textAlign = "start";
     }
 
-    drawHighlightedCode(context, line.content, frameX + 88, y, fontSize);
+    drawCodeColored(ctx, line.fullLineContent ?? line.content, line.charOffset ?? 0, Array.from(line.content).length, codeLeft, y, fontSize, codeMaxW);
+
     y += lineHeight;
   });
 
+  ctx.restore();
+
+  // Status bar
+  const sbH = 24;
+  ctx.fillStyle = "#161b22";
+  ctx.fillRect(fx, fy + fh - sbH, fw, sbH);
+  ctx.strokeStyle = "rgba(48,54,64,0.35)"; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(fx, fy + fh - sbH); ctx.lineTo(fx + fw, fy + fh - sbH); ctx.stroke();
+  ctx.fillStyle = "rgba(56,189,248,0.6)"; roundRect(ctx, fx + 4, fy + fh - sbH + 4, 14, 14, 3); ctx.fill();
+  ctx.fillStyle = "#0d1117"; ctx.font = "bold 8px ui-monospace"; ctx.fillText("><", fx + 5.5, fy + fh - 7);
+  ctx.fillStyle = "rgba(148,163,184,0.45)";
+  ctx.font = `500 ${vert ? 8 : 10}px ui-sans-serif,system-ui`;
+  ctx.fillText(`Ln ${activeLine}`, fx + 24, fy + fh - 7);
+  if (!vert) {
+    ctx.fillText("Spaces: 2", fx + 80, fy + fh - 7);
+    ctx.fillText(language, fx + fw - 100, fy + fh - 7);
+  }
+  ctx.fillText("UTF-8", fx + fw - 42, fy + fh - 7);
+
   if (watermarked) {
-    context.fillStyle = "rgba(255,255,255,0.18)";
-    context.font = "600 14px ui-sans-serif, system-ui";
-    context.fillText("CodeCinematic", frameX + frameW - 120, frameY + frameH + 30);
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.font = "600 11px ui-sans-serif,system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("CodeCinematic", w / 2, fy + fh + 20);
+    ctx.textAlign = "start";
+  }
+
+  if (subtitleText) {
+    const sf = vert ? 14 : 13;
+    const sy = vert ? h - 60 : h - 24;
+    const mw = w - 60;
+    ctx.font = `500 ${sf}px ui-sans-serif, system-ui`;
+    const tw = Math.min(ctx.measureText(subtitleText).width, mw);
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    roundRect(ctx, (w - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 0.5;
+    roundRect(ctx, (w - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.textAlign = "center";
+    ctx.fillText(subtitleText, w / 2, sy, mw);
+    ctx.textAlign = "start";
   }
 }
 
-function drawHighlightedCode(context: CanvasRenderingContext2D, codeLine: string, x: number, y: number, fontSize: number) {
+/** Draw code with syntax coloring, preserving color for wrapped line segments. */
+function drawCodeColored(
+  context: CanvasRenderingContext2D, fullLine: string, charOffset: number, charCount: number,
+  x: number, y: number, fontSize: number, maxW: number
+) {
   context.font = `${fontSize}px ui-monospace, SFMono-Regular, monospace`;
-  const tokens = tokenize(codeLine);
-  let cursor = x;
-
-  tokens.forEach((token) => {
-    context.fillStyle = token.color;
-    context.fillText(token.text, cursor, y);
-    cursor += context.measureText(token.text).width;
-  });
+  const tokens = tokenize(fullLine);
+  let charIdx = 0;
+  let cx = x;
+  for (const t of tokens) {
+    const codePoints = Array.from(t.text);
+    for (const cp of codePoints) {
+      if (charIdx >= charOffset && charIdx < charOffset + charCount) {
+        context.fillStyle = t.color;
+        context.fillText(cp, cx, y);
+        cx += context.measureText(cp).width;
+      }
+      charIdx++;
+    }
+  }
 }
 
 function tokenize(line: string) {
-  if (line.trim().startsWith("//") || line.trim().startsWith("#")) {
+  if (line.trim().startsWith("//") || line.trim().startsWith("#") || line.trim().startsWith("/*") || line.trim().startsWith("*")) {
     return [{ text: line, color: "#67e8f9" }];
   }
 
   const patterns = [
     { regex: /^(".*?"|'.*?'|`.*?`)/, color: "#fda4af" },
-    { regex: /^(const|let|var|function|return|async|await|class|new|if|else|for|while|console|map|log)\b/, color: "#7dd3fc" },
+    { regex: /^(import|export|from|default|type|interface|enum|implements|extends|public|private|protected|static|readonly|abstract|declare|namespace|module)\b/, color: "#c084fc" },
+    { regex: /^(const|let|var|function|return|async|await|class|new|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|typeof|instanceof|in|of|void|delete|yield|super|this|null|undefined|true|false|console|map|filter|reduce|forEach|find|includes|push|pop|shift|length|log|warn|error|debug|info)\b/, color: "#7dd3fc" },
     { regex: /^(\d+(\.\d+)?)/, color: "#facc15" },
     { regex: /^([{}()[\]])/, color: "#c084fc" },
     { regex: /^([.,:;])/ , color: "#94a3b8" },
-    { regex: /^(=>|==|===|!=|!==|\+|-|\*|\/)/, color: "#f97316" }
+    { regex: /^(=>|===|!==|==|!=|>=|<=|&&|\|\||\?\?|\+\+|--|\+=|-=|\*=|\/=|\+|-|\*|\/|%|!|<|>|=|&|\||\?|:)/, color: "#f97316" },
+    { regex: /^([A-Z][a-zA-Z0-9]*)/, color: "#4ade80" },
+    { regex: /^([a-z_$][a-zA-Z0-9_$]*)/, color: "#e6edf3" }
   ];
 
   const tokens: Array<{ text: string; color: string }> = [];
@@ -771,8 +1003,9 @@ function tokenize(line: string) {
     }
 
     if (!matched) {
-      tokens.push({ text: remaining[0], color: "#e6edf3" });
-      remaining = remaining.slice(1);
+      const ch = remaining.match(/^./u)?.[0] ?? remaining[0];
+      tokens.push({ text: ch, color: "#e6edf3" });
+      remaining = remaining.slice(ch.length);
     }
   }
 

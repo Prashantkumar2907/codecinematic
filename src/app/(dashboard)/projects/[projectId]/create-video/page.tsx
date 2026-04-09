@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import { CreateVideoPanel } from "@/components/editor/create-video-panel";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getDemoSession } from "@/lib/demo-auth";
+import { getSession } from "@/lib/auth";
 
 export default async function CreateVideoPage({
   params,
-  searchParams
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
   searchParams: Promise<{
@@ -23,14 +23,14 @@ export default async function CreateVideoPage({
     soundVolume?: string;
   }>;
 }) {
-  const session = await getDemoSession();
+  const session = await getSession();
   if (!session) {
     redirect("/login");
   }
 
   const { projectId } = await params;
   const query = await searchParams;
-  const title = query.title ?? "Untitled cinematic project";
+  const title = query.title ?? "Untitled project";
   const language = query.language ?? "typescript";
   const aspect = query.aspect ?? "9:16";
   const focus = query.focus ? query.focus.split(",").filter(Boolean) : [];
@@ -41,20 +41,16 @@ export default async function CreateVideoPage({
   const soundVolume = query.soundVolume ?? "0.30";
 
   return (
-    <main className="flex-1 flex flex-col min-h-0 w-full max-w-[100rem] mx-auto p-4 gap-2">
-      <div className="shrink-0 flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">Create video</h1>
-            <Badge className="text-[10px] py-0 bg-secondary/50 text-secondary-foreground">{session.plan} demo workflow</Badge>
-          </div>
-          <p className="max-w-3xl text-xs text-muted-foreground">
-            This step turns the editor choices into export jobs. The response is plan-aware.
-          </p>
+    <main className="flex-1 flex flex-col min-h-0 w-full max-w-[100rem] mx-auto p-3 gap-2">
+      <div className="shrink-0 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href={`/projects/${projectId}`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5">
+              <ArrowLeft className="h-3.5 w-3.5" />Back to editor
+            </Button>
+          </Link>
+          <h1 className="text-base font-semibold">Create video</h1>
         </div>
-        <Link href={`/projects/${projectId}`}>
-          <Button variant="secondary" size="sm" className="h-8 text-xs">Back to editor</Button>
-        </Link>
       </div>
 
       <CreateVideoPanel

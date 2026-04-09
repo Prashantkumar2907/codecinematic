@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { detectImportantLines } from "@/lib/render/smart-focus";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { validateCodePayload } from "@/lib/quotas/limits";
+import type { Narration } from "@/lib/narration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,10 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   const sound = draft.sound;
   const soundVolume = draft.soundVolume;
   const code = draft.code;
+  const narration = draft.narration;
+
+  const [generatingNarration, setGeneratingNarration] = useState(false);
+  const [narrationError, setNarrationError] = useState<string | null>(null);
 
   const focusLines = useMemo(() => detectImportantLines(code), [code]);
   const allLines = useMemo(
@@ -84,6 +89,30 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
     setDraft(projectId, { [key]: value } as Partial<typeof draft>);
   }
 
+  async function handleGenerateNarration() {
+    if (!title.trim() || !code.trim()) return;
+    setGeneratingNarration(true);
+    setNarrationError(null);
+
+    try {
+      const res = await fetch("/api/ai/commentary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language, title }),
+      });
+      const data = await res.json() as { ok?: boolean; narration?: Narration; error?: string };
+      if (data.ok && data.narration) {
+        setDraft(projectId, { narration: data.narration });
+      } else {
+        setNarrationError(data.error ?? "Failed to generate narration");
+      }
+    } catch {
+      setNarrationError("Network error generating narration");
+    } finally {
+      setGeneratingNarration(false);
+    }
+  }
+
   function handleContinue() {
     if (!canContinue) {
       return;
@@ -104,11 +133,11 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 space-y-2">
-      <div className="flex-1 min-h-0 grid gap-2 xl:grid-cols-[1.3fr_0.7fr]">
+    <div className="flex flex-col h-full space-y-2 overflow-y-auto xl:overflow-hidden">
+      <div className="grid gap-2 xl:grid-cols-[1.3fr_0.7fr] xl:flex-1 xl:min-h-0 xl:h-[calc(100vh-5rem)]">
         
         {/* LEFT COLUMN: Settings + Code */}
-        <div className="flex flex-col min-h-0 space-y-2">
+        <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
           
           <Card className="shrink-0 border-white/5 bg-background shadow-lg dark:bg-card">
             <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-white/5 mb-2">
@@ -167,13 +196,13 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
             </CardContent>
           </Card>
 
-          <Card className="flex-1 flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
+          <Card className="flex-1 flex flex-col min-h-[300px] xl:min-h-0 border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
             <div className="bg-muted/40 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b flex items-center justify-between">
               <span className="text-muted-foreground ml-1">Code Input</span>
             </div>
-            <div className="flex flex-1 overflow-hidden min-h-0">
-              <div id="line-numbers" className="w-10 shrink-0 bg-muted/20 text-muted-foreground border-r border-white/5 text-[11px] font-mono text-right py-2 pr-2 select-none overflow-hidden" suppressHydrationWarning>
-                {code.split("\n").map((_, i) => <div key={i}>{i + 1}</div>)}
+            <div className="flex flex-1 overflow-auto min-h-0">
+              <div id="line-numbers" className="w-10 shrink-0 bg-muted/20 text-muted-foreground border-r border-white/5 text-[11px] leading-[1.5rem] font-mono text-right pt-2 pb-8 pr-2 select-none overflow-hidden" suppressHydrationWarning>
+                {code.split("\n").map((_, i) => <div key={i} className="h-6 flex items-center justify-end">{i + 1}</div>)}
               </div>
               <Textarea
                 value={code}
@@ -182,7 +211,7 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                   const el = document.getElementById("line-numbers");
                   if (el) el.scrollTop = e.currentTarget.scrollTop;
                 }}
-                className="flex-1 h-full min-h-0 font-mono text-[11px] leading-6 border-0 focus-visible:ring-0 rounded-none bg-transparent resize-none p-2 whitespace-pre"
+                className="flex-1 h-full min-h-0 font-mono text-[11px] leading-6 border-0 focus-visible:ring-0 rounded-none bg-transparent resize-none pt-2 pb-8 px-2 whitespace-pre"
                 spellCheck={false}
               />
             </div>
@@ -190,8 +219,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
         </div>
 
         {/* RIGHT COLUMN: Focus Map */}
-        <div className="flex flex-col min-h-0 space-y-2">
-          <Card className="flex-1 flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
+        <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
+          <Card className="flex-1 flex flex-col min-h-[250px] xl:min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
             <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-white/5 mb-2">
               <CardTitle className="text-sm font-semibold">Focus map</CardTitle>
               <Badge className="text-[9px] px-1.5 py-0 bg-secondary/50 text-secondary-foreground">{normalizedEnabledFocusLines.length} active</Badge>
@@ -227,7 +256,30 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
           </Card>
 
           <Card className="border-white/5 bg-background shadow-lg dark:bg-card shrink-0">
-            <CardContent className="py-2 px-3">
+            <CardContent className="py-2 px-3 space-y-2">
+              <Button
+                className="w-full h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0"
+                onClick={handleGenerateNarration}
+                disabled={generatingNarration || !title.trim() || !code.trim()}
+                variant="secondary"
+              >
+                {generatingNarration ? "Generating narration…" : narration ? "Regenerate narration" : "Generate AI narration"}
+              </Button>
+              {narrationError && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-[10px] text-destructive-foreground">{narrationError}</div>
+              )}
+              {narration && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  <p className="text-[10px] text-muted-foreground italic">&ldquo;{narration.intro}&rdquo;</p>
+                  {narration.segments.map((seg, i) => (
+                    <div key={i} className="rounded border border-white/[0.04] bg-white/[0.01] p-1.5 text-[10px]">
+                      <span className="font-semibold text-primary">L{seg.lineStart}–{seg.lineEnd}:</span>{" "}
+                      <span className="text-muted-foreground">{seg.text}</span>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground italic">&ldquo;{narration.outro}&rdquo;</p>
+                </div>
+              )}
               <Button className="w-full h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleContinue} disabled={!canContinue}>
                 Continue to create video
               </Button>

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="h-screen overflow-hidden flex flex-col bg-background text-foreground antialiased transition-colors duration-200">
+      <body className="min-h-screen xl:h-screen xl:overflow-hidden flex flex-col bg-background text-foreground antialiased transition-colors duration-200">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SiteHeader />
           {children}
