@@ -1,17 +1,14 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { Download, FileCode2, Film, Layers, MessageSquareText, Ruler, Sparkles, Volume2 } from "lucide-react";
+import { ArrowRight, Download, FileCode2, Film, Layers, MessageSquareText, Ruler, Sparkles, Volume2, Wand2, BookOpen } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG } from "@/lib/plans";
 
 export default async function DashboardPage() {
   const session = await getSession();
-  if (!session) {
-    redirect("/login");
-  }
+  if (!session) redirect("/login");
 
   const plan = PLAN_CONFIG[session.plan];
 
@@ -23,57 +20,79 @@ export default async function DashboardPage() {
   ];
 
   const quickLinks = [
-    { label: "Code Studio", desc: "Write code in the editor and render a cinematic video", href: "/projects/new-project?tab=editor", icon: Film },
-    { label: "AI Narration", desc: "Generate a voice-over script with Google Gemini", href: "/projects/new-project?tab=narration", icon: MessageSquareText },
-    { label: "Audio Studio", desc: "Convert narration to speech with Sarvam AI", href: "/projects/new-project?tab=tts", icon: Volume2 },
-    { label: "Auto Pipeline", desc: "Code → narration → audio → video in one click", href: "/projects/new-project?tab=pipeline", icon: Sparkles },
+    { label: "Code Studio", desc: "Write code and render a cinematic typing video", href: "/projects/new-project?tab=editor", icon: Film, color: "primary" },
+    { label: "AI Narration", desc: "Generate voice-over scripts with Google Gemini", href: "/projects/new-project?tab=narration", icon: MessageSquareText, color: "primary" },
+    { label: "Audio Studio", desc: "Convert narration to speech with Sarvam AI", href: "/projects/new-project?tab=tts", icon: Volume2, color: "primary" },
+    { label: "Auto Pipeline", desc: "Code → narration → audio → video in one click", href: "/projects/new-project?tab=pipeline", icon: Sparkles, color: "primary" },
+    { label: "Word of Day", desc: "Create beautiful word definition reveal videos", href: "/projects/new-project?tab=wordofday", icon: BookOpen, color: "primary" },
+    { label: "Did You Know?", desc: "Animate facts and quotes into engaging shorts", href: "/projects/new-project?tab=didyouknow", icon: Wand2, color: "primary" },
   ];
+
+  const planLabel = PLAN_CONFIG[session.plan].name;
 
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="w-full px-4 sm:px-6 lg:px-10 py-10 space-y-10">
+      <div className="w-full px-5 sm:px-8 lg:px-10 py-8 space-y-8 max-w-7xl mx-auto">
+
         {/* Greeting */}
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Welcome back, {session.name}</h1>
-          <p className="text-xs text-muted-foreground mt-1">Pick a workflow or check your plan limits below.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">
+              Welcome back, <span className="text-primary">{session.name}</span>
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Pick a workflow below to get started.</p>
+          </div>
+          <span className="text-[10px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+            {planLabel} plan
+          </span>
         </div>
 
-        {/* Quick links */}
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          {quickLinks.map((f) => (
-            <Link key={f.label} href={f.href as Route}>
-              <Card className="group h-full border-white/[0.06] bg-white/[0.02] hover:border-primary/30 hover:bg-white/[0.04] hover:shadow-lg hover:shadow-primary/[0.03] transition-all duration-200 cursor-pointer">
-                <CardContent className="p-5 space-y-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/[0.08] group-hover:bg-primary/[0.12] transition-colors">
-                    <f.icon className="h-4 w-4 text-primary/80 group-hover:text-primary transition-colors" />
-                  </div>
-                  <p className="text-sm font-semibold group-hover:text-foreground transition-colors">{f.label}</p>
-                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{f.desc}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-
-        {/* Plan limits */}
-        <div>
-          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mb-4">Your plan limits</h2>
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-            {metrics.map((m) => (
-              <Card key={m.label} className="border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] transition-colors">
-                <CardContent className="p-5 flex items-center gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/[0.06]">
-                    <m.icon className="h-4 w-4 text-primary/70" />
+        {/* Workflows grid */}
+        <section>
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">Workflows</h2>
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            {quickLinks.map((f) => (
+              <Link key={f.label} href={f.href as Route}>
+                <div className="group h-full rounded-xl border border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5 p-4 space-y-3 transition-all duration-200 cursor-pointer">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/8 group-hover:bg-primary/12 transition-colors">
+                    <f.icon className="h-3.5 w-3.5 text-primary/70 group-hover:text-primary transition-colors" />
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-0.5">{m.label}</p>
-                    <p className="text-xl font-bold tabular-nums">{m.value}</p>
+                    <p className="text-xs font-semibold leading-tight group-hover:text-foreground transition-colors">{f.label}</p>
+                    <p className="text-[10px] text-muted-foreground/60 leading-snug mt-0.5">{f.desc}</p>
                   </div>
-                </CardContent>
-              </Card>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground/30 group-hover:text-primary/60 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </Link>
             ))}
           </div>
-        </div>
+        </section>
+
+        {/* Plan limits */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              Plan limits — {planLabel}
+            </h2>
+            <Link href="/pricing" className="text-[11px] text-primary/70 hover:text-primary transition-colors">
+              Upgrade plan →
+            </Link>
+          </div>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            {metrics.map((m) => (
+              <div key={m.label} className="rounded-xl border border-border/50 bg-card/40 hover:border-border transition-colors p-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/6 border border-primary/8">
+                  <m.icon className="h-4 w-4 text-primary/60" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 leading-tight">{m.label}</p>
+                  <p className="text-xl font-bold tabular-nums leading-tight mt-0.5">{m.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
       </div>
     </main>
   );

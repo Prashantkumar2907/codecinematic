@@ -1,12 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Sparkles, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { cn } from "@/lib/cn";
 
@@ -14,24 +13,48 @@ const planOrder: PlanCode[] = ["free", "basic", "medium", "high"];
 
 function planFeatures(code: PlanCode): string[] {
   const p = PLAN_CONFIG[code];
-  const list: string[] = [];
-  list.push(`${p.maxCodeLines} max lines / project`);
-  list.push(`${p.maxLineLength} max chars / line`);
-  list.push(`${p.maxDailyDownloads} downloads / day`);
-  list.push(`${p.maxStoredExports} stored exports`);
-  if (p.watermark) list.push("Watermark on exports");
-  else list.push("No watermark");
-  if (code !== "free") list.push("Priority support");
-  return list;
+  return [
+    `${p.maxCodeLines} max lines / project`,
+    `${p.maxLineLength} max chars / line`,
+    `${p.maxDailyDownloads} downloads / day`,
+    `${p.maxStoredExports} stored exports`,
+    p.watermark ? "Watermark on exports" : "No watermark",
+    ...(code !== "free" ? ["Priority support"] : []),
+  ];
 }
+
+const planGradients: Record<PlanCode, string> = {
+  free: "from-slate-500/10 to-slate-500/5",
+  basic: "from-cyan-500/8 to-teal-500/5",
+  medium: "from-primary/12 to-primary/6",
+  high: "from-violet-500/10 to-violet-500/5",
+};
 
 export default function PricingPage() {
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-16 sm:py-24">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-center mb-12">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Simple, transparent pricing</h1>
-          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">Start free, upgrade when you need more exports, storage, and higher limits.</p>
+      {/* Ambient background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/4 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-20">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12 space-y-3"
+        >
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold mb-2">
+            <Zap className="h-3 w-3" />
+            Simple pricing
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
+            Start free, scale when ready
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+            Free stays generous for previewing. Paid tiers unlock higher limits, stored exports, and priority support.
+          </p>
         </motion.div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -39,46 +62,75 @@ export default function PricingPage() {
             const plan = PLAN_CONFIG[code];
             const popular = code === "medium";
             return (
-              <motion.div key={code} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08, duration: 0.4 }}>
-                <Card className={cn(
-                  "relative h-full flex flex-col border-white/[0.06] bg-white/[0.02] hover:border-primary/20 transition-all duration-300",
-                  popular && "border-primary/30 bg-primary/[0.03] ring-1 ring-primary/10"
+              <motion.div
+                key={code}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.07, duration: 0.4 }}
+                className="relative"
+              >
+                {popular && (
+                  <div className="absolute -top-3 inset-x-0 flex justify-center z-10">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold text-primary-foreground shadow-lg shadow-primary/25">
+                      <Sparkles className="h-2.5 w-2.5" />Popular
+                    </span>
+                  </div>
+                )}
+                <div className={cn(
+                  "relative h-full flex flex-col rounded-xl border p-5 bg-gradient-to-b transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl",
+                  planGradients[code],
+                  popular
+                    ? "border-primary/40 shadow-lg shadow-primary/8 hover:shadow-primary/15 bg-card"
+                    : "border-border/50 bg-card hover:border-border"
                 )}>
-                  {popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold text-primary-foreground">
-                        <Sparkles className="h-3 w-3" />Popular
-                      </span>
-                    </div>
-                  )}
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{plan.name}</CardTitle>
-                    <div className="mt-2">
+                  {/* Header */}
+                  <div className="mb-5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{plan.name}</p>
+                    <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-bold">{plan.price}</span>
-                      {code !== "free" && <span className="text-sm text-muted-foreground"> / mo</span>}
+                      {code !== "free" && <span className="text-xs text-muted-foreground">/ mo</span>}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">{plan.badge}</p>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex flex-col">
-                    <ul className="space-y-2.5 flex-1">
-                      {planFeatures(code).map((feature) => (
-                        <li key={feature} className="flex items-start gap-2 text-xs text-muted-foreground">
-                          <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    <Link href={(code === "free" ? "/login" : "/api/billing/checkout?plan=" + code) as Route} className="mt-6 block">
-                      <Button variant={popular ? "default" : "outline"} className="w-full h-9 text-xs font-semibold">
-                        {code === "free" ? "Start free" : "Subscribe"}
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
+                    {code === "free" && <p className="text-xs text-muted-foreground mt-1">Forever free</p>}
+                    {plan.badge && code !== "free" && <p className="text-xs text-muted-foreground mt-1">{plan.badge}</p>}
+                  </div>
+
+                  {/* Features */}
+                  <ul className="space-y-2 flex-1 mb-5">
+                    {planFeatures(code).map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <Check className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", popular ? "text-primary" : "text-primary/70")} />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  <Link href={(code === "free" ? "/login" : "/api/billing/checkout?plan=" + code) as Route}>
+                    <Button
+                      variant={popular ? "default" : "outline"}
+                      className={cn(
+                        "w-full h-9 text-xs font-semibold transition-all",
+                        popular ? "glow-primary-sm hover:glow-primary" : "border-border/60 hover:border-border"
+                      )}
+                    >
+                      {code === "free" ? "Start free" : "Subscribe"}
+                    </Button>
+                  </Link>
+                </div>
               </motion.div>
             );
           })}
         </div>
+
+        {/* Footer note */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-center text-[11px] text-muted-foreground/50 mt-10"
+        >
+          All plans include unlimited preview renders. Downloads count against your daily limit.
+        </motion.p>
       </div>
     </main>
   );

@@ -139,8 +139,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
         {/* LEFT COLUMN: Settings + Code */}
         <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
           
-          <Card className="shrink-0 border-white/5 bg-background shadow-lg dark:bg-card">
-            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-white/5 mb-2">
+          <Card className="shrink-0 border-border/40 bg-card shadow-sm">
+            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold">Project settings</CardTitle>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <MetricBadge label="Lines" value={`${validation.lineCount}/${limits.maxCodeLines}`} status={validation.lineCount > limits.maxCodeLines ? "danger" : "default"} />
@@ -155,14 +155,14 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Language</span>
-                  <select value={language} onChange={(e) => updateDraftField("language", e.target.value)} className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
-                    {languageOptions.map(o => <option key={o} value={o} className="dark:bg-slate-950">{o}</option>)}
+                  <select value={language} onChange={(e) => updateDraftField("language", e.target.value)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                    {languageOptions.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Ratio</span>
-                  <select value={aspectRatioMode} onChange={(e) => updateDraftField("aspect", e.target.value as any)} className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
-                    {aspectOptions.map(o => <option key={o.value} value={o.value} className="dark:bg-slate-950">{o.label}</option>)}
+                  <select value={aspectRatioMode} onChange={(e) => updateDraftField("aspect", e.target.value as any)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                    {aspectOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -178,8 +178,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Sound pattern</span>
-                  <select value={sound} onChange={(e) => updateDraftField("sound", e.target.value as any)} className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
-                    {soundOptions.map(o => <option key={o.value} value={o.value} className="dark:bg-slate-950">{o.label}</option>)}
+                  <select value={sound} onChange={(e) => updateDraftField("sound", e.target.value as any)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                    {soundOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -196,9 +196,9 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
             </CardContent>
           </Card>
 
-          <Card className="flex-1 flex flex-col min-h-[300px] xl:min-h-0 border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
-            <div className="bg-muted/40 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b flex items-center justify-between">
-              <span className="text-muted-foreground ml-1">Code Input</span>
+          <Card className="flex-1 flex flex-col min-h-[300px] xl:min-h-0 border-border/40 bg-card shadow-sm overflow-hidden">
+            <div className="bg-muted/30 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b border-border/30 flex items-center justify-between">
+              <span className="text-muted-foreground font-mono tracking-widest">// code input</span>
             </div>
             <div className="flex flex-1 overflow-auto min-h-0">
               <div id="line-numbers" className="w-10 shrink-0 bg-muted/20 text-muted-foreground border-r border-white/5 text-[11px] leading-[1.5rem] font-mono text-right pt-2 pb-8 pr-2 select-none overflow-hidden" suppressHydrationWarning>
@@ -220,8 +220,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
 
         {/* RIGHT COLUMN: Focus Map */}
         <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
-          <Card className="flex-1 flex flex-col min-h-[250px] xl:min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
-            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-white/5 mb-2">
+          <Card className="flex-1 flex flex-col min-h-[250px] xl:min-h-0 border-border/40 bg-card shadow-sm">
+            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold">Focus map</CardTitle>
               <Badge className="text-[9px] px-1.5 py-0 bg-secondary/50 text-secondary-foreground">{normalizedEnabledFocusLines.length} active</Badge>
             </CardHeader>
@@ -255,24 +255,24 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
             </CardContent>
           </Card>
 
-          <Card className="border-white/5 bg-background shadow-lg dark:bg-card shrink-0">
+          <Card className="border-border/40 bg-card shadow-sm shrink-0">
             <CardContent className="py-2 px-3 space-y-2">
               <Button
-                className="w-full h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0"
+                className="w-full h-8 text-xs font-medium"
                 onClick={handleGenerateNarration}
                 disabled={generatingNarration || !title.trim() || !code.trim()}
                 variant="secondary"
               >
-                {generatingNarration ? "Generating narration…" : narration ? "Regenerate narration" : "Generate AI narration"}
+                {generatingNarration ? "Generating narration…" : narration ? "Regenerate AI narration" : "Generate AI narration"}
               </Button>
               {narrationError && (
-                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-[10px] text-destructive-foreground">{narrationError}</div>
+                <div className="rounded-md border border-destructive/30 bg-destructive/8 p-2 text-[10px] text-destructive">{narrationError}</div>
               )}
               {narration && (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="space-y-1.5 max-h-36 overflow-y-auto scrollbar-none">
                   <p className="text-[10px] text-muted-foreground italic">&ldquo;{narration.intro}&rdquo;</p>
                   {narration.segments.map((seg, i) => (
-                    <div key={i} className="rounded border border-white/[0.04] bg-white/[0.01] p-1.5 text-[10px]">
+                    <div key={i} className="rounded border border-border/40 bg-muted/30 p-1.5 text-[10px]">
                       <span className="font-semibold text-primary">L{seg.lineStart}–{seg.lineEnd}:</span>{" "}
                       <span className="text-muted-foreground">{seg.text}</span>
                     </div>
@@ -280,8 +280,12 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                   <p className="text-[10px] text-muted-foreground italic">&ldquo;{narration.outro}&rdquo;</p>
                 </div>
               )}
-              <Button className="w-full h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleContinue} disabled={!canContinue}>
-                Continue to create video
+              <Button
+                className="w-full h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all"
+                onClick={handleContinue}
+                disabled={!canContinue}
+              >
+                Continue to create video →
               </Button>
             </CardContent>
           </Card>

@@ -1,32 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Loader2, Play, Type, Volume2 } from "lucide-react";
+import { Download, Loader2, Maximize2, Play, Type, Volume2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-/* ═══════════════════════════════════════════════
-   Font catalog — safe web fonts + Google Fonts
-   ═══════════════════════════════════════════════ */
-const FONT_CATALOG = [
-  { name: "Playfair Display", style: "serif", google: true },
-  { name: "Lora", style: "serif", google: true },
-  { name: "Merriweather", style: "serif", google: true },
-  { name: "Cormorant Garamond", style: "serif", google: true },
-  { name: "DM Serif Display", style: "serif", google: true },
-  { name: "Space Grotesk", style: "sans-serif", google: true },
-  { name: "Inter", style: "sans-serif", google: true },
-  { name: "Outfit", style: "sans-serif", google: true },
-  { name: "Sora", style: "sans-serif", google: true },
-  { name: "JetBrains Mono", style: "monospace", google: true },
-  { name: "Georgia", style: "serif", google: false },
-  { name: "Times New Roman", style: "serif", google: false },
-] as const;
-
-type FontEntry = (typeof FONT_CATALOG)[number];
+import { loadGoogleFonts } from "./shared/font-catalog";
+import { FontPickerModal } from "./shared/font-picker-modal";
+import { BgPicker } from "./shared/bg-picker";
+import { BG_PRESETS, type BgPreset, drawBackground, wrapText } from "./shared/canvas-utils";
+import { playTypingPulse } from "./shared/audio-utils";
 
 const ASPECT_OPTIONS = [
   { value: "9:16", label: "Vertical 9:16", w: 720, h: 1280 },
@@ -37,12 +23,21 @@ const ASPECT_OPTIONS = [
    Component
    ═══════════════════════════════════════════════ */
 export function WordOfDayPanel({ projectId }: { projectId: string }) {
-  // Form state
+  // Content
   const [word, setWord] = useState("Ephemeral");
   const [meaning, setMeaning] = useState("lasting for a very short time");
+
+  // Appearance
   const [aspect, setAspect] = useState<"9:16" | "16:9">("9:16");
-  const [selectedFont, setSelectedFont] = useState<string>("Playfair Display");
+  const [selectedFont, setSelectedFont] = useState("Playfair Display");
+  const [wordFontSize, setWordFontSize] = useState(72);
+  const [meaningFontSize, setMeaningFontSize] = useState(26);
   const [showFontPicker, setShowFontPicker] = useState(false);
+  const [bgPreset, setBgPreset] = useState<BgPreset>(BG_PRESETS[0]);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<ImageBitmap | null>(null);
+
+  // Speed & Sound
   const [titleSpeed, setTitleSpeed] = useState(1.0);
   const [wordSpeed, setWordSpeed] = useState(1.0);
   const [meaningSpeed, setMeaningSpeed] = useState(1.0);
@@ -53,32 +48,35 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
   const [rendering, setRendering] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
+  const [expandPreview, setExpandPreview] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
-  // Load Google Fonts
-  useEffect(() => {
-    const googleFonts = FONT_CATALOG.filter((f) => f.google).map((f) => f.name.replace(/ /g, "+"));
-    const families = googleFonts.map((f) => `family=${f}:ital,wght@0,400;0,700;1,400;1,700`).join("&");
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?${families}&display=swap`;
-    document.head.appendChild(link);
-    return () => { link.remove(); };
-  }, []);
+  // Load Google Fonts once
+  useEffect(() => { loadGoogleFonts(); }, []);
 
-  // Live preview
+  // Handle image upload
+  function handleImageUpload(file: File) {
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    createImageBitmap(file).then(setBgImage);
+  }
+  function handleImageClear() {
+    setUploadedImageUrl(null);
+    setBgImage(null);
+  }
+
+  // Live preview (16:9 viewport always)
   useEffect(() => {
     const c = previewRef.current;
     if (!c) return;
-    const dim = ASPECT_OPTIONS.find((a) => a.value === aspect)!;
-    const scale = 0.25;
-    c.width = dim.w * scale;
-    c.height = dim.h * scale;
+    // Always render preview in 16:9 for clean UI layout
+    c.width = 640;
+    c.height = 360;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    drawWordFrame(ctx, c.width, c.height, word, meaning, selectedFont, 1.0, 0.5);
-  }, [word, meaning, aspect, selectedFont]);
+    drawWordFrame(ctx, 640, 360, word, meaning, selectedFont, 1.0, 0.5, bgPreset, bgImage, wordFontSize, meaningFontSize);
+  }, [word, meaning, aspect, selectedFont, bgPreset, bgImage, wordFontSize, meaningFontSize]);
 
   /* ── Render video ── */
   const handleRender = useCallback(async () => {
@@ -95,13 +93,19 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     if (!ctx) { setRendering(false); return; }
 
     const fps = 30;
-    const titleDuration = 1.0 / titleSpeed;
+    const titleDuration = 1.2 / titleSpeed;
     const fadeDuration = 0.8 / titleSpeed;
-    const wordPhaseDur = 1.5 / wordSpeed;    // word typing phase
-    const meaningPhaseDur = 1.5 / meaningSpeed; // meaning typing phase
-    const wordDuration = wordPhaseDur + meaningPhaseDur;
-    const holdDuration = 0.5;
+
+    // Chars-per-second determines typing duration (matches audio exactly)
+    const wordCPS = 10 * wordSpeed;    // characters per second for word
+    const meaningCPS = 12 * meaningSpeed; // characters per second for meaning
+
+    const wordTypingDuration = Math.max(0.5, word.length / wordCPS);
+    const meaningTypingDuration = Math.max(0.5, meaning.length / meaningCPS);
+    const wordDuration = wordTypingDuration + meaningTypingDuration;
+    const holdDuration = 1.0;
     const totalFrames = Math.ceil((titleDuration + fadeDuration + wordDuration + holdDuration) * fps);
+    const wordSplit = wordTypingDuration / wordDuration;
 
     // Audio setup
     const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
@@ -124,24 +128,22 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
     });
 
-    // Schedule typing sounds
+    // Schedule typing sounds: evenly spaced, one sound per character
     if (audioCtx && audioDest && sound !== "off" && soundVolume > 0) {
-      const typeStart = audioCtx.currentTime + titleDuration + fadeDuration + 0.06;
+      const typeStart = audioCtx.currentTime + titleDuration + fadeDuration + 0.05;
       const wordChars = Array.from(word);
       const meaningChars = Array.from(meaning);
 
       wordChars.forEach((ch, i) => {
-        const when = typeStart + (i / wordChars.length) * wordPhaseDur;
+        const when = typeStart + (i / wordCPS);
         playTypingPulse(audioCtx, audioDest, when, sound, soundVolume, ch, i === wordChars.length - 1);
       });
+      const meaningStart = typeStart + wordTypingDuration;
       meaningChars.forEach((ch, i) => {
-        const when = typeStart + wordPhaseDur + (i / meaningChars.length) * meaningPhaseDur;
+        const when = meaningStart + (i / meaningCPS);
         playTypingPulse(audioCtx, audioDest, when, sound, soundVolume, ch, i === meaningChars.length - 1);
       });
     }
-
-    // wordSplit = fraction of wordDuration spent on the word (vs meaning)
-    const wordSplit = wordPhaseDur / wordDuration;
 
     recorder.start();
 
@@ -149,17 +151,14 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       const t = frame / fps;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
       if (t < titleDuration) {
-        drawTitlePhase(ctx, canvas.width, canvas.height, selectedFont, 1.0);
+        drawTitlePhase(ctx, canvas.width, canvas.height, selectedFont, 1.0, bgPreset, bgImage);
       } else if (t < titleDuration + fadeDuration) {
         const fadeProgress = (t - titleDuration) / fadeDuration;
-        drawCrumblePhase(ctx, canvas.width, canvas.height, selectedFont, fadeProgress);
+        drawCrumblePhase(ctx, canvas.width, canvas.height, selectedFont, fadeProgress, bgPreset, bgImage);
       } else {
         const wordT = (t - titleDuration - fadeDuration) / wordDuration;
-        drawWordFrame(ctx, canvas.width, canvas.height, word, meaning, selectedFont, Math.min(wordT, 1.0), wordSplit);
+        drawWordFrame(ctx, canvas.width, canvas.height, word, meaning, selectedFont, Math.min(wordT, 1.0), wordSplit, bgPreset, bgImage, wordFontSize, meaningFontSize);
       }
 
       setProgress(`Rendering… ${Math.round((frame / totalFrames) * 100)}%`);
@@ -173,13 +172,13 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     setVideoUrl(url);
     setRendering(false);
     setProgress("");
-  }, [word, meaning, aspect, selectedFont, titleSpeed, wordSpeed, meaningSpeed, sound, soundVolume]);
+  }, [word, meaning, aspect, selectedFont, titleSpeed, wordSpeed, meaningSpeed, sound, soundVolume, bgPreset, bgImage, wordFontSize, meaningFontSize]);
 
   const handleDownload = () => {
     if (!videoUrl) return;
     const a = document.createElement("a");
     a.href = videoUrl;
-    a.download = `word-of-the-day-${word.toLowerCase().replace(/\s+/g, "-")}.webm`;
+    a.download = `word-of-the-day-${word.toLowerCase().replace(/\s+/g, "-")}.mp4`;
     a.click();
   };
 
@@ -188,15 +187,17 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       <div className="grid gap-2 xl:grid-cols-[1fr_1fr] xl:flex-1 xl:min-h-0">
 
         {/* LEFT: Settings */}
-        <div className="flex flex-col space-y-2">
-          <Card className="border-white/5 bg-background shadow-lg dark:bg-card">
-            <CardHeader className="py-2 px-3 border-b border-white/5 mb-2">
+        <div className="flex flex-col space-y-2 min-h-0 overflow-y-auto">
+          <Card className="border-border/40 bg-card shadow-sm">
+            <CardHeader className="py-2 px-3 border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Type className="h-4 w-4 text-primary" />
                 Word of the Day
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 space-y-3">
+
+              {/* Word + Meaning */}
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">WORD</span>
                 <Input
@@ -215,16 +216,18 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                   placeholder="Enter the meaning / definition"
                 />
               </div>
+
+              {/* Ratio + Font */}
               <div className="grid gap-2 grid-cols-2">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
                   <select
                     value={aspect}
                     onChange={(e) => setAspect(e.target.value as "9:16" | "16:9")}
-                    className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
+                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
                   >
                     {ASPECT_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value} className="dark:bg-slate-950">{o.label}</option>
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -241,14 +244,47 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
+              {/* Font sizes */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-muted-foreground">WORD SIZE</span>
+                    <span className="text-[10px] text-muted-foreground">{wordFontSize}px</span>
+                  </div>
+                  <input type="range" min={36} max={120} step={2} value={wordFontSize}
+                    onChange={(e) => setWordFontSize(parseInt(e.target.value))}
+                    className="w-full h-1 accent-primary" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-muted-foreground">MEANING SIZE</span>
+                    <span className="text-[10px] text-muted-foreground">{meaningFontSize}px</span>
+                  </div>
+                  <input type="range" min={14} max={56} step={1} value={meaningFontSize}
+                    onChange={(e) => setMeaningFontSize(parseInt(e.target.value))}
+                    className="w-full h-1 accent-primary" />
+                </div>
+              </div>
+
+              {/* Background picker */}
+              <div className="pt-1 border-t border-white/5">
+                <BgPicker
+                  selectedId={bgPreset.id}
+                  onSelect={(p) => { setBgPreset(p); handleImageClear(); }}
+                  uploadedImageUrl={uploadedImageUrl}
+                  onImageUpload={handleImageUpload}
+                  onImageClear={handleImageClear}
+                />
+              </div>
+
               {/* Speed / Sound / Volume */}
               <div className="space-y-1.5 pt-1 border-t border-white/5">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-muted-foreground">TITLE SPEED</span>
-                    <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(1)}×</span>
+                    <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(2)}×</span>
                   </div>
-                  <input type="range" min={0.2} max={3.0} step={0.1} value={titleSpeed}
+                  <input type="range" min={0.5} max={1.5} step={0.05} value={titleSpeed}
                     onChange={(e) => setTitleSpeed(parseFloat(e.target.value))}
                     className="w-full h-1 accent-primary" />
                 </div>
@@ -256,18 +292,18 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">WORD SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{wordSpeed.toFixed(1)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{wordSpeed.toFixed(2)}×</span>
                     </div>
-                    <input type="range" min={0.2} max={3.0} step={0.1} value={wordSpeed}
+                    <input type="range" min={0.5} max={1.5} step={0.05} value={wordSpeed}
                       onChange={(e) => setWordSpeed(parseFloat(e.target.value))}
                       className="w-full h-1 accent-primary" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">MEANING SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{meaningSpeed.toFixed(1)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{meaningSpeed.toFixed(2)}×</span>
                     </div>
-                    <input type="range" min={0.2} max={3.0} step={0.1} value={meaningSpeed}
+                    <input type="range" min={0.5} max={1.5} step={0.05} value={meaningSpeed}
                       onChange={(e) => setMeaningSpeed(parseFloat(e.target.value))}
                       className="w-full h-1 accent-primary" />
                   </div>
@@ -278,11 +314,11 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                     <select
                       value={sound}
                       onChange={(e) => setSound(e.target.value as "off" | "soft" | "typewriter")}
-                      className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
+                      className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
                     >
-                      <option value="off" className="dark:bg-slate-950">Sound off</option>
-                      <option value="soft" className="dark:bg-slate-950">Soft keys</option>
-                      <option value="typewriter" className="dark:bg-slate-950">Typewriter</option>
+                      <option value="off">Sound off</option>
+                      <option value="soft">Soft keys</option>
+                      <option value="typewriter">Typewriter</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -317,7 +353,6 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
             </CardContent>
           </Card>
 
-          {/* Font Picker Modal */}
           {showFontPicker && (
             <FontPickerModal
               currentFont={selectedFont}
@@ -330,32 +365,41 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
 
         {/* RIGHT: Preview + Video */}
         <div className="flex flex-col space-y-2">
-          <Card className="flex-1 flex flex-col border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
+          <Card className="flex-1 flex flex-col border-border/40 bg-card shadow-sm overflow-hidden">
             <div className="bg-muted/40 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b flex items-center justify-between">
-              <span className="text-muted-foreground ml-1">Preview</span>
+              <span className="text-muted-foreground font-mono tracking-widest">// preview</span>
+              <button
+                type="button"
+                onClick={() => setExpandPreview(true)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="flex-1 flex items-center justify-center p-4 bg-black/50">
+            {/* Always 16:9 in panel */}
+            <div className="flex-1 flex items-center justify-center p-3 bg-black/50">
               <canvas
                 ref={previewRef}
                 className="max-w-full max-h-full rounded-md shadow-xl"
-                style={{ aspectRatio: aspect === "9:16" ? "9/16" : "16/9" }}
+                style={{ aspectRatio: "16/9" }}
               />
             </div>
           </Card>
 
           {videoUrl && (
-            <Card className="border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
+            <Card className="border-border/40 bg-card shadow-sm overflow-hidden">
               <div className="bg-muted/40 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b">
                 <span className="text-muted-foreground ml-1">Rendered Video</span>
               </div>
               <div className="p-3 flex items-center justify-center">
+                {/* Show as 16:9 in the panel; user can fullscreen for real ratio */}
                 <video
                   src={videoUrl}
                   controls
                   autoPlay
                   loop
-                  className="max-w-full max-h-[360px] rounded-md shadow-lg"
-                  style={{ aspectRatio: aspect === "9:16" ? "9/16" : "16/9" }}
+                  className="w-full rounded-md shadow-lg"
+                  style={{ aspectRatio: "16/9", objectFit: "contain", background: "#000" }}
                 />
               </div>
             </Card>
@@ -363,37 +407,37 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {/* Hidden render canvas */}
+      {/* Hidden render canvas (full resolution) */}
       <canvas ref={canvasRef} className="hidden" />
+
+      {/* Expanded preview lightbox */}
+      {expandPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setExpandPreview(false)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <canvas
+              className="rounded-lg shadow-2xl"
+              ref={(el) => {
+                if (!el) return;
+                const dim = ASPECT_OPTIONS.find((a) => a.value === aspect)!;
+                const scale = Math.min(
+                  (window.innerWidth * 0.9) / dim.w,
+                  (window.innerHeight * 0.9) / dim.h
+                );
+                el.width = dim.w * scale;
+                el.height = dim.h * scale;
+                const ctx = el.getContext("2d");
+                if (ctx) drawWordFrame(ctx, el.width, el.height, word, meaning, selectedFont, 1.0, 0.5, bgPreset, bgImage, wordFontSize, meaningFontSize);
+              }}
+            />
+            <p className="text-center text-xs text-white/50 mt-2">Click anywhere to close · {aspect} actual ratio</p>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-/* ═══════════════════════════════════════════════════════
-   Audio helpers
-   ═══════════════════════════════════════════════════════ */
-
-function playTypingPulse(
-  ac: AudioContext, dest: MediaStreamAudioDestinationNode,
-  when: number, sound: string, vol: number, ch: string, accent: boolean
-) {
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  const filter = ac.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.setValueAtTime(sound === "typewriter" ? 900 : 700, when);
-  filter.Q.setValueAtTime(0.7, when);
-  const ws = ch.trim().length === 0;
-  osc.type = sound === "typewriter" ? "square" : "triangle";
-  osc.frequency.setValueAtTime(
-    sound === "typewriter" ? (ws ? 150 : accent ? 320 : 240) : (ws ? 480 : accent ? 900 : 700), when
-  );
-  const pk = (sound === "typewriter" ? (accent ? 0.12 : 0.08) : (accent ? 0.07 : 0.045)) * vol * (ws ? 0.45 : 1);
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.exponentialRampToValueAtTime(pk, when + 0.0015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + (sound === "typewriter" ? 0.016 : 0.012));
-  osc.connect(filter); filter.connect(gain); gain.connect(dest);
-  osc.start(when); osc.stop(when + (sound === "typewriter" ? 0.018 : 0.014));
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -402,33 +446,42 @@ function playTypingPulse(
 
 function drawTitlePhase(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  font: string,
-  opacity: number
+  w: number, h: number,
+  font: string, opacity: number,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null
 ) {
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  drawBackground(ctx, w, h, bgPreset, bgImage);
 
-  // Subtle gradient overlay
+  // Subtle overlay gradient
   const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.6);
-  g.addColorStop(0, "rgba(56,189,248,0.03)");
+  g.addColorStop(0, "rgba(255,255,255,0.03)");
   g.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
   // Decorative thin lines
-  ctx.strokeStyle = `rgba(255,255,255,${0.05 * opacity})`;
-  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = `rgba(255,255,255,${0.12 * opacity})`;
+  ctx.lineWidth = 1;
   const lineY = h / 2;
-  ctx.beginPath(); ctx.moveTo(w * 0.15, lineY - 40); ctx.lineTo(w * 0.85, lineY - 40); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w * 0.15, lineY + 40); ctx.lineTo(w * 0.85, lineY + 40); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.12, lineY - 48); ctx.lineTo(w * 0.88, lineY - 48); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.12, lineY + 48); ctx.lineTo(w * 0.88, lineY + 48); ctx.stroke();
 
-  // Title text
+  // Small diamond at line centers
+  const drawDiamond = (cx: number, cy: number, size: number) => {
+    ctx.fillStyle = `rgba(255,255,255,${0.3 * opacity})`;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size, cy);
+    ctx.lineTo(cx, cy + size); ctx.lineTo(cx - size, cy);
+    ctx.closePath(); ctx.fill();
+  };
+  drawDiamond(w / 2, lineY - 48, 4);
+  drawDiamond(w / 2, lineY + 48, 4);
+
   const vert = w < h;
-  const titleSize = vert ? 28 : 32;
+  const titleSize = vert ? 32 : 40;
   ctx.font = `300 ${titleSize}px "${font}", Georgia, serif`;
-  ctx.fillStyle = `rgba(255,255,255,${0.9 * opacity})`;
+  ctx.fillStyle = `rgba(255,255,255,${0.95 * opacity})`;
   ctx.textAlign = "center";
-  ctx.letterSpacing = "8px";
+  ctx.letterSpacing = "10px";
   ctx.fillText("WORD OF THE DAY", w / 2, h / 2 + titleSize / 3);
   ctx.letterSpacing = "0px";
   ctx.textAlign = "start";
@@ -436,15 +489,14 @@ function drawTitlePhase(
 
 function drawCrumblePhase(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  font: string,
-  progress: number
+  w: number, h: number,
+  font: string, progress: number,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null
 ) {
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  drawBackground(ctx, w, h, bgPreset, bgImage);
 
   const vert = w < h;
-  const titleSize = vert ? 28 : 32;
+  const titleSize = vert ? 32 : 40;
   const text = "WORD OF THE DAY";
 
   ctx.font = `300 ${titleSize}px "${font}", Georgia, serif`;
@@ -453,20 +505,16 @@ function drawCrumblePhase(
   const startX = (w - textW) / 2;
   const baseY = h / 2 + titleSize / 3;
 
-  // Draw each character with individual displacement
   ctx.textAlign = "start";
   let cx = startX;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     const charW = ctx.measureText(ch).width;
-
-    // Each char starts fading at a slightly different time
     const charDelay = (i / text.length) * 0.3;
     const charProgress = Math.max(0, Math.min(1, (progress - charDelay) / 0.7));
-
     const alpha = 1 - charProgress;
-    const offsetY = charProgress * (40 + Math.random() * 60);
-    const offsetX = (Math.random() - 0.5) * charProgress * 30;
+    const offsetY = charProgress * (40 + Math.sin(i) * 30);
+    const offsetX = (Math.sin(i * 3) - 0.5) * charProgress * 30;
     const scale = 1 - charProgress * 0.5;
 
     if (alpha > 0.01) {
@@ -474,198 +522,88 @@ function drawCrumblePhase(
       ctx.globalAlpha = alpha;
       ctx.translate(cx + charW / 2 + offsetX, baseY + offsetY);
       ctx.scale(scale, scale);
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
       ctx.fillText(ch, -charW / 2, 0);
       ctx.restore();
     }
-
-    // Particle dust effect
-    if (charProgress > 0.1 && charProgress < 0.9) {
-      const numParticles = 3;
-      for (let p = 0; p < numParticles; p++) {
-        const px = cx + charW / 2 + (Math.random() - 0.5) * 20;
-        const py = baseY + offsetY + (Math.random() - 0.5) * 20;
-        const pAlpha = (1 - charProgress) * 0.5;
-        const pSize = (1 - charProgress) * 2;
-        ctx.fillStyle = `rgba(255,255,255,${pAlpha})`;
-        ctx.beginPath();
-        ctx.arc(px, py, pSize, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
     cx += charW;
   }
-
   ctx.globalAlpha = 1;
   ctx.textAlign = "start";
 }
 
 function drawWordFrame(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  word: string,
-  meaning: string,
+  w: number, h: number,
+  word: string, meaning: string,
   font: string,
-  progress: number, // 0-1 for typewriter
-  wordSplit: number = 0.5 // fraction of progress for word vs meaning
+  progress: number,
+  wordSplit: number,
+  bgPreset: BgPreset,
+  bgImage: ImageBitmap | null,
+  wordFontSize: number,
+  meaningFontSize: number,
 ) {
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  drawBackground(ctx, w, h, bgPreset, bgImage);
 
-  // Subtle ambient
-  const g = ctx.createRadialGradient(w / 2, h * 0.35, 0, w / 2, h * 0.35, Math.min(w, h) * 0.5);
-  g.addColorStop(0, "rgba(139,92,246,0.02)");
+  // Subtle ambient overlay
+  const g = ctx.createRadialGradient(w / 2, h * 0.38, 0, w / 2, h * 0.38, Math.min(w, h) * 0.5);
+  g.addColorStop(0, "rgba(255,255,255,0.025)");
   g.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
-  const vert = w < h;
-  const wordSize = vert ? 64 : 72;
-  const meaningSize = vert ? 22 : 24;
+  // Scale font sizes for canvas dimensions (designed for 720w base)
+  const scale = w / 720;
+  const scaledWordSize = Math.round(wordFontSize * scale);
+  const scaledMeaningSize = Math.round(meaningFontSize * scale);
 
   // Word (italic, centered)
   const wordChars = Math.floor(word.length * Math.min(progress / wordSplit, 1));
   const visibleWord = word.substring(0, wordChars);
 
-  ctx.font = `italic 700 ${wordSize}px "${font}", Georgia, serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = `italic 700 ${scaledWordSize}px "${font}", Georgia, serif`;
+  ctx.fillStyle = "rgba(255,255,255,1)";
   ctx.textAlign = "center";
-  ctx.fillText(visibleWord, w / 2, h * 0.42);
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 20;
+  ctx.fillText(visibleWord, w / 2, h * 0.40);
+  ctx.shadowBlur = 0;
 
-  // Cursor after word
-  if (progress < wordSplit && wordChars < word.length) {
-    const partialW = ctx.measureText(visibleWord).width;
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillRect(w / 2 + partialW / 2 + 4, h * 0.42 - wordSize + 8, 2, wordSize - 4);
-  }
+  // Decorative underline below word (fades in)
+  const underlineAlpha = Math.min(progress * 3, 0.25);
+  const wordMeasure = ctx.measureText(word).width;
+  const lineHalf = Math.min(wordMeasure * 0.6, w * 0.3);
+  ctx.strokeStyle = `rgba(255,255,255,${underlineAlpha})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - lineHalf, h * 0.40 + scaledWordSize * 0.35);
+  ctx.lineTo(w / 2 + lineHalf, h * 0.40 + scaledWordSize * 0.35);
+  ctx.stroke();
 
-  // Meaning (appears after word is fully typed)
+  // Meaning (appears after word is fully typed, no cursor)
   if (progress > wordSplit) {
     const meaningProgress = (progress - wordSplit) / (1 - wordSplit);
     const meaningChars = Math.floor(meaning.length * meaningProgress);
     const visibleMeaning = meaning.substring(0, meaningChars);
 
-    ctx.font = `300 ${meaningSize}px "${font}", Georgia, serif`;
-    ctx.fillStyle = `rgba(180,180,180,${Math.min(meaningProgress * 2, 0.85)})`;
+    ctx.font = `300 ${scaledMeaningSize}px "${font}", Georgia, serif`;
+    const baseAlpha = Math.min(meaningProgress * 1.5, 0.9);
+    ctx.fillStyle = `rgba(220,220,220,${baseAlpha})`;
     ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowBlur = 10;
 
     // Word-wrap meaning
-    const maxW = w * 0.7;
+    const maxW = w * 0.72;
     const lines = wrapText(ctx, visibleMeaning, maxW);
-    const lineH = meaningSize * 1.6;
-    const startY = h * 0.42 + wordSize * 0.6;
+    const lineH = scaledMeaningSize * 1.7;
+    const startY = h * 0.40 + scaledWordSize * 0.55;
 
     lines.forEach((line, i) => {
       ctx.fillText(line, w / 2, startY + i * lineH);
     });
-
-    // Cursor after meaning
-    if (meaningChars < meaning.length) {
-      const lastLine = lines[lines.length - 1] || "";
-      const lastW = ctx.measureText(lastLine).width;
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.fillRect(
-        w / 2 + lastW / 2 + 3,
-        startY + (lines.length - 1) * lineH - meaningSize + 4,
-        1.5,
-        meaningSize - 4
-      );
-    }
+    ctx.shadowBlur = 0;
   }
-
-  // Decorative underline below word
-  const underlineAlpha = Math.min(progress * 3, 0.15);
-  ctx.strokeStyle = `rgba(255,255,255,${underlineAlpha})`;
-  ctx.lineWidth = 0.5;
-  ctx.beginPath();
-  ctx.moveTo(w * 0.3, h * 0.42 + 12);
-  ctx.lineTo(w * 0.7, h * 0.42 + 12);
-  ctx.stroke();
 
   ctx.textAlign = "start";
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-
-  for (const w of words) {
-    const test = current ? `${current} ${w}` : w;
-    if (ctx.measureText(test).width > maxWidth && current) {
-      lines.push(current);
-      current = w;
-    } else {
-      current = test;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-/* ═══════════════════════════════════════════════════════
-   Font Picker Modal
-   ═══════════════════════════════════════════════════════ */
-function FontPickerModal({
-  currentFont,
-  onSelect,
-  onClose,
-  sampleText,
-}: {
-  currentFont: string;
-  onSelect: (font: string) => void;
-  onClose: () => void;
-  sampleText: string;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <Card
-        className="w-full max-w-md max-h-[70vh] border-white/10 bg-background shadow-2xl dark:bg-card"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CardHeader className="py-2.5 px-4 border-b border-white/5">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Type className="h-4 w-4 text-primary" />
-            Choose Font
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-2 overflow-y-auto max-h-[55vh] space-y-1">
-          {FONT_CATALOG.map((font) => (
-            <button
-              key={font.name}
-              type="button"
-              onClick={() => onSelect(font.name)}
-              className={`w-full rounded-lg border p-3 text-left transition hover:border-primary/50 ${
-                currentFont === font.name
-                  ? "border-primary bg-primary/10 shadow-sm"
-                  : "border-border bg-card hover:bg-muted/30"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{font.name}</span>
-                <span className="text-[9px] text-muted-foreground/60">{font.style}</span>
-              </div>
-              <p
-                className="text-lg truncate"
-                style={{ fontFamily: `"${font.name}", ${font.style}` }}
-              >
-                {sampleText}
-              </p>
-              <p
-                className="text-xs text-muted-foreground italic truncate mt-0.5"
-                style={{ fontFamily: `"${font.name}", ${font.style}` }}
-              >
-                The quick brown fox jumps over the lazy dog
-              </p>
-            </button>
-          ))}
-        </CardContent>
-        <div className="p-2 border-t border-white/5">
-          <Button variant="ghost" size="sm" className="w-full h-7 text-xs" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
 }

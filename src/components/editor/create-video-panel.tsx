@@ -24,8 +24,8 @@ type RenderedVideo = {
 };
 
 const aspectDimensions: Record<string, { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number }> = {
-  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 28 },
-  "16:9": { width: 1280, height: 720, maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 65 }
+  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 30, maxCharsPerLine: 24 },
+  "16:9": { width: 1280, height: 720,  maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 56 }
 };
 
 export function CreateVideoPanel({
@@ -148,7 +148,7 @@ export function CreateVideoPanel({
           exportId: job.exportId,
           aspectRatio: job.aspectRatio,
           url,
-          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.webm`
+          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.mp4`
         });
       }
 
@@ -182,7 +182,7 @@ export function CreateVideoPanel({
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-2">
       <div className="flex-1 min-h-0 grid gap-2 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
+        <Card className="flex flex-col min-h-0 border-border/40 bg-card shadow-sm">
           <CardHeader className="py-2 px-3">
             <CardTitle className="text-base">Create video</CardTitle>
             <CardDescription className="text-xs">Generate and export your code video with the settings from the editor.</CardDescription>
@@ -208,8 +208,8 @@ export function CreateVideoPanel({
             </div>
 
             <div className="flex gap-2">
-              <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleCreateAndRender} disabled={loading || rendering || renderLineCount === 0}>
-                {loading || rendering ? "Creating video..." : "Create video"}
+              <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || renderLineCount === 0}>
+                {loading || rendering ? "Creating video…" : "Create video"}
               </Button>
               <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || renderLineCount === 0} variant="secondary">
                 {rendering ? "Rendering videos..." : "Render again"}
@@ -221,19 +221,20 @@ export function CreateVideoPanel({
                 No code payload reached this step yet. Go back to the editor and continue again.
               </div>
             ) : null}
-            {error ? <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive-foreground">{error}</div> : null}
+            {error ? <div className="rounded-md border border-destructive/30 bg-destructive/8 p-2 text-xs text-destructive">{error}</div> : null}
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col min-h-0 border-white/5 bg-background shadow-lg dark:bg-card">
+        <Card className="flex flex-col min-h-0 border-border/40 bg-card shadow-sm">
           <CardHeader className="py-2 px-3">
             <CardTitle className="text-base">Export jobs</CardTitle>
             <CardDescription className="text-xs">Plan-aware export jobs with format and watermark settings.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
             {jobs.length === 0 ? (
-              <div className="rounded-md border border-border bg-card p-3 text-xs text-muted-foreground text-center">
-                No export jobs created yet. Use the button on the left to generate the vertical, landscape, or dual-format job list.
+              <div className="rounded-xl border border-dashed border-border/50 p-6 text-xs text-muted-foreground text-center">
+                <p className="font-medium text-foreground/60 mb-1">No export jobs yet</p>
+                <p className="text-[11px]">Click &quot;Create video&quot; on the left to start rendering.</p>
               </div>
             ) : null}
 
@@ -252,14 +253,14 @@ export function CreateVideoPanel({
             ))}
 
             {videos.map((video) => (
-              <div key={video.exportId} className="rounded-md border border-primary/30 bg-primary/5 p-3 shadow-sm">
+              <div key={video.exportId} className="rounded-xl border border-primary/25 bg-primary/5 p-3 shadow-sm">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-primary">{video.aspectRatio} video ready</p>
                   <a href={video.url} download={video.filename}>
-                    <Button size="sm" className="h-6 text-[10px] px-2">Download .webm</Button>
+                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .mp4</Button>
                   </a>
                 </div>
-                <video src={video.url} controls playsInline className="w-full rounded-md border border-border/50 bg-black shadow-inner" />
+                <video src={video.url} controls playsInline className="w-full rounded-lg border border-border/50 bg-black shadow-inner" />
               </div>
             ))}
           </CardContent>
@@ -271,9 +272,9 @@ export function CreateVideoPanel({
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-card shadow-sm p-2">
-      <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xs font-semibold text-foreground truncate max-w-full">{value}</p>
+    <div className="rounded-lg border border-border/40 bg-muted/20 p-2 hover:border-border/60 transition-colors">
+      <p className="text-[9px] uppercase tracking-widest text-muted-foreground/60 font-medium">{label}</p>
+      <p className="mt-0.5 text-xs font-semibold text-foreground truncate max-w-full">{value}</p>
     </div>
   );
 }
@@ -644,13 +645,13 @@ function wrapLine(content: string, maxCharsPerLine: number) {
 
   while (remChars.length > max) {
     let cut = -1;
-    // First try space within first `max` characters
-    for (let i = max; i >= 0; i--) {
+    // Search within bounds: index max-1 is the last valid char in this segment
+    for (let i = max - 1; i >= Math.max(Math.floor(max * 0.3), 4); i--) {
       if (remChars[i] === " ") { cut = i; break; }
     }
-    // If no space or too early, try symbol boundaries
-    if (cut <= Math.max(max * 0.3, 4)) {
-      for (let i = max; i > Math.max(max * 0.3, 4); i--) {
+    // If no space found, try symbol boundaries
+    if (cut < 0) {
+      for (let i = max - 1; i >= Math.max(Math.floor(max * 0.3), 4); i--) {
         const ch = remChars[i];
         if (ch === "." || ch === "(" || ch === "," || ch === "[" || ch === "{" || ch === "=" || ch === ">" || ch === "|" || ch === "&" || ch === "+" || ch === "-") {
           cut = i;
@@ -658,13 +659,13 @@ function wrapLine(content: string, maxCharsPerLine: number) {
         }
       }
     }
-    if (cut <= Math.max(max * 0.3, 4)) cut = max;
+    // Hard cut at max if no break point found
+    if (cut < 0) cut = max;
 
     segments.push(remChars.slice(0, cut).join(""));
     remChars = remChars.slice(cut);
-    if (remChars[0] === " ") {
-      while (remChars.length > 0 && remChars[0] === " ") remChars = remChars.slice(1);
-    }
+    // Trim leading spaces on the continuation
+    while (remChars.length > 0 && remChars[0] === " ") remChars = remChars.slice(1);
   }
 
   if (remChars.length > 0) {
@@ -755,22 +756,25 @@ function paintFrame({
   const vert = w < h;
   ctx.clearRect(0, 0, w, h);
 
-  // Rich dark background
-  const bg = ctx.createLinearGradient(0, 0, w * 0.4, h);
-  bg.addColorStop(0, "#0f1318"); bg.addColorStop(0.4, "#0c1015"); bg.addColorStop(1, "#090d12");
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+  // Rich deep-space IDE background
+  ctx.fillStyle = "#080c10";
+  ctx.fillRect(0, 0, w, h);
 
-  // Dot grid texture
+  // Subtle dot grid
   ctx.fillStyle = "rgba(255,255,255,0.012)";
-  for (let dx = 20; dx < w; dx += 24) for (let dy = 20; dy < h; dy += 24) { ctx.beginPath(); ctx.arc(dx, dy, 0.8, 0, Math.PI * 2); ctx.fill(); }
+  for (let dx = 20; dx < w; dx += 28) for (let dy = 20; dy < h; dy += 28) { ctx.beginPath(); ctx.arc(dx, dy, 0.7, 0, Math.PI * 2); ctx.fill(); }
 
-  // Ambient glows
-  const g1 = ctx.createRadialGradient(w * 0.2, h * 0.12, 0, w * 0.2, h * 0.12, Math.min(w, h) * 0.35);
-  g1.addColorStop(0, "rgba(56,189,248,0.04)"); g1.addColorStop(1, "rgba(56,189,248,0)");
+  // Ambient glows — primary cyan + accent purple
+  const g1 = ctx.createRadialGradient(w * 0.15, h * 0.08, 0, w * 0.15, h * 0.08, Math.min(w, h) * 0.45);
+  g1.addColorStop(0, "rgba(56,189,248,0.07)"); g1.addColorStop(1, "rgba(56,189,248,0)");
   ctx.fillStyle = g1; ctx.fillRect(0, 0, w, h);
-  const g2 = ctx.createRadialGradient(w * 0.85, h * 0.75, 0, w * 0.85, h * 0.75, Math.min(w, h) * 0.25);
-  g2.addColorStop(0, "rgba(139,92,246,0.03)"); g2.addColorStop(1, "rgba(139,92,246,0)");
+  const g2 = ctx.createRadialGradient(w * 0.88, h * 0.82, 0, w * 0.88, h * 0.82, Math.min(w, h) * 0.35);
+  g2.addColorStop(0, "rgba(139,92,246,0.06)"); g2.addColorStop(1, "rgba(139,92,246,0)");
   ctx.fillStyle = g2; ctx.fillRect(0, 0, w, h);
+  // Subtle bottom gradient fade
+  const gBot = ctx.createLinearGradient(0, h * 0.7, 0, h);
+  gBot.addColorStop(0, "rgba(0,0,0,0)"); gBot.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = gBot; ctx.fillRect(0, 0, w, h);
 
   const fw = vert ? w * 0.94 : w * 0.88;
   const fh = vert ? h - 300 : h * 0.86;
@@ -813,25 +817,61 @@ function paintFrame({
     ctx.fillStyle = g!; ctx.beginPath(); ctx.arc(cx, cy + 0.3, dotR - 1, 0, Math.PI * 2); ctx.fill();
   });
 
-  // File tab
-  ctx.font = `500 ${vert ? 11 : 12}px ui-sans-serif,system-ui`;
-  const tabX = fx + (vert ? 64 : 88);
-  const tabW = Math.min(ctx.measureText(title).width + 32, fw * 0.45);
-  ctx.fillStyle = "#0d1117";
-  roundRect(ctx, tabX, fy + 4, tabW, tbH - 4, 8); ctx.fill();
-  ctx.fillStyle = "rgba(56,189,248,0.6)";
-  ctx.fillRect(tabX + 6, fy + 4, tabW - 12, 2);
-  ctx.fillStyle = "#e6edf3";
-  ctx.fillText(title, tabX + 12, fy + tbH / 2 + 4);
+  // File tab — active tab with underline indicator
+  const tabFont = `500 ${vert ? 10 : 11}px ui-sans-serif,system-ui`;
+  ctx.font = tabFont;
+  const tabX = fx + (vert ? 64 : 90);
+  const titleShort = title.length > 28 ? title.slice(0, 26) + "…" : title;
+  const tabW = Math.min(ctx.measureText(titleShort).width + 32, fw * 0.42);
+  // Tab background
+  const tabGrad = ctx.createLinearGradient(tabX, fy + 2, tabX, fy + tbH);
+  tabGrad.addColorStop(0, "#1c2128"); tabGrad.addColorStop(1, "#0d1117");
+  ctx.fillStyle = tabGrad;
+  // Draw tab with rounded top corners only (8px radius)
+  ctx.beginPath();
+  ctx.moveTo(tabX, fy + tbH);
+  ctx.lineTo(tabX, fy + 11);
+  ctx.arcTo(tabX, fy + 3, tabX + 8, fy + 3, 8);
+  ctx.lineTo(tabX + tabW - 8, fy + 3);
+  ctx.arcTo(tabX + tabW, fy + 3, tabX + tabW, fy + 11, 8);
+  ctx.lineTo(tabX + tabW, fy + tbH);
+  ctx.closePath(); ctx.fill();
+  // Tab border sides
+  ctx.strokeStyle = "rgba(48,54,64,0.5)"; ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(tabX, fy + tbH); ctx.lineTo(tabX, fy + 4);
+  ctx.arcTo(tabX, fy + 2, tabX + 8, fy + 2, 6);
+  ctx.lineTo(tabX + tabW - 8, fy + 2);
+  ctx.arcTo(tabX + tabW, fy + 2, tabX + tabW, fy + 10, 6);
+  ctx.lineTo(tabX + tabW, fy + tbH);
+  ctx.stroke();
+  // Active tab indicator (top highlight)
+  ctx.fillStyle = "rgba(56,189,248,0.75)";
+  roundRect(ctx, tabX + 6, fy + 3, tabW - 12, 2, 2); ctx.fill();
+  // File icon dot
+  ctx.fillStyle = "rgba(56,189,248,0.4)";
+  ctx.beginPath(); ctx.arc(tabX + 12, fy + tbH / 2, 3, 0, Math.PI * 2); ctx.fill();
+  // Title text
+  ctx.fillStyle = "rgba(230,237,243,0.95)";
+  ctx.font = tabFont;
+  ctx.fillText(titleShort, tabX + 20, fy + tbH / 2 + 4, tabW - 26);
 
-  // Language badge
-  ctx.font = `500 ${vert ? 9 : 10}px ui-sans-serif,system-ui`;
+  // Language badge — right side of title bar
+  ctx.font = `600 ${vert ? 8 : 9}px ui-sans-serif,system-ui`;
   const langTxt = language.toUpperCase();
-  const lw = ctx.measureText(langTxt).width + 12;
-  ctx.fillStyle = "rgba(56,189,248,0.1)";
-  roundRect(ctx, fx + fw - lw - 10, fy + tbH / 2 - 8, lw, 16, 4); ctx.fill();
-  ctx.fillStyle = "rgba(56,189,248,0.65)";
-  ctx.fillText(langTxt, fx + fw - lw - 4, fy + tbH / 2 + 3);
+  const lw = ctx.measureText(langTxt).width + 14;
+  const langX = fx + fw - lw - 12;
+  const langY = fy + tbH / 2 - 9;
+  // Badge background
+  const langGrad = ctx.createLinearGradient(langX, langY, langX, langY + 18);
+  langGrad.addColorStop(0, "rgba(56,189,248,0.18)");
+  langGrad.addColorStop(1, "rgba(56,189,248,0.08)");
+  ctx.fillStyle = langGrad;
+  roundRect(ctx, langX, langY, lw, 18, 4); ctx.fill();
+  ctx.strokeStyle = "rgba(56,189,248,0.25)"; ctx.lineWidth = 0.5;
+  roundRect(ctx, langX, langY, lw, 18, 4); ctx.stroke();
+  ctx.fillStyle = "rgba(56,189,248,0.9)";
+  ctx.fillText(langTxt, langX + 7, langY + 12);
 
   // Activity bar — landscape only
   const abW = vert ? 0 : 32;
@@ -855,14 +895,15 @@ function paintFrame({
   ctx.strokeStyle = "rgba(48,54,64,0.25)"; ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(gutterX + gutterW, fy + tbH); ctx.lineTo(gutterX + gutterW, fy + fh); ctx.stroke();
 
-  // Code area (clipped)
+  // Code area (clipped) — 24px right margin so last char is never cut
   const codeLeft = gutterX + gutterW + 10;
-  const codeRight = fx + fw - 16;
+  const codeRight = fx + fw - 24;
   const codeMaxW = codeRight - codeLeft;
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(fx, fy + tbH, fw, fh - tbH - 24);
+  // Leave 24px for status bar; subtract 2 so bottom line chars don't get clipped
+  ctx.rect(fx, fy + tbH, fw, fh - tbH - 22);
   ctx.clip();
 
   const lineHeight = fontSize * 1.5;
@@ -874,28 +915,25 @@ function paintFrame({
     const isActive = line.number === activeLine;
     const isFocused = focusSet.has(line.number);
 
+    // Active / focused line highlight (no cursor bar — removed)
     if (isActive || isFocused) {
       ctx.fillStyle = isActive ? "rgba(56,189,248,0.06)" : "rgba(255,255,255,0.02)";
       ctx.fillRect(gutterX, y - lineHeight + 6, fx + fw - gutterX, lineHeight);
-      if (isActive) {
-        ctx.fillStyle = "rgba(56,189,248,0.45)";
-        ctx.fillRect(gutterX + gutterW, y - lineHeight + 6, 2, lineHeight);
-      }
     }
 
-    ctx.fillStyle = line.continuation ? "rgba(100,116,139,0.25)" : (isActive ? "rgba(56,189,248,0.55)" : "rgba(100,116,139,0.4)");
+    // Gutter: show line number OR the continuation arrow
     ctx.font = `${fontSize - 4}px ui-monospace, SFMono-Regular, monospace`;
     ctx.textAlign = "right";
-    ctx.fillText(line.lineNumberLabel, gutterX + gutterW - 6, y);
-    ctx.textAlign = "start";
-
     if (line.continuation) {
-      ctx.fillStyle = "rgba(56,189,248,0.3)";
-      ctx.font = `${fontSize - 6}px ui-monospace, SFMono-Regular, monospace`;
-      ctx.textAlign = "right";
+      // Arrow goes in the gutter column (line-number side), not the code area
+      ctx.fillStyle = "rgba(56,189,248,0.45)";
+      ctx.font = `${fontSize - 3}px ui-monospace, SFMono-Regular, monospace`;
       ctx.fillText("\u21B3", gutterX + gutterW - 6, y);
-      ctx.textAlign = "start";
+    } else {
+      ctx.fillStyle = isActive ? "rgba(56,189,248,0.55)" : "rgba(100,116,139,0.4)";
+      ctx.fillText(line.lineNumberLabel, gutterX + gutterW - 6, y);
     }
+    ctx.textAlign = "start";
 
     drawCodeColored(ctx, line.fullLineContent ?? line.content, line.charOffset ?? 0, Array.from(line.content).length, codeLeft, y, fontSize, codeMaxW);
 
@@ -904,22 +942,28 @@ function paintFrame({
 
   ctx.restore();
 
-  // Status bar
-  const sbH = 24;
-  ctx.fillStyle = "#161b22";
+  // Status bar — VSCode-style
+  const sbH = 22;
+  const sbGrad = ctx.createLinearGradient(fx, fy + fh - sbH, fx, fy + fh);
+  sbGrad.addColorStop(0, "#1c2736"); sbGrad.addColorStop(1, "#142030");
+  ctx.fillStyle = sbGrad;
   ctx.fillRect(fx, fy + fh - sbH, fw, sbH);
-  ctx.strokeStyle = "rgba(48,54,64,0.35)"; ctx.lineWidth = 0.5;
+  ctx.strokeStyle = "rgba(56,189,248,0.12)"; ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(fx, fy + fh - sbH); ctx.lineTo(fx + fw, fy + fh - sbH); ctx.stroke();
-  ctx.fillStyle = "rgba(56,189,248,0.6)"; roundRect(ctx, fx + 4, fy + fh - sbH + 4, 14, 14, 3); ctx.fill();
-  ctx.fillStyle = "#0d1117"; ctx.font = "bold 8px ui-monospace"; ctx.fillText("><", fx + 5.5, fy + fh - 7);
-  ctx.fillStyle = "rgba(148,163,184,0.45)";
-  ctx.font = `500 ${vert ? 8 : 10}px ui-sans-serif,system-ui`;
-  ctx.fillText(`Ln ${activeLine}`, fx + 24, fy + fh - 7);
+  // Branch icon
+  ctx.fillStyle = "rgba(56,189,248,0.7)";
+  roundRect(ctx, fx + 4, fy + fh - sbH + 4, 12, 14, 3); ctx.fill();
+  ctx.fillStyle = "#0d1117"; ctx.font = "bold 7px ui-monospace"; ctx.fillText("β", fx + 5.5, fy + fh - 6);
+  // Status items
+  ctx.fillStyle = "rgba(148,163,184,0.6)";
+  ctx.font = `500 ${vert ? 8 : 9}px ui-sans-serif,system-ui`;
+  ctx.fillText(`Ln ${activeLine}`, fx + 22, fy + fh - 6);
   if (!vert) {
-    ctx.fillText("Spaces: 2", fx + 80, fy + fh - 7);
-    ctx.fillText(language, fx + fw - 100, fy + fh - 7);
+    ctx.fillText("✓ 0 errors", fx + 70, fy + fh - 6);
+    ctx.fillText("Spaces: 2", fx + 150, fy + fh - 6);
+    ctx.fillText(language, fx + fw - 80, fy + fh - 6);
   }
-  ctx.fillText("UTF-8", fx + fw - 42, fy + fh - 7);
+  ctx.fillText("UTF-8", fx + fw - 36, fy + fh - 6);
 
   if (watermarked) {
     ctx.fillStyle = "rgba(255,255,255,0.1)";
@@ -947,7 +991,7 @@ function paintFrame({
   }
 }
 
-/** Draw code with syntax coloring, preserving color for wrapped line segments. */
+/** Draw code with syntax coloring, clamped to maxW so no char is ever clipped by the right edge. */
 function drawCodeColored(
   context: CanvasRenderingContext2D, fullLine: string, charOffset: number, charCount: number,
   x: number, y: number, fontSize: number, maxW: number
@@ -956,34 +1000,77 @@ function drawCodeColored(
   const tokens = tokenize(fullLine);
   let charIdx = 0;
   let cx = x;
+  const rightEdge = x + maxW; // absolute right boundary
   for (const t of tokens) {
     const codePoints = Array.from(t.text);
     for (const cp of codePoints) {
       if (charIdx >= charOffset && charIdx < charOffset + charCount) {
-        context.fillStyle = t.color;
-        context.fillText(cp, cx, y);
-        cx += context.measureText(cp).width;
+        const charW = context.measureText(cp).width;
+        // Only draw if the character fits fully within the right boundary
+        if (cx + charW <= rightEdge) {
+          context.fillStyle = t.color;
+          context.fillText(cp, cx, y);
+        }
+        cx += charW;
       }
       charIdx++;
     }
   }
 }
 
+/**
+ * Tokenizes a line of code into colored segments.
+ * Key fix: identifiers (including camelCase like `evenNumbers`) are matched
+ * as a WHOLE token first, THEN checked against keyword lists — so the full
+ * name gets a single color, not split at case boundaries.
+ */
 function tokenize(line: string) {
-  if (line.trim().startsWith("//") || line.trim().startsWith("#") || line.trim().startsWith("/*") || line.trim().startsWith("*")) {
-    return [{ text: line, color: "#67e8f9" }];
+  // Full-line comment shortcut
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+    return [{ text: line, color: "rgba(100,220,200,0.75)" }];
   }
 
-  const patterns = [
-    { regex: /^(".*?"|'.*?'|`.*?`)/, color: "#fda4af" },
-    { regex: /^(import|export|from|default|type|interface|enum|implements|extends|public|private|protected|static|readonly|abstract|declare|namespace|module)\b/, color: "#c084fc" },
-    { regex: /^(const|let|var|function|return|async|await|class|new|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|typeof|instanceof|in|of|void|delete|yield|super|this|null|undefined|true|false|console|map|filter|reduce|forEach|find|includes|push|pop|shift|length|log|warn|error|debug|info)\b/, color: "#7dd3fc" },
-    { regex: /^(\d+(\.\d+)?)/, color: "#facc15" },
-    { regex: /^([{}()[\]])/, color: "#c084fc" },
-    { regex: /^([.,:;])/ , color: "#94a3b8" },
-    { regex: /^(=>|===|!==|==|!=|>=|<=|&&|\|\||\?\?|\+\+|--|\+=|-=|\*=|\/=|\+|-|\*|\/|%|!|<|>|=|&|\||\?|:)/, color: "#f97316" },
-    { regex: /^([A-Z][a-zA-Z0-9]*)/, color: "#4ade80" },
-    { regex: /^([a-z_$][a-zA-Z0-9_$]*)/, color: "#e6edf3" }
+  const KEYWORDS_MODULE = new Set([
+    "import", "export", "from", "default", "type", "interface", "enum",
+    "implements", "extends", "public", "private", "protected", "static",
+    "readonly", "abstract", "declare", "namespace", "module",
+  ]);
+  const KEYWORDS_CONTROL = new Set([
+    "const", "let", "var", "function", "return", "async", "await", "class",
+    "new", "if", "else", "for", "while", "do", "switch", "case", "break",
+    "continue", "try", "catch", "finally", "throw", "typeof", "instanceof",
+    "in", "of", "void", "delete", "yield", "super", "this", "null",
+    "undefined", "true", "false",
+  ]);
+  const BUILTINS = new Set([
+    "console", "map", "filter", "reduce", "forEach", "find", "includes",
+    "push", "pop", "shift", "length", "log", "warn", "error", "debug", "info",
+    "Math", "Array", "Object", "String", "Number", "Boolean", "Promise",
+    "JSON", "Date", "parseInt", "parseFloat", "setTimeout", "setInterval",
+  ]);
+
+  // Ordered patterns (identifier MUST come AFTER strings but before symbol patterns)
+  const patterns: Array<{ regex: RegExp; resolver: (m: string) => string }> = [
+    // Strings (template literals, single/double quoted)
+    { regex: /^(`[^`]*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/, resolver: () => "#fda4af" },
+    // Full identifier — matches entire camelCase/PascalCase/snake_case name
+    { regex: /^([a-zA-Z_$][a-zA-Z0-9_$]*)/, resolver: (m) => {
+      if (KEYWORDS_MODULE.has(m)) return "#c084fc";
+      if (KEYWORDS_CONTROL.has(m)) return "#7dd3fc";
+      if (BUILTINS.has(m)) return "#7dd3fc";
+      // PascalCase = type/class name
+      if (/^[A-Z]/.test(m)) return "#4ade80";
+      return "#e6edf3";
+    }},
+    // Numbers
+    { regex: /^(\d+(\.\d+)?)/, resolver: () => "#facc15" },
+    // Brackets
+    { regex: /^([{}()[\]])/, resolver: () => "#c084fc" },
+    // Punctuation
+    { regex: /^([.,:;])/, resolver: () => "#94a3b8" },
+    // Operators
+    { regex: /^(=>|===|!==|==|!=|>=|<=|&&|\|\||\?\?|\+\+|--|\+=|-=|\*=|\/=|\+|-|\*|\/|%|!|<|>|=|&|\||\?|:)/, resolver: () => "#f97316" },
   ];
 
   const tokens: Array<{ text: string; color: string }> = [];
@@ -991,17 +1078,15 @@ function tokenize(line: string) {
 
   while (remaining.length > 0) {
     let matched = false;
-
-    for (const pattern of patterns) {
-      const match = remaining.match(pattern.regex);
+    for (const { regex, resolver } of patterns) {
+      const match = remaining.match(regex);
       if (match) {
-        tokens.push({ text: match[0], color: pattern.color });
+        tokens.push({ text: match[0], color: resolver(match[0]) });
         remaining = remaining.slice(match[0].length);
         matched = true;
         break;
       }
     }
-
     if (!matched) {
       const ch = remaining.match(/^./u)?.[0] ?? remaining[0];
       tokens.push({ text: ch, color: "#e6edf3" });

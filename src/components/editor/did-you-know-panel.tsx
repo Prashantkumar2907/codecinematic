@@ -1,29 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Loader2, Play, Type, ToggleLeft, ToggleRight, Volume2 } from "lucide-react";
+import { Download, Loader2, Maximize2, Play, Type, ToggleLeft, ToggleRight, Volume2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 
-/* ═══════════════════════════════════════════════
-   Font catalog (shared with word-of-day)
-   ═══════════════════════════════════════════════ */
-const FONT_CATALOG = [
-  { name: "Playfair Display", style: "serif", google: true },
-  { name: "Lora", style: "serif", google: true },
-  { name: "Merriweather", style: "serif", google: true },
-  { name: "Cormorant Garamond", style: "serif", google: true },
-  { name: "DM Serif Display", style: "serif", google: true },
-  { name: "Space Grotesk", style: "sans-serif", google: true },
-  { name: "Inter", style: "sans-serif", google: true },
-  { name: "Outfit", style: "sans-serif", google: true },
-  { name: "Sora", style: "sans-serif", google: true },
-  { name: "JetBrains Mono", style: "monospace", google: true },
-  { name: "Georgia", style: "serif", google: false },
-  { name: "Times New Roman", style: "serif", google: false },
-] as const;
+import { loadGoogleFonts } from "./shared/font-catalog";
+import { FontPickerModal } from "./shared/font-picker-modal";
+import { BgPicker } from "./shared/bg-picker";
+import { BG_PRESETS, type BgPreset, drawBackground, wrapText } from "./shared/canvas-utils";
+import { playTypingPulse } from "./shared/audio-utils";
 
 const ASPECT_OPTIONS = [
   { value: "9:16", label: "Vertical 9:16", w: 720, h: 1280 },
@@ -34,13 +22,23 @@ const ASPECT_OPTIONS = [
    Component
    ═══════════════════════════════════════════════ */
 export function DidYouKnowPanel({ projectId }: { projectId: string }) {
-  // Form state
-  const [factText, setFactText] = useState("Honey never spoils. Archaeologists have found 3,000-year-old honey in Egyptian tombs that was still perfectly edible.");
+  // Content
+  const [factText, setFactText] = useState(
+    "Honey never spoils. Archaeologists have found 3,000-year-old honey in Egyptian tombs that was still perfectly edible."
+  );
   const [showTitle, setShowTitle] = useState(true);
   const [titleMode, setTitleMode] = useState<"didyouknow" | "thoughtofday">("didyouknow");
+
+  // Appearance
   const [aspect, setAspect] = useState<"9:16" | "16:9">("9:16");
-  const [selectedFont, setSelectedFont] = useState<string>("Playfair Display");
+  const [selectedFont, setSelectedFont] = useState("Playfair Display");
+  const [factFontSize, setFactFontSize] = useState(34);
   const [showFontPicker, setShowFontPicker] = useState(false);
+  const [bgPreset, setBgPreset] = useState<BgPreset>(BG_PRESETS[1]); // Midnight Blue default
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<ImageBitmap | null>(null);
+
+  // Speed & Sound
   const [titleSpeed, setTitleSpeed] = useState(1.0);
   const [textSpeed, setTextSpeed] = useState(1.0);
   const [sound, setSound] = useState<"off" | "soft" | "typewriter">("soft");
@@ -50,35 +48,36 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
   const [rendering, setRendering] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
+  const [expandPreview, setExpandPreview] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
-  // Load Google Fonts
-  useEffect(() => {
-    const googleFonts = FONT_CATALOG.filter((f) => f.google).map((f) => f.name.replace(/ /g, "+"));
-    const families = googleFonts.map((f) => `family=${f}:ital,wght@0,400;0,700;1,400;1,700`).join("&");
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?${families}&display=swap`;
-    document.head.appendChild(link);
-    return () => { link.remove(); };
-  }, []);
+  const titleText = titleMode === "didyouknow" ? "DID YOU KNOW ?" : "THOUGHT OF THE DAY";
 
-  // Live preview
+  // Load Google Fonts once
+  useEffect(() => { loadGoogleFonts(); }, []);
+
+  // Handle image upload
+  function handleImageUpload(file: File) {
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    createImageBitmap(file).then(setBgImage);
+  }
+  function handleImageClear() {
+    setUploadedImageUrl(null);
+    setBgImage(null);
+  }
+
+  // Live preview — always 16:9
   useEffect(() => {
     const c = previewRef.current;
     if (!c) return;
-    const dim = ASPECT_OPTIONS.find((a) => a.value === aspect)!;
-    const scale = 0.25;
-    c.width = dim.w * scale;
-    c.height = dim.h * scale;
+    c.width = 640;
+    c.height = 360;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    // Show the fact text phase in preview
-    drawFactFrame(ctx, c.width, c.height, factText, selectedFont, 1.0);
-  }, [factText, aspect, selectedFont]);
-
-  const titleText = titleMode === "didyouknow" ? "DID YOU KNOW ?" : "THOUGHT OF THE DAY";
+    drawFactFrame(ctx, 640, 360, factText, selectedFont, 1.0, bgPreset, bgImage, factFontSize);
+  }, [factText, aspect, selectedFont, bgPreset, bgImage, factFontSize]);
 
   /* ── Render video ── */
   const handleRender = useCallback(async () => {
@@ -97,12 +96,14 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
     const fps = 30;
     const titleDuration = showTitle ? 1.2 / titleSpeed : 0;
     const fadeDuration = showTitle ? 0.8 / titleSpeed : 0;
-    const charsPerSec = 40 * textSpeed;
-    const typingDuration = Math.max(2, factText.length / charsPerSec);
+
+    // Chars per second: matches audio exactly
+    const cps = Math.max(2, 12 * textSpeed);
+    const typingDuration = Math.max(1.0, factText.length / cps);
     const holdDuration = 1.5;
     const totalFrames = Math.ceil((titleDuration + fadeDuration + typingDuration + holdDuration) * fps);
 
-    // Audio setup
+    // Audio
     const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
     const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
@@ -123,12 +124,12 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
       recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
     });
 
-    // Schedule typing sounds
+    // Schedule typing sounds — evenly spaced at the real CPS rate
     if (audioCtx && audioDest && sound !== "off" && soundVolume > 0) {
-      const typeStart = audioCtx.currentTime + titleDuration + fadeDuration + 0.06;
+      const typeStart = audioCtx.currentTime + titleDuration + fadeDuration + 0.05;
       const chars = Array.from(factText);
       chars.forEach((ch, i) => {
-        const when = typeStart + (i / chars.length) * typingDuration;
+        const when = typeStart + (i / cps);
         playTypingPulse(audioCtx, audioDest, when, sound, soundVolume, ch, i === chars.length - 1);
       });
     }
@@ -139,18 +140,15 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
       const t = frame / fps;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
       if (showTitle && t < titleDuration) {
-        drawTitleScreen(ctx, canvas.width, canvas.height, titleText, selectedFont, 1.0);
+        drawTitleScreen(ctx, canvas.width, canvas.height, titleText, selectedFont, 1.0, bgPreset, bgImage);
       } else if (showTitle && t < titleDuration + fadeDuration) {
         const fadeProgress = (t - titleDuration) / fadeDuration;
-        drawCrumbleEffect(ctx, canvas.width, canvas.height, titleText, selectedFont, fadeProgress);
+        drawCrumbleEffect(ctx, canvas.width, canvas.height, titleText, selectedFont, fadeProgress, bgPreset, bgImage);
       } else {
         const factStartTime = titleDuration + fadeDuration;
         const factT = (t - factStartTime) / typingDuration;
-        drawFactFrame(ctx, canvas.width, canvas.height, factText, selectedFont, Math.min(factT, 1.0));
+        drawFactFrame(ctx, canvas.width, canvas.height, factText, selectedFont, Math.min(factT, 1.0), bgPreset, bgImage, factFontSize);
       }
 
       setProgress(`Rendering… ${Math.round((frame / totalFrames) * 100)}%`);
@@ -164,14 +162,14 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
     setVideoUrl(url);
     setRendering(false);
     setProgress("");
-  }, [factText, aspect, selectedFont, showTitle, titleText, titleSpeed, textSpeed, sound, soundVolume]);
+  }, [factText, aspect, selectedFont, showTitle, titleText, titleSpeed, textSpeed, sound, soundVolume, bgPreset, bgImage, factFontSize]);
 
   const handleDownload = () => {
     if (!videoUrl) return;
     const slug = titleMode === "didyouknow" ? "did-you-know" : "thought-of-the-day";
     const a = document.createElement("a");
     a.href = videoUrl;
-    a.download = `${slug}-${Date.now()}.webm`;
+    a.download = `${slug}-${Date.now()}.mp4`;
     a.click();
   };
 
@@ -180,15 +178,16 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
       <div className="grid gap-2 xl:grid-cols-[1fr_1fr] xl:flex-1 xl:min-h-0">
 
         {/* LEFT: Settings */}
-        <div className="flex flex-col space-y-2">
-          <Card className="border-white/5 bg-background shadow-lg dark:bg-card">
-            <CardHeader className="py-2 px-3 border-b border-white/5 mb-2">
+        <div className="flex flex-col space-y-2 min-h-0 overflow-y-auto">
+          <Card className="border-border/40 bg-card shadow-sm">
+            <CardHeader className="py-2 px-3 border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Type className="h-4 w-4 text-primary" />
                 {titleMode === "didyouknow" ? "Did You Know?" : "Thought of the Day"}
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 space-y-3">
+
               {/* Title mode selector */}
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">MODE</span>
@@ -213,12 +212,12 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                         : "border-border bg-card hover:border-primary/30"
                     }`}
                   >
-                    Thought of the Day
+                    Thought of Day
                   </button>
                 </div>
               </div>
 
-              {/* Toggle title visibility */}
+              {/* Toggle title */}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-semibold text-muted-foreground">SHOW TITLE SCREEN</span>
                 <button
@@ -230,6 +229,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                 </button>
               </div>
 
+              {/* Content textarea */}
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">
                   {titleMode === "didyouknow" ? "FACT / CONTENT" : "YOUR THOUGHT"}
@@ -237,21 +237,22 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                 <Textarea
                   value={factText}
                   onChange={(e) => setFactText(e.target.value)}
-                  className="min-h-[100px] text-xs border-input shadow-sm resize-none"
+                  className="min-h-[90px] text-xs border-input shadow-sm resize-none"
                   placeholder={titleMode === "didyouknow" ? "Enter an interesting fact…" : "Enter a thought or quote…"}
                 />
               </div>
 
+              {/* Ratio + Font */}
               <div className="grid gap-2 grid-cols-2">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
                   <select
                     value={aspect}
                     onChange={(e) => setAspect(e.target.value as "9:16" | "16:9")}
-                    className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
+                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
                   >
                     {ASPECT_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value} className="dark:bg-slate-950">{o.label}</option>
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -268,24 +269,46 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
+              {/* Font size slider */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground">TEXT SIZE</span>
+                  <span className="text-[10px] text-muted-foreground">{factFontSize}px</span>
+                </div>
+                <input type="range" min={18} max={72} step={1} value={factFontSize}
+                  onChange={(e) => setFactFontSize(parseInt(e.target.value))}
+                  className="w-full h-1 accent-primary" />
+              </div>
+
+              {/* Background picker */}
+              <div className="pt-1 border-t border-white/5">
+                <BgPicker
+                  selectedId={bgPreset.id}
+                  onSelect={(p) => { setBgPreset(p); handleImageClear(); }}
+                  uploadedImageUrl={uploadedImageUrl}
+                  onImageUpload={handleImageUpload}
+                  onImageClear={handleImageClear}
+                />
+              </div>
+
               {/* Speed / Sound / Volume */}
               <div className="space-y-1.5 pt-1 border-t border-white/5">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">TITLE SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(1)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(2)}×</span>
                     </div>
-                    <input type="range" min={0.2} max={3.0} step={0.1} value={titleSpeed}
+                    <input type="range" min={0.5} max={1.5} step={0.05} value={titleSpeed}
                       onChange={(e) => setTitleSpeed(parseFloat(e.target.value))}
                       className="w-full h-1 accent-primary" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">TEXT SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{textSpeed.toFixed(1)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{textSpeed.toFixed(2)}×</span>
                     </div>
-                    <input type="range" min={0.2} max={3.0} step={0.1} value={textSpeed}
+                    <input type="range" min={0.5} max={1.5} step={0.05} value={textSpeed}
                       onChange={(e) => setTextSpeed(parseFloat(e.target.value))}
                       className="w-full h-1 accent-primary" />
                   </div>
@@ -296,11 +319,11 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                     <select
                       value={sound}
                       onChange={(e) => setSound(e.target.value as "off" | "soft" | "typewriter")}
-                      className="flex h-7 w-full rounded-md border border-input shadow-sm bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
+                      className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
                     >
-                      <option value="off" className="dark:bg-slate-950">Sound off</option>
-                      <option value="soft" className="dark:bg-slate-950">Soft keys</option>
-                      <option value="typewriter" className="dark:bg-slate-950">Typewriter</option>
+                      <option value="off">Sound off</option>
+                      <option value="soft">Soft keys</option>
+                      <option value="typewriter">Typewriter</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -335,7 +358,6 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
             </CardContent>
           </Card>
 
-          {/* Font Picker Modal */}
           {showFontPicker && (
             <FontPickerModal
               currentFont={selectedFont}
@@ -348,21 +370,29 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
 
         {/* RIGHT: Preview + Video */}
         <div className="flex flex-col space-y-2">
-          <Card className="flex-1 flex flex-col border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
-            <div className="bg-muted/40 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b flex items-center justify-between">
-              <span className="text-muted-foreground ml-1">Preview</span>
+          <Card className="flex-1 flex flex-col border-border/40 bg-card shadow-sm overflow-hidden">
+            <div className="bg-muted/30 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b border-border/30 flex items-center justify-between">
+              <span className="text-muted-foreground font-mono tracking-widest">// preview</span>
+              <button
+                type="button"
+                onClick={() => setExpandPreview(true)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="flex-1 flex items-center justify-center p-4 bg-black/50">
+            {/* Always 16:9 in panel */}
+            <div className="flex-1 flex items-center justify-center p-3 bg-black/50">
               <canvas
                 ref={previewRef}
                 className="max-w-full max-h-full rounded-md shadow-xl"
-                style={{ aspectRatio: aspect === "9:16" ? "9/16" : "16/9" }}
+                style={{ aspectRatio: "16/9" }}
               />
             </div>
           </Card>
 
           {videoUrl && (
-            <Card className="border-white/5 bg-background shadow-lg dark:bg-card overflow-hidden">
+            <Card className="border-border/40 bg-card shadow-sm overflow-hidden">
               <div className="bg-muted/40 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b">
                 <span className="text-muted-foreground ml-1">Rendered Video</span>
               </div>
@@ -372,8 +402,8 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                   controls
                   autoPlay
                   loop
-                  className="max-w-full max-h-[360px] rounded-md shadow-lg"
-                  style={{ aspectRatio: aspect === "9:16" ? "9/16" : "16/9" }}
+                  className="w-full rounded-md shadow-lg"
+                  style={{ aspectRatio: "16/9", objectFit: "contain", background: "#000" }}
                 />
               </div>
             </Card>
@@ -383,35 +413,35 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
 
       {/* Hidden render canvas */}
       <canvas ref={canvasRef} className="hidden" />
+
+      {/* Expanded preview lightbox */}
+      {expandPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setExpandPreview(false)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <canvas
+              className="rounded-lg shadow-2xl"
+              ref={(el) => {
+                if (!el) return;
+                const dim = ASPECT_OPTIONS.find((a) => a.value === aspect)!;
+                const scale = Math.min(
+                  (window.innerWidth * 0.9) / dim.w,
+                  (window.innerHeight * 0.9) / dim.h
+                );
+                el.width = dim.w * scale;
+                el.height = dim.h * scale;
+                const ctx = el.getContext("2d");
+                if (ctx) drawFactFrame(ctx, el.width, el.height, factText, selectedFont, 1.0, bgPreset, bgImage, factFontSize);
+              }}
+            />
+            <p className="text-center text-xs text-white/50 mt-2">Click to close · {aspect} actual ratio</p>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-/* ═══════════════════════════════════════════════════════
-   Audio helpers
-   ═══════════════════════════════════════════════════════ */
-
-function playTypingPulse(
-  ac: AudioContext, dest: MediaStreamAudioDestinationNode,
-  when: number, sound: string, vol: number, ch: string, accent: boolean
-) {
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  const filter = ac.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.setValueAtTime(sound === "typewriter" ? 900 : 700, when);
-  filter.Q.setValueAtTime(0.7, when);
-  const ws = ch.trim().length === 0;
-  osc.type = sound === "typewriter" ? "square" : "triangle";
-  osc.frequency.setValueAtTime(
-    sound === "typewriter" ? (ws ? 150 : accent ? 320 : 240) : (ws ? 480 : accent ? 900 : 700), when
-  );
-  const pk = (sound === "typewriter" ? (accent ? 0.12 : 0.08) : (accent ? 0.07 : 0.045)) * vol * (ws ? 0.45 : 1);
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.exponentialRampToValueAtTime(pk, when + 0.0015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + (sound === "typewriter" ? 0.016 : 0.012));
-  osc.connect(filter); filter.connect(gain); gain.connect(dest);
-  osc.start(when); osc.stop(when + (sound === "typewriter" ? 0.018 : 0.014));
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -420,66 +450,59 @@ function playTypingPulse(
 
 function drawTitleScreen(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  titleText: string,
-  font: string,
-  opacity: number
+  w: number, h: number,
+  titleText: string, font: string, opacity: number,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null
 ) {
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  drawBackground(ctx, w, h, bgPreset, bgImage);
 
-  // Subtle gradient
   const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.6);
-  g.addColorStop(0, "rgba(139,92,246,0.03)");
+  g.addColorStop(0, "rgba(255,255,255,0.04)");
   g.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
   // Decorative lines
-  ctx.strokeStyle = `rgba(255,255,255,${0.06 * opacity})`;
-  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = `rgba(255,255,255,${0.12 * opacity})`;
+  ctx.lineWidth = 1;
   const lineY = h / 2;
-  ctx.beginPath(); ctx.moveTo(w * 0.12, lineY - 45); ctx.lineTo(w * 0.88, lineY - 45); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w * 0.12, lineY + 45); ctx.lineTo(w * 0.88, lineY + 45); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.1, lineY - 52); ctx.lineTo(w * 0.9, lineY - 52); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.1, lineY + 52); ctx.lineTo(w * 0.9, lineY + 52); ctx.stroke();
 
-  // Small diamond decoration at center of lines
-  const drawDiamond = (cx: number, cy: number, size: number) => {
-    ctx.fillStyle = `rgba(255,255,255,${0.15 * opacity})`;
+  // Diamonds
+  const drawDiamond = (cx: number, cy: number, sz: number) => {
+    ctx.fillStyle = `rgba(255,255,255,${0.3 * opacity})`;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - size);
-    ctx.lineTo(cx + size, cy);
-    ctx.lineTo(cx, cy + size);
-    ctx.lineTo(cx - size, cy);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(cx, cy - sz); ctx.lineTo(cx + sz, cy);
+    ctx.lineTo(cx, cy + sz); ctx.lineTo(cx - sz, cy);
+    ctx.closePath(); ctx.fill();
   };
-  drawDiamond(w / 2, lineY - 45, 3);
-  drawDiamond(w / 2, lineY + 45, 3);
+  drawDiamond(w / 2, lineY - 52, 5);
+  drawDiamond(w / 2, lineY + 52, 5);
 
-  // Title text
   const vert = w < h;
-  const titleSize = vert ? 26 : 30;
+  const titleSize = vert ? 28 : 36;
   ctx.font = `400 ${titleSize}px "${font}", Georgia, serif`;
-  ctx.fillStyle = `rgba(255,255,255,${0.92 * opacity})`;
+  ctx.fillStyle = `rgba(255,255,255,${0.95 * opacity})`;
   ctx.textAlign = "center";
-  ctx.letterSpacing = "6px";
+  ctx.shadowColor = "rgba(0,0,0,0.4)";
+  ctx.shadowBlur = 12;
+  ctx.letterSpacing = "8px";
   ctx.fillText(titleText, w / 2, h / 2 + titleSize / 3);
   ctx.letterSpacing = "0px";
+  ctx.shadowBlur = 0;
   ctx.textAlign = "start";
 }
 
 function drawCrumbleEffect(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  titleText: string,
-  font: string,
-  progress: number
+  w: number, h: number,
+  titleText: string, font: string, progress: number,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null
 ) {
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  drawBackground(ctx, w, h, bgPreset, bgImage);
 
   const vert = w < h;
-  const titleSize = vert ? 26 : 30;
-
+  const titleSize = vert ? 28 : 36;
   ctx.font = `400 ${titleSize}px "${font}", Georgia, serif`;
   ctx.textAlign = "center";
   const textW = ctx.measureText(titleText).width;
@@ -491,73 +514,57 @@ function drawCrumbleEffect(
   for (let i = 0; i < titleText.length; i++) {
     const ch = titleText[i];
     const charW = ctx.measureText(ch).width;
-
     const charDelay = (i / titleText.length) * 0.35;
     const charProgress = Math.max(0, Math.min(1, (progress - charDelay) / 0.65));
-
     const alpha = 1 - charProgress;
-    const offsetY = charProgress * (30 + Math.random() * 50);
-    const offsetX = (Math.random() - 0.5) * charProgress * 25;
-    const rotate = (Math.random() - 0.5) * charProgress * 0.4;
+    const offsetY = charProgress * (30 + Math.sin(i) * 30);
+    const offsetX = (Math.sin(i * 2.5) - 0.5) * charProgress * 25;
+    const rotate = Math.sin(i) * charProgress * 0.3;
 
     if (alpha > 0.01) {
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(cx + charW / 2 + offsetX, baseY + offsetY);
       ctx.rotate(rotate);
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
       ctx.fillText(ch, -charW / 2, 0);
       ctx.restore();
     }
-
-    // Dust particles
-    if (charProgress > 0.05 && charProgress < 0.85) {
-      for (let p = 0; p < 2; p++) {
-        const px = cx + charW / 2 + (Math.random() - 0.5) * 18;
-        const py = baseY + offsetY + (Math.random() - 0.5) * 18;
-        ctx.fillStyle = `rgba(255,255,255,${(1 - charProgress) * 0.4})`;
-        ctx.beginPath();
-        ctx.arc(px, py, (1 - charProgress) * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
     cx += charW;
   }
-
   ctx.globalAlpha = 1;
   ctx.textAlign = "start";
 }
 
 function drawFactFrame(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  text: string,
-  font: string,
-  progress: number
+  w: number, h: number,
+  text: string, font: string, progress: number,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null,
+  factFontSize: number,
 ) {
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  drawBackground(ctx, w, h, bgPreset, bgImage);
 
-  // Subtle ambient glow
-  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.5);
-  g.addColorStop(0, "rgba(56,189,248,0.015)");
+  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.55);
+  g.addColorStop(0, "rgba(255,255,255,0.02)");
   g.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
-  const vert = w < h;
-  const fontSize = vert ? 32 : 36;
-  const lineHeight = fontSize * 1.8;
+  const scale = w / 720;
+  const fontSize = Math.round(factFontSize * scale);
+  const lineHeight = fontSize * 1.85;
   const maxW = w * 0.78;
+
   const totalChars = text.length;
   const visibleChars = Math.floor(totalChars * progress);
   const visibleText = text.substring(0, visibleChars);
 
   ctx.font = `400 ${fontSize}px "${font}", Georgia, serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillStyle = "rgba(255,255,255,0.97)";
   ctx.textAlign = "center";
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 16;
 
-  // Word-wrap the visible text
   const lines = wrapText(ctx, visibleText, maxW);
   const totalHeight = lines.length * lineHeight;
   const startY = (h - totalHeight) / 2 + fontSize;
@@ -565,111 +572,17 @@ function drawFactFrame(
   lines.forEach((line, i) => {
     ctx.fillText(line, w / 2, startY + i * lineHeight);
   });
+  ctx.shadowBlur = 0;
 
-  // Blinking cursor at end
-  if (visibleChars < totalChars) {
-    const lastLine = lines[lines.length - 1] || "";
-    const lastW = ctx.measureText(lastLine).width;
-    const cursorX = w / 2 + lastW / 2 + 4;
-    const cursorY = startY + (lines.length - 1) * lineHeight;
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
-    ctx.fillRect(cursorX, cursorY - fontSize + 6, 2, fontSize - 4);
-  }
-
-  // Decorative subtle quotes on the sides
-  if (progress > 0.3) {
-    const quoteAlpha = Math.min((progress - 0.3) * 2, 0.08);
-    ctx.font = `italic 64px "${font}", Georgia, serif`;
+  // Decorative opening quote (no cursor)
+  if (progress > 0.2) {
+    const quoteAlpha = Math.min((progress - 0.2) * 2, 0.1);
+    ctx.font = `italic ${Math.round(80 * scale)}px "${font}", Georgia, serif`;
     ctx.fillStyle = `rgba(255,255,255,${quoteAlpha})`;
     ctx.textAlign = "center";
-    ctx.fillText("\u201C", w * 0.08, startY - 10);
-    ctx.fillText("\u201D", w * 0.92, startY + totalHeight + 10);
+    ctx.fillText("\u201C", w * 0.08, startY - fontSize * 0.3);
+    ctx.fillText("\u201D", w * 0.92, startY + totalHeight + fontSize * 0.3);
   }
 
   ctx.textAlign = "start";
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-
-  for (const w of words) {
-    const test = current ? `${current} ${w}` : w;
-    if (ctx.measureText(test).width > maxWidth && current) {
-      lines.push(current);
-      current = w;
-    } else {
-      current = test;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-/* ═══════════════════════════════════════════════════════
-   Font Picker Modal (same as word-of-day)
-   ═══════════════════════════════════════════════════════ */
-function FontPickerModal({
-  currentFont,
-  onSelect,
-  onClose,
-  sampleText,
-}: {
-  currentFont: string;
-  onSelect: (font: string) => void;
-  onClose: () => void;
-  sampleText: string;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <Card
-        className="w-full max-w-md max-h-[70vh] border-white/10 bg-background shadow-2xl dark:bg-card"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CardHeader className="py-2.5 px-4 border-b border-white/5">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Type className="h-4 w-4 text-primary" />
-            Choose Font
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-2 overflow-y-auto max-h-[55vh] space-y-1">
-          {FONT_CATALOG.map((font) => (
-            <button
-              key={font.name}
-              type="button"
-              onClick={() => onSelect(font.name)}
-              className={`w-full rounded-lg border p-3 text-left transition hover:border-primary/50 ${
-                currentFont === font.name
-                  ? "border-primary bg-primary/10 shadow-sm"
-                  : "border-border bg-card hover:bg-muted/30"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{font.name}</span>
-                <span className="text-[9px] text-muted-foreground/60">{font.style}</span>
-              </div>
-              <p
-                className="text-lg truncate"
-                style={{ fontFamily: `"${font.name}", ${font.style}` }}
-              >
-                {sampleText}
-              </p>
-              <p
-                className="text-xs text-muted-foreground italic truncate mt-0.5"
-                style={{ fontFamily: `"${font.name}", ${font.style}` }}
-              >
-                The quick brown fox jumps over the lazy dog
-              </p>
-            </button>
-          ))}
-        </CardContent>
-        <div className="p-2 border-t border-white/5">
-          <Button variant="ghost" size="sm" className="w-full h-7 text-xs" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
 }
