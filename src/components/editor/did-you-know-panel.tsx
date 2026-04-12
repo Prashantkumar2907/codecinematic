@@ -97,17 +97,18 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
     const titleDuration = showTitle ? 1.2 / titleSpeed : 0;
     const fadeDuration = showTitle ? 0.8 / titleSpeed : 0;
 
-    // Chars per second: matches audio exactly
-    const cps = Math.max(2, 12 * textSpeed);
+    // Chars per second: matches Code Studio rate
+    const cps = Math.max(2, (1000 / 110) * textSpeed);
     const typingDuration = Math.max(1.0, factText.length / cps);
-    const holdDuration = 1.5;
+    const holdDuration = 3.0;
     const totalFrames = Math.ceil((titleDuration + fadeDuration + typingDuration + holdDuration) * fps);
 
     // Audio
     const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
     const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
-    const videoStream = canvas.captureStream(fps);
+    const videoStream = canvas.captureStream(0);
+    const videoTrack = videoStream.getVideoTracks()[0];
     const combinedStream = new MediaStream([
       ...videoStream.getVideoTracks(),
       ...(audioDest ? audioDest.stream.getAudioTracks() : []),
@@ -136,6 +137,9 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
 
     recorder.start();
 
+    // Wall-clock pacing: prevent video from being too fast on high-refresh displays
+    const renderStart = performance.now();
+
     for (let frame = 0; frame < totalFrames; frame++) {
       const t = frame / fps;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -152,7 +156,17 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
       }
 
       setProgress(`Rendering… ${Math.round((frame / totalFrames) * 100)}%`);
-      await new Promise((r) => requestAnimationFrame(r));
+
+      // Explicitly capture the painted frame into the MediaRecorder stream
+      if (videoTrack && 'requestFrame' in videoTrack) {
+        (videoTrack as any).requestFrame();
+      }
+      // Pace to wall-clock time so recorded video matches real-time duration
+      const targetWall = renderStart + (frame + 1) * (1000 / fps);
+      const remainingMs = targetWall - performance.now();
+      if (remainingMs > 1) {
+        await new Promise((r) => setTimeout(r, remainingMs));
+      }
     }
 
     recorder.stop();

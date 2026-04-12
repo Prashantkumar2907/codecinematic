@@ -8,7 +8,7 @@ import type { Narration } from "@/lib/narration";
  */
 
 const aspectDimensions: Record<string, { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number }> = {
-  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 28 },
+  "9:16": { width: 720, height: 1280, maxVisibleLines: 24, fontSize: 26, maxCharsPerLine: 34 },
   "16:9": { width: 1280, height: 720, maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 65 },
 };
 

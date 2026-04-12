@@ -15,6 +15,23 @@ const PROTECTED_API_PREFIXES = ["/api/export", "/api/ai", "/api/history", "/api/
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Read session cookie early so it's available for all checks
+  const sessionCookie = request.cookies.get(SESSION_COOKIE)?.value;
+
+  // Redirect logged-in users from home page to dashboard
+  if (pathname === "/" && sessionCookie) {
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(sessionCookie, "base64url").toString("utf8")
+      ) as { email?: string };
+      if (decoded.email) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    } catch {
+      // invalid cookie — fall through
+    }
+  }
+
   // Check if route is protected
   const isProtectedPage = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
   const isProtectedApi = PROTECTED_API_PREFIXES.some((p) => pathname.startsWith(p));
@@ -22,9 +39,6 @@ export function middleware(request: NextRequest) {
   if (!isProtectedPage && !isProtectedApi) {
     return NextResponse.next();
   }
-
-  // Read session cookie
-  const sessionCookie = request.cookies.get(SESSION_COOKIE)?.value;
 
   if (!sessionCookie) {
     if (isProtectedApi) {
@@ -67,6 +81,7 @@ export const config = {
      * - Public marketing pages (/, /about, etc.)
      * - Auth routes (/login, /api/auth/*)
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|api/auth|login|$|about|pricing|blog).*)",
+    "/",
+    "/((?!_next/static|_next/image|favicon\\.ico|api/auth|login|about|pricing|blog).*)",
   ],
 };

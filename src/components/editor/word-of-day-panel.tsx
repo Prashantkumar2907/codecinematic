@@ -96,9 +96,9 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     const titleDuration = 1.2 / titleSpeed;
     const fadeDuration = 0.8 / titleSpeed;
 
-    // Chars-per-second determines typing duration (matches audio exactly)
-    const wordCPS = 10 * wordSpeed;    // characters per second for word
-    const meaningCPS = 12 * meaningSpeed; // characters per second for meaning
+    // Chars-per-second determines typing duration (matches Code Studio rate)
+    const wordCPS = (1000 / 110) * wordSpeed;    // characters per second for word
+    const meaningCPS = (1000 / 110) * meaningSpeed; // characters per second for meaning
 
     const wordTypingDuration = Math.max(0.5, word.length / wordCPS);
     const meaningTypingDuration = Math.max(0.5, meaning.length / meaningCPS);
@@ -111,7 +111,8 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
     const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
-    const videoStream = canvas.captureStream(fps);
+    const videoStream = canvas.captureStream(0);
+    const videoTrack = videoStream.getVideoTracks()[0];
     const combinedStream = new MediaStream([
       ...videoStream.getVideoTracks(),
       ...(audioDest ? audioDest.stream.getAudioTracks() : []),
@@ -147,6 +148,11 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
 
     recorder.start();
 
+    // Wall-clock pacing: each frame advances by exactly 1/fps seconds of animation
+    // time, and we wait until the corresponding wall-clock time has elapsed.
+    // This prevents the video from being 2-4x too fast on high-refresh-rate displays.
+    const renderStart = performance.now();
+
     for (let frame = 0; frame < totalFrames; frame++) {
       const t = frame / fps;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -162,7 +168,17 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       }
 
       setProgress(`Rendering… ${Math.round((frame / totalFrames) * 100)}%`);
-      await new Promise((r) => requestAnimationFrame(r));
+
+      // Explicitly capture the painted frame into the MediaRecorder stream
+      if (videoTrack && 'requestFrame' in videoTrack) {
+        (videoTrack as any).requestFrame();
+      }
+      // Pace to wall-clock time so recorded video matches real-time duration
+      const targetWall = renderStart + (frame + 1) * (1000 / fps);
+      const remainingMs = targetWall - performance.now();
+      if (remainingMs > 1) {
+        await new Promise((r) => setTimeout(r, remainingMs));
+      }
     }
 
     recorder.stop();
@@ -569,17 +585,6 @@ function drawWordFrame(
   ctx.fillText(visibleWord, w / 2, h * 0.40);
   ctx.shadowBlur = 0;
 
-  // Decorative underline below word (fades in)
-  const underlineAlpha = Math.min(progress * 3, 0.25);
-  const wordMeasure = ctx.measureText(word).width;
-  const lineHalf = Math.min(wordMeasure * 0.6, w * 0.3);
-  ctx.strokeStyle = `rgba(255,255,255,${underlineAlpha})`;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(w / 2 - lineHalf, h * 0.40 + scaledWordSize * 0.35);
-  ctx.lineTo(w / 2 + lineHalf, h * 0.40 + scaledWordSize * 0.35);
-  ctx.stroke();
-
   // Meaning (appears after word is fully typed, no cursor)
   if (progress > wordSplit) {
     const meaningProgress = (progress - wordSplit) / (1 - wordSplit);
@@ -597,7 +602,7 @@ function drawWordFrame(
     const maxW = w * 0.72;
     const lines = wrapText(ctx, visibleMeaning, maxW);
     const lineH = scaledMeaningSize * 1.7;
-    const startY = h * 0.40 + scaledWordSize * 0.55;
+    const startY = h * 0.40 + scaledWordSize * 1.0;
 
     lines.forEach((line, i) => {
       ctx.fillText(line, w / 2, startY + i * lineH);

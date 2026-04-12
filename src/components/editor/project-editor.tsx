@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import { detectImportantLines } from "@/lib/render/smart-focus";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { validateCodePayload } from "@/lib/quotas/limits";
-import type { Narration } from "@/lib/narration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,10 +39,6 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   const sound = draft.sound;
   const soundVolume = draft.soundVolume;
   const code = draft.code;
-  const narration = draft.narration;
-
-  const [generatingNarration, setGeneratingNarration] = useState(false);
-  const [narrationError, setNarrationError] = useState<string | null>(null);
 
   const focusLines = useMemo(() => detectImportantLines(code), [code]);
   const allLines = useMemo(
@@ -87,30 +82,6 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
 
   function updateDraftField<K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) {
     setDraft(projectId, { [key]: value } as Partial<typeof draft>);
-  }
-
-  async function handleGenerateNarration() {
-    if (!title.trim() || !code.trim()) return;
-    setGeneratingNarration(true);
-    setNarrationError(null);
-
-    try {
-      const res = await fetch("/api/ai/commentary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, language, title }),
-      });
-      const data = await res.json() as { ok?: boolean; narration?: Narration; error?: string };
-      if (data.ok && data.narration) {
-        setDraft(projectId, { narration: data.narration });
-      } else {
-        setNarrationError(data.error ?? "Failed to generate narration");
-      }
-    } catch {
-      setNarrationError("Network error generating narration");
-    } finally {
-      setGeneratingNarration(false);
-    }
   }
 
   function handleContinue() {
@@ -258,34 +229,11 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
           <Card className="border-border/40 bg-card shadow-sm shrink-0">
             <CardContent className="py-2 px-3 space-y-2">
               <Button
-                className="w-full h-8 text-xs font-medium"
-                onClick={handleGenerateNarration}
-                disabled={generatingNarration || !title.trim() || !code.trim()}
-                variant="secondary"
-              >
-                {generatingNarration ? "Generating narration…" : narration ? "Regenerate AI narration" : "Generate AI narration"}
-              </Button>
-              {narrationError && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/8 p-2 text-[10px] text-destructive">{narrationError}</div>
-              )}
-              {narration && (
-                <div className="space-y-1.5 max-h-36 overflow-y-auto scrollbar-none">
-                  <p className="text-[10px] text-muted-foreground italic">&ldquo;{narration.intro}&rdquo;</p>
-                  {narration.segments.map((seg, i) => (
-                    <div key={i} className="rounded border border-border/40 bg-muted/30 p-1.5 text-[10px]">
-                      <span className="font-semibold text-primary">L{seg.lineStart}–{seg.lineEnd}:</span>{" "}
-                      <span className="text-muted-foreground">{seg.text}</span>
-                    </div>
-                  ))}
-                  <p className="text-[10px] text-muted-foreground italic">&ldquo;{narration.outro}&rdquo;</p>
-                </div>
-              )}
-              <Button
                 className="w-full h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all"
                 onClick={handleContinue}
                 disabled={!canContinue}
               >
-                Continue to create video →
+                Continue to create video
               </Button>
             </CardContent>
           </Card>

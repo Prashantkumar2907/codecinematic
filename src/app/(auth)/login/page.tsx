@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Github, Loader2, AlertCircle, Code2, Sparkles, Film, Zap } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Github, Loader2, AlertCircle, Code2, Film, Zap, BookOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 
 const features = [
   { icon: Code2, label: "Code Studio", desc: "Type code cinematically with syntax highlighting" },
-  { icon: Sparkles, label: "AI Narration", desc: "Generate voice-over scripts with Google Gemini" },
   { icon: Film, label: "Export Video", desc: "Download 9:16 or 16:9 MP4 for social media" },
-  { icon: Zap, label: "Auto Pipeline", desc: "Code → narration → audio → video in one click" },
+  { icon: BookOpen, label: "Word of Day", desc: "Create beautiful word definition reveal videos" },
+  { icon: Zap, label: "Did You Know?", desc: "Animate facts and quotes into engaging shorts" },
 ];
 
 function LoginForm() {

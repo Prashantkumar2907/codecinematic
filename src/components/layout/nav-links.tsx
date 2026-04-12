@@ -12,9 +12,6 @@ const publicLinks = [
 const authLinks = [
   { href: "/dashboard", label: "Dashboard", tab: null },
   { href: "/projects/new-project?tab=editor", label: "Code Studio", tab: "editor" },
-  { href: "/projects/new-project?tab=narration", label: "AI Narration", tab: "narration" },
-  { href: "/projects/new-project?tab=tts", label: "Audio Studio", tab: "tts" },
-  { href: "/projects/new-project?tab=pipeline", label: "Auto Pipeline", tab: "pipeline" },
   { href: "/projects/new-project?tab=wordofday", label: "Word of Day", tab: "wordofday" },
   { href: "/projects/new-project?tab=didyouknow", label: "Did You Know", tab: "didyouknow" },
 ];

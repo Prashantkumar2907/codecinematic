@@ -4,15 +4,12 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { ProjectEditor } from "@/components/editor/project-editor";
-import { NarrationPanel } from "@/components/editor/narration-panel";
-import { TtsPanel } from "@/components/editor/tts-panel";
-import { PipelinePanel } from "@/components/editor/pipeline-panel";
 import { WordOfDayPanel } from "@/components/editor/word-of-day-panel";
 import { DidYouKnowPanel } from "@/components/editor/did-you-know-panel";
 import { useEditorStore, defaultEditorDraft } from "@/lib/editor-store";
 import type { PlanCode } from "@/lib/plans";
 
-const tabIds = ["editor", "narration", "tts", "pipeline", "wordofday", "didyouknow"] as const;
+const tabIds = ["editor", "wordofday", "didyouknow"] as const;
 
 type TabId = (typeof tabIds)[number];
 
@@ -39,15 +36,6 @@ export function ProjectWorkspace({ plan, projectId }: { plan: PlanCode; projectI
       <div className="flex-1 min-h-0 p-3">
         {activeTab === "editor" && (
           <ProjectEditor plan={plan} projectId={projectId} />
-        )}
-        {activeTab === "narration" && (
-          <NarrationPanel projectId={projectId} />
-        )}
-        {activeTab === "tts" && (
-          <TtsPanel projectId={projectId} />
-        )}
-        {activeTab === "pipeline" && (
-          <PipelinePanel plan={plan} projectId={projectId} />
         )}
         {activeTab === "wordofday" && (
           <WordOfDayPanel projectId={projectId} />

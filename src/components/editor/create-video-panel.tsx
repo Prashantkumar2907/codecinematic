@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
-import type { Narration, NarrationSegment } from "@/lib/narration";
+import type { Narration } from "@/lib/narration";
 
 type Job = {
   exportId: string;
@@ -24,7 +24,7 @@ type RenderedVideo = {
 };
 
 const aspectDimensions: Record<string, { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number }> = {
-  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 30, maxCharsPerLine: 24 },
+  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 34 },
   "16:9": { width: 1280, height: 720,  maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 56 }
 };
 
@@ -102,6 +102,7 @@ export function CreateVideoPanel({
           aspectRatios,
           format: "mp4"
         })
+        // NOTE: we request mp4 from the API for job metadata, but client renders .webm
       });
 
       const data = (await response.json()) as { jobs?: Job[]; error?: string };
@@ -148,7 +149,7 @@ export function CreateVideoPanel({
           exportId: job.exportId,
           aspectRatio: job.aspectRatio,
           url,
-          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.mp4`
+          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.webm`
         });
       }
 
@@ -257,7 +258,7 @@ export function CreateVideoPanel({
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-primary">{video.aspectRatio} video ready</p>
                   <a href={video.url} download={video.filename}>
-                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .mp4</Button>
+                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .webm</Button>
                   </a>
                 </div>
                 <video src={video.url} controls playsInline className="w-full rounded-lg border border-border/50 bg-black shadow-inner" />
@@ -287,19 +288,21 @@ function slugify(value: string) {
     .slice(0, 60);
 }
 
-async function renderVideoBlob({
-  title,
-  language,
-  aspectRatio,
-  code,
-  focusLines,
-  watermarked,
-  normalSpeed,
-  focusSpeed,
-  sound,
-  soundVolume,
-  narration,
-}: {
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VIDEO GENERATION ENGINE
+ *
+ * Approach:
+ * 1. Split code into lines (keep empty lines).
+ * 2. Pre-compute a per-character timeline: every character has a wall-clock
+ *    millisecond at which it should appear. Empty lines get a short pause.
+ * 3. For each frame at 30 fps, compute virtual ms, figure out which chars
+ *    are visible, word-wrap visible text, and paint the IDE frame.
+ * 4. captureStream(0) + requestFrame() ensures every painted frame is
+ *    captured; wall-clock pacing keeps audio in sync.
+ * 5. Audio clicks are pre-scheduled on AudioContext for each character.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+async function renderVideoBlob(opts: {
   title: string;
   language: string;
   aspectRatio: string;
@@ -312,805 +315,532 @@ async function renderVideoBlob({
   soundVolume: string;
   narration: Narration | null;
 }) {
-  if (typeof window === "undefined") {
-    throw new Error("Rendering is only available in the browser.");
-  }
+  const {
+    title, language, aspectRatio, code, focusLines, watermarked,
+    normalSpeed, focusSpeed, sound, soundVolume, narration,
+  } = opts;
 
-  if (typeof MediaRecorder === "undefined") {
-    throw new Error("This browser does not support MediaRecorder video export.");
-  }
+  if (typeof window === "undefined") throw new Error("Browser only.");
+  if (typeof MediaRecorder === "undefined") throw new Error("MediaRecorder not available.");
 
   const preset = aspectDimensions[aspectRatio];
+  if (!preset) throw new Error(`Unknown aspect ratio: ${aspectRatio}`);
+
+  // ── Canvas ──
   const canvas = document.createElement("canvas");
   canvas.width = preset.width;
   canvas.height = preset.height;
-  const ctxRaw = canvas.getContext("2d");
-  if (!ctxRaw) {
-    throw new Error("Canvas rendering is unavailable.");
-  }
-  const context: CanvasRenderingContext2D = ctxRaw;
+  const ctx = canvas.getContext("2d")!;
+  if (!ctx) throw new Error("Canvas unavailable.");
 
-  const videoStream = canvas.captureStream(30);
-  const audioContext = typeof AudioContext !== "undefined" ? new AudioContext() : null;
-  const audioDestination = audioContext ? audioContext.createMediaStreamDestination() : null;
-  const stream = new MediaStream([
-    ...videoStream.getVideoTracks(),
-    ...(audioDestination ? audioDestination.stream.getAudioTracks() : [])
+  // ── Compute actual maxCharsPerLine from measured monospace char width ──
+  const vert = preset.width < preset.height;
+  const fw = vert ? preset.width * 0.9 : preset.width * 0.84;
+  const fx = (preset.width - fw) / 2;
+  const codeAreaLeft = fx + 78;
+  const codeAreaRight = fx + fw;
+  const drawableWidth = codeAreaRight - codeAreaLeft - 30; // padding
+  ctx.font = `${preset.fontSize}px ui-monospace, SFMono-Regular, monospace`;
+  const charWidth = ctx.measureText("M").width; // use widest char
+  const actualMaxChars = Math.max(10, Math.floor(drawableWidth / charWidth));
+  const effectivePreset = { ...preset, maxCharsPerLine: actualMaxChars };
+
+  // ── Streams ──
+  const vStream = (canvas as any).captureStream(0) as MediaStream;
+  const vTrack = vStream.getVideoTracks()[0] as any;
+  const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
+  const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
+  const combined = new MediaStream([
+    ...vStream.getVideoTracks(),
+    ...(audioDest ? audioDest.stream.getAudioTracks() : []),
   ]);
+
+  // ── Recorder ──
   const chunks: BlobPart[] = [];
-  const mimeType = getSupportedMimeType();
-  const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  };
+  const mime = pickMime();
+  const rec = mime ? new MediaRecorder(combined, { mimeType: mime }) : new MediaRecorder(combined);
+  rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-  const lines = code
-    .split("\n")
-    .map((line, index) => ({ number: index + 1, content: line }));
-
+  // ── Lines & timeline ──
+  const allLines = code.split("\n");
   const focusSet = new Set(focusLines);
-  const lineSchedule = buildLineSchedule(lines, focusSet, normalSpeed, focusSpeed);
-  const durationMs = lineSchedule.totalDurationMs;
 
-  const stopPromise = new Promise<Blob>((resolve) => {
-    recorder.onstop = () => {
-      stream.getTracks().forEach((track) => track.stop());
-      if (audioContext) {
-        void audioContext.close();
-      }
+  // Build per-line durations (ms) based on character count and speed
+  const lineDurations = allLines.map((lineText, i) => {
+    const lineNum = i + 1;
+    const isFocused = focusSet.has(lineNum);
+    const chars = lineText.length;
+    if (chars === 0) {
+      // Empty line: brief pause
+      return Math.round(180 / Math.max(0.05, Number(normalSpeed) || 1));
+    }
+    const mult = Math.max(0.05, Number(isFocused ? focusSpeed : normalSpeed) || 1);
+    const msPerChar = isFocused ? 150 : 110;
+    const pad = isFocused ? 280 : 160;
+    return Math.round((chars * msPerChar + pad) / mult);
+  });
+
+  // Cumulative end times
+  const cumEnd: number[] = [];
+  let sum = 0;
+  for (const d of lineDurations) { sum += d; cumEnd.push(sum); }
+  const totalMs = Math.max(3000, sum);
+
+  // ── Start recording ──
+  const done = new Promise<Blob>((resolve) => {
+    rec.onstop = () => {
+      combined.getTracks().forEach((t) => t.stop());
+      if (audioCtx) void audioCtx.close();
       resolve(new Blob(chunks, { type: "video/webm" }));
     };
   });
+  rec.start(200);
+  if (audioCtx?.state === "suspended") await audioCtx.resume();
 
-  recorder.start(250);
-  if (audioContext && audioContext.state === "suspended") {
-    await audioContext.resume();
-  }
-  const startTime = performance.now();
-  scheduleTypingAudio({
-    audioContext,
-    audioDestination,
-    lines,
-    lineSchedule,
-    sound,
-    volume: Number(soundVolume)
-  });
-
-  // Schedule TTS narration using SpeechSynthesis if narration is available
-  const ttsCleanup = narration
-    ? scheduleNarrationTTS(narration, lines, lineSchedule)
-    : null;
-
-  await new Promise<void>((resolve) => {
-    function draw(now: number) {
-      const elapsed = now - startTime;
-      const safeElapsed = Math.min(elapsed, durationMs);
-      const renderState = getRenderState(safeElapsed, lines, lineSchedule, preset.maxCharsPerLine);
-
-      // Find the current narration segment based on active line
-      const currentNarrationText = narration
-        ? getCurrentNarrationText(narration, renderState.activeLine)
-        : null;
-
-      paintFrame({
-        context,
-        width: preset.width,
-        height: preset.height,
-        title,
-        language,
-        visibleLines: renderState.visibleLines,
-        activeLine: renderState.activeLine,
-        maxVisibleLines: preset.maxVisibleLines,
-        fontSize: preset.fontSize,
-        focusSet,
-        watermarked,
-        subtitleText: currentNarrationText,
-      });
-
-      if (safeElapsed < durationMs) {
-        requestAnimationFrame(draw);
-      } else {
-        if (ttsCleanup) ttsCleanup();
-        window.setTimeout(() => {
-          recorder.stop();
-          resolve();
-        }, 500);
+  // ── Schedule audio clicks ──
+  if (audioCtx && audioDest && sound !== "off" && Number(soundVolume) > 0) {
+    const vol = Number(soundVolume);
+    const t0 = audioCtx.currentTime + 0.06;
+    let elapsed = 0;
+    for (let li = 0; li < allLines.length; li++) {
+      const lineText = allLines[li]!;
+      const dur = lineDurations[li]!;
+      const chars = lineText.length;
+      if (chars === 0) { elapsed += dur; continue; }
+      for (let ci = 0; ci < chars; ci++) {
+        const frac = (ci + 1) / (chars + 1);
+        const when = t0 + (elapsed + dur * frac) / 1000;
+        emitClick(audioCtx, audioDest, when, sound, vol, lineText[ci]!, ci === chars - 1);
       }
+      elapsed += dur;
     }
+  }
 
-    requestAnimationFrame(draw);
-  });
+  const ttsCleanup = narration ? scheduleNarrationTTS(narration, allLines, cumEnd, totalMs) : null;
 
-  return stopPromise;
+  // ── Frame loop ── render at 30 fps virtual time, paced to wall-clock
+  const FPS = 30;
+  const frameDur = 1000 / FPS;
+  const totalFrames = Math.ceil(totalMs / frameDur) + 15;
+  const wallStart = performance.now();
+
+  for (let f = 0; f <= totalFrames; f++) {
+    const ms = Math.min(f * frameDur, totalMs);
+
+    // Figure out which line is active at this ms
+    let activeIdx = cumEnd.findIndex((c) => ms <= c);
+    if (activeIdx === -1) activeIdx = allLines.length - 1;
+
+    // Progress within the active line (0→1)
+    const prevEnd = activeIdx === 0 ? 0 : cumEnd[activeIdx - 1]!;
+    const dur = lineDurations[activeIdx]!;
+    const progress = Math.min(1, Math.max(0, ms - prevEnd) / dur);
+
+    // Build visible lines array
+    const visLines = buildVisibleLines(allLines, activeIdx, progress, effectivePreset.maxCharsPerLine);
+    const activeLine = activeIdx + 1; // 1-based
+
+    const subtitle = narration ? getNarrationText(narration, activeLine) : null;
+
+    paintFrame(ctx, effectivePreset, title, language, visLines, activeLine,
+      focusSet, watermarked, subtitle);
+
+    // Push frame
+    if (vTrack && typeof vTrack.requestFrame === "function") vTrack.requestFrame();
+
+    // Pace to wall-clock
+    const target = wallStart + (f + 1) * frameDur;
+    const wait = target - performance.now();
+    if (wait > 1) await delay(wait);
+    else await delay(0); // yield
+  }
+
+  if (ttsCleanup) ttsCleanup();
+  await delay(300);
+  rec.stop();
+  return done;
 }
 
-/**
- * Schedule narration speech using the browser SpeechSynthesis API.
- * Speaks each segment's text when the corresponding lines start typing.
- * Returns a cleanup function to cancel any pending speech.
- */
-function scheduleNarrationTTS(
-  narration: Narration,
-  lines: Array<{ number: number; content: string }>,
-  lineSchedule: { cumulativeDurations: number[]; totalDurationMs: number }
-): () => void {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return () => {};
-  }
+function delay(ms: number) { return new Promise<void>((r) => setTimeout(r, ms)); }
 
-  const synth = window.speechSynthesis;
-  const timeouts: ReturnType<typeof setTimeout>[] = [];
-
-  // Speak intro immediately
-  if (narration.intro) {
-    const utterance = new SpeechSynthesisUtterance(narration.intro);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.9;
-    synth.speak(utterance);
-  }
-
-  // Build a map from line number to line index
-  const lineIndexMap = new Map<number, number>();
-  lines.forEach((line, idx) => lineIndexMap.set(line.number, idx));
-
-  // Schedule each segment to start speaking when its first line starts typing
-  for (const segment of narration.segments) {
-    const lineIdx = lineIndexMap.get(segment.lineStart);
-    if (lineIdx === undefined) continue;
-
-    // Time when this line begins = cumulative of all previous lines
-    const startMs = lineIdx === 0 ? 0 : lineSchedule.cumulativeDurations[lineIdx - 1] ?? 0;
-    // Add a small buffer for intro to finish
-    const delayMs = Math.max(0, startMs + (narration.intro ? 2000 : 0));
-
-    const tid = setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(segment.text);
-      utterance.rate = 1.05;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.9;
-      synth.speak(utterance);
-    }, delayMs);
-
-    timeouts.push(tid);
-  }
-
-  // Schedule outro after all code is typed
-  if (narration.outro) {
-    const tid = setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(narration.outro);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.9;
-      synth.speak(utterance);
-    }, lineSchedule.totalDurationMs - 500);
-    timeouts.push(tid);
-  }
-
-  return () => {
-    timeouts.forEach(clearTimeout);
-    synth.cancel();
-  };
-}
-
-/**
- * Find the narration text for the current active line.
- */
-function getCurrentNarrationText(narration: Narration, activeLine: number): string | null {
-  for (const seg of narration.segments) {
-    if (activeLine >= seg.lineStart && activeLine <= seg.lineEnd) {
-      return seg.text;
-    }
+function pickMime() {
+  for (const m of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) return m;
   }
   return null;
 }
 
-function getSupportedMimeType() {
-  const options = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-  return options.find((option) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(option)) ?? null;
+/* ── Build visible lines for a given time snapshot ─────────────────────── */
+
+interface VLine {
+  lineNum: number;     // original 1-based line number
+  text: string;        // text to render (may be partial for active line)
+  gutterLabel: string; // "  1" or "   " for continuation rows
+  isCont: boolean;     // is this a continuation (word-wrapped) row?
+  isEmpty: boolean;    // true for blank lines
 }
 
-function scheduleTypingAudio({
-  audioContext,
-  audioDestination,
-  lines,
-  lineSchedule,
-  sound,
-  volume
-}: {
-  audioContext: AudioContext | null;
-  audioDestination: MediaStreamAudioDestinationNode | null;
-  lines: Array<{ number: number; content: string }>;
-  lineSchedule: { perLineDurations: number[]; totalDurationMs: number };
-  sound: string;
-  volume: number;
-}) {
-  if (!audioContext || !audioDestination || sound === "off" || lines.length === 0 || volume <= 0) {
-    return;
-  }
+function buildVisibleLines(
+  allLines: string[],
+  activeIdx: number,
+  progress: number,
+  maxChars: number,
+): VLine[] {
+  const out: VLine[] = [];
 
-  let elapsedMs = 0;
-  const startAt = audioContext.currentTime + 0.06;
+  for (let i = 0; i <= activeIdx; i++) {
+    const raw = allLines[i]!;
+    const lineNum = i + 1;
+    const isActive = i === activeIdx;
 
-  lines.forEach((line, lineIndex) => {
-    const charsInLine = Math.max(line.content.length, 1);
-    const lineDurationMs = lineSchedule.perLineDurations[lineIndex] ?? 400;
-
-    for (let index = 0; index < charsInLine; index += 1) {
-      const lineProgress = (index + 1) / (charsInLine + 1);
-      const when = startAt + (elapsedMs + lineDurationMs * lineProgress) / 1000;
-      const character = line.content[index] ?? "";
-      playTypingPulse(audioContext, audioDestination, when, sound, volume, character, index === charsInLine - 1);
+    if (raw.length === 0) {
+      // Empty line
+      out.push({ lineNum, text: "", gutterLabel: String(lineNum).padStart(3, " "), isCont: false, isEmpty: true });
+      continue;
     }
 
-    elapsedMs += lineDurationMs;
-  });
-}
+    // For completed lines show full text; for active line show partial (char by char)
+    const displayText = isActive
+      ? raw.slice(0, Math.max(1, Math.ceil(raw.length * progress)))
+      : raw;
 
-function buildLineSchedule(
-  lines: Array<{ number: number; content: string }>,
-  focusSet: Set<number>,
-  normalSpeed: string,
-  focusSpeed: string
-) {
-  const perLineDurations = lines.map((line) => {
-    const charsInLine = Math.max(line.content.length, 1);
-    return focusSet.has(line.number)
-      ? getLineDurationForSpeed(charsInLine, focusSpeed, true)
-      : getLineDurationForSpeed(charsInLine, normalSpeed, false);
-  });
-  const totalDurationMs = Math.max(3000, perLineDurations.reduce((sum, duration) => sum + duration, 0));
-  const cumulativeDurations: number[] = [];
-  let running = 0;
-  perLineDurations.forEach((duration) => {
-    running += duration;
-    cumulativeDurations.push(running);
-  });
-
-  return {
-    perLineDurations,
-    cumulativeDurations,
-    totalDurationMs
-  };
-}
-
-function getLineDurationForSpeed(charCount: number, speed: string, isFocused: boolean) {
-  const multiplier = Math.max(0.05, Number(speed) || 1);
-  const msPerChar = isFocused ? 150 : 110;
-  const linePadding = isFocused ? 280 : 160;
-  return Math.round((charCount * msPerChar + linePadding) / multiplier);
-}
-
-function getVisibleLineCount(elapsedMs: number, cumulativeDurations: number[]) {
-  const index = cumulativeDurations.findIndex((value) => elapsedMs <= value);
-  return index === -1 ? cumulativeDurations.length : index + 1;
-}
-
-function getRenderState(
-  elapsedMs: number,
-  lines: Array<{ number: number; content: string }>,
-  lineSchedule: { perLineDurations: number[]; cumulativeDurations: number[] },
-  maxCharsPerLine: number
-) {
-  const activeIndex = Math.max(0, getVisibleLineCount(elapsedMs, lineSchedule.cumulativeDurations) - 1);
-  const previousElapsed = activeIndex === 0 ? 0 : lineSchedule.cumulativeDurations[activeIndex - 1] ?? 0;
-  const currentDuration = lineSchedule.perLineDurations[activeIndex] ?? 1;
-  const localElapsed = Math.max(0, elapsedMs - previousElapsed);
-  const activeProgress = Math.min(1, localElapsed / currentDuration);
-  const activeRawLine = lines[activeIndex];
-
-  const visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean; fullLineContent: string; charOffset: number }> = [];
-
-  function addWrapped(lineContent: string, lineNum: number, limit?: number) {
-    const text = limit !== undefined ? Array.from(lineContent).slice(0, limit).join("") : lineContent;
-    const segs = wrapLine(text, maxCharsPerLine);
-    let offset = 0;
-    segs.forEach((s, si) => {
-      visibleLines.push({
-        number: lineNum,
-        content: s,
-        lineNumberLabel: si === 0 ? String(lineNum).padStart(2, " ") : "  ",
-        continuation: si > 0,
-        fullLineContent: lineContent,
-        charOffset: offset,
+    // Word-wrap (same logic for active and completed lines)
+    const segments = wordWrap(displayText, maxChars);
+    for (let s = 0; s < segments.length; s++) {
+      out.push({
+        lineNum,
+        text: segments[s]!,
+        gutterLabel: s === 0 ? String(lineNum).padStart(3, " ") : "   ",
+        isCont: s > 0,
+        isEmpty: false,
       });
-      offset += Array.from(s).length;
-    });
+    }
   }
 
-  lines.slice(0, activeIndex).forEach((line) => addWrapped(line.content, line.number));
-
-  if (activeRawLine) {
-    const revealedCharacters = Math.max(1, Math.ceil(Array.from(activeRawLine.content).length * activeProgress));
-    addWrapped(activeRawLine.content, activeRawLine.number, revealedCharacters);
-  }
-
-  return {
-    visibleLines,
-    activeLine: activeRawLine?.number ?? 1
-  };
+  return out;
 }
 
-function wrapLine(content: string, maxCharsPerLine: number) {
-  const chars = Array.from(content);
-  if (chars.length <= maxCharsPerLine) {
-    return [content];
-  }
-
+function wordWrap(text: string, max: number): string[] {
+  if (text.length <= max) return [text];
   const segments: string[] = [];
-  let remChars = chars;
-  const max = maxCharsPerLine;
-
-  while (remChars.length > max) {
-    let cut = -1;
-    // Search within bounds: index max-1 is the last valid char in this segment
-    for (let i = max - 1; i >= Math.max(Math.floor(max * 0.3), 4); i--) {
-      if (remChars[i] === " ") { cut = i; break; }
-    }
-    // If no space found, try symbol boundaries
-    if (cut < 0) {
-      for (let i = max - 1; i >= Math.max(Math.floor(max * 0.3), 4); i--) {
-        const ch = remChars[i];
-        if (ch === "." || ch === "(" || ch === "," || ch === "[" || ch === "{" || ch === "=" || ch === ">" || ch === "|" || ch === "&" || ch === "+" || ch === "-") {
-          cut = i;
-          break;
-        }
-      }
-    }
-    // Hard cut at max if no break point found
-    if (cut < 0) cut = max;
-
-    segments.push(remChars.slice(0, cut).join(""));
-    remChars = remChars.slice(cut);
-    // Trim leading spaces on the continuation
-    while (remChars.length > 0 && remChars[0] === " ") remChars = remChars.slice(1);
+  let rem = text;
+  while (rem.length > max) {
+    // Find the last space within the allowed width
+    let cut = rem.lastIndexOf(" ", max);
+    if (cut <= 0) cut = max; // no space found: hard break
+    segments.push(rem.slice(0, cut));
+    rem = rem.slice(cut).replace(/^ /, ""); // trim leading space on next segment
   }
-
-  if (remChars.length > 0) {
-    segments.push(remChars.join(""));
-  }
-
+  if (rem.length > 0) segments.push(rem);
   return segments;
 }
 
-function playTypingPulse(
-  audioContext: AudioContext,
-  destination: MediaStreamAudioDestinationNode,
-  when: number,
-  sound: string,
-  volume: number,
-  character: string,
-  accent: boolean
+/** Hard-break wrap: split at exactly `max` chars so earlier rows never change. */
+function hardWrap(text: string, max: number): string[] {
+  if (text.length <= max) return [text];
+  const segments: string[] = [];
+  for (let i = 0; i < text.length; i += max) {
+    segments.push(text.slice(i, i + max));
+  }
+  return segments;
+}
+
+/* ── Typing audio ──────────────────────────────────────────────────────── */
+
+function emitClick(
+  ctx: AudioContext, dest: MediaStreamAudioDestinationNode,
+  when: number, sound: string, vol: number, ch: string, accent: boolean,
 ) {
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-  const filter = audioContext.createBiquadFilter();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filt = ctx.createBiquadFilter();
+  filt.type = "highpass";
+  filt.frequency.setValueAtTime(sound === "typewriter" ? 900 : 700, when);
+  filt.Q.setValueAtTime(0.7, when);
 
-  filter.type = "highpass";
-  filter.frequency.setValueAtTime(sound === "typewriter" ? 900 : 700, when);
-  filter.Q.setValueAtTime(0.7, when);
-
-  const isWhitespace = character.trim().length === 0;
-  oscillator.type = sound === "typewriter" ? "square" : "triangle";
-  oscillator.frequency.setValueAtTime(
+  const ws = ch.trim().length === 0;
+  osc.type = sound === "typewriter" ? "square" : "triangle";
+  osc.frequency.setValueAtTime(
     sound === "typewriter"
-      ? isWhitespace
-        ? 150
-        : accent
-          ? 320
-          : 240
-      : isWhitespace
-        ? 480
-        : accent
-          ? 900
-          : 700,
-    when
+      ? ws ? 150 : accent ? 320 : 240
+      : ws ? 480 : accent ? 900 : 700,
+    when,
   );
 
-  const basePeakGain = sound === "typewriter" ? (accent ? 0.12 : 0.08) : accent ? 0.07 : 0.045;
-  const peakGain = basePeakGain * volume * (isWhitespace ? 0.45 : 1);
-  gainNode.gain.setValueAtTime(0.0001, when);
-  gainNode.gain.exponentialRampToValueAtTime(peakGain, when + 0.0015);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, when + (sound === "typewriter" ? 0.016 : 0.012));
+  const peak = (sound === "typewriter" ? (accent ? 0.12 : 0.08) : (accent ? 0.07 : 0.045)) * vol * (ws ? 0.45 : 1);
+  gain.gain.setValueAtTime(0.0001, when);
+  gain.gain.exponentialRampToValueAtTime(peak, when + 0.0015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + (sound === "typewriter" ? 0.016 : 0.012));
 
-  oscillator.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(destination);
-
-  oscillator.start(when);
-  oscillator.stop(when + (sound === "typewriter" ? 0.018 : 0.014));
+  osc.connect(filt); filt.connect(gain); gain.connect(dest);
+  osc.start(when);
+  osc.stop(when + (sound === "typewriter" ? 0.018 : 0.014));
 }
 
-function paintFrame({
-  context,
-  width,
-  height,
-  title,
-  language,
-  visibleLines,
-  activeLine,
-  maxVisibleLines,
-  fontSize,
-  focusSet,
-  watermarked,
-  subtitleText,
-}: {
-  context: CanvasRenderingContext2D;
-  width: number;
-  height: number;
-  title: string;
-  language: string;
-  visibleLines: Array<{ number: number; content: string; lineNumberLabel: string; continuation: boolean; fullLineContent?: string; charOffset?: number }>;
-  activeLine: number;
-  maxVisibleLines: number;
-  fontSize: number;
-  focusSet: Set<number>;
-  watermarked: boolean;
-  subtitleText?: string | null;
-}) {
-  const ctx = context;
-  const w = width;
-  const h = height;
-  const vert = w < h;
-  ctx.clearRect(0, 0, w, h);
+/* ── Narration (TTS) ───────────────────────────────────────────────────── */
 
-  // Rich deep-space IDE background
-  ctx.fillStyle = "#080c10";
-  ctx.fillRect(0, 0, w, h);
+function scheduleNarrationTTS(
+  narration: Narration,
+  allLines: string[],
+  cumEnd: number[],
+  totalMs: number,
+): () => void {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return () => {};
+  const synth = window.speechSynthesis;
+  const timers: ReturnType<typeof setTimeout>[] = [];
 
-  // Subtle dot grid
-  ctx.fillStyle = "rgba(255,255,255,0.012)";
-  for (let dx = 20; dx < w; dx += 28) for (let dy = 20; dy < h; dy += 28) { ctx.beginPath(); ctx.arc(dx, dy, 0.7, 0, Math.PI * 2); ctx.fill(); }
+  if (narration.intro) {
+    const u = new SpeechSynthesisUtterance(narration.intro);
+    u.rate = 1; u.volume = 0.9;
+    synth.speak(u);
+  }
 
-  // Ambient glows — primary cyan + accent purple
-  const g1 = ctx.createRadialGradient(w * 0.15, h * 0.08, 0, w * 0.15, h * 0.08, Math.min(w, h) * 0.45);
-  g1.addColorStop(0, "rgba(56,189,248,0.07)"); g1.addColorStop(1, "rgba(56,189,248,0)");
-  ctx.fillStyle = g1; ctx.fillRect(0, 0, w, h);
-  const g2 = ctx.createRadialGradient(w * 0.88, h * 0.82, 0, w * 0.88, h * 0.82, Math.min(w, h) * 0.35);
-  g2.addColorStop(0, "rgba(139,92,246,0.06)"); g2.addColorStop(1, "rgba(139,92,246,0)");
-  ctx.fillStyle = g2; ctx.fillRect(0, 0, w, h);
-  // Subtle bottom gradient fade
-  const gBot = ctx.createLinearGradient(0, h * 0.7, 0, h);
-  gBot.addColorStop(0, "rgba(0,0,0,0)"); gBot.addColorStop(1, "rgba(0,0,0,0.35)");
-  ctx.fillStyle = gBot; ctx.fillRect(0, 0, w, h);
+  for (const seg of narration.segments) {
+    // seg.lineStart is 1-based
+    const idx = seg.lineStart - 1;
+    if (idx < 0 || idx >= allLines.length) continue;
+    const startMs = idx === 0 ? 0 : cumEnd[idx - 1]!;
+    const d = Math.max(0, startMs + (narration.intro ? 2000 : 0));
+    timers.push(setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(seg.text);
+      u.rate = 1.05; u.volume = 0.9;
+      synth.speak(u);
+    }, d));
+  }
 
-  const fw = vert ? w * 0.94 : w * 0.88;
-  const fh = vert ? h - 300 : h * 0.86;
-  const fx = (w - fw) / 2;
-  const fy = vert ? 120 : (h - fh) / 2;
+  if (narration.outro) {
+    timers.push(setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(narration.outro);
+      u.rate = 1; u.volume = 0.9;
+      synth.speak(u);
+    }, totalMs - 500));
+  }
 
-  // Outer glow
-  ctx.shadowColor = "rgba(56,189,248,0.05)"; ctx.shadowBlur = 60; ctx.shadowOffsetY = 0;
-  roundRect(ctx, fx - 2, fy - 2, fw + 4, fh + 4, 16);
-  ctx.strokeStyle = "rgba(56,189,248,0.06)"; ctx.lineWidth = 1; ctx.stroke();
-  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+  return () => { timers.forEach(clearTimeout); synth.cancel(); };
+}
 
-  // Frame shadow
-  ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
-  roundRect(ctx, fx, fy, fw, fh, 12);
-  ctx.fillStyle = "#0d1117"; ctx.fill();
+function getNarrationText(narration: Narration, activeLine: number): string | null {
+  for (const seg of narration.segments) {
+    if (activeLine >= seg.lineStart && activeLine <= seg.lineEnd) return seg.text;
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PAINT FRAME — VS Code–style IDE look
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+function paintFrame(
+  ctx: CanvasRenderingContext2D,
+  preset: { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number },
+  title: string,
+  language: string,
+  visLines: VLine[],
+  activeLine: number,
+  focusSet: Set<number>,
+  watermarked: boolean,
+  subtitle: string | null,
+) {
+  const W = preset.width;
+  const H = preset.height;
+  const fs = preset.fontSize;
+  const maxVis = preset.maxVisibleLines;
+  const vert = W < H;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#08101a"); bg.addColorStop(1, "#03080d");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Atmospheric glow
+  ctx.fillStyle = "rgba(45, 212, 191, 0.05)";
+  ctx.beginPath();
+  ctx.arc(W * 0.3, H * 0.2, Math.min(W, H) * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Frame dimensions
+  const fw = vert ? W * 0.9 : W * 0.84;
+  const fh = vert ? H - 360 : H * 0.84;
+  const fx = (W - fw) / 2;
+  const fy = vert ? 160 : (H - fh) / 2;
+
+  // Frame shadow + fill
+  ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 50; ctx.shadowOffsetY = 25;
+  rr(ctx, fx, fy, fw, fh, 20);
+  ctx.fillStyle = "rgba(10,16,24,0.75)"; ctx.fill();
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-
-  // Frame border
-  roundRect(ctx, fx, fy, fw, fh, 12);
-  ctx.strokeStyle = "rgba(48,54,64,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1; ctx.stroke();
 
   // Title bar
-  const tbH = vert ? 40 : 44;
-  ctx.save();
-  roundRect(ctx, fx, fy, fw, tbH, 12); ctx.clip();
-  const tb = ctx.createLinearGradient(fx, fy, fx, fy + tbH);
-  tb.addColorStop(0, "#161b22"); tb.addColorStop(1, "#12161d");
-  ctx.fillStyle = tb; ctx.fillRect(fx, fy, fw, tbH);
-  ctx.restore();
-  ctx.strokeStyle = "rgba(48,54,64,0.45)"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(fx, fy + tbH); ctx.lineTo(fx + fw, fy + tbH); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  rr(ctx, fx + 12, fy + 12, fw - 24, 44, 12); ctx.fill();
 
-  // Traffic lights
-  const dotR = vert ? 4.5 : 5.5;
-  const dotGap = vert ? 16 : 20;
-  [["#ff5f57","#e0443e"],["#febc2e","#dea123"],["#28c840","#1aab29"]].forEach(([c, g], i) => {
-    const cx = fx + 16 + i * dotGap; const cy = fy + tbH / 2;
-    ctx.fillStyle = c!; ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = g!; ctx.beginPath(); ctx.arc(cx, cy + 0.3, dotR - 1, 0, Math.PI * 2); ctx.fill();
+  // Glass gutter bg
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  rr(ctx, fx + 12, fy + 68, 54, fh - 80, 12); ctx.fill();
+
+  // Traffic dots
+  (["#ef4444", "#f59e0b", "#10b981"] as const).forEach((color, i) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(fx + 32 + i * 18, fy + 34, 5, 0, Math.PI * 2);
+    ctx.fill();
   });
 
-  // File tab — active tab with underline indicator
-  const tabFont = `500 ${vert ? 10 : 11}px ui-sans-serif,system-ui`;
-  ctx.font = tabFont;
-  const tabX = fx + (vert ? 64 : 90);
-  const titleShort = title.length > 28 ? title.slice(0, 26) + "…" : title;
-  const tabW = Math.min(ctx.measureText(titleShort).width + 32, fw * 0.42);
-  // Tab background
-  const tabGrad = ctx.createLinearGradient(tabX, fy + 2, tabX, fy + tbH);
-  tabGrad.addColorStop(0, "#1c2128"); tabGrad.addColorStop(1, "#0d1117");
-  ctx.fillStyle = tabGrad;
-  // Draw tab with rounded top corners only (8px radius)
-  ctx.beginPath();
-  ctx.moveTo(tabX, fy + tbH);
-  ctx.lineTo(tabX, fy + 11);
-  ctx.arcTo(tabX, fy + 3, tabX + 8, fy + 3, 8);
-  ctx.lineTo(tabX + tabW - 8, fy + 3);
-  ctx.arcTo(tabX + tabW, fy + 3, tabX + tabW, fy + 11, 8);
-  ctx.lineTo(tabX + tabW, fy + tbH);
-  ctx.closePath(); ctx.fill();
-  // Tab border sides
-  ctx.strokeStyle = "rgba(48,54,64,0.5)"; ctx.lineWidth = 0.5;
-  ctx.beginPath();
-  ctx.moveTo(tabX, fy + tbH); ctx.lineTo(tabX, fy + 4);
-  ctx.arcTo(tabX, fy + 2, tabX + 8, fy + 2, 6);
-  ctx.lineTo(tabX + tabW - 8, fy + 2);
-  ctx.arcTo(tabX + tabW, fy + 2, tabX + tabW, fy + 10, 6);
-  ctx.lineTo(tabX + tabW, fy + tbH);
-  ctx.stroke();
-  // Active tab indicator (top highlight)
-  ctx.fillStyle = "rgba(56,189,248,0.75)";
-  roundRect(ctx, tabX + 6, fy + 3, tabW - 12, 2, 2); ctx.fill();
-  // File icon dot
-  ctx.fillStyle = "rgba(56,189,248,0.4)";
-  ctx.beginPath(); ctx.arc(tabX + 12, fy + tbH / 2, 3, 0, Math.PI * 2); ctx.fill();
   // Title text
-  ctx.fillStyle = "rgba(230,237,243,0.95)";
-  ctx.font = tabFont;
-  ctx.fillText(titleShort, tabX + 20, fy + tbH / 2 + 4, tabW - 26);
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "600 16px ui-sans-serif, system-ui";
+  ctx.fillText(title, fx + 100, fy + 39);
 
-  // Language badge — right side of title bar
-  ctx.font = `600 ${vert ? 8 : 9}px ui-sans-serif,system-ui`;
-  const langTxt = language.toUpperCase();
-  const lw = ctx.measureText(langTxt).width + 14;
-  const langX = fx + fw - lw - 12;
-  const langY = fy + tbH / 2 - 9;
-  // Badge background
-  const langGrad = ctx.createLinearGradient(langX, langY, langX, langY + 18);
-  langGrad.addColorStop(0, "rgba(56,189,248,0.18)");
-  langGrad.addColorStop(1, "rgba(56,189,248,0.08)");
-  ctx.fillStyle = langGrad;
-  roundRect(ctx, langX, langY, lw, 18, 4); ctx.fill();
-  ctx.strokeStyle = "rgba(56,189,248,0.25)"; ctx.lineWidth = 0.5;
-  roundRect(ctx, langX, langY, lw, 18, 4); ctx.stroke();
-  ctx.fillStyle = "rgba(56,189,248,0.9)";
-  ctx.fillText(langTxt, langX + 7, langY + 12);
+  // Language label
+  ctx.fillStyle = "rgba(148,163,184,0.8)";
+  ctx.font = "500 12px ui-sans-serif, system-ui";
+  ctx.fillText(language, fx + fw - 80, fy + 38);
 
-  // Activity bar — landscape only
-  const abW = vert ? 0 : 32;
-  if (!vert) {
-    ctx.fillStyle = "rgba(13,17,23,0.5)";
-    ctx.fillRect(fx, fy + tbH, abW, fh - tbH);
-    ctx.strokeStyle = "rgba(48,54,64,0.3)"; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(fx + abW, fy + tbH); ctx.lineTo(fx + abW, fy + fh); ctx.stroke();
-    [0.2, 0.32, 0.44, 0.56].forEach((r) => {
-      const iy = fy + tbH + (fh - 60) * r;
-      ctx.fillStyle = "rgba(100,116,139,0.2)";
-      roundRect(ctx, fx + 8, iy, 16, 16, 3); ctx.fill();
-    });
-  }
-
-  // Line gutter
-  const gutterW = vert ? 36 : 42;
-  const gutterX = fx + abW;
-  ctx.fillStyle = "rgba(13,17,23,0.3)";
-  ctx.fillRect(gutterX, fy + tbH, gutterW, fh - tbH);
-  ctx.strokeStyle = "rgba(48,54,64,0.25)"; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(gutterX + gutterW, fy + tbH); ctx.lineTo(gutterX + gutterW, fy + fh); ctx.stroke();
-
-  // Code area (clipped) — 24px right margin so last char is never cut
-  const codeLeft = gutterX + gutterW + 10;
-  const codeRight = fx + fw - 24;
-  const codeMaxW = codeRight - codeLeft;
+  // ── Code area (clipped to frame) ──
+  const codeAreaTop = fy + 68;
+  const codeAreaBottom = fy + fh;
+  const codeAreaLeft = fx + 78;
+  const codeAreaRight = fx + fw;
+  const lineH = fs * 1.55;
 
   ctx.save();
   ctx.beginPath();
-  // Leave 24px for status bar; subtract 2 so bottom line chars don't get clipped
-  ctx.rect(fx, fy + tbH, fw, fh - tbH - 22);
+  ctx.rect(fx, codeAreaTop, fw, codeAreaBottom - codeAreaTop);
   ctx.clip();
 
-  const lineHeight = fontSize * 1.5;
-  const startIndex = Math.max(0, visibleLines.length - maxVisibleLines);
-  const viewportLines = visibleLines.slice(startIndex);
-  let y = fy + tbH + 10 + fontSize;
+  // Only show the last maxVis rows (scroll effect), but reserve buffer for wrapping
+  const WRAP_BUFFER = 4;
+  const effMaxVis = Math.max(4, maxVis - WRAP_BUFFER);
+  let startIdx = Math.max(0, visLines.length - effMaxVis);
+  // Back up if startIdx lands on a continuation row — show the full source line
+  while (startIdx > 0 && visLines[startIdx]!.isCont) startIdx--;
+  const viewport = visLines.slice(startIdx);
+  let y = codeAreaTop + 17 + fs;
 
-  viewportLines.forEach((line) => {
-    const isActive = line.number === activeLine;
-    const isFocused = focusSet.has(line.number);
+  for (const vl of viewport) {
+    const isActive = vl.lineNum === activeLine;
+    const isFocused = focusSet.has(vl.lineNum);
 
-    // Active / focused line highlight (no cursor bar — removed)
-    if (isActive || isFocused) {
-      ctx.fillStyle = isActive ? "rgba(56,189,248,0.06)" : "rgba(255,255,255,0.02)";
-      ctx.fillRect(gutterX, y - lineHeight + 6, fx + fw - gutterX, lineHeight);
+    // Highlight bar
+    if ((isActive || isFocused) && !vl.isEmpty) {
+      ctx.fillStyle = isActive ? "rgba(45,212,191,0.15)" : "rgba(255,255,255,0.04)";
+      rr(ctx, codeAreaLeft, y - lineH + 6, codeAreaRight - codeAreaLeft - 10, lineH, 8);
+      ctx.fill();
     }
 
-    // Gutter: show line number OR the continuation arrow
-    ctx.font = `${fontSize - 4}px ui-monospace, SFMono-Regular, monospace`;
-    ctx.textAlign = "right";
-    if (line.continuation) {
-      // Arrow goes in the gutter column (line-number side), not the code area
-      ctx.fillStyle = "rgba(56,189,248,0.45)";
-      ctx.font = `${fontSize - 3}px ui-monospace, SFMono-Regular, monospace`;
-      ctx.fillText("\u21B3", gutterX + gutterW - 6, y);
-    } else {
-      ctx.fillStyle = isActive ? "rgba(56,189,248,0.55)" : "rgba(100,116,139,0.4)";
-      ctx.fillText(line.lineNumberLabel, gutterX + gutterW - 6, y);
+    // Gutter number
+    ctx.fillStyle = vl.isCont ? "rgba(100,116,139,0.7)" : "rgba(148,163,184,0.9)";
+    ctx.font = `${fs - 4}px ui-monospace, SFMono-Regular, monospace`;
+    ctx.fillText(vl.gutterLabel, fx + 22, y);
+
+    if (vl.isCont) {
+      ctx.fillStyle = "rgba(45,212,191,0.6)";
+      ctx.fillText(">", fx + 50, y);
     }
-    ctx.textAlign = "start";
 
-    drawCodeColored(ctx, line.fullLineContent ?? line.content, line.charOffset ?? 0, Array.from(line.content).length, codeLeft, y, fontSize, codeMaxW);
+    // Code tokens (with overflow guard)
+    if (vl.text.length > 0) {
+      drawTokenized(ctx, vl.text, codeAreaLeft + 10, y, fs, codeAreaRight - codeAreaLeft - 20);
+    }
 
-    y += lineHeight;
-  });
+    y += lineH;
+  }
 
   ctx.restore();
 
-  // Status bar — VSCode-style
-  const sbH = 22;
-  const sbGrad = ctx.createLinearGradient(fx, fy + fh - sbH, fx, fy + fh);
-  sbGrad.addColorStop(0, "#1c2736"); sbGrad.addColorStop(1, "#142030");
-  ctx.fillStyle = sbGrad;
-  ctx.fillRect(fx, fy + fh - sbH, fw, sbH);
-  ctx.strokeStyle = "rgba(56,189,248,0.12)"; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(fx, fy + fh - sbH); ctx.lineTo(fx + fw, fy + fh - sbH); ctx.stroke();
-  // Branch icon
-  ctx.fillStyle = "rgba(56,189,248,0.7)";
-  roundRect(ctx, fx + 4, fy + fh - sbH + 4, 12, 14, 3); ctx.fill();
-  ctx.fillStyle = "#0d1117"; ctx.font = "bold 7px ui-monospace"; ctx.fillText("β", fx + 5.5, fy + fh - 6);
-  // Status items
-  ctx.fillStyle = "rgba(148,163,184,0.6)";
-  ctx.font = `500 ${vert ? 8 : 9}px ui-sans-serif,system-ui`;
-  ctx.fillText(`Ln ${activeLine}`, fx + 22, fy + fh - 6);
-  if (!vert) {
-    ctx.fillText("✓ 0 errors", fx + 70, fy + fh - 6);
-    ctx.fillText("Spaces: 2", fx + 150, fy + fh - 6);
-    ctx.fillText(language, fx + fw - 80, fy + fh - 6);
-  }
-  ctx.fillText("UTF-8", fx + fw - 36, fy + fh - 6);
-
+  // Watermark
   if (watermarked) {
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
-    ctx.font = "600 11px ui-sans-serif,system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("CodeCinematic", w / 2, fy + fh + 20);
-    ctx.textAlign = "start";
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.font = "600 14px ui-sans-serif, system-ui";
+    ctx.fillText("CodeCinematic", fx + fw - 120, fy + fh + 30);
   }
 
-  if (subtitleText) {
+  // Subtitle overlay
+  if (subtitle) {
     const sf = vert ? 14 : 13;
-    const sy = vert ? h - 60 : h - 24;
-    const mw = w - 60;
+    const sy = vert ? H - 60 : H - 24;
+    const mw = W - 60;
     ctx.font = `500 ${sf}px ui-sans-serif, system-ui`;
-    const tw = Math.min(ctx.measureText(subtitleText).width, mw);
+    const tw = Math.min(ctx.measureText(subtitle).width, mw);
     ctx.fillStyle = "rgba(0,0,0,0.78)";
-    roundRect(ctx, (w - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8);
-    ctx.fill();
+    rr(ctx, (W - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8); ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 0.5;
-    roundRect(ctx, (w - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.textAlign = "center";
-    ctx.fillText(subtitleText, w / 2, sy, mw);
-    ctx.textAlign = "start";
+    rr(ctx, (W - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.textAlign = "center";
+    ctx.fillText(subtitle, W / 2, sy, mw); ctx.textAlign = "start";
   }
 }
 
-/** Draw code with syntax coloring, clamped to maxW so no char is ever clipped by the right edge. */
-function drawCodeColored(
-  context: CanvasRenderingContext2D, fullLine: string, charOffset: number, charCount: number,
-  x: number, y: number, fontSize: number, maxW: number
-) {
-  context.font = `${fontSize}px ui-monospace, SFMono-Regular, monospace`;
-  const tokens = tokenize(fullLine);
-  let charIdx = 0;
+/* ── Syntax-highlighted code drawing (stops at maxWidth) ───────────────── */
+
+function drawTokenized(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fontSize: number, maxWidth: number) {
+  ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, monospace`;
+  const tokens = tokenize(text);
   let cx = x;
-  const rightEdge = x + maxW; // absolute right boundary
-  for (const t of tokens) {
-    const codePoints = Array.from(t.text);
-    for (const cp of codePoints) {
-      if (charIdx >= charOffset && charIdx < charOffset + charCount) {
-        const charW = context.measureText(cp).width;
-        // Only draw if the character fits fully within the right boundary
-        if (cx + charW <= rightEdge) {
-          context.fillStyle = t.color;
-          context.fillText(cp, cx, y);
-        }
-        cx += charW;
-      }
-      charIdx++;
-    }
+  for (const tok of tokens) {
+    ctx.fillStyle = tok.color;
+    ctx.fillText(tok.text, cx, y);
+    cx += ctx.measureText(tok.text).width;
   }
 }
 
-/**
- * Tokenizes a line of code into colored segments.
- * Key fix: identifiers (including camelCase like `evenNumbers`) are matched
- * as a WHOLE token first, THEN checked against keyword lists — so the full
- * name gets a single color, not split at case boundaries.
- */
-function tokenize(line: string) {
-  // Full-line comment shortcut
+/* ── Simple tokenizer ──────────────────────────────────────────────────── */
+
+function tokenize(line: string): Array<{ text: string; color: string }> {
   const trimmed = line.trimStart();
-  if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
-    return [{ text: line, color: "rgba(100,220,200,0.75)" }];
+  if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
+    return [{ text: line, color: "#67e8f9" }];
   }
 
-  const KEYWORDS_MODULE = new Set([
-    "import", "export", "from", "default", "type", "interface", "enum",
-    "implements", "extends", "public", "private", "protected", "static",
-    "readonly", "abstract", "declare", "namespace", "module",
-  ]);
-  const KEYWORDS_CONTROL = new Set([
-    "const", "let", "var", "function", "return", "async", "await", "class",
-    "new", "if", "else", "for", "while", "do", "switch", "case", "break",
-    "continue", "try", "catch", "finally", "throw", "typeof", "instanceof",
-    "in", "of", "void", "delete", "yield", "super", "this", "null",
-    "undefined", "true", "false",
-  ]);
-  const BUILTINS = new Set([
-    "console", "map", "filter", "reduce", "forEach", "find", "includes",
-    "push", "pop", "shift", "length", "log", "warn", "error", "debug", "info",
-    "Math", "Array", "Object", "String", "Number", "Boolean", "Promise",
-    "JSON", "Date", "parseInt", "parseFloat", "setTimeout", "setInterval",
-  ]);
-
-  // Ordered patterns (identifier MUST come AFTER strings but before symbol patterns)
-  const patterns: Array<{ regex: RegExp; resolver: (m: string) => string }> = [
-    // Strings (template literals, single/double quoted)
-    { regex: /^(`[^`]*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/, resolver: () => "#fda4af" },
-    // Full identifier — matches entire camelCase/PascalCase/snake_case name
-    { regex: /^([a-zA-Z_$][a-zA-Z0-9_$]*)/, resolver: (m) => {
-      if (KEYWORDS_MODULE.has(m)) return "#c084fc";
-      if (KEYWORDS_CONTROL.has(m)) return "#7dd3fc";
-      if (BUILTINS.has(m)) return "#7dd3fc";
-      // PascalCase = type/class name
-      if (/^[A-Z]/.test(m)) return "#4ade80";
-      return "#e6edf3";
-    }},
-    // Numbers
-    { regex: /^(\d+(\.\d+)?)/, resolver: () => "#facc15" },
-    // Brackets
-    { regex: /^([{}()[\]])/, resolver: () => "#c084fc" },
-    // Punctuation
-    { regex: /^([.,:;])/, resolver: () => "#94a3b8" },
-    // Operators
-    { regex: /^(=>|===|!==|==|!=|>=|<=|&&|\|\||\?\?|\+\+|--|\+=|-=|\*=|\/=|\+|-|\*|\/|%|!|<|>|=|&|\||\?|:)/, resolver: () => "#f97316" },
+  const patterns: Array<{ regex: RegExp; color: string }> = [
+    { regex: /^(".*?"|'.*?'|`.*?`)/, color: "#fda4af" },
+    { regex: /^(const|let|var|function|return|async|await|class|new|if|else|for|while|console|map|log)\b/, color: "#7dd3fc" },
+    { regex: /^(\d+(\.\d+)?)/, color: "#facc15" },
+    { regex: /^([{}()[\]])/, color: "#c084fc" },
+    { regex: /^([.,:;])/, color: "#94a3b8" },
+    { regex: /^(=>|===|!==|==|!=|\+|-|\*|\/)/, color: "#f97316" },
   ];
 
   const tokens: Array<{ text: string; color: string }> = [];
-  let remaining = line;
-
-  while (remaining.length > 0) {
+  let rem = line;
+  while (rem.length > 0) {
     let matched = false;
-    for (const { regex, resolver } of patterns) {
-      const match = remaining.match(regex);
-      if (match) {
-        tokens.push({ text: match[0], color: resolver(match[0]) });
-        remaining = remaining.slice(match[0].length);
+    for (const p of patterns) {
+      const m = rem.match(p.regex);
+      if (m) {
+        tokens.push({ text: m[0], color: p.color });
+        rem = rem.slice(m[0].length);
         matched = true;
         break;
       }
     }
     if (!matched) {
-      const ch = remaining.match(/^./u)?.[0] ?? remaining[0];
-      tokens.push({ text: ch, color: "#e6edf3" });
-      remaining = remaining.slice(ch.length);
+      tokens.push({ text: rem[0]!, color: "#e6edf3" });
+      rem = rem.slice(1);
     }
   }
-
   return tokens;
 }
+
+/* ── Helpers ───────────────────────────────────────────────────────────── */
 
 function formatMultiplier(value: string) {
   return `${Number(value).toFixed(2)}x`;
 }
 
-function roundRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
-  context.beginPath();
-  context.moveTo(x + radius, y);
-  context.lineTo(x + width - radius, y);
-  context.quadraticCurveTo(x + width, y, x + width, y + radius);
-  context.lineTo(x + width, y + height - radius);
-  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  context.lineTo(x + radius, y + height);
-  context.quadraticCurveTo(x, y + height, x, y + height - radius);
-  context.lineTo(x, y + radius);
-  context.quadraticCurveTo(x, y, x + radius, y);
-  context.closePath();
+function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { ArrowRight, Download, FileCode2, Film, Layers, MessageSquareText, Ruler, Sparkles, Volume2, Wand2, BookOpen } from "lucide-react";
+import { ArrowRight, Download, FileCode2, Film, Layers, Ruler, Wand2, BookOpen } from "lucide-react";
 
 import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG } from "@/lib/plans";
@@ -21,9 +21,6 @@ export default async function DashboardPage() {
 
   const quickLinks = [
     { label: "Code Studio", desc: "Write code and render a cinematic typing video", href: "/projects/new-project?tab=editor", icon: Film, color: "primary" },
-    { label: "AI Narration", desc: "Generate voice-over scripts with Google Gemini", href: "/projects/new-project?tab=narration", icon: MessageSquareText, color: "primary" },
-    { label: "Audio Studio", desc: "Convert narration to speech with Sarvam AI", href: "/projects/new-project?tab=tts", icon: Volume2, color: "primary" },
-    { label: "Auto Pipeline", desc: "Code → narration → audio → video in one click", href: "/projects/new-project?tab=pipeline", icon: Sparkles, color: "primary" },
     { label: "Word of Day", desc: "Create beautiful word definition reveal videos", href: "/projects/new-project?tab=wordofday", icon: BookOpen, color: "primary" },
     { label: "Did You Know?", desc: "Animate facts and quotes into engaging shorts", href: "/projects/new-project?tab=didyouknow", icon: Wand2, color: "primary" },
   ];
@@ -50,7 +47,7 @@ export default async function DashboardPage() {
         {/* Workflows grid */}
         <section>
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">Workflows</h2>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
             {quickLinks.map((f) => (
               <Link key={f.label} href={f.href as Route}>
                 <div className="group h-full rounded-xl border border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5 p-4 space-y-3 transition-all duration-200 cursor-pointer">
