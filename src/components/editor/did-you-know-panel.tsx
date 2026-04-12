@@ -5,6 +5,7 @@ import { Download, Loader2, Maximize2, Play, Type, ToggleLeft, ToggleRight, Volu
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import { loadGoogleFonts } from "./shared/font-catalog";
@@ -27,7 +28,8 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
     "Honey never spoils. Archaeologists have found 3,000-year-old honey in Egyptian tombs that was still perfectly edible."
   );
   const [showTitle, setShowTitle] = useState(true);
-  const [titleMode, setTitleMode] = useState<"didyouknow" | "thoughtofday">("didyouknow");
+  const [titleMode, setTitleMode] = useState<"didyouknow" | "thoughtofday" | "custom">("didyouknow");
+  const [customTitle, setCustomTitle] = useState("");
 
   // Appearance
   const [aspect, setAspect] = useState<"9:16" | "16:9">("9:16");
@@ -52,7 +54,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
-  const titleText = titleMode === "didyouknow" ? "DID YOU KNOW ?" : "THOUGHT OF THE DAY";
+  const titleText = titleMode === "didyouknow" ? "DID YOU KNOW ?" : titleMode === "thoughtofday" ? "THOUGHT OF THE DAY" : (customTitle || "THOUGHT OF THE DAY");
 
   // Load Google Fonts once
   useEffect(() => { loadGoogleFonts(); }, []);
@@ -180,7 +182,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
 
   const handleDownload = () => {
     if (!videoUrl) return;
-    const slug = titleMode === "didyouknow" ? "did-you-know" : "thought-of-the-day";
+    const slug = titleMode === "didyouknow" ? "did-you-know" : titleMode === "thoughtofday" ? "thought-of-the-day" : "custom";
     const a = document.createElement("a");
     a.href = videoUrl;
     a.download = `${slug}-${Date.now()}.mp4`;
@@ -188,7 +190,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto xl:overflow-hidden">
+    <div className="flex flex-col h-full space-y-2 overflow-y-auto">
       <div className="grid gap-2 xl:grid-cols-[1fr_1fr] xl:flex-1 xl:min-h-0">
 
         {/* LEFT: Settings */}
@@ -197,7 +199,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
             <CardHeader className="py-2 px-3 border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Type className="h-4 w-4 text-primary" />
-                {titleMode === "didyouknow" ? "Did You Know?" : "Thought of the Day"}
+                {titleMode === "didyouknow" ? "Did You Know?" : titleMode === "thoughtofday" ? "Thought of the Day" : (customTitle || "Custom Title")}
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 space-y-3">
@@ -205,7 +207,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
               {/* Title mode selector */}
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">MODE</span>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setTitleMode("didyouknow")}
@@ -228,7 +230,26 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                   >
                     Thought of Day
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setTitleMode("custom")}
+                    className={`rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+                      titleMode === "custom"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card hover:border-primary/30"
+                    }`}
+                  >
+                    Custom
+                  </button>
                 </div>
+                {titleMode === "custom" && (
+                  <Input
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                    placeholder="Enter custom title…"
+                    className="mt-1.5 text-xs h-8"
+                  />
+                )}
               </div>
 
               {/* Toggle title */}
@@ -570,7 +591,7 @@ function drawFactFrame(
   const maxW = w * 0.78;
 
   const totalChars = text.length;
-  const visibleChars = Math.floor(totalChars * progress);
+  const visibleChars = progress > 0 ? Math.max(1, Math.ceil(totalChars * progress)) : 0;
   const visibleText = text.substring(0, visibleChars);
 
   ctx.font = `400 ${fontSize}px "${font}", Georgia, serif`;

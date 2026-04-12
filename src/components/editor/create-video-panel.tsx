@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import type { Narration } from "@/lib/narration";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile } from "@ffmpeg/util";
 
 type Job = {
   exportId: string;
@@ -102,7 +104,7 @@ export function CreateVideoPanel({
           aspectRatios,
           format: "mp4"
         })
-        // NOTE: we request mp4 from the API for job metadata, but client renders .webm
+        // Client renders webm then converts to mp4 via ffmpeg.wasm
       });
 
       const data = (await response.json()) as { jobs?: Job[]; error?: string };
@@ -149,7 +151,7 @@ export function CreateVideoPanel({
           exportId: job.exportId,
           aspectRatio: job.aspectRatio,
           url,
-          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.webm`
+          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.mp4`
         });
       }
 
@@ -258,7 +260,7 @@ export function CreateVideoPanel({
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-primary">{video.aspectRatio} video ready</p>
                   <a href={video.url} download={video.filename}>
-                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .webm</Button>
+                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .mp4</Button>
                   </a>
                 </div>
                 <video src={video.url} controls playsInline className="w-full rounded-lg border border-border/50 bg-black shadow-inner" />
@@ -372,9 +374,9 @@ async function renderVideoBlob(opts: {
     const chars = lineText.length;
     if (chars === 0) {
       // Empty line: brief pause
-      return Math.round(180 / Math.max(0.05, Number(normalSpeed) || 1));
+      return Math.round(180 / Math.max(0.5, Number(normalSpeed) || 1));
     }
-    const mult = Math.max(0.05, Number(isFocused ? focusSpeed : normalSpeed) || 1);
+    const mult = Math.max(0.5, Number(isFocused ? focusSpeed : normalSpeed) || 1);
     const msPerChar = isFocused ? 150 : 110;
     const pad = isFocused ? 280 : 160;
     return Math.round((chars * msPerChar + pad) / mult);
@@ -458,10 +460,25 @@ async function renderVideoBlob(opts: {
   if (ttsCleanup) ttsCleanup();
   await delay(300);
   rec.stop();
-  return done;
+  const webmBlob = await done;
+
+  // Convert webm → mp4 using ffmpeg.wasm
+  const mp4Blob = await convertWebmToMp4(webmBlob);
+  return mp4Blob;
 }
 
 function delay(ms: number) { return new Promise<void>((r) => setTimeout(r, ms)); }
+
+async function convertWebmToMp4(webmBlob: Blob): Promise<Blob> {
+  const ffmpeg = new FFmpeg();
+  await ffmpeg.load();
+  const webmData = await fetchFile(webmBlob);
+  await ffmpeg.writeFile("input.webm", webmData);
+  await ffmpeg.exec(["-i", "input.webm", "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", "output.mp4"]);
+  const mp4Data = await ffmpeg.readFile("output.mp4") as Uint8Array;
+  ffmpeg.terminate();
+  return new Blob([new Uint8Array(mp4Data)], { type: "video/mp4" });
+}
 
 function pickMime() {
   for (const m of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {

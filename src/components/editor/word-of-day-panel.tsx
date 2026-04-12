@@ -199,7 +199,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto xl:overflow-hidden">
+    <div className="flex flex-col h-full space-y-2 overflow-y-auto">
       <div className="grid gap-2 xl:grid-cols-[1fr_1fr] xl:flex-1 xl:min-h-0">
 
         {/* LEFT: Settings */}
@@ -573,8 +573,9 @@ function drawWordFrame(
   const scaledWordSize = Math.round(wordFontSize * scale);
   const scaledMeaningSize = Math.round(meaningFontSize * scale);
 
-  // Word (italic, centered)
-  const wordChars = Math.floor(word.length * Math.min(progress / wordSplit, 1));
+  // Word (italic, centered) — use Math.ceil + Math.max(1,...) like Code Studio
+  const wordFrac = Math.min(progress / wordSplit, 1);
+  const wordChars = wordFrac > 0 ? Math.max(1, Math.ceil(word.length * wordFrac)) : 0;
   const visibleWord = word.substring(0, wordChars);
 
   ctx.font = `italic 700 ${scaledWordSize}px "${font}", Georgia, serif`;
@@ -588,7 +589,7 @@ function drawWordFrame(
   // Meaning (appears after word is fully typed, no cursor)
   if (progress > wordSplit) {
     const meaningProgress = (progress - wordSplit) / (1 - wordSplit);
-    const meaningChars = Math.floor(meaning.length * meaningProgress);
+    const meaningChars = meaningProgress > 0 ? Math.max(1, Math.ceil(meaning.length * meaningProgress)) : 0;
     const visibleMeaning = meaning.substring(0, meaningChars);
 
     ctx.font = `300 ${scaledMeaningSize}px "${font}", Georgia, serif`;

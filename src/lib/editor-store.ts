@@ -29,8 +29,8 @@ export const defaultEditorDraft: EditorDraft = {
   title: "API Gateway explainer",
   language: "typescript",
   aspect: "9:16",
-  normalSpeed: "0.60",
-  focusSpeed: "0.35",
+  normalSpeed: "1.00",
+  focusSpeed: "0.70",
   sound: "soft",
   soundVolume: "0.30",
   code: `# What API Gateway is?

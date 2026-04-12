@@ -141,11 +141,11 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 pt-1">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Normal speed</span>
-                  <Slider value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.05" max="1.50" step="0.05" />
+                  <Slider value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.50" max="1.50" step="0.05" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Focus speed</span>
-                  <Slider value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.05" max="1.50" step="0.05" />
+                  <Slider value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.50" max="1.50" step="0.05" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Sound pattern</span>
