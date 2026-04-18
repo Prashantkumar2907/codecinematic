@@ -495,6 +495,7 @@ interface VLine {
   gutterLabel: string; // "  1" or "   " for continuation rows
   isCont: boolean;     // is this a continuation (word-wrapped) row?
   isEmpty: boolean;    // true for blank lines
+  baseColor?: string;  // color to use for this line (if continuation, inherited from parent)
 }
 
 function buildVisibleLines(
@@ -521,6 +522,13 @@ function buildVisibleLines(
       ? raw.slice(0, Math.max(1, Math.ceil(raw.length * progress)))
       : raw;
 
+    // Determine base color for this line (for inherited color on continuations)
+    const trimmed = raw.trimStart();
+    let baseColor: string | undefined;
+    if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
+      baseColor = "#67e8f9"; // comment color
+    }
+
     // Word-wrap (same logic for active and completed lines)
     const segments = wordWrap(displayText, maxChars);
     for (let s = 0; s < segments.length; s++) {
@@ -530,6 +538,7 @@ function buildVisibleLines(
         gutterLabel: s === 0 ? String(lineNum).padStart(3, " ") : "   ",
         isCont: s > 0,
         isEmpty: false,
+        baseColor,
       });
     }
   }
@@ -760,7 +769,7 @@ function paintFrame(
 
     // Code tokens (with overflow guard)
     if (vl.text.length > 0) {
-      drawTokenized(ctx, vl.text, codeAreaLeft + 10, y, fs, codeAreaRight - codeAreaLeft - 20);
+      drawTokenized(ctx, vl.text, codeAreaLeft + 10, y, fs, codeAreaRight - codeAreaLeft - 20, vl.baseColor);
     }
 
     y += lineH;
@@ -793,8 +802,14 @@ function paintFrame(
 
 /* ── Syntax-highlighted code drawing (stops at maxWidth) ───────────────── */
 
-function drawTokenized(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fontSize: number, maxWidth: number) {
+function drawTokenized(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fontSize: number, maxWidth: number, baseColor?: string) {
   ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, monospace`;
+  // If baseColor is provided, use it uniformly (for continuation lines)
+  if (baseColor) {
+    ctx.fillStyle = baseColor;
+    ctx.fillText(text, x, y);
+    return;
+  }
   const tokens = tokenize(text);
   let cx = x;
   for (const tok of tokens) {
