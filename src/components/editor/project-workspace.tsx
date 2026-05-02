@@ -6,10 +6,14 @@ import { useSearchParams } from "next/navigation";
 import { ProjectEditor } from "@/components/editor/project-editor";
 import { WordOfDayPanel } from "@/components/editor/word-of-day-panel";
 import { DidYouKnowPanel } from "@/components/editor/did-you-know-panel";
+import { ShayariPanel } from "@/components/editor/shayari-panel";
+import { SuvicharPanel } from "@/components/editor/suvichar-panel";
+import { BollywoodPanel } from "@/components/editor/bollywood-panel";
+import { FactsHindiPanel } from "@/components/editor/facts-hindi-panel";
 import { useEditorStore, defaultEditorDraft } from "@/lib/editor-store";
 import type { PlanCode } from "@/lib/plans";
 
-const tabIds = ["editor", "wordofday", "didyouknow"] as const;
+const tabIds = ["editor", "wordofday", "didyouknow", "shayari", "suvichar", "bollywood", "factshindi"] as const;
 
 type TabId = (typeof tabIds)[number];
 
@@ -42,6 +46,18 @@ export function ProjectWorkspace({ plan, projectId }: { plan: PlanCode; projectI
         )}
         {activeTab === "didyouknow" && (
           <DidYouKnowPanel projectId={projectId} />
+        )}
+        {activeTab === "shayari" && (
+          <ShayariPanel projectId={projectId} />
+        )}
+        {activeTab === "suvichar" && (
+          <SuvicharPanel projectId={projectId} />
+        )}
+        {activeTab === "bollywood" && (
+          <BollywoodPanel projectId={projectId} />
+        )}
+        {activeTab === "factshindi" && (
+          <FactsHindiPanel projectId={projectId} />
         )}
       </div>
     </div>

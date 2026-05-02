@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import type { Narration } from "@/lib/narration";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile } from "@ffmpeg/util";
+import { BG_PRESETS, type BgPreset, drawBackground } from "@/components/editor/shared/canvas-utils";
+import { loadGoogleFonts } from "@/components/editor/shared/font-catalog";
 
 type Job = {
   exportId: string;
@@ -25,9 +27,83 @@ type RenderedVideo = {
   filename: string;
 };
 
+// ─── Singleton AudioContext (avoids Chrome's ~6 ctx-per-page limit) ──────────
+let _sharedAudioCtx: AudioContext | null = null;
+function acquireAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
+  if (_sharedAudioCtx && _sharedAudioCtx.state !== "closed") {
+    if (_sharedAudioCtx.state === "suspended") void _sharedAudioCtx.resume();
+    return _sharedAudioCtx;
+  }
+  _sharedAudioCtx = new AudioContext();
+  return _sharedAudioCtx;
+}
+
+type RenderSignal = { cancelled: boolean };
+
 const aspectDimensions: Record<string, { width: number; height: number; maxVisibleLines: number; fontSize: number; maxCharsPerLine: number }> = {
-  "9:16": { width: 720, height: 1280, maxVisibleLines: 16, fontSize: 32, maxCharsPerLine: 34 },
-  "16:9": { width: 1280, height: 720,  maxVisibleLines: 14, fontSize: 22, maxCharsPerLine: 56 }
+  "9:16": { width: 1080, height: 1920, maxVisibleLines: 20, fontSize: 36, maxCharsPerLine: 36 },
+  "16:9": { width: 1280, height: 720,  maxVisibleLines: 16, fontSize: 24, maxCharsPerLine: 60 }
+};
+
+// ── Code Color Themes ────────────────────────────────────────────────────
+type CodeTheme = {
+  bg0: string; bg1: string;
+  atmoColor: string;
+  frameGlass: string; frameBorder: string;
+  titleBar: string; gutterBg: string;
+  activeLineBg: string; focusLineBg: string;
+  gutterText: string;
+  cursorColor: string; accentColor: string;
+  tokens: { string: string; keyword: string; number: string; bracket: string; punct: string; operator: string; comment: string; type: string; default: string };
+};
+
+const CODE_THEMES: Record<string, CodeTheme> = {
+  "vscode": {
+    bg0: "#08101a", bg1: "#03080d",
+    atmoColor: "rgba(45,212,191,0.06)",
+    frameGlass: "rgba(10,16,24,0.82)", frameBorder: "rgba(255,255,255,0.12)",
+    titleBar: "rgba(255,255,255,0.03)", gutterBg: "rgba(0,0,0,0.32)",
+    activeLineBg: "rgba(45,212,191,0.15)", focusLineBg: "rgba(255,255,255,0.04)",
+    gutterText: "rgba(148,163,184,0.9)", cursorColor: "#2dd4bf", accentColor: "#2dd4bf",
+    tokens: { string: "#fda4af", keyword: "#7dd3fc", number: "#facc15", bracket: "#c084fc", punct: "#94a3b8", operator: "#f97316", comment: "#67e8f9", type: "#4ade80", default: "#e6edf3" }
+  },
+  "dracula": {
+    bg0: "#1e1e2e", bg1: "#161625",
+    atmoColor: "rgba(189,147,249,0.06)",
+    frameGlass: "rgba(24,24,40,0.95)", frameBorder: "rgba(189,147,249,0.20)",
+    titleBar: "rgba(189,147,249,0.05)", gutterBg: "rgba(0,0,0,0.28)",
+    activeLineBg: "rgba(189,147,249,0.13)", focusLineBg: "rgba(255,255,255,0.04)",
+    gutterText: "rgba(98,114,164,0.9)", cursorColor: "#bd93f9", accentColor: "#bd93f9",
+    tokens: { string: "#f1fa8c", keyword: "#ff79c6", number: "#bd93f9", bracket: "#8be9fd", punct: "#6272a4", operator: "#ff79c6", comment: "#6272a4", type: "#50fa7b", default: "#f8f8f2" }
+  },
+  "monokai": {
+    bg0: "#1b1b1b", bg1: "#121212",
+    atmoColor: "rgba(249,38,114,0.05)",
+    frameGlass: "rgba(20,20,20,0.95)", frameBorder: "rgba(249,38,114,0.15)",
+    titleBar: "rgba(255,255,255,0.02)", gutterBg: "rgba(0,0,0,0.30)",
+    activeLineBg: "rgba(249,38,114,0.10)", focusLineBg: "rgba(255,255,255,0.03)",
+    gutterText: "rgba(117,113,94,0.9)", cursorColor: "#f92672", accentColor: "#f92672",
+    tokens: { string: "#e6db74", keyword: "#f92672", number: "#ae81ff", bracket: "#a6e22e", punct: "#75715e", operator: "#f92672", comment: "#75715e", type: "#66d9e8", default: "#f8f8f2" }
+  },
+  "nord": {
+    bg0: "#2e3440", bg1: "#242933",
+    atmoColor: "rgba(129,161,193,0.05)",
+    frameGlass: "rgba(36,41,51,0.95)", frameBorder: "rgba(129,161,193,0.20)",
+    titleBar: "rgba(129,161,193,0.05)", gutterBg: "rgba(0,0,0,0.20)",
+    activeLineBg: "rgba(136,192,208,0.14)", focusLineBg: "rgba(255,255,255,0.04)",
+    gutterText: "rgba(76,86,106,0.9)", cursorColor: "#88c0d0", accentColor: "#88c0d0",
+    tokens: { string: "#a3be8c", keyword: "#81a1c1", number: "#b48ead", bracket: "#88c0d0", punct: "#4c566a", operator: "#81a1c1", comment: "#616e88", type: "#8fbcbb", default: "#eceff4" }
+  },
+  "github-dark": {
+    bg0: "#0d1117", bg1: "#090d13",
+    atmoColor: "rgba(88,166,255,0.04)",
+    frameGlass: "rgba(13,17,23,0.95)", frameBorder: "rgba(48,54,61,0.80)",
+    titleBar: "rgba(255,255,255,0.02)", gutterBg: "rgba(0,0,0,0.30)",
+    activeLineBg: "rgba(88,166,255,0.10)", focusLineBg: "rgba(255,255,255,0.03)",
+    gutterText: "rgba(139,148,158,0.9)", cursorColor: "#58a6ff", accentColor: "#58a6ff",
+    tokens: { string: "#a5d6ff", keyword: "#ff7b72", number: "#79c0ff", bracket: "#ffa657", punct: "#8b949e", operator: "#ff7b72", comment: "#8b949e", type: "#7ee787", default: "#c9d1d9" }
+  },
 };
 
 export function CreateVideoPanel({
@@ -58,6 +134,8 @@ export function CreateVideoPanel({
   const [loading, setLoading] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cancellation ref: when set + cancelled=true, the in-flight render loop exits cleanly
+  const renderSignalRef = useRef<RenderSignal | null>(null);
   const storedDraft = useEditorStore((state) => state.drafts[projectId]);
   const resolvedDraft = storedDraft ?? {
     ...defaultEditorDraft,
@@ -66,7 +144,7 @@ export function CreateVideoPanel({
     aspect: aspect as "9:16" | "16:9",
     normalSpeed,
     focusSpeed,
-    sound: sound as "off" | "soft" | "typewriter",
+    sound: sound as "off" | "soft" | "typewriter" | "keyboard" | "chime",
     soundVolume,
     focus: focus.map((line) => Number(line)).filter((line) => !Number.isNaN(line)),
     code,
@@ -79,11 +157,36 @@ export function CreateVideoPanel({
   const resolvedSound = resolvedDraft.sound;
   const resolvedSoundVolume = resolvedDraft.soundVolume;
   const resolvedNarration = resolvedDraft.narration;
+  const resolvedTheme = resolvedDraft.theme ?? "vscode";
+  const resolvedBgPresetId = resolvedDraft.bgPresetId ?? "cosmic";
+  const resolvedCodeFont = resolvedDraft.codeFont ?? "ui-monospace";
+  const resolvedCursorBlink = resolvedDraft.cursorBlink ?? true;
+  const resolvedFocusFlash = resolvedDraft.focusFlash ?? true;
   const aspectRatios = [aspect];
   const renderLineCount = useMemo(
     () => resolvedCode.split("\n").length,
     [resolvedCode]
   );
+
+  const estimatedDuration = useMemo(() => {
+    const allLines = resolvedCode.split("\n");
+    const focusSet = new Set(resolvedFocus.map(Number).filter(n => !isNaN(n)));
+    let totalMs = 0;
+    for (let i = 0; i < allLines.length; i++) {
+      const chars = allLines[i]!.length;
+      const isFocused = focusSet.has(i + 1);
+      const mult = Math.max(0.25, Number(isFocused ? resolvedFocusSpeed : resolvedNormalSpeed) || 1);
+      if (chars === 0) { totalMs += Math.round(180 / mult); continue; }
+      const msPerChar = isFocused ? 150 : 110;
+      const pad = isFocused ? 280 : 160;
+      totalMs += Math.round((chars * msPerChar + pad) / mult);
+    }
+    const ms = Math.max(3000, totalMs);
+    const secs = Math.ceil(ms / 1000);
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m > 0 ? `~${m}m ${s}s` : `~${s}s`;
+  }, [resolvedCode, resolvedFocus, resolvedNormalSpeed, resolvedFocusSpeed]);
 
   useEffect(() => {
     setError(null);
@@ -126,12 +229,25 @@ export function CreateVideoPanel({
   }
 
   async function renderJobs(targetJobs: Job[]) {
+    // Cancel any in-flight render before starting a new one
+    if (renderSignalRef.current) {
+      renderSignalRef.current.cancelled = true;
+    }
+    // Stop any queued speech synthesis from a previous render
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    const signal: RenderSignal = { cancelled: false };
+    renderSignalRef.current = signal;
+
     setRendering(true);
     setError(null);
 
     try {
       const nextVideos: RenderedVideo[] = [];
       for (const job of targetJobs) {
+        if (signal.cancelled) break;
         const blob = await renderVideoBlob({
           title,
           language,
@@ -144,7 +260,14 @@ export function CreateVideoPanel({
           sound: resolvedSound,
           soundVolume: resolvedSoundVolume,
           narration: resolvedNarration,
+          theme: resolvedTheme,
+          bgPresetId: resolvedBgPresetId,
+          codeFont: resolvedCodeFont,
+          cursorBlink: resolvedCursorBlink,
+          focusFlash: resolvedFocusFlash,
+          signal,
         });
+        if (signal.cancelled) break;
 
         const url = URL.createObjectURL(blob);
         nextVideos.push({
@@ -155,14 +278,20 @@ export function CreateVideoPanel({
         });
       }
 
-      setVideos((current) => {
-        current.forEach((video) => URL.revokeObjectURL(video.url));
-        return nextVideos;
-      });
+      if (!signal.cancelled) {
+        setVideos((current) => {
+          current.forEach((video) => URL.revokeObjectURL(video.url));
+          return nextVideos;
+        });
+      }
     } catch (renderError) {
-      setError(renderError instanceof Error ? renderError.message : "Video rendering failed.");
+      if (!signal.cancelled) {
+        setError(renderError instanceof Error ? renderError.message : "Video rendering failed.");
+      }
     } finally {
-      setRendering(false);
+      if (!signal.cancelled) {
+        setRendering(false);
+      }
     }
   }
 
@@ -201,6 +330,9 @@ export function CreateVideoPanel({
               <Meta label="Insertion volume" value={`${Math.round(Number(resolvedSoundVolume) * 100)}%`} />
               <Meta label="Focus lines" value={resolvedFocus.length ? resolvedFocus.join(", ") : "None"} />
               <Meta label="Render source lines" value={`${renderLineCount}`} />
+              <Meta label="Est. duration" value={estimatedDuration} />
+              <Meta label="Theme" value={resolvedTheme} />
+              <Meta label="Background" value={resolvedBgPresetId} />
               <Meta label="Narration" value={resolvedNarration ? `${resolvedNarration.segments.length} segments` : "None"} />
             </div>
 
@@ -215,8 +347,23 @@ export function CreateVideoPanel({
                 {loading || rendering ? "Creating video…" : "Create video"}
               </Button>
               <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || renderLineCount === 0} variant="secondary">
-                {rendering ? "Rendering videos..." : "Render again"}
+                {rendering ? "Rendering…" : "Render again"}
               </Button>
+              {rendering && (
+                <Button
+                  variant="outline"
+                  className="h-8 text-xs px-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    if (renderSignalRef.current) {
+                      renderSignalRef.current.cancelled = true;
+                    }
+                    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+                    setRendering(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
             </div>
             
             {renderLineCount === 0 ? (
@@ -316,17 +463,36 @@ async function renderVideoBlob(opts: {
   sound: string;
   soundVolume: string;
   narration: Narration | null;
+  theme: string;
+  bgPresetId: string;
+  codeFont: string;
+  cursorBlink: boolean;
+  focusFlash: boolean;
+  signal: RenderSignal;
 }) {
   const {
     title, language, aspectRatio, code, focusLines, watermarked,
     normalSpeed, focusSpeed, sound, soundVolume, narration,
+    theme, bgPresetId, codeFont, cursorBlink, focusFlash, signal,
   } = opts;
 
   if (typeof window === "undefined") throw new Error("Browser only.");
   if (typeof MediaRecorder === "undefined") throw new Error("MediaRecorder not available.");
 
+  // Resolve preset first
   const preset = aspectDimensions[aspectRatio];
   if (!preset) throw new Error(`Unknown aspect ratio: ${aspectRatio}`);
+
+  // Resolve theme and background
+  const codeTheme = CODE_THEMES[theme] ?? CODE_THEMES["vscode"]!;
+  const bgPreset: BgPreset = BG_PRESETS.find((p) => p.id === bgPresetId) ?? BG_PRESETS[0]!;
+  const resolvedFont = codeFont || "ui-monospace";
+
+  // Pre-load custom font if needed
+  if (resolvedFont !== "ui-monospace" && resolvedFont !== "Courier New" && resolvedFont !== "monospace") {
+    loadGoogleFonts();
+    try { await document.fonts.load(`${preset.fontSize}px "${resolvedFont}"`); } catch { /* fallback ok */ }
+  }
 
   // ── Canvas ──
   const canvas = document.createElement("canvas");
@@ -350,7 +516,9 @@ async function renderVideoBlob(opts: {
   // ── Streams ──
   const vStream = (canvas as any).captureStream(0) as MediaStream;
   const vTrack = vStream.getVideoTracks()[0] as any;
-  const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
+  // Use singleton AudioContext (avoids Chrome 6-ctx-per-page limit on repeated renders)
+  const audioCtx = acquireAudioCtx();
+  if (audioCtx?.state === "suspended") await audioCtx.resume();
   const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
   const combined = new MediaStream([
     ...vStream.getVideoTracks(),
@@ -376,7 +544,7 @@ async function renderVideoBlob(opts: {
       // Empty line: brief pause
       return Math.round(180 / Math.max(0.5, Number(normalSpeed) || 1));
     }
-    const mult = Math.max(0.5, Number(isFocused ? focusSpeed : normalSpeed) || 1);
+    const mult = Math.max(0.25, Number(isFocused ? focusSpeed : normalSpeed) || 1);
     const msPerChar = isFocused ? 150 : 110;
     const pad = isFocused ? 280 : 160;
     return Math.round((chars * msPerChar + pad) / mult);
@@ -392,17 +560,26 @@ async function renderVideoBlob(opts: {
   const done = new Promise<Blob>((resolve) => {
     rec.onstop = () => {
       combined.getTracks().forEach((t) => t.stop());
-      if (audioCtx) void audioCtx.close();
+      // Note: audioCtx is a singleton — do NOT close it between renders
       resolve(new Blob(chunks, { type: "video/webm" }));
     };
   });
   rec.start(200);
-  if (audioCtx?.state === "suspended") await audioCtx.resume();
 
-  // ── Schedule audio clicks ──
-  if (audioCtx && audioDest && sound !== "off" && Number(soundVolume) > 0) {
+  // ── Startup delay: let recorder buffer initialize before audio begins ──
+  const STARTUP_MS = 350;
+  await delay(STARTUP_MS);
+  if (signal.cancelled) {
+    try { rec.stop(); } catch { /* ignore */ }
+    await done.catch(() => {});
+    return new Blob([], { type: "video/mp4" });
+  }
+
+  // ── Schedule audio AFTER startup (so audio aligns with the recorded stream) ──
+  // t0Audio is the AudioContext absolute time when char-0 of line-0 starts
+  const t0Audio = audioCtx ? (audioCtx.currentTime + 0.04) : null;
+  if (audioCtx && audioDest && t0Audio !== null && sound !== "off" && Number(soundVolume) > 0) {
     const vol = Number(soundVolume);
-    const t0 = audioCtx.currentTime + 0.06;
     let elapsed = 0;
     for (let li = 0; li < allLines.length; li++) {
       const lineText = allLines[li]!;
@@ -411,7 +588,7 @@ async function renderVideoBlob(opts: {
       if (chars === 0) { elapsed += dur; continue; }
       for (let ci = 0; ci < chars; ci++) {
         const frac = (ci + 1) / (chars + 1);
-        const when = t0 + (elapsed + dur * frac) / 1000;
+        const when = t0Audio + (elapsed + dur * frac) / 1000;
         emitClick(audioCtx, audioDest, when, sound, vol, lineText[ci]!, ci === chars - 1);
       }
       elapsed += dur;
@@ -420,46 +597,82 @@ async function renderVideoBlob(opts: {
 
   const ttsCleanup = narration ? scheduleNarrationTTS(narration, allLines, cumEnd, totalMs) : null;
 
-  // ── Frame loop ── render at 30 fps virtual time, paced to wall-clock
-  const FPS = 30;
-  const frameDur = 1000 / FPS;
-  const totalFrames = Math.ceil(totalMs / frameDur) + 15;
-  const wallStart = performance.now();
+  // ── rAF frame loop — AudioContext is the master clock ──
+  // Video virtual-time = audioCtx.currentTime - t0Audio (in ms).
+  // This guarantees audio clicks are always in sync with the animation,
+  // even if rAF or setTimeout are throttled by the browser.
+  type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
+  const particles: Particle[] = [];
+  let prevActiveIdx = -1;
+  let frameNum = 0;
+  const perf0 = performance.now();
 
-  for (let f = 0; f <= totalFrames; f++) {
-    const ms = Math.min(f * frameDur, totalMs);
+  // Derive virtual animation time from the master clock
+  const getMs = (): number => {
+    if (audioCtx && t0Audio !== null) return Math.max(0, (audioCtx.currentTime - t0Audio) * 1000);
+    return performance.now() - perf0;
+  };
 
-    // Figure out which line is active at this ms
-    let activeIdx = cumEnd.findIndex((c) => ms <= c);
-    if (activeIdx === -1) activeIdx = allLines.length - 1;
+  await new Promise<void>((resolve) => {
+    let stopped = false;
 
-    // Progress within the active line (0→1)
-    const prevEnd = activeIdx === 0 ? 0 : cumEnd[activeIdx - 1]!;
-    const dur = lineDurations[activeIdx]!;
-    const progress = Math.min(1, Math.max(0, ms - prevEnd) / dur);
+    function rafFrame() {
+      if (signal.cancelled || stopped) { resolve(); return; }
 
-    // Build visible lines array
-    const visLines = buildVisibleLines(allLines, activeIdx, progress, effectivePreset.maxCharsPerLine);
-    const activeLine = activeIdx + 1; // 1-based
+      const ms = Math.min(getMs(), totalMs);
 
-    const subtitle = narration ? getNarrationText(narration, activeLine) : null;
+      let activeIdx = cumEnd.findIndex((c) => ms <= c);
+      if (activeIdx === -1) activeIdx = allLines.length - 1;
 
-    paintFrame(ctx, effectivePreset, title, language, visLines, activeLine,
-      focusSet, watermarked, subtitle);
+      const prevEnd = activeIdx === 0 ? 0 : cumEnd[activeIdx - 1]!;
+      const dur = lineDurations[activeIdx]!;
+      const progress = Math.min(1, Math.max(0, ms - prevEnd) / Math.max(1, dur));
 
-    // Push frame
-    if (vTrack && typeof vTrack.requestFrame === "function") vTrack.requestFrame();
+      // Spawn particles on focus-line entry
+      if (focusFlash && activeIdx !== prevActiveIdx && focusSet.has(activeIdx + 1)) {
+        const spawnX = effectivePreset.width * 0.5;
+        const spawnY = effectivePreset.height * 0.55;
+        for (let i = 0; i < 14; i++) {
+          const angle = (Math.PI * 2 * i) / 14;
+          const speed = 2 + Math.random() * 4;
+          particles.push({ x: spawnX, y: spawnY, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2, life: 1, color: codeTheme.accentColor, size: 2 + Math.random() * 3 });
+        }
+      }
+      prevActiveIdx = activeIdx;
 
-    // Pace to wall-clock
-    const target = wallStart + (f + 1) * frameDur;
-    const wait = target - performance.now();
-    if (wait > 1) await delay(wait);
-    else await delay(0); // yield
-  }
+      // Advance particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i]!;
+        p.x += p.vx; p.y += p.vy; p.vy += 0.2;
+        p.life -= 0.025;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
 
-  if (ttsCleanup) ttsCleanup();
-  await delay(300);
-  rec.stop();
+      const visLines = buildVisibleLines(allLines, activeIdx, progress, effectivePreset.maxCharsPerLine);
+      const activeLine = activeIdx + 1;
+      const subtitle = narration ? getNarrationText(narration, activeLine) : null;
+
+      paintFrame(ctx, effectivePreset, title, language, visLines, activeLine,
+        focusSet, watermarked, subtitle, codeTheme, bgPreset, frameNum, cursorBlink, particles, resolvedFont);
+
+      frameNum++;
+      if (vTrack && typeof vTrack.requestFrame === "function") vTrack.requestFrame();
+
+      if (ms >= totalMs) {
+        stopped = true;
+        if (ttsCleanup) ttsCleanup();
+        // 400ms tail-buffer so recorder captures last frames
+        setTimeout(() => { rec.stop(); resolve(); }, 400);
+      } else {
+        requestAnimationFrame(rafFrame);
+      }
+    }
+
+    requestAnimationFrame(rafFrame);
+  });
+
+  if (signal.cancelled) return new Blob([], { type: "video/mp4" });
+
   const webmBlob = await done;
 
   // Convert webm → mp4 using ffmpeg.wasm
@@ -577,14 +790,54 @@ function emitClick(
   ctx: AudioContext, dest: MediaStreamAudioDestinationNode,
   when: number, sound: string, vol: number, ch: string, accent: boolean,
 ) {
+  const ws = ch.trim().length === 0;
+
+  if (sound === "chime") {
+    // Soft piano/xylophone-like sound: sine wave with quick decay
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    // Map character to a pentatonic-ish note (pleasant, not jarring)
+    const notes = [523, 587, 659, 784, 880, 988, 1047]; // C5 pentatonic ish
+    const noteIdx = (ch.charCodeAt(0) ?? 65) % notes.length;
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(accent ? (notes[noteIdx]! * 1.5) : notes[noteIdx]!, when);
+    const peak = (accent ? 0.08 : 0.05) * vol * (ws ? 0.3 : 1);
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(peak, when + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.08);
+    osc.connect(gain); gain.connect(dest);
+    osc.start(when); osc.stop(when + 0.09);
+    return;
+  }
+
+  if (sound === "keyboard") {
+    // Deep mechanical keyboard: noise burst + resonant click
+    const bufLen = Math.floor(ctx.sampleRate * 0.012);
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 2);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.frequency.setValueAtTime(ws ? 120 : accent ? 380 : 260, when);
+    filt.Q.setValueAtTime(1.2, when);
+    const gain = ctx.createGain();
+    const peak = (accent ? 0.22 : 0.14) * vol * (ws ? 0.5 : 1);
+    gain.gain.setValueAtTime(peak, when);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.014);
+    src.connect(filt); filt.connect(gain); gain.connect(dest);
+    src.start(when); src.stop(when + 0.016);
+    return;
+  }
+
+  // Original soft / typewriter logic
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   const filt = ctx.createBiquadFilter();
   filt.type = "highpass";
   filt.frequency.setValueAtTime(sound === "typewriter" ? 900 : 700, when);
   filt.Q.setValueAtTime(0.7, when);
-
-  const ws = ch.trim().length === 0;
   osc.type = sound === "typewriter" ? "square" : "triangle";
   osc.frequency.setValueAtTime(
     sound === "typewriter"
@@ -592,12 +845,10 @@ function emitClick(
       : ws ? 480 : accent ? 900 : 700,
     when,
   );
-
   const peak = (sound === "typewriter" ? (accent ? 0.12 : 0.08) : (accent ? 0.07 : 0.045)) * vol * (ws ? 0.45 : 1);
   gain.gain.setValueAtTime(0.0001, when);
   gain.gain.exponentialRampToValueAtTime(peak, when + 0.0015);
   gain.gain.exponentialRampToValueAtTime(0.0001, when + (sound === "typewriter" ? 0.016 : 0.012));
-
   osc.connect(filt); filt.connect(gain); gain.connect(dest);
   osc.start(when);
   osc.stop(when + (sound === "typewriter" ? 0.018 : 0.014));
@@ -666,6 +917,12 @@ function paintFrame(
   focusSet: Set<number>,
   watermarked: boolean,
   subtitle: string | null,
+  theme: CodeTheme,
+  bgPreset: BgPreset,
+  frameNum: number,
+  cursorBlink: boolean,
+  particles: Array<{ x: number; y: number; vx: number; vy: number; life: number; color: string; size: number }>,
+  codeFont: string,
 ) {
   const W = preset.width;
   const H = preset.height;
@@ -675,182 +932,310 @@ function paintFrame(
 
   ctx.clearRect(0, 0, W, H);
 
-  // Background
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#08101a"); bg.addColorStop(1, "#03080d");
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  // ── Background (themed gradient) ──
+  drawBackground(ctx, W, H, bgPreset, null);
 
-  // Atmospheric glow
-  ctx.fillStyle = "rgba(45, 212, 191, 0.05)";
+  // ── Atmospheric accent glow (theme-colored) ──
+  ctx.fillStyle = theme.atmoColor;
   ctx.beginPath();
-  ctx.arc(W * 0.3, H * 0.2, Math.min(W, H) * 0.25, 0, Math.PI * 2);
+  ctx.arc(W * 0.25, H * 0.18, Math.min(W, H) * 0.30, 0, Math.PI * 2);
+  ctx.fill();
+  // Secondary softer glow opposite corner
+  ctx.fillStyle = theme.atmoColor.replace("0.06", "0.03").replace("0.05", "0.025").replace("0.04", "0.02");
+  ctx.beginPath();
+  ctx.arc(W * 0.75, H * 0.82, Math.min(W, H) * 0.22, 0, Math.PI * 2);
   ctx.fill();
 
   // Frame dimensions
-  const fw = vert ? W * 0.9 : W * 0.84;
-  const fh = vert ? H - 360 : H * 0.84;
+  const fw = vert ? W * 0.90 : W * 0.84;
+  const fh = vert ? H - 380 : H * 0.84;
   const fx = (W - fw) / 2;
-  const fy = vert ? 160 : (H - fh) / 2;
+  const fy = vert ? 170 : (H - fh) / 2;
 
-  // Frame shadow + fill
-  ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 50; ctx.shadowOffsetY = 25;
-  rr(ctx, fx, fy, fw, fh, 20);
-  ctx.fillStyle = "rgba(10,16,24,0.75)"; ctx.fill();
+  // ── Frame shadow + glass fill ──
+  ctx.shadowColor = "rgba(0,0,0,0.85)"; ctx.shadowBlur = 60; ctx.shadowOffsetY = 30;
+  rr(ctx, fx, fy, fw, fh, 22);
+  ctx.fillStyle = theme.frameGlass; ctx.fill();
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-  ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1; ctx.stroke();
+  // Frame border (theme-colored subtle glow ring)
+  ctx.strokeStyle = theme.frameBorder; ctx.lineWidth = 1.5; ctx.stroke();
 
-  // Title bar
-  ctx.fillStyle = "rgba(255,255,255,0.03)";
-  rr(ctx, fx + 12, fy + 12, fw - 24, 44, 12); ctx.fill();
+  // ── Title bar ──
+  ctx.fillStyle = theme.titleBar;
+  rr(ctx, fx + 12, fy + 12, fw - 24, 46, 12); ctx.fill();
 
-  // Glass gutter bg
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  rr(ctx, fx + 12, fy + 68, 54, fh - 80, 12); ctx.fill();
+  // ── Gutter background ──
+  ctx.fillStyle = theme.gutterBg;
+  rr(ctx, fx + 12, fy + 70, 56, fh - 82, 12); ctx.fill();
 
-  // Traffic dots
+  // ── Traffic-light dots ──
   (["#ef4444", "#f59e0b", "#10b981"] as const).forEach((color, i) => {
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(fx + 32 + i * 18, fy + 34, 5, 0, Math.PI * 2);
+    ctx.arc(fx + 34 + i * 19, fy + 35, 5.5, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  // Title text
+  // ── Title text ──
   ctx.fillStyle = "#e2e8f0";
-  ctx.font = "600 16px ui-sans-serif, system-ui";
-  ctx.fillText(title, fx + 100, fy + 39);
+  ctx.font = `600 ${vert ? 18 : 16}px ui-sans-serif, system-ui`;
+  const maxTitleW = fw - 200;
+  ctx.fillText(title, fx + 108, fy + 41, maxTitleW);
 
-  // Language label
-  ctx.fillStyle = "rgba(148,163,184,0.8)";
-  ctx.font = "500 12px ui-sans-serif, system-ui";
-  ctx.fillText(language, fx + fw - 80, fy + 38);
+  // ── Language badge ──
+  const langW = vert ? 80 : 70;
+  const langX = fx + fw - langW - 14;
+  const langY = fy + 20;
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  rr(ctx, langX, langY, langW, 24, 6); ctx.fill();
+  ctx.fillStyle = theme.accentColor;
+  ctx.font = `500 ${vert ? 13 : 11}px ui-sans-serif, system-ui`;
+  ctx.textAlign = "center";
+  ctx.fillText(language, langX + langW / 2, langY + 16);
+  ctx.textAlign = "start";
 
   // ── Code area (clipped to frame) ──
-  const codeAreaTop = fy + 68;
+  const codeAreaTop = fy + 70;
   const codeAreaBottom = fy + fh;
-  const codeAreaLeft = fx + 78;
+  const codeAreaLeft = fx + 80;
   const codeAreaRight = fx + fw;
-  const lineH = fs * 1.55;
+  const lineH = fs * 1.58;
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(fx, codeAreaTop, fw, codeAreaBottom - codeAreaTop);
   ctx.clip();
 
-  // Only show the last maxVis rows (scroll effect), but reserve buffer for wrapping
   const WRAP_BUFFER = 4;
   const effMaxVis = Math.max(4, maxVis - WRAP_BUFFER);
   let startIdx = Math.max(0, visLines.length - effMaxVis);
-  // Back up if startIdx lands on a continuation row — show the full source line
   while (startIdx > 0 && visLines[startIdx]!.isCont) startIdx--;
   const viewport = visLines.slice(startIdx);
-  let y = codeAreaTop + 17 + fs;
+  let y = codeAreaTop + 18 + fs;
+
+  // Track cursor position for blinking cursor
+  let cursorX = -1, cursorY = -1;
 
   for (const vl of viewport) {
     const isActive = vl.lineNum === activeLine;
     const isFocused = focusSet.has(vl.lineNum);
 
-    // Highlight bar
-    if ((isActive || isFocused) && !vl.isEmpty) {
-      ctx.fillStyle = isActive ? "rgba(45,212,191,0.15)" : "rgba(255,255,255,0.04)";
-      rr(ctx, codeAreaLeft, y - lineH + 6, codeAreaRight - codeAreaLeft - 10, lineH, 8);
+    // ── Active line highlight bar ──
+    if (isActive && !vl.isEmpty) {
+      ctx.fillStyle = theme.activeLineBg;
+      rr(ctx, codeAreaLeft - 4, y - lineH + 6, codeAreaRight - codeAreaLeft + 4, lineH, 8);
+      ctx.fill();
+      // Accent left border
+      ctx.fillStyle = theme.accentColor;
+      ctx.fillRect(fx + 12, y - lineH + 8, 3, lineH - 4);
+    }
+
+    // ── Focus line highlight (non-active) ──
+    if (isFocused && !isActive && !vl.isEmpty) {
+      ctx.fillStyle = theme.focusLineBg;
+      rr(ctx, codeAreaLeft - 4, y - lineH + 6, codeAreaRight - codeAreaLeft + 4, lineH, 8);
       ctx.fill();
     }
 
-    // Gutter number
-    ctx.fillStyle = vl.isCont ? "rgba(100,116,139,0.7)" : "rgba(148,163,184,0.9)";
-    ctx.font = `${fs - 4}px ui-monospace, SFMono-Regular, monospace`;
+    // ── Gutter line number ──
+    ctx.fillStyle = vl.isCont ? "rgba(100,116,139,0.5)" : theme.gutterText;
+    ctx.font = `${fs - 6}px ${codeFont}, ui-monospace, monospace`;
     ctx.fillText(vl.gutterLabel, fx + 22, y);
 
     if (vl.isCont) {
-      ctx.fillStyle = "rgba(45,212,191,0.6)";
-      ctx.fillText(">", fx + 50, y);
+      ctx.fillStyle = `${theme.accentColor}99`;
+      ctx.font = `${fs - 8}px ui-sans-serif, system-ui`;
+      ctx.fillText("↳", fx + 52, y);
     }
 
-    // Code tokens (with overflow guard)
+    // ── Code text (tokenized + theme-aware) ──
     if (vl.text.length > 0) {
-      drawTokenized(ctx, vl.text, codeAreaLeft + 10, y, fs, codeAreaRight - codeAreaLeft - 20, vl.baseColor);
+      const monoFont = `${fs}px ${codeFont}, ui-monospace, SFMono-Regular, monospace`;
+      drawTokenized(ctx, vl.text, codeAreaLeft + 10, y, fs, codeAreaRight - codeAreaLeft - 20, vl.baseColor, theme, monoFont);
+
+      // Track cursor at end of last active segment
+      if (isActive) {
+        ctx.font = monoFont;
+        cursorX = codeAreaLeft + 10 + ctx.measureText(vl.text).width + 2;
+        cursorY = y;
+      }
+    } else if (isActive) {
+      cursorX = codeAreaLeft + 10;
+      cursorY = y;
     }
 
     y += lineH;
   }
 
-  ctx.restore();
-
-  // Watermark
-  if (watermarked) {
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    ctx.font = "600 14px ui-sans-serif, system-ui";
-    ctx.fillText("CodeCinematic", fx + fw - 120, fy + fh + 30);
+  // ── Blinking cursor ──
+  if (cursorBlink && cursorX >= 0 && cursorY >= 0) {
+    const showCursor = frameNum % 30 < 18; // blinks at ~1Hz at 30fps
+    if (showCursor) {
+      ctx.fillStyle = theme.cursorColor;
+      ctx.shadowColor = theme.cursorColor;
+      ctx.shadowBlur = 8;
+      ctx.fillRect(cursorX, cursorY - fs + 2, Math.max(2, fs * 0.07), fs * 1.05);
+      ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
+    }
   }
 
-  // Subtitle overlay
+  // ── Particles (focus flash effect) ──
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // ── Watermark ──
+  if (watermarked) {
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.font = `600 ${vert ? 16 : 13}px ui-sans-serif, system-ui`;
+    ctx.fillText("CodeCinematic", fx + fw - (vert ? 155 : 130), fy + fh + (vert ? 40 : 28));
+  }
+
+  // ── Subtitle overlay ──
   if (subtitle) {
-    const sf = vert ? 14 : 13;
-    const sy = vert ? H - 60 : H - 24;
-    const mw = W - 60;
+    const sf = vert ? 16 : 13;
+    const sy = vert ? H - 72 : H - 28;
+    const mw = W - 80;
     ctx.font = `500 ${sf}px ui-sans-serif, system-ui`;
     const tw = Math.min(ctx.measureText(subtitle).width, mw);
-    ctx.fillStyle = "rgba(0,0,0,0.78)";
-    rr(ctx, (W - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8); ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 0.5;
-    rr(ctx, (W - tw) / 2 - 14, sy - sf - 5, tw + 28, sf + 14, 8); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,0.82)";
+    rr(ctx, (W - tw) / 2 - 16, sy - sf - 5, tw + 32, sf + 16, 10); ctx.fill();
+    ctx.strokeStyle = `${theme.accentColor}33`; ctx.lineWidth = 1;
+    rr(ctx, (W - tw) / 2 - 16, sy - sf - 5, tw + 32, sf + 16, 10); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.textAlign = "center";
     ctx.fillText(subtitle, W / 2, sy, mw); ctx.textAlign = "start";
   }
 }
 
-/* ── Syntax-highlighted code drawing (stops at maxWidth) ───────────────── */
+/* ── Syntax-highlighted code drawing ──────────────────────────────────── */
 
-function drawTokenized(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fontSize: number, maxWidth: number, baseColor?: string) {
-  ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, monospace`;
-  // If baseColor is provided, use it uniformly (for continuation lines)
+function drawTokenized(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  maxWidth: number,
+  baseColor: string | undefined,
+  theme: CodeTheme,
+  monoFont: string,
+) {
+  ctx.font = monoFont;
   if (baseColor) {
     ctx.fillStyle = baseColor;
-    ctx.fillText(text, x, y);
+    ctx.fillText(text, x, y, maxWidth);
     return;
   }
-  const tokens = tokenize(text);
+  const tokens = tokenize(text, theme);
   let cx = x;
+  const right = x + maxWidth;
   for (const tok of tokens) {
+    if (cx >= right) break;
     ctx.fillStyle = tok.color;
-    ctx.fillText(tok.text, cx, y);
+    const availW = right - cx;
+    ctx.fillText(tok.text, cx, y, availW);
     cx += ctx.measureText(tok.text).width;
   }
 }
 
-/* ── Simple tokenizer ──────────────────────────────────────────────────── */
+/* ── Multi-language theme-aware tokenizer ─────────────────────────────── */
 
-function tokenize(line: string): Array<{ text: string; color: string }> {
+const KEYWORDS_BY_LANGUAGE: Record<string, string[]> = {
+  typescript: ["const","let","var","function","return","async","await","class","new","if","else","for","while","import","export","from","type","interface","extends","implements","void","null","undefined","true","false","this","super","try","catch","throw"],
+  javascript: ["const","let","var","function","return","async","await","class","new","if","else","for","while","import","export","from","null","undefined","true","false","this","super","try","catch","throw"],
+  python: ["def","class","return","import","from","if","elif","else","for","while","in","not","and","or","True","False","None","with","as","try","except","finally","raise","lambda","self","pass","yield","async","await"],
+  go: ["func","var","const","type","struct","interface","return","if","else","for","range","import","package","nil","true","false","go","defer","select","case","switch","break","continue","make","new","map","chan","error"],
+  rust: ["fn","let","mut","const","struct","enum","impl","trait","use","pub","mod","return","if","else","for","while","match","Some","None","Ok","Err","true","false","self","Self","async","await","move","ref","dyn","where"],
+  java: ["public","private","protected","static","void","class","interface","extends","implements","return","new","if","else","for","while","import","package","null","true","false","this","super","try","catch","throw","final","abstract","synchronized"],
+  kotlin: ["fun","val","var","class","interface","object","return","if","else","for","while","when","import","package","null","true","false","this","super","try","catch","throw","companion","data","sealed","override","open"],
+  swift: ["func","var","let","class","struct","enum","protocol","extension","return","if","else","for","while","guard","switch","case","default","import","nil","true","false","self","super","try","catch","throw","async","await","init","deinit"],
+  csharp: ["public","private","protected","static","void","class","interface","namespace","return","new","if","else","for","while","foreach","using","null","true","false","this","base","try","catch","throw","async","await","var","string","int","bool"],
+  cpp: ["auto","const","class","struct","enum","namespace","return","new","delete","if","else","for","while","switch","case","include","nullptr","true","false","this","public","private","protected","virtual","override","template","typename"],
+  bash: ["if","then","else","elif","fi","for","while","do","done","case","esac","function","return","in","echo","exit","export","source","local","readonly"],
+  sql: ["SELECT","FROM","WHERE","JOIN","INNER","LEFT","RIGHT","ON","GROUP","BY","ORDER","HAVING","INSERT","INTO","UPDATE","SET","DELETE","CREATE","TABLE","DROP","ALTER","INDEX","VIEW","AS","AND","OR","NOT","IN","IS","NULL","DISTINCT","LIMIT","OFFSET"],
+  default: ["const","let","var","function","return","async","await","class","new","if","else","for","while","import","export","null","true","false"],
+};
+
+function tokenize(line: string, theme: CodeTheme): Array<{ text: string; color: string }> {
   const trimmed = line.trimStart();
-  if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
-    return [{ text: line, color: "#67e8f9" }];
+
+  // ── Full-line comment ──
+  if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("--")) {
+    return [{ text: line, color: theme.tokens.comment }];
+  }
+  if (trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+    return [{ text: line, color: theme.tokens.comment }];
+  }
+  if (trimmed.startsWith("<!--")) {
+    return [{ text: line, color: theme.tokens.comment }];
   }
 
   const patterns: Array<{ regex: RegExp; color: string }> = [
-    { regex: /^(".*?"|'.*?'|`.*?`)/, color: "#fda4af" },
-    { regex: /^(const|let|var|function|return|async|await|class|new|if|else|for|while|console|map|log)\b/, color: "#7dd3fc" },
-    { regex: /^(\d+(\.\d+)?)/, color: "#facc15" },
-    { regex: /^([{}()[\]])/, color: "#c084fc" },
-    { regex: /^([.,:;])/, color: "#94a3b8" },
-    { regex: /^(=>|===|!==|==|!=|\+|-|\*|\/)/, color: "#f97316" },
+    // Strings
+    { regex: /^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/, color: theme.tokens.string },
+    // Numbers (including hex, floats)
+    { regex: /^(0x[0-9a-fA-F]+|\d+(\.\d+)?([eE][+-]?\d+)?)/, color: theme.tokens.number },
+    // Type annotations (: Type or <Type>)
+    { regex: /^(:\s*[A-Z][a-zA-Z0-9_<>[\]|]+)/, color: theme.tokens.type },
+    // Decorators (@something)
+    { regex: /^@[a-zA-Z_][a-zA-Z0-9_]*/, color: theme.tokens.operator },
+    // Brackets and parens
+    { regex: /^([{}()[\]])/, color: theme.tokens.bracket },
+    // Operators
+    { regex: /^(=>|===|!==|==|!=|<=|>=|&&|\|\||\.\.\.|\+\+|--|[.,:;?!+\-*/&|^~%<>])/, color: theme.tokens.operator },
   ];
 
   const tokens: Array<{ text: string; color: string }> = [];
   let rem = line;
   while (rem.length > 0) {
     let matched = false;
-    for (const p of patterns) {
-      const m = rem.match(p.regex);
-      if (m) {
-        tokens.push({ text: m[0], color: p.color });
-        rem = rem.slice(m[0].length);
+
+    // Check if current word is a keyword
+    const wordMatch = rem.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)/);
+    if (wordMatch) {
+      const word = wordMatch[1]!;
+      // Check against known keywords
+      const allKws = [
+        ...(KEYWORDS_BY_LANGUAGE["typescript"] ?? []),
+        ...(KEYWORDS_BY_LANGUAGE["python"] ?? []),
+        ...(KEYWORDS_BY_LANGUAGE["go"] ?? []),
+      ];
+      if (allKws.includes(word)) {
+        tokens.push({ text: word, color: theme.tokens.keyword });
+        rem = rem.slice(word.length);
         matched = true;
-        break;
+      } else if (/^[A-Z][A-Za-z0-9]*$/.test(word)) {
+        // PascalCase → likely a type/class name
+        tokens.push({ text: word, color: theme.tokens.type });
+        rem = rem.slice(word.length);
+        matched = true;
       }
     }
+
     if (!matched) {
-      tokens.push({ text: rem[0]!, color: "#e6edf3" });
+      for (const p of patterns) {
+        const m = rem.match(p.regex);
+        if (m) {
+          tokens.push({ text: m[0], color: p.color });
+          rem = rem.slice(m[0].length);
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    if (!matched) {
+      tokens.push({ text: rem[0]!, color: theme.tokens.default });
       rem = rem.slice(1);
     }
   }

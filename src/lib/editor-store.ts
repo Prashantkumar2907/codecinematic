@@ -11,11 +11,17 @@ export type EditorDraft = {
   aspect: "9:16" | "16:9";
   normalSpeed: string;
   focusSpeed: string;
-  sound: "off" | "soft" | "typewriter";
+  sound: "off" | "soft" | "typewriter" | "keyboard" | "chime";
   soundVolume: string;
   code: string;
   focus: number[];
   narration: Narration | null;
+  // Visual settings
+  bgPresetId: string;
+  theme: string;
+  codeFont: string;
+  cursorBlink: boolean;
+  focusFlash: boolean;
 };
 
 type EditorStore = {
@@ -46,6 +52,11 @@ function createGateway() {
 app.use("/api", createGateway().middleware())`,
   focus: [],
   narration: null,
+  bgPresetId: "cosmic",
+  theme: "vscode",
+  codeFont: "ui-monospace",
+  cursorBlink: true,
+  focusFlash: true,
 };
 
 export const useEditorStore = create<EditorStore>()(

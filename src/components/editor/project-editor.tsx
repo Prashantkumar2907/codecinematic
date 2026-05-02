@@ -7,21 +7,41 @@ import { detectImportantLines } from "@/lib/render/smart-focus";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { validateCodePayload } from "@/lib/quotas/limits";
+import { BG_PRESETS } from "@/components/editor/shared/canvas-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-const languageOptions = ["typescript", "javascript", "python", "go", "java", "rust", "php", "csharp", "ruby", "kotlin"];
+const languageOptions = [
+  "typescript", "javascript", "python", "go", "java", "rust",
+  "php", "csharp", "ruby", "kotlin", "swift", "cpp", "c",
+  "dart", "sql", "bash", "r", "scala"
+];
 const aspectOptions = [
   { value: "9:16", label: "Vertical 9:16" },
   { value: "16:9", label: "Landscape 16:9" }
 ] as const;
 const soundOptions = [
-  { value: "off", label: "Sound off" },
-  { value: "soft", label: "Soft keys" },
-  { value: "typewriter", label: "Typewriter" }
+  { value: "off",        label: "Sound off" },
+  { value: "soft",       label: "Soft keys" },
+  { value: "typewriter", label: "Typewriter" },
+  { value: "keyboard",   label: "Mech keyboard" },
+  { value: "chime",      label: "Chime / piano" },
+] as const;
+const themeOptions = [
+  { value: "vscode",      label: "VS Code Dark", accent: "#2dd4bf" },
+  { value: "dracula",     label: "Dracula",      accent: "#bd93f9" },
+  { value: "monokai",     label: "Monokai",      accent: "#f92672" },
+  { value: "nord",        label: "Nord",         accent: "#88c0d0" },
+  { value: "github-dark", label: "GitHub Dark",  accent: "#58a6ff" },
+] as const;
+const codeFontOptions = [
+  { value: "ui-monospace",    label: "System Mono" },
+  { value: "JetBrains Mono",  label: "JetBrains Mono" },
+  { value: "Courier New",     label: "Courier New" },
+  { value: "monospace",       label: "Generic Mono" },
 ] as const;
 
 export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; projectId: string }) {
@@ -39,6 +59,11 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   const sound = draft.sound;
   const soundVolume = draft.soundVolume;
   const code = draft.code;
+  const bgPresetId = draft.bgPresetId ?? "cosmic";
+  const theme = draft.theme ?? "vscode";
+  const codeFont = draft.codeFont ?? "ui-monospace";
+  const cursorBlink = draft.cursorBlink ?? true;
+  const focusFlash = draft.focusFlash ?? true;
 
   const focusLines = useMemo(() => detectImportantLines(code), [code]);
   const allLines = useMemo(
@@ -141,11 +166,11 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 pt-1">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Normal speed</span>
-                  <Slider value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.50" max="1.50" step="0.05" />
+                  <SpeedSlider value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.25" max="3.00" step="0.05" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Focus speed</span>
-                  <Slider value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.50" max="1.50" step="0.05" />
+                  <SpeedSlider value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.25" max="3.00" step="0.05" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Sound pattern</span>
@@ -156,6 +181,62 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Volume</span>
                   <Slider value={soundVolume} onChange={(v) => updateDraftField("soundVolume", v)} min="0.00" max="1.00" step="0.05" formatter={(val) => `${Math.round(Number(val) * 100)}%`} />
+                </div>
+              </div>
+
+              {/* Row 3: Theme + Font + Effects */}
+              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 pt-1">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground">Color theme</span>
+                  <select value={theme} onChange={(e) => updateDraftField("theme", e.target.value)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                    {themeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground">Code font</span>
+                  <select value={codeFont} onChange={(e) => updateDraftField("codeFont", e.target.value)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                    {codeFontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground">Cursor blink</span>
+                  <button
+                    type="button"
+                    onClick={() => updateDraftField("cursorBlink", !cursorBlink)}
+                    className={`flex h-7 w-full items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${cursorBlink ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
+                  >
+                    {cursorBlink ? "On" : "Off"}
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground">Focus flash</span>
+                  <button
+                    type="button"
+                    onClick={() => updateDraftField("focusFlash", !focusFlash)}
+                    className={`flex h-7 w-full items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${focusFlash ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
+                  >
+                    {focusFlash ? "On" : "Off"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 4: Background presets */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground">Background</span>
+                  <span className="text-[9px] text-muted-foreground/60">{BG_PRESETS.find(p => p.id === bgPresetId)?.label ?? ""}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {BG_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      title={preset.label}
+                      onClick={() => updateDraftField("bgPresetId", preset.id)}
+                      className={`w-6 h-6 rounded-md border-2 transition-all ${bgPresetId === preset.id ? "border-primary shadow-md scale-110" : "border-transparent hover:border-white/30"}`}
+                      style={{ background: preset.preview }}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -285,6 +366,60 @@ function Slider({
         </div>
       </div>
       <div className="w-10 shrink-0 text-right text-[11px] font-bold text-primary">{formatter(value)}</div>
+    </div>
+  );
+}
+
+/** SpeedSlider wraps Slider with − / + step buttons (±0.5 by default) */
+function SpeedSlider({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  nudge = "0.5",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  min: string;
+  max: string;
+  step: string;
+  nudge?: string;
+}) {
+  function adjust(delta: number) {
+    const next = Math.round((Number(value) + delta) * 100) / 100;
+    const clamped = Math.min(Number(max), Math.max(Number(min), next));
+    onChange(String(clamped.toFixed(2)));
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => adjust(-Number(nudge))}
+          className="h-5 w-5 shrink-0 rounded border border-border bg-muted/40 text-[11px] font-bold flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-colors leading-none"
+        >−</button>
+        <div className="flex-1 rounded-md border border-border bg-card p-1.5 flex flex-col justify-center h-7 relative shadow-sm hover:border-primary/50 transition-colors">
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+          />
+          <div className="h-[4px] w-full bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary transition-all" style={{ width: `${((Number(value) - Number(min)) / (Number(max) - Number(min))) * 100}%` }} />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => adjust(Number(nudge))}
+          className="h-5 w-5 shrink-0 rounded border border-border bg-muted/40 text-[11px] font-bold flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-colors leading-none"
+        >+</button>
+        <div className="w-10 shrink-0 text-right text-[11px] font-bold text-primary">{Number(value).toFixed(2)}x</div>
+      </div>
     </div>
   );
 }
