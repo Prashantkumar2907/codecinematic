@@ -349,7 +349,7 @@ export function CreateVideoPanel({
             <CardTitle className="text-base">Create video</CardTitle>
             <CardDescription className="text-xs">Generate and export your code video with the settings from the editor.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
+            <CardContent className="flex-1 overflow-y-auto app-scroll space-y-3 px-3 pb-3">
             <div className="grid gap-2 md:grid-cols-2">
               <Meta label="Project" value={resolvedTitle} />
               <Meta label="Language" value={resolvedLanguage} />
@@ -410,7 +410,7 @@ export function CreateVideoPanel({
             <CardTitle className="text-base">Export jobs</CardTitle>
             <CardDescription className="text-xs">Plan-aware export jobs with format and watermark settings.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
+            <CardContent className="flex-1 overflow-y-auto app-scroll space-y-3 px-3 pb-3">
             {jobs.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border/50 p-6 text-xs text-muted-foreground text-center">
                 <p className="font-medium text-foreground/60 mb-1">No export jobs yet</p>

@@ -198,11 +198,11 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto">
-      <div className="grid gap-2 xl:grid-cols-[1fr_1fr] xl:flex-1 xl:min-h-0">
+    <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll">
+      <div className="grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:flex-1">
 
         {/* LEFT: Settings */}
-        <div className="flex flex-col space-y-2 min-h-0 overflow-y-auto">
+        <div className="flex flex-col space-y-2 min-h-0 overflow-y-auto app-scroll">
           <Card className="border-border/40 bg-card shadow-sm">
             <CardHeader className="py-2 px-3 border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -215,7 +215,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
               {/* Title mode selector */}
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">MODE</span>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => setTitleMode("didyouknow")}
@@ -286,7 +286,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
               </div>
 
               {/* Ratio + Font */}
-              <div className="grid gap-2 grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
                   <select
@@ -336,7 +336,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
 
               {/* Speed / Sound / Volume */}
               <div className="space-y-1.5 pt-1 border-t border-white/5">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">TITLE SPEED</span>
@@ -356,7 +356,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                       className="w-full h-1 accent-primary" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="space-y-1">
                     <span className="text-[10px] font-semibold text-muted-foreground">SOUND</span>
                     <select
@@ -384,9 +384,9 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row">
                 <Button
-                  className="flex-1 h-8 text-xs font-semibold gap-1.5"
+                  className="h-8 flex-1 text-xs font-semibold gap-1.5"
                   onClick={handleRender}
                   disabled={rendering || !factText.trim()}
                 >
@@ -412,7 +412,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
         </div>
 
         {/* RIGHT: Preview + Video */}
-        <div className="flex flex-col space-y-2">
+        <div className="flex min-h-[18rem] flex-col space-y-2 xl:min-h-0">
           <Card className="flex-1 flex flex-col border-border/40 bg-card shadow-sm overflow-hidden">
             <div className="bg-muted/30 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b border-border/30 flex items-center justify-between">
               <span className="text-muted-foreground font-mono tracking-widest">// preview</span>
@@ -425,7 +425,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
               </button>
             </div>
             {/* Always 16:9 in panel */}
-            <div className="flex-1 flex items-center justify-center p-3 bg-black/50">
+            <div className="flex min-h-[12rem] flex-1 items-center justify-center bg-black/50 p-2 sm:p-3">
               <canvas
                 ref={previewRef}
                 className="max-w-full max-h-full rounded-md shadow-xl"

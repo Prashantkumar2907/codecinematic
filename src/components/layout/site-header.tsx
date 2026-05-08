@@ -11,18 +11,19 @@ export async function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-gradient-to-b from-background/95 to-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 shadow-sm shadow-black/10">
-      <div className="grid grid-cols-[auto_1fr_auto] h-12 items-center px-3 sm:px-5 gap-3">
+      <div className="grid h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2 sm:gap-3 sm:px-5">
         {/* Left: logo */}
         <Link
           href="/"
-          className="group flex items-center gap-2 text-[13px] font-bold tracking-widest uppercase text-foreground/80 hover:text-foreground transition-colors shrink-0"
+          className="group flex shrink-0 items-center gap-2 text-[13px] font-bold uppercase tracking-widest text-foreground/80 transition-colors hover:text-foreground"
         >
           <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all shadow-lg shadow-primary/20" />
-          CodeCinematic
+          <span className="hidden sm:inline">CodeCinematic</span>
+          <span className="sm:hidden">CC</span>
         </Link>
 
         {/* Center: nav tabs */}
-        <div className="flex justify-center">
+        <div className="flex min-w-0 justify-center overflow-hidden">
           <NavLinks isLoggedIn={!!session} />
         </div>
 

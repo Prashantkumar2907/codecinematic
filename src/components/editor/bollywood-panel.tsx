@@ -273,7 +273,7 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
   }, [dialog, movieTitle, movieYear, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, bgImage]);
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto">
+    <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll">
       {/* Quick Presets */}
       <div className="flex items-center gap-1.5 flex-wrap px-1">
         <span className="text-[10px] text-muted-foreground mr-1">Presets:</span>

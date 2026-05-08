@@ -31,7 +31,7 @@ const item = {
 
 export default function HomePage() {
   return (
-    <main className="flex-1 overflow-y-auto">
+    <main className="flex-1 overflow-y-auto app-scroll">
       <Hero />
 
       <section className="mx-auto max-w-7xl px-4 sm:px-6 py-16">

@@ -28,7 +28,7 @@ export function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   return (
     <LayoutGroup>
-      <nav className="flex items-center rounded-full bg-white/[0.04] border border-white/[0.06] px-1 py-0.5 gap-0.5 overflow-x-auto scrollbar-none max-w-full">
+      <nav className="flex w-full max-w-full items-center justify-start gap-0.5 overflow-x-auto overscroll-x-contain rounded-full border border-white/[0.06] bg-white/[0.04] px-1 py-0.5 scrollbar-none sm:justify-center">
         {links.map((link) => {
           const base = link.href.split("?")[0];
           let isActive = false;
@@ -54,7 +54,7 @@ export function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
             <Link
               key={link.label}
               href={link.href as Route}
-              className="relative rounded-full px-3 py-1 text-[11px] whitespace-nowrap font-medium"
+              className="relative rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap sm:px-3"
             >
               {isActive && (
                 <motion.span

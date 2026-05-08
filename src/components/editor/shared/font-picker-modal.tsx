@@ -33,7 +33,7 @@ export function FontPickerModal({
             Choose Font
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-2 overflow-y-auto max-h-[55vh] space-y-1">
+            <CardContent className="p-2 overflow-y-auto app-scroll max-h-[55vh] space-y-1">
           {FONT_CATALOG.map((font) => (
             <button
               key={font.name}

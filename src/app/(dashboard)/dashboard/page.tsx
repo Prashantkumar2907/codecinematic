@@ -45,12 +45,12 @@ export default async function DashboardPage() {
   const planLabel = PLAN_CONFIG[session.plan].name;
 
   return (
-    <main className="flex-1 overflow-y-auto">
-      <div className="w-full px-5 sm:px-8 lg:px-10 py-8 space-y-8 max-w-7xl mx-auto">
+    <main className="flex-1 overflow-y-auto app-scroll">
+      <div className="mx-auto w-full max-w-7xl space-y-8 px-3 py-6 sm:px-8 sm:py-8 lg:px-10">
 
         {/* Greeting */}
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-lg font-semibold tracking-tight">
               Welcome back, <span className="text-primary">{session.name}</span>
             </h1>
@@ -64,7 +64,7 @@ export default async function DashboardPage() {
         {/* Workflows grid */}
         <section>
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">Workflows</h2>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
             {quickLinks.map((f) => (
               <Link key={f.label} href={f.href as Route}>
                 <div className="group h-full rounded-xl border border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5 p-4 space-y-3 transition-all duration-200 cursor-pointer">
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
 
         {/* Plan limits */}
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Plan limits — {planLabel}
             </h2>
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
               Upgrade plan →
             </Link>
           </div>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {metrics.map((m) => (
               <div key={m.label} className="rounded-xl border border-border/50 bg-card/40 hover:border-border transition-colors p-4 flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/6 border border-primary/8">

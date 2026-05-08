@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CodeCinematic icon">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="42" x2="448" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b1724"/>
+      <stop offset="0.54" stop-color="#0a2533"/>
+      <stop offset="1" stop-color="#051018"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="126" y1="118" x2="386" y2="396" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#54e0ff"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="86" y="106" width="340" height="300" rx="42" fill="#08111c" stroke="rgba(255,255,255,0.14)" stroke-width="10"/>
+  <rect x="112" y="138" width="288" height="34" rx="17" fill="rgba(255,255,255,0.08)"/>
+  <circle cx="138" cy="155" r="7" fill="#ff6b6b"/>
+  <circle cx="164" cy="155" r="7" fill="#ffd166"/>
+  <circle cx="190" cy="155" r="7" fill="#22c55e"/>
+  <path d="M204 236l-48 42 48 42" fill="none" stroke="url(#accent)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M308 236l48 42-48 42" fill="none" stroke="url(#accent)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M276 222l-40 116" fill="none" stroke="#e8f7ff" stroke-width="24" stroke-linecap="round"/>
+  <rect x="150" y="362" width="212" height="14" rx="7" fill="rgba(84,224,255,0.55)"/>
+</svg>

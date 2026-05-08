@@ -7,12 +7,13 @@
  * Clean title bar, fact text reveal, emoji decoration.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Loader2, Play, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Textarea } from "@/components/ui/textarea";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
@@ -45,6 +46,8 @@ const FACTS_BG: BgPreset[] = [
   },
   ...BG_PRESETS.filter((p) => ["cosmic", "slate", "aurora", "sapphire"].includes(p.id)),
 ];
+
+const FACTS_PER_PAGE = 3;
 
 const CATEGORY_OPTIONS = [
   { value: "science", label: "🔬 Science" },
@@ -219,10 +222,21 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
   const [rendering, setRendering] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [previewFactIdx, setPreviewFactIdx] = useState(0);
+  const [factsPage, setFactsPage] = useState(1);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const cancelRef = useRef(false);
+  const factsPageCount = Math.max(1, Math.ceil(facts.length / FACTS_PER_PAGE));
+  const currentFactsPage = Math.min(Math.max(factsPage, 1), factsPageCount);
+  const factsStart = (currentFactsPage - 1) * FACTS_PER_PAGE;
+  const visibleFacts = useMemo(() => facts.slice(factsStart, factsStart + FACTS_PER_PAGE), [facts, factsStart]);
+  const visiblePreviewFactIdx =
+    facts.length === 0
+      ? 0
+      : previewFactIdx < factsStart || previewFactIdx >= factsStart + visibleFacts.length
+        ? Math.min(factsStart, facts.length - 1)
+        : previewFactIdx;
 
   const TITLE_PRESETS = [
     { value: "kya_aap_jante", label: "क्या आप जानते हैं?" },
@@ -234,6 +248,23 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
   ];
 
   useEffect(() => { loadFont(font); }, [font]);
+  useEffect(() => {
+    if (factsPage !== currentFactsPage) {
+      setFactsPage(currentFactsPage);
+    }
+  }, [currentFactsPage, factsPage]);
+  useEffect(() => {
+    if (previewFactIdx >= facts.length) {
+      setPreviewFactIdx(Math.max(0, facts.length - 1));
+    }
+  }, [facts.length, previewFactIdx]);
+  useEffect(() => {
+    if (facts.length === 0) return;
+    const pageEnd = factsStart + visibleFacts.length;
+    if (previewFactIdx < factsStart || previewFactIdx >= pageEnd) {
+      setPreviewFactIdx(Math.min(factsStart, facts.length - 1));
+    }
+  }, [facts.length, factsStart, previewFactIdx, visibleFacts.length]);
   useEffect(() => () => {
     if (videoUrl) URL.revokeObjectURL(videoUrl);
   }, [videoUrl]);
@@ -255,10 +286,10 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     c.width = 320; c.height = 568;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    const fact = facts[previewFactIdx] ?? facts[0];
+    const fact = facts[visiblePreviewFactIdx] ?? facts[0];
     if (!fact) return;
     drawFactFrame(ctx, 320, 568, bgPreset, bgImage, titleText, fact, 1, 1, font, Math.round(fontSize * 0.42), textColor, accentColor);
-  }, [facts, previewFactIdx, titleText, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
+  }, [facts, visiblePreviewFactIdx, titleText, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
 
   function handleImageUpload(file: File) {
     const url = URL.createObjectURL(file);
@@ -272,13 +303,25 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
   }
 
   function addFact() {
+    const nextLength = facts.length + 1;
     setFacts((f) => [...f, { id: makeId(), text: "", source: "", category: "india" }]);
+    setPreviewFactIdx(nextLength - 1);
+    setFactsPage(Math.max(1, Math.ceil(nextLength / FACTS_PER_PAGE)));
   }
   function removeFact(id: string) {
+    const nextLength = facts.some((fact) => fact.id === id) ? Math.max(0, facts.length - 1) : facts.length;
     setFacts((f) => f.filter((x) => x.id !== id));
+    setFactsPage(Math.max(1, Math.ceil(nextLength / FACTS_PER_PAGE)));
+    setPreviewFactIdx((current) => Math.min(current, Math.max(0, nextLength - 1)));
   }
   function updateFact(id: string, patch: Partial<Fact>) {
     setFacts((f) => f.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+  function handleFactsPageChange(page: number) {
+    const nextPage = Math.min(Math.max(page, 1), factsPageCount);
+    const nextStart = (nextPage - 1) * FACTS_PER_PAGE;
+    setFactsPage(nextPage);
+    setPreviewFactIdx(Math.min(nextStart, Math.max(0, facts.length - 1)));
   }
 
   const handleRender = useCallback(async () => {
@@ -347,14 +390,14 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
   }, [facts, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, bgImage, titleText]);
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto">
-      <div className="grid gap-2 xl:grid-cols-[1fr_1fr]">
+    <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll">
+      <div className="grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="border-border/40 bg-card shadow-sm">
           <CardHeader className="py-2 px-3 border-b border-border/30">
             <CardTitle className="text-sm font-semibold">💡 Facts Hindi Studio</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-3 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">TITLE STYLE</span>
                 <select value={titlePreset} onChange={(e) => setTitlePreset(e.target.value)}
@@ -379,7 +422,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span className="text-[10px] font-semibold text-muted-foreground">FONT SIZE</span>
@@ -397,7 +440,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
                   onChange={(e) => setCharSpeed(parseFloat(e.target.value))} className="w-full h-1 accent-primary" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
                 <select value={aspect} onChange={(e) => setAspect(e.target.value as any)}
@@ -430,13 +473,16 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
                   <Plus className="h-2.5 w-2.5" />Add fact
                 </button>
               </div>
-              {facts.map((fact, idx) => (
-                <div key={fact.id} className={`rounded border p-2 space-y-1.5 transition-colors cursor-pointer ${previewFactIdx === idx ? "border-primary/50 bg-primary/5" : "border-border/40"}`}
-                  onClick={() => setPreviewFactIdx(idx)}>
+              {visibleFacts.map((fact, idx) => {
+                const absoluteIndex = factsStart + idx;
+
+                return (
+                  <div key={fact.id} className={`rounded border p-2 space-y-1.5 transition-colors cursor-pointer ${visiblePreviewFactIdx === absoluteIndex ? "border-primary/50 bg-primary/5" : "border-border/40"}`}
+                  onClick={() => setPreviewFactIdx(absoluteIndex)}>
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground flex-1">Fact {idx + 1}</span>
+                    <span className="text-[10px] text-muted-foreground flex-1">Fact {absoluteIndex + 1}</span>
                     <select value={fact.category} onChange={(e) => { e.stopPropagation(); updateFact(fact.id, { category: e.target.value }); }}
-                      className="h-5 rounded border border-input bg-background px-1 text-[10px]"
+                      className="h-5 max-w-[8.5rem] rounded border border-input bg-background px-1 text-[10px]"
                       onClick={(e) => e.stopPropagation()}>
                       {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
@@ -453,8 +499,15 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
                   <Input value={fact.source ?? ""} onChange={(e) => { e.stopPropagation(); updateFact(fact.id, { source: e.target.value }); }}
                     className="h-6 text-[10px] border-input" placeholder="Source (optional)"
                     onClick={(e) => e.stopPropagation()} />
-                </div>
-              ))}
+                  </div>
+                );
+              })}
+              <PaginationControls
+                page={currentFactsPage}
+                pageCount={factsPageCount}
+                onPageChange={handleFactsPageChange}
+                itemLabel={`${facts.length} facts`}
+              />
             </div>
 
             <div className="pt-1 border-t border-white/5">
@@ -481,7 +534,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
 
         <Card className="flex flex-col border-border/40 bg-card shadow-sm">
           <CardHeader className="py-2 px-3 border-b border-border/30">
-            <CardTitle className="text-sm font-semibold">Preview (Fact {previewFactIdx + 1})</CardTitle>
+            <CardTitle className="text-sm font-semibold">Preview (Fact {visiblePreviewFactIdx + 1})</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col items-center justify-center gap-3 p-3">
             <canvas ref={previewRef} className="rounded-lg border border-border/50 shadow-inner h-52" style={{ width: "auto" }} />

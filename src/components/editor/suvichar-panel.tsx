@@ -268,9 +268,9 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
   }, [quote, source, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, bgImage, resolvedTitle]);
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto">
+    <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll">
       <div className="grid gap-2 xl:grid-cols-[1fr_1fr] xl:flex-1 xl:min-h-0">
-        <div className="flex flex-col space-y-2 min-h-0 overflow-y-auto">
+        <div className="flex flex-col space-y-2 min-h-0 overflow-y-auto app-scroll">
           <Card className="border-border/40 bg-card shadow-sm">
             <CardHeader className="py-2 px-3 border-b border-border/30">
               <CardTitle className="text-sm font-semibold">✦ Suvichar Studio</CardTitle>

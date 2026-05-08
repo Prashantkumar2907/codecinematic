@@ -10,7 +10,6 @@ import { ShayariPanel } from "@/components/editor/shayari-panel";
 import { SuvicharPanel } from "@/components/editor/suvichar-panel";
 import { BollywoodPanel } from "@/components/editor/bollywood-panel";
 import { FactsHindiPanel } from "@/components/editor/facts-hindi-panel";
-import { useEditorStore, defaultEditorDraft } from "@/lib/editor-store";
 import type { PlanCode } from "@/lib/plans";
 
 const tabIds = ["editor", "wordofday", "didyouknow", "shayari", "suvichar", "bollywood", "factshindi"] as const;
@@ -23,9 +22,6 @@ export function ProjectWorkspace({ plan, projectId }: { plan: PlanCode; projectI
   const [activeTab, setActiveTab] = useState<TabId>(
     tabIds.includes(initialTab) ? initialTab : "editor"
   );
-  const storedDraft = useEditorStore((s) => s.drafts[projectId]);
-  const draft = storedDraft ?? defaultEditorDraft;
-
   // Sync tab when URL search param changes
   useEffect(() => {
     const tab = searchParams.get("tab") as TabId;
@@ -35,9 +31,9 @@ export function ProjectWorkspace({ plan, projectId }: { plan: PlanCode; projectI
   }, [searchParams]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Tab content — tab selection is handled by the top nav bar */}
-      <div className="flex-1 min-h-0 p-3">
+      <div className="flex-1 min-h-0 overflow-hidden p-2 sm:p-3">
         {activeTab === "editor" && (
           <ProjectEditor plan={plan} projectId={projectId} />
         )}

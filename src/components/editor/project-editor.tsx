@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { detectImportantLines } from "@/lib/render/smart-focus";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Textarea } from "@/components/ui/textarea";
 
 const languageOptions = [
@@ -44,11 +45,14 @@ const codeFontOptions = [
   { value: "monospace",       label: "Generic Mono" },
 ] as const;
 
+const FOCUS_LINES_PER_PAGE = 8;
+
 export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; projectId: string }) {
   const router = useRouter();
   const limits = PLAN_CONFIG[plan];
   const storedDraft = useEditorStore((state) => state.drafts[projectId]);
   const setDraft = useEditorStore((state) => state.setDraft);
+  const [focusPage, setFocusPage] = useState(1);
 
   const draft = storedDraft ?? defaultEditorDraft;
   const title = draft.title;
@@ -74,6 +78,12 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
         .filter((line) => line.content.trim().length > 0),
     [code]
   );
+  const focusPageCount = Math.max(1, Math.ceil(allLines.length / FOCUS_LINES_PER_PAGE));
+  const currentFocusPage = Math.min(Math.max(focusPage, 1), focusPageCount);
+  const paginatedLines = useMemo(() => {
+    const start = (currentFocusPage - 1) * FOCUS_LINES_PER_PAGE;
+    return allLines.slice(start, start + FOCUS_LINES_PER_PAGE);
+  }, [allLines, currentFocusPage]);
   const focusLineMap = useMemo(() => new Map(focusLines.map((line) => [line.line, line])), [focusLines]);
   const validation = useMemo(() => validateCodePayload(plan, code), [plan, code]);
   const suggestedFocusLines = useMemo(() => {
@@ -84,6 +94,12 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
     () => (draft.focus.length > 0 ? draft.focus : suggestedFocusLines),
     [draft.focus, suggestedFocusLines]
   );
+
+  useEffect(() => {
+    if (focusPage !== currentFocusPage) {
+      setFocusPage(currentFocusPage);
+    }
+  }, [currentFocusPage, focusPage]);
 
   useEffect(() => {
     const nextFocus = (() => {
@@ -136,8 +152,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   }
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-y-auto xl:overflow-hidden">
-      <div className="grid gap-2 xl:grid-cols-[1.3fr_0.7fr] xl:flex-1 xl:min-h-0 xl:h-[calc(100vh-5rem)]">
+    <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll xl:overflow-hidden">
+      <div className="grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] xl:flex-1 xl:h-[calc(100vh-5rem)]">
         
         {/* LEFT COLUMN: Settings + Code */}
         <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
@@ -259,7 +275,7 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
             <div className="bg-muted/30 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b border-border/30 flex items-center justify-between">
               <span className="text-muted-foreground font-mono tracking-widest">// code input</span>
             </div>
-            <div className="flex flex-1 overflow-auto min-h-0">
+            <div className="flex flex-1 overflow-auto app-scroll min-h-0">
               <div id="line-numbers" className="w-10 shrink-0 bg-muted/20 text-muted-foreground border-r border-white/5 text-[11px] leading-[1.5rem] font-mono text-right pt-2 pb-8 pr-2 select-none overflow-hidden" suppressHydrationWarning>
                 {code.split("\n").map((_, i) => <div key={i} className="h-6 flex items-center justify-end">{i + 1}</div>)}
               </div>
@@ -284,8 +300,13 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <CardTitle className="text-sm font-semibold">Focus map</CardTitle>
               <Badge className="text-[9px] px-1.5 py-0 bg-secondary/50 text-secondary-foreground">{normalizedEnabledFocusLines.length} active</Badge>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto space-y-2 px-3 pb-3">
-              {allLines.map(({ lineNumber, content }) => {
+            <CardContent className="flex-1 overflow-y-auto app-scroll space-y-2 px-3 pb-3">
+              {allLines.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+                  Add code to build a focus map.
+                </div>
+              ) : null}
+              {paginatedLines.map(({ lineNumber, content }) => {
                 const detected = focusLineMap.get(lineNumber);
                 const active = normalizedEnabledFocusLines.includes(lineNumber);
                 const preview = content.trim();
@@ -311,6 +332,12 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                   </button>
                 );
               })}
+              <PaginationControls
+                page={currentFocusPage}
+                pageCount={focusPageCount}
+                onPageChange={setFocusPage}
+                itemLabel={`${allLines.length} lines`}
+              />
             </CardContent>
           </Card>
 
