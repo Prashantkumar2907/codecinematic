@@ -1,4 +1,4 @@
-# Deployment Guide — CodeCinematic
+# Deployment Guide - CodeCinematic
 
 ## 1. Prerequisites
 
@@ -21,6 +21,7 @@ Required variables:
 | Variable | Description |
 |---|---|
 | `NEXT_PUBLIC_APP_URL` | Your public URL, e.g. `https://codecinematic.vercel.app` |
+| `SESSION_SECRET` | Random 32+ character secret used to sign app session cookies |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
@@ -39,7 +40,7 @@ Required variables:
 
 ### Admin account
 
-The built-in admin account `admin@example.com` / `admin123` is hardcoded and bypasses Supabase auth. It gets full premium (High plan) access with all features unlocked. Change these credentials in `src/lib/auth.ts` before going to production.
+The built-in demo admin account `admin@example.com` / `adminpassword123` bypasses Supabase auth and gets full premium (High plan) access. Change these credentials in `src/lib/demo-account.ts` before going to production, and set a strong `SESSION_SECRET` so app session cookies cannot be tampered with.
 
 ## 3. Install dependencies
 
@@ -79,8 +80,8 @@ In Supabase Auth settings:
 2. Enable Google provider with your client ID/secret.
 3. Enable GitHub provider with your client ID/secret.
 4. Add redirect URLs:
-   - `http://localhost:3000/dashboard`
-   - `https://your-domain.com/dashboard`
+   - `http://localhost:3000/api/auth/callback`
+   - `https://your-domain.com/api/auth/callback`
 
 ## 8. Set up Stripe
 
@@ -112,7 +113,7 @@ Open `http://localhost:3000`.
 
 1. Push this repository to GitHub.
 2. Import the repo into Vercel.
-3. Add all `.env` variables in Vercel project settings (Settings → Environment Variables).
+3. Add all `.env` variables in Vercel project settings (Settings -> Environment Variables).
 4. Set `NEXT_PUBLIC_APP_URL` to your production URL.
 5. Update Supabase auth redirect URLs with your production domain.
 6. Deploy.
