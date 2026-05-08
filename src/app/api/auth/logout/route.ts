@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       const supabase = await createSupabaseServerClient();
       await supabase.auth.signOut();
     } catch {
-      // Ignore — cookie is already cleared
+      // Ignore because the app session cookie is already cleared.
     }
   }
 

@@ -238,11 +238,83 @@ create table if not exists public.video_analysis_jobs (
   completed_at timestamptz
 );
 
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'projects_status_check'
+  ) then
+    alter table public.projects
+      add constraint projects_status_check
+      check (status in ('draft', 'ready', 'rendering', 'completed', 'archived'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'exports_status_check'
+  ) then
+    alter table public.exports
+      add constraint exports_status_check
+      check (status in ('queued', 'rendering', 'completed', 'failed', 'expired'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'subscriptions_status_check'
+  ) then
+    alter table public.subscriptions
+      add constraint subscriptions_status_check
+      check (status in ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'paused'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'project_scenes_project_order_unique'
+  ) then
+    alter table public.project_scenes
+      add constraint project_scenes_project_order_unique unique (project_id, scene_order);
+  end if;
+end $$;
+
 create index if not exists idx_projects_user_id on public.projects(user_id);
+create index if not exists idx_projects_user_updated on public.projects(user_id, updated_at desc);
+create index if not exists idx_projects_public_updated on public.projects(is_public, updated_at desc) where is_public = true;
+create index if not exists idx_projects_slug on public.projects(slug) where slug is not null;
+create index if not exists idx_project_scenes_project_id on public.project_scenes(project_id);
+create index if not exists idx_project_scenes_project_order on public.project_scenes(project_id, scene_order);
 create index if not exists idx_exports_user_id on public.exports(user_id);
+create index if not exists idx_exports_user_created on public.exports(user_id, created_at desc);
 create index if not exists idx_exports_project_id on public.exports(project_id);
+create index if not exists idx_exports_status_created on public.exports(status, created_at desc);
+create index if not exists idx_plan_features_plan_id on public.plan_features(plan_id);
+create index if not exists idx_plan_features_feature_key on public.plan_features(feature_key);
+create index if not exists idx_subscriptions_user_id on public.subscriptions(user_id);
+create index if not exists idx_subscriptions_user_status_period on public.subscriptions(user_id, status, current_period_end desc);
+create index if not exists idx_subscriptions_plan_id on public.subscriptions(plan_id);
+create unique index if not exists idx_subscriptions_provider_subscription_id on public.subscriptions(provider_subscription_id) where provider_subscription_id is not null;
 create index if not exists idx_usage_counters_user_metric on public.usage_counters(user_id, metric_key);
+create index if not exists idx_usage_events_user_id on public.usage_events(user_id);
+create index if not exists idx_usage_events_user_created on public.usage_events(user_id, created_at desc);
+create index if not exists idx_usage_events_project_id on public.usage_events(project_id);
+create index if not exists idx_usage_events_export_id on public.usage_events(export_id);
+create index if not exists idx_feature_overrides_user_id on public.feature_overrides(user_id);
 create index if not exists idx_important_line_rules_project on public.important_line_rules(project_id);
+create index if not exists idx_important_line_rules_scene_id on public.important_line_rules(scene_id);
+create index if not exists idx_project_assets_project_id on public.project_assets(project_id);
+create index if not exists idx_project_assets_user_id on public.project_assets(user_id);
+create index if not exists idx_audio_generations_project_id on public.audio_generations(project_id);
+create index if not exists idx_audio_generations_scene_id on public.audio_generations(scene_id);
+create index if not exists idx_audio_generations_user_id on public.audio_generations(user_id);
+create index if not exists idx_audio_generations_status_created on public.audio_generations(status, created_at desc);
+create index if not exists idx_video_analysis_jobs_user_id on public.video_analysis_jobs(user_id);
+create index if not exists idx_video_analysis_jobs_project_id on public.video_analysis_jobs(project_id);
+create index if not exists idx_video_analysis_jobs_source_asset_id on public.video_analysis_jobs(source_asset_id);
+create index if not exists idx_video_analysis_jobs_status_created on public.video_analysis_jobs(status, created_at desc);
 
 alter table public.plans enable row level security;
 alter table public.plan_features enable row level security;

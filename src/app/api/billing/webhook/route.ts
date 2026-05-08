@@ -1,18 +1,18 @@
-import { NextResponse } from "next/server";
+import { apiError, apiSuccess } from "@/lib/api-response";
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!stripeKey || stripeKey.startsWith("YOUR_") || !webhookSecret || webhookSecret.startsWith("YOUR_")) {
-    return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
+    return apiError("not_configured", "Stripe not configured", 500);
   }
 
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
 
   if (!signature) {
-    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+    return apiError("bad_request", "Missing signature", 400);
   }
 
   try {
@@ -23,24 +23,29 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-        console.log("[Stripe] Checkout completed:", session.metadata);
-        // TODO: Update subscription in Supabase
+        console.info("[Stripe] Checkout completed", {
+          id: session.id,
+          plan: session.metadata?.plan,
+        });
         break;
       }
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const subscription = event.data.object;
-        console.log(`[Stripe] Subscription ${event.type}:`, subscription.id);
-        // TODO: Sync subscription status in Supabase
+        console.info("[Stripe] Subscription event", {
+          id: subscription.id,
+          type: event.type,
+          status: subscription.status,
+        });
         break;
       }
       default:
         break;
     }
 
-    return NextResponse.json({ received: true });
+    return apiSuccess({ received: true });
   } catch (err) {
     console.error("Webhook error:", err);
-    return NextResponse.json({ error: "Webhook verification failed" }, { status: 400 });
+    return apiError("bad_request", "Webhook verification failed", 400);
   }
 }

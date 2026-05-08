@@ -1,33 +1,37 @@
-import { NextResponse } from "next/server";
-
-import { SESSION_COOKIE, isAdminLogin, buildAdminSession, encodeSession } from "@/lib/auth";
+import { apiError, apiSuccess } from "@/lib/api-response";
+import { SESSION_COOKIE, buildAdminSession, encodeSession, isAdminLogin } from "@/lib/auth";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 7,
+};
 
 export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  // Admin bypass — no database needed
   if (isAdminLogin(email, password)) {
-    const session = buildAdminSession();
-    const response = NextResponse.json({ ok: true });
-    response.cookies.set(SESSION_COOKIE, encodeSession(session), {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    });
-    return response;
+    try {
+      const response = apiSuccess({});
+      response.cookies.set(
+        SESSION_COOKIE,
+        await encodeSession(buildAdminSession()),
+        SESSION_COOKIE_OPTIONS,
+      );
+      return response;
+    } catch {
+      return apiError("not_configured", "Session signing is not configured.", 500);
+    }
   }
 
-  // Regular Supabase email/password login
   if (!hasSupabaseEnv()) {
-    return NextResponse.json(
-      { ok: false, error: "Supabase is not configured" },
-      { status: 400 }
-    );
+    return apiError("not_configured", "Supabase is not configured.", 400);
   }
 
   try {
@@ -35,32 +39,22 @@ export async function POST(request: Request) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 401 }
-      );
+      return apiError("unauthorized", error.message, 401);
     }
 
-    // Build a session from Supabase user
-    const session = {
-      email: data.user.email ?? email,
-      plan: "free" as const,
-      name: data.user.user_metadata?.full_name ?? email.split("@")[0],
-      isAdmin: false,
-    };
-
-    const response = NextResponse.json({ ok: true });
-    response.cookies.set(SESSION_COOKIE, encodeSession(session), {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    const response = apiSuccess({});
+    response.cookies.set(
+      SESSION_COOKIE,
+      await encodeSession({
+        email: data.user.email ?? email,
+        plan: "free",
+        name: data.user.user_metadata?.full_name ?? email.split("@")[0],
+        isAdmin: false,
+      }),
+      SESSION_COOKIE_OPTIONS,
+    );
     return response;
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Unexpected error" },
-      { status: 500 }
-    );
+    return apiError("upstream_error", "Unexpected error", 500);
   }
 }

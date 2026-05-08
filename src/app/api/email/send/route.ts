@@ -1,28 +1,28 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { apiError, apiSuccess, readJsonBody } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 
 const emailSchema = z.object({
   to: z.string().email(),
-  subject: z.string().min(1).max(200),
-  html: z.string().min(1),
+  subject: z.string().trim().min(1).max(200),
+  html: z.string().min(1).max(100_000),
 });
 
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session?.isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("unauthorized", "Unauthorized", 401);
   }
 
-  const parsed = emailSchema.safeParse(await request.json());
+  const parsed = emailSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    return apiError("invalid_payload", "Invalid payload", 400, parsed.error.flatten());
   }
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey || resendKey.startsWith("YOUR_")) {
-    return NextResponse.json({ error: "Resend not configured" }, { status: 500 });
+    return apiError("not_configured", "Resend not configured", 500);
   }
 
   try {
@@ -38,12 +38,12 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return apiError("upstream_error", error.message, 502);
     }
 
-    return NextResponse.json({ id: data?.id ?? "sent" });
+    return apiSuccess({ id: data?.id ?? "sent" });
   } catch (err) {
     console.error("Email send error:", err);
-    return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
+    return apiError("upstream_error", "Failed to send email", 500);
   }
 }

@@ -1,5 +1,6 @@
 const CACHE_NAME = "codecinematic-v1";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
+const PRIVATE_PREFIXES = ["/api/", "/dashboard", "/projects"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -23,6 +24,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  const isPrivateRequest = PRIVATE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+  if (isPrivateRequest) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

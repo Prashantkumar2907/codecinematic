@@ -14,15 +14,16 @@ const PROTECTED_API_PREFIXES = [
   "/api/export",
   "/api/ai",
   "/api/history",
-  "/api/billing",
   "/api/email",
   "/api/tts",
 ];
 
-export function middleware(request: NextRequest) {
+const PROTECTED_API_PATHS = ["/api/billing/checkout"];
+
+export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const sessionCookie = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = sessionCookie ? decodeSessionCookie(sessionCookie) : null;
+  const session = sessionCookie ? await decodeSessionCookie(sessionCookie) : null;
 
   if (session && pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -34,7 +35,9 @@ export function middleware(request: NextRequest) {
   }
 
   const isProtectedPage = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-  const isProtectedApi = PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  const isProtectedApi =
+    PROTECTED_API_PATHS.includes(pathname) ||
+    PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
   if (!isProtectedPage && !isProtectedApi) {
     return NextResponse.next();
@@ -43,7 +46,7 @@ export function middleware(request: NextRequest) {
   if (!sessionCookie) {
     if (isProtectedApi) {
       return NextResponse.json(
-        { ok: false, error: "Unauthorized. Please log in." },
+        { ok: false, error: { code: "unauthorized", message: "Unauthorized. Please log in." } },
         { status: 401 },
       );
     }
@@ -54,6 +57,15 @@ export function middleware(request: NextRequest) {
   }
 
   if (!session) {
+    if (isProtectedApi) {
+      const response = NextResponse.json(
+        { ok: false, error: { code: "invalid_session", message: "Session expired. Please log in again." } },
+        { status: 401 },
+      );
+      response.cookies.delete(SESSION_COOKIE);
+      return response;
+    }
+
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", `${pathname}${search}`);
     const response = NextResponse.redirect(loginUrl);

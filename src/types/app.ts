@@ -1,11 +1,4 @@
-import type { PlanCode } from "@/lib/plans";
-
-export type AppSession = {
-  email: string;
-  plan: PlanCode;
-  name: string;
-  isAdmin: boolean;
-};
+export type { AppSession } from "@/lib/session-cookie";
 
 export type LanguageOption = {
   value: string;
