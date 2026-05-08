@@ -10,6 +10,7 @@ import type { Narration } from "@/lib/narration";
 import { BG_PRESETS, type BgPreset, drawBackground } from "@/components/editor/shared/canvas-utils";
 import { loadGoogleFonts } from "@/components/editor/shared/font-catalog";
 import { createWebmBlob, createWebmRecorder } from "@/components/editor/shared/media-recorder";
+import { RenderStatusPanel } from "@/components/editor/shared/render-status-panel";
 
 type Job = {
   exportId: string;
@@ -201,6 +202,37 @@ export function CreateVideoPanel({
     const s = secs % 60;
     return m > 0 ? `~${m}m ${s}s` : `~${s}s`;
   }, [resolvedCode, resolvedFocus, resolvedNormalSpeed, resolvedFocusSpeed]);
+  const renderStatus = error
+    ? {
+        status: "error" as const,
+        title: "Render could not start",
+        description: error,
+      }
+    : loading || rendering
+      ? {
+          status: "loading" as const,
+          title: rendering ? "Rendering video" : "Creating export job",
+          description: rendering
+            ? "The browser renderer is painting frames and encoding the WebM file."
+            : "The server is validating plan limits and creating the export job.",
+        }
+      : videos.length > 0
+        ? {
+            status: "success" as const,
+            title: "Video ready",
+            description: "Preview the export on the right or download the generated WebM file.",
+          }
+        : hasRenderableCode
+          ? {
+              status: "empty" as const,
+              title: "Ready to render",
+              description: "Create a browser export job to generate the first video.",
+            }
+          : {
+              status: "empty" as const,
+              title: "No code payload",
+              description: "Go back to the editor, add code, and continue again.",
+            };
 
   useEffect(() => {
     setError(null);
@@ -239,14 +271,19 @@ export function CreateVideoPanel({
         })
       });
 
-      const data = (await response.json()) as { jobs?: Job[]; error?: string };
+      const data = (await response.json()) as {
+        jobs?: Job[];
+        data?: { jobs?: Job[] };
+        error?: string | { message?: string };
+      };
       if (!response.ok) {
-        setError(data.error ?? "Unable to create export jobs.");
+        const message = typeof data.error === "string" ? data.error : data.error?.message;
+        setError(message ?? "Unable to create export jobs.");
         setLoading(false);
         return [];
       }
 
-      const nextJobs = data.jobs ?? [];
+      const nextJobs = data.data?.jobs ?? data.jobs ?? [];
       setJobs(nextJobs);
       setLoading(false);
       return nextJobs;
@@ -374,10 +411,10 @@ export function CreateVideoPanel({
 
             <div className="flex gap-2">
               <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || !hasRenderableCode}>
-                {loading || rendering ? "Creating video…" : "Create video"}
+                {loading || rendering ? "Creating video..." : "Create video"}
               </Button>
               <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || !hasRenderableCode} variant="secondary">
-                {rendering ? "Rendering…" : "Render again"}
+                {rendering ? "Rendering..." : "Render again"}
               </Button>
               {rendering && (
                 <Button
@@ -396,12 +433,7 @@ export function CreateVideoPanel({
               )}
             </div>
             
-            {!hasRenderableCode ? (
-              <div className="rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-100">
-                No code payload reached this step yet. Go back to the editor and continue again.
-              </div>
-            ) : null}
-            {error ? <div className="rounded-md border border-destructive/30 bg-destructive/8 p-2 text-xs text-destructive">{error}</div> : null}
+            <RenderStatusPanel {...renderStatus} />
           </CardContent>
         </Card>
 
@@ -412,10 +444,11 @@ export function CreateVideoPanel({
           </CardHeader>
             <CardContent className="flex-1 overflow-y-auto app-scroll space-y-3 px-3 pb-3">
             {jobs.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/50 p-6 text-xs text-muted-foreground text-center">
-                <p className="font-medium text-foreground/60 mb-1">No export jobs yet</p>
-                <p className="text-[11px]">Click &quot;Create video&quot; on the left to start rendering.</p>
-              </div>
+              <RenderStatusPanel
+                status="empty"
+                title="No export jobs yet"
+                description="Click Create video on the left to validate the payload and start rendering."
+              />
             ) : null}
 
             {jobs.map((job) => (

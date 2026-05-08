@@ -24,6 +24,7 @@ const aspectOptions = [
   { value: "9:16", label: "Vertical 9:16" },
   { value: "16:9", label: "Landscape 16:9" }
 ] as const;
+type AspectValue = (typeof aspectOptions)[number]["value"];
 const soundOptions = [
   { value: "off",        label: "Sound off" },
   { value: "soft",       label: "Soft keys" },
@@ -31,6 +32,7 @@ const soundOptions = [
   { value: "keyboard",   label: "Mech keyboard" },
   { value: "chime",      label: "Chime / piano" },
 ] as const;
+type SoundValue = (typeof soundOptions)[number]["value"];
 const themeOptions = [
   { value: "vscode",      label: "VS Code Dark", accent: "#2dd4bf" },
   { value: "dracula",     label: "Dracula",      accent: "#bd93f9" },
@@ -170,17 +172,17 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-1 lg:col-span-2">
                   <span className="text-[10px] font-semibold text-muted-foreground">Title</span>
-                  <Input value={title} onChange={(e) => updateDraftField("title", e.target.value)} className="h-7 text-xs border-input shadow-sm focus-visible:ring-1" placeholder="Project title" />
+                  <Input value={title} onChange={(e) => updateDraftField("title", e.target.value)} aria-label="Project title" className="h-7 text-xs border-input shadow-sm focus-visible:ring-1" placeholder="Project title" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Language</span>
-                  <select value={language} onChange={(e) => updateDraftField("language", e.target.value)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={language} onChange={(e) => updateDraftField("language", e.target.value)} aria-label="Programming language" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {languageOptions.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Ratio</span>
-                  <select value={aspectRatioMode} onChange={(e) => updateDraftField("aspect", e.target.value as any)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={aspectRatioMode} onChange={(e) => updateDraftField("aspect", e.target.value as AspectValue)} aria-label="Aspect ratio" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {aspectOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
@@ -189,21 +191,21 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 pt-1">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Normal speed</span>
-                  <SpeedSlider value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.25" max="3.00" step="0.05" />
+                  <SpeedSlider label="Normal typing speed" value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.25" max="3.00" step="0.05" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Focus speed</span>
-                  <SpeedSlider value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.25" max="3.00" step="0.05" />
+                  <SpeedSlider label="Focused line typing speed" value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.25" max="3.00" step="0.05" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Sound pattern</span>
-                  <select value={sound} onChange={(e) => updateDraftField("sound", e.target.value as any)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={sound} onChange={(e) => updateDraftField("sound", e.target.value as SoundValue)} aria-label="Typing sound pattern" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {soundOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Volume</span>
-                  <Slider value={soundVolume} onChange={(v) => updateDraftField("soundVolume", v)} min="0.00" max="1.00" step="0.05" formatter={(val) => `${Math.round(Number(val) * 100)}%`} />
+                  <Slider label="Typing sound volume" value={soundVolume} onChange={(v) => updateDraftField("soundVolume", v)} min="0.00" max="1.00" step="0.05" formatter={(val) => `${Math.round(Number(val) * 100)}%`} />
                 </div>
               </div>
 
@@ -211,13 +213,13 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <div className="grid gap-2 grid-cols-2 md:grid-cols-4 pt-1">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Color theme</span>
-                  <select value={theme} onChange={(e) => updateDraftField("theme", e.target.value)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={theme} onChange={(e) => updateDraftField("theme", e.target.value)} aria-label="Code color theme" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {themeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Code font</span>
-                  <select value={codeFont} onChange={(e) => updateDraftField("codeFont", e.target.value)} className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={codeFont} onChange={(e) => updateDraftField("codeFont", e.target.value)} aria-label="Code font" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {codeFontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
@@ -226,6 +228,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                   <button
                     type="button"
                     onClick={() => updateDraftField("cursorBlink", !cursorBlink)}
+                    aria-label="Toggle cursor blink"
+                    aria-pressed={cursorBlink}
                     className={`flex h-7 w-full items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${cursorBlink ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
                   >
                     {cursorBlink ? "On" : "Off"}
@@ -236,6 +240,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                   <button
                     type="button"
                     onClick={() => updateDraftField("focusFlash", !focusFlash)}
+                    aria-label="Toggle focus flash"
+                    aria-pressed={focusFlash}
                     className={`flex h-7 w-full items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${focusFlash ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
                   >
                     {focusFlash ? "On" : "Off"}
@@ -255,6 +261,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                       key={preset.id}
                       type="button"
                       title={preset.label}
+                      aria-label={`Use ${preset.label} background`}
+                      aria-pressed={bgPresetId === preset.id}
                       onClick={() => updateDraftField("bgPresetId", preset.id)}
                       className={`w-6 h-6 rounded-md border-2 transition-all ${bgPresetId === preset.id ? "border-primary shadow-md scale-110" : "border-transparent hover:border-white/30"}`}
                       style={{ background: preset.preview }}
@@ -369,6 +377,7 @@ function MetricBadge({ label, value, status = "default" }: { label: string; valu
 }
 
 function Slider({
+  label,
   value,
   onChange,
   min,
@@ -376,6 +385,7 @@ function Slider({
   step,
   formatter = formatMultiplier
 }: {
+  label: string;
   value: string;
   onChange: (value: string) => void;
   min: string;
@@ -393,6 +403,7 @@ function Slider({
           step={step}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          aria-label={label}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         />
         <div className="h-[4px] w-full bg-muted rounded-full overflow-hidden">
@@ -404,8 +415,9 @@ function Slider({
   );
 }
 
-/** SpeedSlider wraps Slider with − / + step buttons (±0.5 by default) */
+/** SpeedSlider wraps Slider with +/- step buttons. */
 function SpeedSlider({
+  label,
   value,
   onChange,
   min,
@@ -413,6 +425,7 @@ function SpeedSlider({
   step,
   nudge = "0.5",
 }: {
+  label: string;
   value: string;
   onChange: (value: string) => void;
   min: string;
@@ -431,8 +444,9 @@ function SpeedSlider({
         <button
           type="button"
           onClick={() => adjust(-Number(nudge))}
+          aria-label={`Decrease ${label}`}
           className="h-5 w-5 shrink-0 rounded border border-border bg-muted/40 text-[11px] font-bold flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-colors leading-none"
-        >−</button>
+        >-</button>
         <div className="flex-1 rounded-md border border-border bg-card p-1.5 flex flex-col justify-center h-7 relative shadow-sm hover:border-primary/50 transition-colors">
           <input
             type="range"
@@ -441,6 +455,7 @@ function SpeedSlider({
             step={step}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-label={label}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
           />
           <div className="h-[4px] w-full bg-muted rounded-full overflow-hidden">
@@ -450,6 +465,7 @@ function SpeedSlider({
         <button
           type="button"
           onClick={() => adjust(Number(nudge))}
+          aria-label={`Increase ${label}`}
           className="h-5 w-5 shrink-0 rounded border border-border bg-muted/40 text-[11px] font-bold flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-colors leading-none"
         >+</button>
         <div className="w-10 shrink-0 text-right text-[11px] font-bold text-primary">{Number(value).toFixed(2)}x</div>

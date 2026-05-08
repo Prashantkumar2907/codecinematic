@@ -24,7 +24,7 @@
     --border: 220 15% 88%;
     --input: 220 15% 88%;
     --ring: 194 89% 43%;
-    --radius: 0.6rem;
+    --radius: 0.5rem;
   }
 
   .dark {
@@ -48,7 +48,7 @@
     --border: 222 18% 16%;
     --input: 222 18% 14%;
     --ring: 194 89% 48%;
-    --radius: 0.6rem;
+    --radius: 0.5rem;
   }
 }
 
@@ -150,5 +150,26 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .animate-surface-in {
+    animation: surface-in 360ms ease-out both;
+  }
+}
+
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-surface-in {
+    animation: none;
   }
 }

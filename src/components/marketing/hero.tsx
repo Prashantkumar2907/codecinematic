@@ -24,8 +24,8 @@ const features = [
 export function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(12,163,176,0.15),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(99,102,241,0.08),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(12,163,176,0.10),transparent_44%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:72px_72px]" />
 
       <motion.div
         variants={container}
@@ -36,7 +36,7 @@ export function Hero() {
         <motion.div variants={item} className="mb-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            Deterministic code videos — not AI-generated
+            Deterministic code videos - not AI-generated
           </span>
         </motion.div>
 

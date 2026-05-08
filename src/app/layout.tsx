@@ -4,6 +4,7 @@ import { Outfit, JetBrains_Mono } from "next/font/google";
 import "@/app/globals.css";
 
 import { SiteHeader } from "@/components/layout/site-header";
+import { PageTransition } from "@/components/layout/page-transition";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -45,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <SiteHeader />
           <InstallPrompt />
-          {children}
+          <PageTransition>{children}</PageTransition>
         </ThemeProvider>
       </body>
     </html>

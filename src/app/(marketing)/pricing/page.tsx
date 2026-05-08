@@ -33,10 +33,7 @@ const planGradients: Record<PlanCode, string> = {
 export default function PricingPage() {
   return (
     <main className="flex-1 overflow-y-auto app-scroll">
-      {/* Ambient background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/4 rounded-full blur-3xl" />
-      </div>
+      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(45,212,191,0.04),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:auto,72px_72px]" />
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-20">
         <motion.div

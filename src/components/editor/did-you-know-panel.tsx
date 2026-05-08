@@ -96,7 +96,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
     if (!canvas || !factText.trim()) return;
     setRendering(true);
     setVideoUrl(null);
-    setProgress("Preparing…");
+    setProgress("Preparing...");
 
     const dim = ASPECT_OPTIONS.find((a) => a.value === aspect)!;
     canvas.width = dim.w;
@@ -119,7 +119,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
     const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
     const videoStream = canvas.captureStream(0);
-    const videoTrack = videoStream.getVideoTracks()[0];
+    const videoTrack = videoStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
     const combinedStream = new MediaStream([
       ...videoStream.getVideoTracks(),
       ...(audioDest ? audioDest.stream.getAudioTracks() : []),
@@ -165,12 +165,10 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
         drawFactFrame(ctx, canvas.width, canvas.height, factText, selectedFont, Math.min(factT, 1.0), bgPreset, bgImage, factFontSize);
       }
 
-      setProgress(`Rendering… ${Math.round((frame / totalFrames) * 100)}%`);
+      setProgress(`Rendering... ${Math.round((frame / totalFrames) * 100)}%`);
 
       // Explicitly capture the painted frame into the MediaRecorder stream
-      if (videoTrack && 'requestFrame' in videoTrack) {
-        (videoTrack as any).requestFrame();
-      }
+      videoTrack?.requestFrame?.();
       // Pace to wall-clock time so recorded video matches real-time duration
       const targetWall = renderStart + (frame + 1) * (1000 / fps);
       const remainingMs = targetWall - performance.now();
@@ -254,7 +252,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                   <Input
                     value={customTitle}
                     onChange={(e) => setCustomTitle(e.target.value)}
-                    placeholder="Enter custom title…"
+                    placeholder="Enter custom title..."
                     className="mt-1.5 text-xs h-8"
                   />
                 )}
@@ -281,7 +279,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                   value={factText}
                   onChange={(e) => setFactText(e.target.value)}
                   className="min-h-[90px] text-xs border-input shadow-sm resize-none"
-                  placeholder={titleMode === "didyouknow" ? "Enter an interesting fact…" : "Enter a thought or quote…"}
+                  placeholder={titleMode === "didyouknow" ? "Enter an interesting fact..." : "Enter a thought or quote..."}
                 />
               </div>
 
@@ -340,7 +338,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">TITLE SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(2)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(2)}x</span>
                     </div>
                     <input type="range" min={0.5} max={1.5} step={0.05} value={titleSpeed}
                       onChange={(e) => setTitleSpeed(parseFloat(e.target.value))}
@@ -349,7 +347,7 @@ export function DidYouKnowPanel({ projectId }: { projectId: string }) {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">TEXT SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{textSpeed.toFixed(2)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{textSpeed.toFixed(2)}x</span>
                     </div>
                     <input type="range" min={0.5} max={1.5} step={0.05} value={textSpeed}
                       onChange={(e) => setTextSpeed(parseFloat(e.target.value))}

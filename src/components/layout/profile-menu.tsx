@@ -21,8 +21,17 @@ export function ProfileMenu({ email, planLabel, isAdmin }: ProfileMenuProps) {
         setOpen(false);
       }
     }
+    function handleKeydown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeydown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeydown);
+    };
   }, []);
 
   return (
@@ -30,6 +39,8 @@ export function ProfileMenu({ email, planLabel, isAdmin }: ProfileMenuProps) {
       <button
         onClick={() => setOpen((p) => !p)}
         aria-label="Profile menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 hover:bg-primary/20 border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm shadow-primary/10"
       >
         <User className="h-4 w-4 text-primary" />
@@ -42,6 +53,7 @@ export function ProfileMenu({ email, planLabel, isAdmin }: ProfileMenuProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" as const }}
+            role="menu"
             className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-white/[0.08] bg-background/95 backdrop-blur-xl shadow-xl shadow-black/30 overflow-hidden z-50"
           >
             {/* Account info */}
@@ -63,6 +75,7 @@ export function ProfileMenu({ email, planLabel, isAdmin }: ProfileMenuProps) {
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"
+                  role="menuitem"
                   className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
                 >
                   <LogOut className="h-3.5 w-3.5" />

@@ -93,7 +93,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     if (!canvas || !word.trim()) return;
     setRendering(true);
     setVideoUrl(null);
-    setProgress("Preparing…");
+    setProgress("Preparing...");
 
     const dim = ASPECT_OPTIONS.find((a) => a.value === aspect)!;
     canvas.width = dim.w;
@@ -121,7 +121,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
     const videoStream = canvas.captureStream(0);
-    const videoTrack = videoStream.getVideoTracks()[0];
+    const videoTrack = videoStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
     const combinedStream = new MediaStream([
       ...videoStream.getVideoTracks(),
       ...(audioDest ? audioDest.stream.getAudioTracks() : []),
@@ -175,12 +175,10 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
         drawWordFrame(ctx, canvas.width, canvas.height, word, meaning, selectedFont, Math.min(wordT, 1.0), wordSplit, bgPreset, bgImage, wordFontSize, meaningFontSize);
       }
 
-      setProgress(`Rendering… ${Math.round((frame / totalFrames) * 100)}%`);
+      setProgress(`Rendering... ${Math.round((frame / totalFrames) * 100)}%`);
 
       // Explicitly capture the painted frame into the MediaRecorder stream
-      if (videoTrack && 'requestFrame' in videoTrack) {
-        (videoTrack as any).requestFrame();
-      }
+      videoTrack?.requestFrame?.();
       // Pace to wall-clock time so recorded video matches real-time duration
       const targetWall = renderStart + (frame + 1) * (1000 / fps);
       const remainingMs = targetWall - performance.now();
@@ -306,7 +304,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-muted-foreground">TITLE SPEED</span>
-                    <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(2)}×</span>
+                    <span className="text-[10px] text-muted-foreground">{titleSpeed.toFixed(2)}x</span>
                   </div>
                   <input type="range" min={0.5} max={1.5} step={0.05} value={titleSpeed}
                     onChange={(e) => setTitleSpeed(parseFloat(e.target.value))}
@@ -316,7 +314,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">WORD SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{wordSpeed.toFixed(2)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{wordSpeed.toFixed(2)}x</span>
                     </div>
                     <input type="range" min={0.5} max={1.5} step={0.05} value={wordSpeed}
                       onChange={(e) => setWordSpeed(parseFloat(e.target.value))}
@@ -325,7 +323,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-muted-foreground">MEANING SPEED</span>
-                      <span className="text-[10px] text-muted-foreground">{meaningSpeed.toFixed(2)}×</span>
+                      <span className="text-[10px] text-muted-foreground">{meaningSpeed.toFixed(2)}x</span>
                     </div>
                     <input type="range" min={0.5} max={1.5} step={0.05} value={meaningSpeed}
                       onChange={(e) => setMeaningSpeed(parseFloat(e.target.value))}

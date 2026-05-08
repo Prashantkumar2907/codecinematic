@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Github, Loader2, AlertCircle, Code2, Film, Zap, BookOpen, Crown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { getSafeRedirectPath } from "@/lib/session-cookie";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "invalid-provider": "Unknown authentication provider.",
+  "oauth-missing-code": "Social login did not return a verification code. Please try again.",
   "supabase-not-configured": "Social login is not yet configured. Please sign in with email and password.",
   "oauth-failed": "Social login failed. Please try again or use email login.",
   "supabase-unavailable": "Authentication service is unavailable. Please use email credentials.",
@@ -24,9 +25,9 @@ const features = [
 ];
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = getSafeRedirectPath(searchParams.get("next"));
+  const socialNextParam = encodeURIComponent(nextPath);
   const urlError = searchParams.get("error");
 
   const [email, setEmail] = useState("");
@@ -48,12 +49,12 @@ function LoginForm() {
 
     try {
       const res = await fetch("/api/auth/demo-login", { method: "POST", body: formData });
-      let data: { ok?: boolean; error?: string } = {};
+      let data: { ok?: boolean; error?: string | { message?: string } } = {};
       try { data = await res.json() as typeof data; } catch { data = { ok: false, error: "Unexpected server response." }; }
 
       if (data.ok) { window.location.href = nextPath; return; }
 
-      const rawError = data.error ?? "";
+      const rawError = typeof data.error === "string" ? data.error : data.error?.message ?? "";
       if (rawError.toLowerCase().includes("supabase") || rawError.toLowerCase().includes("not configured")) {
         setError(AUTH_ERROR_MESSAGES["supabase-unavailable"]);
       } else if (rawError.toLowerCase().includes("invalid") || rawError.toLowerCase().includes("wrong")) {
@@ -78,11 +79,9 @@ function LoginForm() {
 
   return (
     <div className="flex-1 grid lg:grid-cols-2 overflow-hidden">
-      {/* Left — branding panel */}
-      <div className="hidden lg:flex flex-col justify-between p-10 relative overflow-hidden bg-gradient-to-br from-[#080c12] via-[#0c1118] to-[#0a0f16]">
-        {/* Ambient glow */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full bg-primary/4 blur-3xl pointer-events-none" />
+      {/* Left - branding panel */}
+      <div className="hidden lg:flex flex-col justify-between p-10 relative overflow-hidden bg-[linear-gradient(135deg,#080c12_0%,#0c1118_48%,#10161c_100%)]">
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,rgba(45,212,191,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:64px_64px]" />
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 relative z-10">
@@ -118,11 +117,11 @@ function LoginForm() {
 
         {/* Bottom note */}
         <p className="text-[11px] text-muted-foreground/40 relative z-10">
-          © 2026 CodeCinematic. All rights reserved.
+          (c) 2026 CodeCinematic. All rights reserved.
         </p>
       </div>
 
-      {/* Right — form */}
+      {/* Right - form */}
       <div className="flex items-center justify-center px-6 py-10 bg-background">
         <div className="w-full max-w-sm space-y-8">
           {/* Mobile logo */}
@@ -208,7 +207,7 @@ function LoginForm() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <a href="/api/auth/social?provider=google">
+            <a href={`/api/auth/social?provider=google&next=${socialNextParam}`}>
               <Button variant="outline" className="w-full h-9 border-border/60 hover:bg-card hover:border-border text-xs transition-all" type="button">
                 <svg className="mr-2 h-3.5 w-3.5" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -219,7 +218,7 @@ function LoginForm() {
                 Google
               </Button>
             </a>
-            <a href="/api/auth/social?provider=github">
+            <a href={`/api/auth/social?provider=github&next=${socialNextParam}`}>
               <Button variant="outline" className="w-full h-9 border-border/60 hover:bg-card hover:border-border text-xs transition-all" type="button">
                 <Github className="mr-2 h-3.5 w-3.5" />GitHub
               </Button>

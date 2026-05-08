@@ -14,10 +14,10 @@ const authLinks = [
   { href: "/projects/new-project?tab=editor", label: "Code Studio", tab: "editor" },
   { href: "/projects/new-project?tab=wordofday", label: "Word of Day", tab: "wordofday" },
   { href: "/projects/new-project?tab=didyouknow", label: "Did You Know", tab: "didyouknow" },
-  { href: "/projects/new-project?tab=shayari", label: "✦ Shayari", tab: "shayari" },
-  { href: "/projects/new-project?tab=suvichar", label: "✦ Suvichar", tab: "suvichar" },
-  { href: "/projects/new-project?tab=bollywood", label: "🎬 Bollywood", tab: "bollywood" },
-  { href: "/projects/new-project?tab=factshindi", label: "💡 Facts Hindi", tab: "factshindi" },
+  { href: "/projects/new-project?tab=shayari", label: "Shayari", tab: "shayari" },
+  { href: "/projects/new-project?tab=suvichar", label: "Suvichar", tab: "suvichar" },
+  { href: "/projects/new-project?tab=bollywood", label: "Bollywood", tab: "bollywood" },
+  { href: "/projects/new-project?tab=factshindi", label: "Facts Hindi", tab: "factshindi" },
 ];
 
 export function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {

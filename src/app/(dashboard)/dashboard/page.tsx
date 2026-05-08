@@ -65,9 +65,12 @@ export default async function DashboardPage() {
         <section>
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">Workflows</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {quickLinks.map((f) => (
+            {quickLinks.map((f, index) => (
               <Link key={f.label} href={f.href as Route}>
-                <div className="group h-full rounded-xl border border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5 p-4 space-y-3 transition-all duration-200 cursor-pointer">
+                <div
+                  className="animate-surface-in group h-full rounded-xl border border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5 p-4 space-y-3 transition-all duration-200 cursor-pointer"
+                  style={{ animationDelay: `${index * 45}ms` }}
+                >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/8 group-hover:bg-primary/12 transition-colors">
                     <f.icon className="h-3.5 w-3.5 text-primary/70 group-hover:text-primary transition-colors" />
                   </div>
@@ -86,15 +89,19 @@ export default async function DashboardPage() {
         <section>
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-              Plan limits — {planLabel}
+              Plan limits - {planLabel}
             </h2>
             <Link href="/pricing" className="text-[11px] text-primary/70 hover:text-primary transition-colors">
-              Upgrade plan →
+              Upgrade plan -&gt;
             </Link>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {metrics.map((m) => (
-              <div key={m.label} className="rounded-xl border border-border/50 bg-card/40 hover:border-border transition-colors p-4 flex items-center gap-3">
+            {metrics.map((m, index) => (
+              <div
+                key={m.label}
+                className="animate-surface-in rounded-xl border border-border/50 bg-card/40 hover:border-border transition-colors p-4 flex items-center gap-3"
+                style={{ animationDelay: `${(quickLinks.length + index) * 45}ms` }}
+              >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/6 border border-primary/8">
                   <m.icon className="h-4 w-4 text-primary/60" />
                 </div>

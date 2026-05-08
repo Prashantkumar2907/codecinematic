@@ -39,8 +39,8 @@ const config: Config = {
         }
       },
       borderRadius: {
-        xl: "1rem",
-        "2xl": "1.5rem"
+        xl: "0.5rem",
+        "2xl": "0.5rem"
       },
       boxShadow: {
         glow: "0 0 0 1px rgba(255,255,255,0.08), 0 16px 48px rgba(7, 18, 28, 0.22)"
