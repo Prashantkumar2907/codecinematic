@@ -25,3 +25,13 @@ CodeCinematic is a SaaS web app for turning code snippets and inline explanation
 2. Fill in your keys
 3. Run `npm install`
 4. Follow [deployment.md](./deployment.md)
+
+## Demo login
+
+- Email: `admin@example.com`
+- Password: `adminpassword123`
+- Plan: Enterprise / premium demo access
+
+## Video export note
+
+The code video editor exports high-bitrate browser-native `.webm` files by default. This avoids the heavy in-browser FFmpeg conversion step and keeps rendering smoother on normal creator laptops.

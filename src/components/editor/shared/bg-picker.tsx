@@ -10,6 +10,7 @@ interface BgPickerProps {
   uploadedImageUrl: string | null;
   onImageUpload: (file: File) => void;
   onImageClear: () => void;
+  presets?: BgPreset[];
 }
 
 export function BgPicker({
@@ -18,6 +19,7 @@ export function BgPicker({
   uploadedImageUrl,
   onImageUpload,
   onImageClear,
+  presets = BG_PRESETS,
 }: BgPickerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -61,11 +63,12 @@ export function BgPicker({
 
       {/* Gradient preset grid */}
       <div className="grid grid-cols-5 gap-1.5">
-        {BG_PRESETS.map((preset) => (
+        {presets.map((preset) => (
           <button
             key={preset.id}
             type="button"
             title={preset.label}
+            aria-label={preset.label}
             onClick={() => onSelect(preset)}
             className={`relative h-8 rounded-md border-2 transition-all overflow-hidden ${
               selectedId === preset.id && !uploadedImageUrl
@@ -100,7 +103,7 @@ export function BgPicker({
       {/* Preset label */}
       {!uploadedImageUrl && (
         <p className="text-[9px] text-muted-foreground/60 text-center">
-          {BG_PRESETS.find((p) => p.id === selectedId)?.label ?? ""}
+          {presets.find((p) => p.id === selectedId)?.label ?? ""}
         </p>
       )}
 

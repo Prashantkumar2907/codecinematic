@@ -1,6 +1,7 @@
 "use client";
 
 import type { Narration } from "@/lib/narration";
+import { createWebmBlob, createWebmRecorder, pickWebmMimeType } from "./shared/media-recorder";
 
 /**
  * Stripped-down render function for the pipeline flow.
@@ -57,10 +58,8 @@ export async function renderVideoBlobFromPipeline({
   ]);
 
   const chunks: BlobPart[] = [];
-  const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(
-    (m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)
-  );
-  const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+  const mime = pickWebmMimeType();
+  const recorder = createWebmRecorder(stream, mime ? { mimeType: mime } : {});
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
   const lines = code.split("\n").map((c, i) => ({ number: i + 1, content: c }));
@@ -71,7 +70,7 @@ export async function renderVideoBlobFromPipeline({
     recorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       if (audioCtx) void audioCtx.close();
-      resolve(new Blob(chunks, { type: "video/webm" }));
+      resolve(createWebmBlob(chunks, recorder.mimeType));
     };
   });
 

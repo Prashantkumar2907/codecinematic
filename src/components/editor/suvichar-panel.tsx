@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
+import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
 
 const SUVICHAR_BG: BgPreset[] = [
   {
@@ -84,11 +85,11 @@ function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxW: numbe
 
 function drawSuvicharFrame(
   ctx: CanvasRenderingContext2D, W: number, H: number,
-  bgPreset: BgPreset, title: string, quote: string, source: string,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null, title: string, quote: string, source: string,
   font: string, titleProgress: number, quoteProgress: number, // 0→1
   fontSize: number, accentColor: string, textColor: string,
 ) {
-  drawBackground(ctx, W, H, bgPreset, null);
+  drawBackground(ctx, W, H, bgPreset, bgImage);
   const vert = H > W;
   const pad = vert ? W * 0.08 : W * 0.06;
   const maxW = W - pad * 2;
@@ -188,14 +189,22 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
 
   useEffect(() => { loadHindiFont(font); }, [font]);
 
+  useEffect(() => () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [videoUrl]);
+
+  useEffect(() => () => {
+    if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
+  }, [uploadedImageUrl]);
+
   useEffect(() => {
     const c = previewRef.current;
     if (!c) return;
     c.width = 320; c.height = 568;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    drawSuvicharFrame(ctx, 320, 568, bgPreset, resolvedTitle, quote, source, font, 1, 1, Math.round(fontSize * 0.4), accentColor, textColor);
-  }, [quote, source, resolvedTitle, font, fontSize, accentColor, textColor, bgPreset]);
+    drawSuvicharFrame(ctx, 320, 568, bgPreset, bgImage, resolvedTitle, quote, source, font, 1, 1, Math.round(fontSize * 0.4), accentColor, textColor);
+  }, [quote, source, resolvedTitle, font, fontSize, accentColor, textColor, bgPreset, bgImage]);
 
   function handleImageUpload(file: File) { const url = URL.createObjectURL(file); setUploadedImageUrl(url); createImageBitmap(file).then(setBgImage); }
   function handleImageClear() { setUploadedImageUrl(null); setBgImage(null); }
@@ -225,9 +234,9 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
     const vStream = (canvas as any).captureStream(0) as MediaStream;
     const vTrack = vStream.getVideoTracks()[0] as any;
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
+    const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
+    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
 
     rec.start(200);
     await new Promise<void>((r) => setTimeout(r, 300));
@@ -242,7 +251,7 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
         const titleProg = Math.min(1, elapsed / titleDur);
         const quoteProg = elapsed > titleDur ? Math.min(1, (elapsed - titleDur) / quoteDur) : 0;
 
-        drawSuvicharFrame(ctx, dim.w, dim.h, bgPreset, resolvedTitle, quote, source, font, titleProg, quoteProg, fontSize, accentColor, textColor);
+        drawSuvicharFrame(ctx, dim.w, dim.h, bgPreset, bgImage, resolvedTitle, quote, source, font, titleProg, quoteProg, fontSize, accentColor, textColor);
         vTrack?.requestFrame?.();
 
         if (elapsed >= totalMs) { rec.stop(); resolve(); }
@@ -254,16 +263,7 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
     const webm = await done;
     if (cancelRef.current) { setRendering(false); return; }
 
-    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-    const { fetchFile } = await import("@ffmpeg/util");
-    const ff = new FFmpeg();
-    await ff.load();
-    await ff.writeFile("in.webm", await fetchFile(webm));
-    await ff.exec(["-i", "in.webm", "-c:v", "libx264", "-preset", "fast", "-crf", "22", "-movflags", "+faststart", "out.mp4"]);
-    const mp4 = await ff.readFile("out.mp4") as Uint8Array;
-    ff.terminate();
-
-    setVideoUrl(URL.createObjectURL(new Blob([new Uint8Array(mp4)], { type: "video/mp4" })));
+    setVideoUrl(URL.createObjectURL(webm));
     setRendering(false);
   }, [quote, source, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, bgImage, resolvedTitle]);
 
@@ -354,6 +354,7 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
               </div>
               <div className="pt-1 border-t border-white/5">
                 <BgPicker selectedId={bgPreset.id}
+                  presets={SUVICHAR_BG}
                   onSelect={(p) => { setBgPreset(p); handleImageClear(); }}
                   uploadedImageUrl={uploadedImageUrl}
                   onImageUpload={handleImageUpload}
@@ -390,9 +391,9 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
               {videoUrl && (
                 <div className="w-full space-y-2">
                   <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-border/50 bg-black" />
-                  <a href={videoUrl} download="suvichar.mp4">
+                  <a href={videoUrl} download="suvichar.webm">
                     <Button className="w-full h-8 text-xs glow-primary-sm hover:glow-primary">
-                      <Download className="h-3.5 w-3.5 mr-1.5" />Download .mp4
+                      <Download className="h-3.5 w-3.5 mr-1.5" />Download .webm
                     </Button>
                   </a>
                 </div>

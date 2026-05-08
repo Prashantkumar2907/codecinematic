@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
+import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
 
 const FACTS_BG: BgPreset[] = [
   {
@@ -87,11 +88,11 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): st
 
 function drawFactFrame(
   ctx: CanvasRenderingContext2D, W: number, H: number,
-  bgPreset: BgPreset, titleText: string, fact: Fact, factProgress: number,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null, titleText: string, fact: Fact, factProgress: number,
   titleProgress: number, font: string, fontSize: number,
   textColor: string, accentColor: string,
 ) {
-  drawBackground(ctx, W, H, bgPreset, null);
+  drawBackground(ctx, W, H, bgPreset, bgImage);
   const vert = H > W;
   const pad = W * 0.07;
   const maxW = W - pad * 2;
@@ -213,6 +214,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
   const [charSpeed, setCharSpeed] = useState(1.0);
   const [bgPreset, setBgPreset] = useState<BgPreset>(FACTS_BG[0]!);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<ImageBitmap | null>(null);
   const [aspect, setAspect] = useState<"9:16" | "16:9">("9:16");
   const [rendering, setRendering] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -232,6 +234,14 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
   ];
 
   useEffect(() => { loadFont(font); }, [font]);
+  useEffect(() => () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [videoUrl]);
+
+  useEffect(() => () => {
+    if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
+  }, [uploadedImageUrl]);
+
   useEffect(() => {
     if (titlePreset !== "custom") {
       setTitleText(TITLE_PRESETS.find((p) => p.value === titlePreset)?.label ?? "क्या आप जानते हैं?");
@@ -247,8 +257,19 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     if (!ctx) return;
     const fact = facts[previewFactIdx] ?? facts[0];
     if (!fact) return;
-    drawFactFrame(ctx, 320, 568, bgPreset, titleText, fact, 1, 1, font, Math.round(fontSize * 0.42), textColor, accentColor);
-  }, [facts, previewFactIdx, titleText, font, fontSize, textColor, accentColor, bgPreset]);
+    drawFactFrame(ctx, 320, 568, bgPreset, bgImage, titleText, fact, 1, 1, font, Math.round(fontSize * 0.42), textColor, accentColor);
+  }, [facts, previewFactIdx, titleText, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
+
+  function handleImageUpload(file: File) {
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    createImageBitmap(file).then(setBgImage);
+  }
+
+  function handleImageClear() {
+    setUploadedImageUrl(null);
+    setBgImage(null);
+  }
 
   function addFact() {
     setFacts((f) => [...f, { id: makeId(), text: "", source: "", category: "india" }]);
@@ -282,9 +303,9 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     const vStream = (canvas as any).captureStream(0) as MediaStream;
     const vTrack = vStream.getVideoTracks()[0] as any;
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
+    const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
+    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
 
     rec.start(200);
     await new Promise<void>((r) => setTimeout(r, 300));
@@ -309,7 +330,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
         const factDur = ms[factIdx === -1 ? validFacts.length - 1 : factIdx]!;
         const factProg = Math.min(1, Math.max(0, (elapsed - factStart) / factDur));
 
-        drawFactFrame(ctx, dim.w, dim.h, bgPreset, titleText, activeFact, factProg, titleProg, font, fontSize, textColor, accentColor);
+        drawFactFrame(ctx, dim.w, dim.h, bgPreset, bgImage, titleText, activeFact, factProg, titleProg, font, fontSize, textColor, accentColor);
         vTrack?.requestFrame?.();
 
         if (elapsed >= totalMs) { rec.stop(); resolve(); }
@@ -321,18 +342,9 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     const webm = await done;
     if (cancelRef.current) { setRendering(false); return; }
 
-    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-    const { fetchFile } = await import("@ffmpeg/util");
-    const ff = new FFmpeg();
-    await ff.load();
-    await ff.writeFile("in.webm", await fetchFile(webm));
-    await ff.exec(["-i", "in.webm", "-c:v", "libx264", "-preset", "fast", "-crf", "22", "-movflags", "+faststart", "out.mp4"]);
-    const mp4 = await ff.readFile("out.mp4") as Uint8Array;
-    ff.terminate();
-
-    setVideoUrl(URL.createObjectURL(new Blob([new Uint8Array(mp4)], { type: "video/mp4" })));
+    setVideoUrl(URL.createObjectURL(webm));
     setRendering(false);
-  }, [facts, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, titleText]);
+  }, [facts, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, bgImage, titleText]);
 
   return (
     <div className="flex flex-col h-full space-y-2 overflow-y-auto">
@@ -447,10 +459,11 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
 
             <div className="pt-1 border-t border-white/5">
               <BgPicker selectedId={bgPreset.id}
-                onSelect={(p) => { setBgPreset(p); setUploadedImageUrl(null); }}
+                presets={FACTS_BG}
+                onSelect={(p) => { setBgPreset(p); handleImageClear(); }}
                 uploadedImageUrl={uploadedImageUrl}
-                onImageUpload={(f) => { setUploadedImageUrl(URL.createObjectURL(f)); }}
-                onImageClear={() => setUploadedImageUrl(null)}
+                onImageUpload={handleImageUpload}
+                onImageClear={handleImageClear}
               />
             </div>
             <div className="flex gap-2">
@@ -475,9 +488,9 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
             {videoUrl && (
               <div className="w-full space-y-2">
                 <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-border/50 bg-black" />
-                <a href={videoUrl} download="facts-hindi.mp4">
+                <a href={videoUrl} download="facts-hindi.webm">
                   <Button className="w-full h-8 text-xs glow-primary-sm hover:glow-primary">
-                    <Download className="h-3.5 w-3.5 mr-1.5" />Download .mp4
+                    <Download className="h-3.5 w-3.5 mr-1.5" />Download .webm
                   </Button>
                 </a>
               </div>

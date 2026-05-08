@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
+import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
 
 // ── Shayari-specific background presets ─────────────────────────────────────
 const SHAYARI_BG: BgPreset[] = [
@@ -104,14 +105,14 @@ function drawOrnament(ctx: CanvasRenderingContext2D, cx: number, cy: number, siz
 
 function drawFrame(
   ctx: CanvasRenderingContext2D, W: number, H: number,
-  bgPreset: BgPreset, lines: string[], author: string,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null, lines: string[], author: string,
   font: string, textColor: string, accentColor: string,
   revealProgress: number, // 0→1 for each line as array
   lineProgress: number[], // per-line reveal (0→1)
   fontSize: number,
 ) {
   // Background
-  drawBackground(ctx, W, H, bgPreset, null);
+  drawBackground(ctx, W, H, bgPreset, bgImage);
 
   const vert = H > W;
   const lineH = fontSize * 1.8;
@@ -203,6 +204,14 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
 
   useEffect(() => { loadHindiFont(font); }, [font]);
 
+  useEffect(() => () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [videoUrl]);
+
+  useEffect(() => () => {
+    if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
+  }, [uploadedImageUrl]);
+
   // Live preview
   useEffect(() => {
     const c = previewRef.current;
@@ -211,8 +220,8 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     const linesArr = lines.split("\n").filter(Boolean);
-    drawFrame(ctx, 320, 568, bgPreset, linesArr, author, font, textColor, accentColor, 1, linesArr.map(() => 1), Math.round(fontSize * 0.38));
-  }, [lines, author, font, fontSize, textColor, accentColor, bgPreset]);
+    drawFrame(ctx, 320, 568, bgPreset, bgImage, linesArr, author, font, textColor, accentColor, 1, linesArr.map(() => 1), Math.round(fontSize * 0.38));
+  }, [lines, author, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
 
   function handleImageUpload(file: File) {
     const url = URL.createObjectURL(file);
@@ -252,9 +261,9 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
     const vStream = (canvas as any).captureStream(0) as MediaStream;
     const vTrack = vStream.getVideoTracks()[0] as any;
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
+    const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
+    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
 
     rec.start(200);
     await new Promise<void>((res) => setTimeout(res, 300));
@@ -278,7 +287,7 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
         });
         const overallProgress = lineProgress.every((p) => p >= 1) ? 1 : 0;
 
-        drawFrame(ctx, dim.w, dim.h, bgPreset, linesArr, author, font, textColor, accentColor,
+        drawFrame(ctx, dim.w, dim.h, bgPreset, bgImage, linesArr, author, font, textColor, accentColor,
           overallProgress, lineProgress, fontSize);
 
         vTrack?.requestFrame?.();
@@ -296,17 +305,7 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
     const webm = await done;
     if (cancelRef.current) { setRendering(false); return; }
 
-    // Convert to mp4 via ffmpeg.wasm
-    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-    const { fetchFile } = await import("@ffmpeg/util");
-    const ff = new FFmpeg();
-    await ff.load();
-    await ff.writeFile("in.webm", await fetchFile(webm));
-    await ff.exec(["-i", "in.webm", "-c:v", "libx264", "-preset", "fast", "-crf", "22", "-movflags", "+faststart", "out.mp4"]);
-    const mp4 = await ff.readFile("out.mp4") as Uint8Array;
-    ff.terminate();
-
-    const url = URL.createObjectURL(new Blob([new Uint8Array(mp4)], { type: "video/mp4" }));
+    const url = URL.createObjectURL(webm);
     setVideoUrl(url);
     setRendering(false);
   }, [lines, author, aspect, font, fontSize, textColor, accentColor, lineDelay, charSpeed, bgPreset, bgImage]);
@@ -397,6 +396,7 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
               </div>
               <div className="pt-1 border-t border-white/5">
                 <BgPicker selectedId={bgPreset.id}
+                  presets={SHAYARI_BG}
                   onSelect={(p) => { setBgPreset(p); handleImageClear(); }}
                   uploadedImageUrl={uploadedImageUrl}
                   onImageUpload={handleImageUpload}
@@ -434,9 +434,9 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
               {videoUrl && (
                 <div className="w-full space-y-2">
                   <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-border/50 bg-black" />
-                  <a href={videoUrl} download="shayari.mp4">
+                  <a href={videoUrl} download="shayari.webm">
                     <Button className="w-full h-8 text-xs glow-primary-sm hover:glow-primary">
-                      <Download className="h-3.5 w-3.5 mr-1.5" />Download .mp4
+                      <Download className="h-3.5 w-3.5 mr-1.5" />Download .webm
                     </Button>
                   </a>
                 </div>

@@ -2,10 +2,12 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Github, Loader2, AlertCircle, Code2, Film, Zap, BookOpen } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Github, Loader2, AlertCircle, Code2, Film, Zap, BookOpen, Crown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DEMO_PREMIUM_EMAIL, DEMO_PREMIUM_PASSWORD } from "@/lib/demo-account";
+import { getSafeRedirectPath } from "@/lib/session-cookie";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "invalid-provider": "Unknown authentication provider.",
@@ -16,7 +18,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 
 const features = [
   { icon: Code2, label: "Code Studio", desc: "Type code cinematically with syntax highlighting" },
-  { icon: Film, label: "Export Video", desc: "Download 9:16 or 16:9 MP4 for social media" },
+  { icon: Film, label: "Export Video", desc: "Download 9:16 or 16:9 WebM for social media" },
   { icon: BookOpen, label: "Word of Day", desc: "Create beautiful word definition reveal videos" },
   { icon: Zap, label: "Did You Know?", desc: "Animate facts and quotes into engaging shorts" },
 ];
@@ -24,7 +26,7 @@ const features = [
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = getSafeRedirectPath(searchParams.get("next"));
   const urlError = searchParams.get("error");
 
   const [email, setEmail] = useState("");
@@ -66,6 +68,12 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function usePremiumDemo() {
+    setEmail(DEMO_PREMIUM_EMAIL);
+    setPassword(DEMO_PREMIUM_PASSWORD);
+    setError(null);
   }
 
   return (
@@ -110,7 +118,7 @@ function LoginForm() {
 
         {/* Bottom note */}
         <p className="text-[11px] text-muted-foreground/40 relative z-10">
-          © 2025 CodeCinematic. All rights reserved.
+          © 2026 CodeCinematic. All rights reserved.
         </p>
       </div>
 
@@ -174,12 +182,24 @@ function LoginForm() {
               </div>
             )}
 
-            <Button type="submit" className="w-full h-10 font-semibold group glow-primary-sm hover:glow-primary transition-all" disabled={loading}>
+            <Button type="submit" aria-label="Sign in with email" className="w-full h-10 font-semibold group glow-primary-sm hover:glow-primary transition-all" disabled={loading}>
               {loading
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <><span>Sign in</span><ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" /></>
               }
             </Button>
+
+            <button
+              type="button"
+              onClick={usePremiumDemo}
+              className="flex w-full items-center justify-between rounded-md border border-primary/25 bg-primary/8 px-3 py-2 text-left text-xs transition-colors hover:bg-primary/12"
+            >
+              <span className="flex items-center gap-2 font-semibold text-primary">
+                <Crown className="h-3.5 w-3.5" />
+                Premium demo
+              </span>
+              <span className="font-mono text-[10px] text-muted-foreground">{DEMO_PREMIUM_EMAIL}</span>
+            </button>
           </form>
 
           <div className="relative">

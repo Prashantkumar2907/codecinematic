@@ -1,16 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Layers3, Music4, Subtitles } from "lucide-react";
+import { ArrowRight, BookOpen, Film, Lightbulb } from "lucide-react";
 
 import { Hero } from "@/components/marketing/hero";
 import { PlanGrid } from "@/components/dashboard/plan-grid";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const workflows = [
-  { icon: Layers3, title: "Text to video", description: "Paste code or mixed script scenes and export typing animations in vertical or landscape." },
-  { icon: Subtitles, title: "Video to text timeline", description: "Upload a technical demo and generate a timestamped breakdown of what happened." },
-  { icon: Music4, title: "Text to audio", description: "Generate narration for each scene and merge it with the code animation timeline." },
+  { icon: Film, title: "Code Studio", description: "Paste code, choose focus lines, and export typing animations in vertical or landscape." },
+  { icon: BookOpen, title: "Word and fact shorts", description: "Build word-of-day, fact, quote, and thought videos with browser-native rendering." },
+  { icon: Lightbulb, title: "Hindi creator tools", description: "Create Shayari, Suvichar, Bollywood dialogue, and Hindi fact clips from one dashboard." },
 ];
 
 const standards = [

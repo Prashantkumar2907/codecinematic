@@ -7,10 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import type { Narration } from "@/lib/narration";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile } from "@ffmpeg/util";
 import { BG_PRESETS, type BgPreset, drawBackground } from "@/components/editor/shared/canvas-utils";
 import { loadGoogleFonts } from "@/components/editor/shared/font-catalog";
+import { createWebmBlob, createWebmRecorder } from "@/components/editor/shared/media-recorder";
 
 type Job = {
   exportId: string;
@@ -23,6 +22,7 @@ type Job = {
 type RenderedVideo = {
   exportId: string;
   aspectRatio: string;
+  format: string;
   url: string;
   filename: string;
 };
@@ -45,6 +45,15 @@ const aspectDimensions: Record<string, { width: number; height: number; maxVisib
   "9:16": { width: 1080, height: 1920, maxVisibleLines: 20, fontSize: 36, maxCharsPerLine: 36 },
   "16:9": { width: 1280, height: 720,  maxVisibleLines: 16, fontSize: 24, maxCharsPerLine: 60 }
 };
+
+const RECORDING_FPS = 30;
+const RECORDING_FRAME_MS = 1000 / RECORDING_FPS;
+const RECORDING_AUDIO_BITS_PER_SECOND = 128_000;
+const RECORDING_VIDEO_BITS_PER_SECOND: Record<string, number> = {
+  "9:16": 10_000_000,
+  "16:9": 7_000_000,
+};
+const VISIBLE_LINE_OVERSCAN = 8;
 
 // ── Code Color Themes ────────────────────────────────────────────────────
 type CodeTheme = {
@@ -136,12 +145,13 @@ export function CreateVideoPanel({
   const [error, setError] = useState<string | null>(null);
   // Cancellation ref: when set + cancelled=true, the in-flight render loop exits cleanly
   const renderSignalRef = useRef<RenderSignal | null>(null);
+  const videosRef = useRef<RenderedVideo[]>([]);
   const storedDraft = useEditorStore((state) => state.drafts[projectId]);
   const resolvedDraft = storedDraft ?? {
     ...defaultEditorDraft,
     title,
     language,
-    aspect: aspect as "9:16" | "16:9",
+    aspect: aspect === "16:9" ? "16:9" : "9:16",
     normalSpeed,
     focusSpeed,
     sound: sound as "off" | "soft" | "typewriter" | "keyboard" | "chime",
@@ -150,6 +160,9 @@ export function CreateVideoPanel({
     code,
     narration: null as Narration | null,
   };
+  const resolvedTitle = resolvedDraft.title;
+  const resolvedLanguage = resolvedDraft.language;
+  const resolvedAspect = resolvedDraft.aspect === "16:9" ? "16:9" : "9:16";
   const resolvedCode = resolvedDraft.code;
   const resolvedFocus = resolvedDraft.focus.map((line) => String(line));
   const resolvedNormalSpeed = resolvedDraft.normalSpeed;
@@ -162,11 +175,12 @@ export function CreateVideoPanel({
   const resolvedCodeFont = resolvedDraft.codeFont ?? "ui-monospace";
   const resolvedCursorBlink = resolvedDraft.cursorBlink ?? true;
   const resolvedFocusFlash = resolvedDraft.focusFlash ?? true;
-  const aspectRatios = [aspect];
+  const aspectRatios = [resolvedAspect];
   const renderLineCount = useMemo(
-    () => resolvedCode.split("\n").length,
+    () => (resolvedCode.trim().length > 0 ? resolvedCode.split("\n").length : 0),
     [resolvedCode]
   );
+  const hasRenderableCode = renderLineCount > 0;
 
   const estimatedDuration = useMemo(() => {
     const allLines = resolvedCode.split("\n");
@@ -192,6 +206,22 @@ export function CreateVideoPanel({
     setError(null);
   }, [projectId, storedDraft]);
 
+  useEffect(() => {
+    videosRef.current = videos;
+  }, [videos]);
+
+  useEffect(() => {
+    return () => {
+      if (renderSignalRef.current) {
+        renderSignalRef.current.cancelled = true;
+      }
+      videosRef.current.forEach((video) => URL.revokeObjectURL(video.url));
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   async function createJobs() {
     setLoading(true);
     setError(null);
@@ -205,9 +235,8 @@ export function CreateVideoPanel({
         body: JSON.stringify({
           projectId,
           aspectRatios,
-          format: "mp4"
+          format: "webm"
         })
-        // Client renders webm then converts to mp4 via ffmpeg.wasm
       });
 
       const data = (await response.json()) as { jobs?: Job[]; error?: string };
@@ -249,8 +278,8 @@ export function CreateVideoPanel({
       for (const job of targetJobs) {
         if (signal.cancelled) break;
         const blob = await renderVideoBlob({
-          title,
-          language,
+          title: resolvedTitle,
+          language: resolvedLanguage,
           aspectRatio: job.aspectRatio,
           code: resolvedCode,
           focusLines: resolvedFocus.map((line) => Number(line)).filter((line) => !Number.isNaN(line)),
@@ -273,8 +302,9 @@ export function CreateVideoPanel({
         nextVideos.push({
           exportId: job.exportId,
           aspectRatio: job.aspectRatio,
+          format: job.format,
           url,
-          filename: `${slugify(title)}-${job.aspectRatio.replace(":", "x")}.mp4`
+          filename: `${slugify(resolvedTitle)}-${job.aspectRatio.replace(":", "x")}.${getFileExtension(job.format)}`
         });
       }
 
@@ -321,9 +351,9 @@ export function CreateVideoPanel({
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto space-y-3 px-3 pb-3">
             <div className="grid gap-2 md:grid-cols-2">
-              <Meta label="Project" value={title} />
-              <Meta label="Language" value={language} />
-              <Meta label="Aspect mode" value={aspect} />
+              <Meta label="Project" value={resolvedTitle} />
+              <Meta label="Language" value={resolvedLanguage} />
+              <Meta label="Aspect mode" value={resolvedAspect} />
               <Meta label="Normal line speed" value={formatMultiplier(resolvedNormalSpeed)} />
               <Meta label="Focused line speed" value={formatMultiplier(resolvedFocusSpeed)} />
               <Meta label="Typing sound" value={resolvedSound} />
@@ -343,10 +373,10 @@ export function CreateVideoPanel({
             </div>
 
             <div className="flex gap-2">
-              <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || renderLineCount === 0}>
+              <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || !hasRenderableCode}>
                 {loading || rendering ? "Creating video…" : "Create video"}
               </Button>
-              <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || renderLineCount === 0} variant="secondary">
+              <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || !hasRenderableCode} variant="secondary">
                 {rendering ? "Rendering…" : "Render again"}
               </Button>
               {rendering && (
@@ -366,7 +396,7 @@ export function CreateVideoPanel({
               )}
             </div>
             
-            {renderLineCount === 0 ? (
+            {!hasRenderableCode ? (
               <div className="rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-100">
                 No code payload reached this step yet. Go back to the editor and continue again.
               </div>
@@ -407,7 +437,7 @@ export function CreateVideoPanel({
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-primary">{video.aspectRatio} video ready</p>
                   <a href={video.url} download={video.filename}>
-                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .mp4</Button>
+                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .{getFileExtension(video.format)}</Button>
                   </a>
                 </div>
                 <video src={video.url} controls playsInline className="w-full rounded-lg border border-border/50 bg-black shadow-inner" />
@@ -435,6 +465,10 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+}
+
+function getFileExtension(format: string) {
+  return format === "mp4" ? "mp4" : "webm";
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -514,8 +548,15 @@ async function renderVideoBlob(opts: {
   const effectivePreset = { ...preset, maxCharsPerLine: actualMaxChars };
 
   // ── Streams ──
-  const vStream = (canvas as any).captureStream(0) as MediaStream;
-  const vTrack = vStream.getVideoTracks()[0] as any;
+  let vStream = canvas.captureStream(0);
+  let vTrack = vStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
+  let manualFrameCapture = typeof vTrack?.requestFrame === "function";
+  if (!manualFrameCapture) {
+    vStream.getTracks().forEach((track) => track.stop());
+    vStream = canvas.captureStream(RECORDING_FPS);
+    vTrack = vStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
+    manualFrameCapture = false;
+  }
   // Use singleton AudioContext (avoids Chrome 6-ctx-per-page limit on repeated renders)
   const audioCtx = acquireAudioCtx();
   if (audioCtx?.state === "suspended") await audioCtx.resume();
@@ -527,8 +568,10 @@ async function renderVideoBlob(opts: {
 
   // ── Recorder ──
   const chunks: BlobPart[] = [];
-  const mime = pickMime();
-  const rec = mime ? new MediaRecorder(combined, { mimeType: mime }) : new MediaRecorder(combined);
+  const rec = createWebmRecorder(combined, {
+    videoBitsPerSecond: RECORDING_VIDEO_BITS_PER_SECOND[aspectRatio] ?? 8_000_000,
+    audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
+  }, true);
   rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
   // ── Lines & timeline ──
@@ -555,13 +598,17 @@ async function renderVideoBlob(opts: {
   let sum = 0;
   for (const d of lineDurations) { sum += d; cumEnd.push(sum); }
   const totalMs = Math.max(3000, sum);
+  const wrappedLines = allLines.map((lineText, index) =>
+    buildWrappedLineRows(lineText, index + 1, effectivePreset.maxCharsPerLine)
+  );
+  const visibleLineBudget = effectivePreset.maxVisibleLines + VISIBLE_LINE_OVERSCAN;
 
   // ── Start recording ──
   const done = new Promise<Blob>((resolve) => {
     rec.onstop = () => {
       combined.getTracks().forEach((t) => t.stop());
       // Note: audioCtx is a singleton — do NOT close it between renders
-      resolve(new Blob(chunks, { type: "video/webm" }));
+      resolve(createWebmBlob(chunks, rec.mimeType));
     };
   });
   rec.start(200);
@@ -572,7 +619,7 @@ async function renderVideoBlob(opts: {
   if (signal.cancelled) {
     try { rec.stop(); } catch { /* ignore */ }
     await done.catch(() => {});
-    return new Blob([], { type: "video/mp4" });
+    return createWebmBlob([], rec.mimeType);
   }
 
   // ── Schedule audio AFTER startup (so audio aligns with the recorded stream) ──
@@ -606,6 +653,7 @@ async function renderVideoBlob(opts: {
   let prevActiveIdx = -1;
   let frameNum = 0;
   const perf0 = performance.now();
+  let lastFrameAt = Number.NEGATIVE_INFINITY;
 
   // Derive virtual animation time from the master clock
   const getMs = (): number => {
@@ -616,10 +664,16 @@ async function renderVideoBlob(opts: {
   await new Promise<void>((resolve) => {
     let stopped = false;
 
-    function rafFrame() {
+    function rafFrame(now: number) {
       if (signal.cancelled || stopped) { resolve(); return; }
 
       const ms = Math.min(getMs(), totalMs);
+      const shouldPaint = ms >= totalMs || now - lastFrameAt >= RECORDING_FRAME_MS - 1;
+      if (!shouldPaint) {
+        requestAnimationFrame(rafFrame);
+        return;
+      }
+      lastFrameAt = now;
 
       let activeIdx = cumEnd.findIndex((c) => ms <= c);
       if (activeIdx === -1) activeIdx = allLines.length - 1;
@@ -648,7 +702,14 @@ async function renderVideoBlob(opts: {
         if (p.life <= 0) particles.splice(i, 1);
       }
 
-      const visLines = buildVisibleLines(allLines, activeIdx, progress, effectivePreset.maxCharsPerLine);
+      const visLines = buildVisibleLines(
+        wrappedLines,
+        allLines,
+        activeIdx,
+        progress,
+        effectivePreset.maxCharsPerLine,
+        visibleLineBudget,
+      );
       const activeLine = activeIdx + 1;
       const subtitle = narration ? getNarrationText(narration, activeLine) : null;
 
@@ -656,7 +717,7 @@ async function renderVideoBlob(opts: {
         focusSet, watermarked, subtitle, codeTheme, bgPreset, frameNum, cursorBlink, particles, resolvedFont);
 
       frameNum++;
-      if (vTrack && typeof vTrack.requestFrame === "function") vTrack.requestFrame();
+      if (manualFrameCapture && typeof vTrack?.requestFrame === "function") vTrack.requestFrame();
 
       if (ms >= totalMs) {
         stopped = true;
@@ -671,34 +732,15 @@ async function renderVideoBlob(opts: {
     requestAnimationFrame(rafFrame);
   });
 
-  if (signal.cancelled) return new Blob([], { type: "video/mp4" });
+  if (signal.cancelled) return createWebmBlob([], rec.mimeType);
 
   const webmBlob = await done;
 
-  // Convert webm → mp4 using ffmpeg.wasm
-  const mp4Blob = await convertWebmToMp4(webmBlob);
-  return mp4Blob;
+  return webmBlob;
 }
 
 function delay(ms: number) { return new Promise<void>((r) => setTimeout(r, ms)); }
 
-async function convertWebmToMp4(webmBlob: Blob): Promise<Blob> {
-  const ffmpeg = new FFmpeg();
-  await ffmpeg.load();
-  const webmData = await fetchFile(webmBlob);
-  await ffmpeg.writeFile("input.webm", webmData);
-  await ffmpeg.exec(["-i", "input.webm", "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", "output.mp4"]);
-  const mp4Data = await ffmpeg.readFile("output.mp4") as Uint8Array;
-  ffmpeg.terminate();
-  return new Blob([new Uint8Array(mp4Data)], { type: "video/mp4" });
-}
-
-function pickMime() {
-  for (const m of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) return m;
-  }
-  return null;
-}
 
 /* ── Build visible lines for a given time snapshot ─────────────────────── */
 
@@ -711,52 +753,70 @@ interface VLine {
   baseColor?: string;  // color to use for this line (if continuation, inherited from parent)
 }
 
+type WrappedLineRows = {
+  rows: VLine[];
+  baseColor?: string;
+};
+
 function buildVisibleLines(
+  wrappedLines: WrappedLineRows[],
   allLines: string[],
   activeIdx: number,
   progress: number,
   maxChars: number,
+  rowBudget: number,
 ): VLine[] {
-  const out: VLine[] = [];
+  const activeRaw = allLines[activeIdx] ?? "";
+  const activeRows = activeRaw.length === 0
+    ? buildWrappedLineRows(activeRaw, activeIdx + 1, maxChars).rows
+    : buildRowsForText(
+        activeRaw.slice(0, Math.max(1, Math.ceil(activeRaw.length * progress))),
+        activeIdx + 1,
+        maxChars,
+        getBaseColor(activeRaw),
+      );
 
-  for (let i = 0; i <= activeIdx; i++) {
-    const raw = allLines[i]!;
-    const lineNum = i + 1;
-    const isActive = i === activeIdx;
+  const previousRows: VLine[] = [];
+  let rowsCollected = activeRows.length;
 
-    if (raw.length === 0) {
-      // Empty line
-      out.push({ lineNum, text: "", gutterLabel: String(lineNum).padStart(3, " "), isCont: false, isEmpty: true });
-      continue;
-    }
-
-    // For completed lines show full text; for active line show partial (char by char)
-    const displayText = isActive
-      ? raw.slice(0, Math.max(1, Math.ceil(raw.length * progress)))
-      : raw;
-
-    // Determine base color for this line (for inherited color on continuations)
-    const trimmed = raw.trimStart();
-    let baseColor: string | undefined;
-    if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
-      baseColor = "#67e8f9"; // comment color
-    }
-
-    // Word-wrap (same logic for active and completed lines)
-    const segments = wordWrap(displayText, maxChars);
-    for (let s = 0; s < segments.length; s++) {
-      out.push({
-        lineNum,
-        text: segments[s]!,
-        gutterLabel: s === 0 ? String(lineNum).padStart(3, " ") : "   ",
-        isCont: s > 0,
-        isEmpty: false,
-        baseColor,
-      });
-    }
+  for (let i = activeIdx - 1; i >= 0 && rowsCollected < rowBudget; i--) {
+    const rows = wrappedLines[i]?.rows ?? [];
+    previousRows.unshift(...rows);
+    rowsCollected += rows.length;
   }
 
-  return out;
+  return [...previousRows, ...activeRows];
+}
+
+function buildWrappedLineRows(raw: string, lineNum: number, maxChars: number): WrappedLineRows {
+  const baseColor = getBaseColor(raw);
+  return {
+    baseColor,
+    rows: raw.length === 0
+      ? [{ lineNum, text: "", gutterLabel: String(lineNum).padStart(3, " "), isCont: false, isEmpty: true }]
+      : buildRowsForText(raw, lineNum, maxChars, baseColor),
+  };
+}
+
+function buildRowsForText(
+  text: string,
+  lineNum: number,
+  maxChars: number,
+  baseColor?: string,
+): VLine[] {
+  return wordWrap(text, maxChars).map((segment, index) => ({
+    lineNum,
+    text: segment,
+    gutterLabel: index === 0 ? String(lineNum).padStart(3, " ") : "   ",
+    isCont: index > 0,
+    isEmpty: false,
+    baseColor,
+  }));
+}
+
+function getBaseColor(raw: string): string | undefined {
+  const trimmed = raw.trimStart();
+  return trimmed.startsWith("//") || trimmed.startsWith("#") ? "#67e8f9" : undefined;
 }
 
 function wordWrap(text: string, max: number): string[] {
@@ -1136,7 +1196,7 @@ function drawTokenized(
     ctx.fillText(text, x, y, maxWidth);
     return;
   }
-  const tokens = tokenize(text, theme);
+  const tokens = getCachedTokens(text, theme);
   let cx = x;
   const right = x + maxWidth;
   for (const tok of tokens) {
@@ -1149,6 +1209,19 @@ function drawTokenized(
 }
 
 /* ── Multi-language theme-aware tokenizer ─────────────────────────────── */
+
+const TOKEN_CACHE_LIMIT = 3000;
+const tokenCache = new Map<string, Array<{ text: string; color: string }>>();
+
+function getCachedTokens(text: string, theme: CodeTheme): Array<{ text: string; color: string }> {
+  const key = `${theme.tokens.keyword}|${theme.tokens.string}|${theme.tokens.comment}|${theme.tokens.default}|${text}`;
+  const cached = tokenCache.get(key);
+  if (cached) return cached;
+  const tokens = tokenize(text, theme);
+  if (tokenCache.size > TOKEN_CACHE_LIMIT) tokenCache.clear();
+  tokenCache.set(key, tokens);
+  return tokens;
+}
 
 const KEYWORDS_BY_LANGUAGE: Record<string, string[]> = {
   typescript: ["const","let","var","function","return","async","await","class","new","if","else","for","while","import","export","from","type","interface","extends","implements","void","null","undefined","true","false","this","super","try","catch","throw"],

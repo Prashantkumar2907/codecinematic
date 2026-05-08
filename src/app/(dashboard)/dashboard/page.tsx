@@ -1,7 +1,20 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { ArrowRight, Download, FileCode2, Film, Layers, Ruler, Wand2, BookOpen } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Clapperboard,
+  Download,
+  FileCode2,
+  Film,
+  Layers,
+  Lightbulb,
+  MessageSquareQuote,
+  Quote,
+  Ruler,
+  Wand2,
+} from "lucide-react";
 
 import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG } from "@/lib/plans";
@@ -23,6 +36,10 @@ export default async function DashboardPage() {
     { label: "Code Studio", desc: "Write code and render a cinematic typing video", href: "/projects/new-project?tab=editor", icon: Film, color: "primary" },
     { label: "Word of Day", desc: "Create beautiful word definition reveal videos", href: "/projects/new-project?tab=wordofday", icon: BookOpen, color: "primary" },
     { label: "Did You Know?", desc: "Animate facts and quotes into engaging shorts", href: "/projects/new-project?tab=didyouknow", icon: Wand2, color: "primary" },
+    { label: "Shayari", desc: "Reveal Hindi and Urdu poetry with ornate motion", href: "/projects/new-project?tab=shayari", icon: Quote, color: "primary" },
+    { label: "Suvichar", desc: "Build motivational Hindi thought-of-day videos", href: "/projects/new-project?tab=suvichar", icon: MessageSquareQuote, color: "primary" },
+    { label: "Bollywood", desc: "Turn dialogue lines into cinematic quote clips", href: "/projects/new-project?tab=bollywood", icon: Clapperboard, color: "primary" },
+    { label: "Facts Hindi", desc: "Create multi-fact Hindi explainer shorts", href: "/projects/new-project?tab=factshindi", icon: Lightbulb, color: "primary" },
   ];
 
   const planLabel = PLAN_CONFIG[session.plan].name;
@@ -47,7 +64,7 @@ export default async function DashboardPage() {
         {/* Workflows grid */}
         <section>
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">Workflows</h2>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
             {quickLinks.map((f) => (
               <Link key={f.label} href={f.href as Route}>
                 <div className="group h-full rounded-xl border border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5 p-4 space-y-3 transition-all duration-200 cursor-pointer">

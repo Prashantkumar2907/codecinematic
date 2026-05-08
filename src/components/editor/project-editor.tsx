@@ -76,24 +76,31 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   );
   const focusLineMap = useMemo(() => new Map(focusLines.map((line) => [line.line, line])), [focusLines]);
   const validation = useMemo(() => validateCodePayload(plan, code), [plan, code]);
-  const enabledFocusLines = draft.focus.length > 0 ? draft.focus : focusLines.map((line) => line.line);
+  const suggestedFocusLines = useMemo(() => {
+    const detected = focusLines.map((line) => line.line);
+    return detected.length > 0 ? detected : allLines.slice(0, 1).map((line) => line.lineNumber);
+  }, [allLines, focusLines]);
+  const enabledFocusLines = useMemo(
+    () => (draft.focus.length > 0 ? draft.focus : suggestedFocusLines),
+    [draft.focus, suggestedFocusLines]
+  );
 
   useEffect(() => {
     const nextFocus = (() => {
-      const available = new Set(focusLines.map((line) => line.line));
+      const available = new Set(allLines.map((line) => line.lineNumber));
       const kept = enabledFocusLines.filter((line) => available.has(line));
-      return kept.length > 0 ? kept : focusLines.map((line) => line.line);
+      return kept.length > 0 ? kept : suggestedFocusLines;
     })();
 
     if (JSON.stringify(nextFocus) !== JSON.stringify(draft.focus)) {
       setDraft(projectId, { focus: nextFocus });
     }
-  }, [draft.focus, enabledFocusLines, focusLines, projectId, setDraft]);
+  }, [allLines, draft.focus, enabledFocusLines, projectId, setDraft, suggestedFocusLines]);
 
   const normalizedEnabledFocusLines = useMemo(() => {
-    const available = new Set(focusLines.map((line) => line.line));
+    const available = new Set(allLines.map((line) => line.lineNumber));
     return enabledFocusLines.filter((line) => available.has(line));
-  }, [enabledFocusLines, focusLines]);
+  }, [allLines, enabledFocusLines]);
 
   const canContinue = validation.ok && title.trim().length > 1 && normalizedEnabledFocusLines.length > 0;
 

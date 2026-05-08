@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
+import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
 
 const CINEMA_BG: BgPreset[] = [
   {
@@ -78,14 +79,14 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): st
 
 function drawCinemaFrame(
   ctx: CanvasRenderingContext2D, W: number, H: number,
-  bgPreset: BgPreset,
+  bgPreset: BgPreset, bgImage: ImageBitmap | null,
   dialogLines: string[], movieTitle: string, movieYear: string,
   font: string, fontSize: number,
   lineReveal: number[], // 0→1 per line
   showMeta: boolean,
   textColor: string, accentColor: string,
 ) {
-  drawBackground(ctx, W, H, bgPreset, null);
+  drawBackground(ctx, W, H, bgPreset, bgImage);
   const vert = H > W;
   const pad = W * 0.08;
   const maxW = W - pad * 2;
@@ -161,6 +162,7 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
   const [charSpeed, setCharSpeed] = useState(0.8);
   const [bgPreset, setBgPreset] = useState<BgPreset>(CINEMA_BG[0]!);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<ImageBitmap | null>(null);
   const [rendering, setRendering] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [aspect, setAspect] = useState<"9:16" | "16:9">("9:16");
@@ -171,6 +173,14 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
 
   useEffect(() => { loadFont(font); }, [font]);
 
+  useEffect(() => () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [videoUrl]);
+
+  useEffect(() => () => {
+    if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
+  }, [uploadedImageUrl]);
+
   // Refresh preview
   useEffect(() => {
     const c = previewRef.current;
@@ -180,8 +190,19 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
     if (!ctx) return;
     const lines = dialog.split("\n").filter(Boolean);
     const filled = lines.map(() => 1);
-    drawCinemaFrame(ctx, 320, 568, bgPreset, lines, movieTitle, movieYear, font, Math.round(fontSize * 0.42), filled, true, textColor, accentColor);
-  }, [dialog, movieTitle, movieYear, font, fontSize, textColor, accentColor, bgPreset]);
+    drawCinemaFrame(ctx, 320, 568, bgPreset, bgImage, lines, movieTitle, movieYear, font, Math.round(fontSize * 0.42), filled, true, textColor, accentColor);
+  }, [dialog, movieTitle, movieYear, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
+
+  function handleImageUpload(file: File) {
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    createImageBitmap(file).then(setBgImage);
+  }
+
+  function handleImageClear() {
+    setUploadedImageUrl(null);
+    setBgImage(null);
+  }
 
   function applyPreset(p: typeof DIALOG_PRESETS[number]) {
     setDialog(p.lines.join("\n"));
@@ -213,9 +234,9 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
     const vStream = (canvas as any).captureStream(0) as MediaStream;
     const vTrack = vStream.getVideoTracks()[0] as any;
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
+    const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
+    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
 
     rec.start(200);
     await new Promise<void>((r) => setTimeout(r, 300));
@@ -235,7 +256,7 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
         });
         const showMeta = elapsed > (cumEnd[cumEnd.length - 1] ?? 0);
 
-        drawCinemaFrame(ctx, dim.w, dim.h, bgPreset, lines, movieTitle, movieYear, font, fontSize, lineReveal, showMeta, textColor, accentColor);
+        drawCinemaFrame(ctx, dim.w, dim.h, bgPreset, bgImage, lines, movieTitle, movieYear, font, fontSize, lineReveal, showMeta, textColor, accentColor);
         vTrack?.requestFrame?.();
 
         if (elapsed >= totalMs) { rec.stop(); resolve(); }
@@ -247,18 +268,9 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
     const webm = await done;
     if (cancelRef.current) { setRendering(false); return; }
 
-    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-    const { fetchFile } = await import("@ffmpeg/util");
-    const ff = new FFmpeg();
-    await ff.load();
-    await ff.writeFile("in.webm", await fetchFile(webm));
-    await ff.exec(["-i", "in.webm", "-c:v", "libx264", "-preset", "fast", "-crf", "22", "-movflags", "+faststart", "out.mp4"]);
-    const mp4 = await ff.readFile("out.mp4") as Uint8Array;
-    ff.terminate();
-
-    setVideoUrl(URL.createObjectURL(new Blob([new Uint8Array(mp4)], { type: "video/mp4" })));
+    setVideoUrl(URL.createObjectURL(webm));
     setRendering(false);
-  }, [dialog, movieTitle, movieYear, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset]);
+  }, [dialog, movieTitle, movieYear, aspect, font, fontSize, textColor, accentColor, charSpeed, bgPreset, bgImage]);
 
   return (
     <div className="flex flex-col h-full space-y-2 overflow-y-auto">
@@ -350,10 +362,11 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
             </div>
             <div className="pt-1 border-t border-white/5">
               <BgPicker selectedId={bgPreset.id}
-                onSelect={(p) => { setBgPreset(p); setUploadedImageUrl(null); }}
+                presets={CINEMA_BG}
+                onSelect={(p) => { setBgPreset(p); handleImageClear(); }}
                 uploadedImageUrl={uploadedImageUrl}
-                onImageUpload={(f) => { setUploadedImageUrl(URL.createObjectURL(f)); }}
-                onImageClear={() => setUploadedImageUrl(null)}
+                onImageUpload={handleImageUpload}
+                onImageClear={handleImageClear}
               />
             </div>
             <div className="flex gap-2">
@@ -378,9 +391,9 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
             {videoUrl && (
               <div className="w-full space-y-2">
                 <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-border/50 bg-black" />
-                <a href={videoUrl} download="bollywood-dialogue.mp4">
+                <a href={videoUrl} download="bollywood-dialogue.webm">
                   <Button className="w-full h-8 text-xs glow-primary-sm hover:glow-primary">
-                    <Download className="h-3.5 w-3.5 mr-1.5" />Download .mp4
+                    <Download className="h-3.5 w-3.5 mr-1.5" />Download .webm
                   </Button>
                 </a>
               </div>

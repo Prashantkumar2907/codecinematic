@@ -13,6 +13,7 @@ import { FontPickerModal } from "./shared/font-picker-modal";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground, wrapText } from "./shared/canvas-utils";
 import { playTypingPulse } from "./shared/audio-utils";
+import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
 
 const ASPECT_OPTIONS = [
   { value: "9:16", label: "Vertical 9:16", w: 720, h: 1280 },
@@ -54,6 +55,14 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
 
   // Load Google Fonts once
   useEffect(() => { loadGoogleFonts(); }, []);
+
+  useEffect(() => () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [videoUrl]);
+
+  useEffect(() => () => {
+    if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
+  }, [uploadedImageUrl]);
 
   // Handle image upload
   function handleImageUpload(file: File) {
@@ -118,15 +127,14 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       ...(audioDest ? audioDest.stream.getAudioTracks() : []),
     ]);
 
-    const recorder = new MediaRecorder(combinedStream, {
-      mimeType: "video/webm;codecs=vp9",
+    const recorder = createWebmRecorder(combinedStream, {
       videoBitsPerSecond: 4_000_000,
-    });
+    }, true);
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
     const done = new Promise<Blob>((resolve) => {
-      recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
+      recorder.onstop = () => resolve(createWebmBlob(chunks, recorder.mimeType));
     });
 
     // Schedule typing sounds: evenly spaced, one sound per character
@@ -194,7 +202,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     if (!videoUrl) return;
     const a = document.createElement("a");
     a.href = videoUrl;
-    a.download = `word-of-the-day-${word.toLowerCase().replace(/\s+/g, "-")}.mp4`;
+    a.download = `word-of-the-day-${word.toLowerCase().replace(/\s+/g, "-")}.webm`;
     a.click();
   };
 
@@ -362,7 +370,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
                 </Button>
                 {videoUrl && (
                   <Button variant="secondary" className="h-8 text-xs font-semibold gap-1.5" onClick={handleDownload}>
-                    <Download className="h-3 w-3" />Download
+                    <Download className="h-3 w-3" />Download .webm
                   </Button>
                 )}
               </div>
