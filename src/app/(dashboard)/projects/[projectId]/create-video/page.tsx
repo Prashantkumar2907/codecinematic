@@ -6,8 +6,16 @@ import { CreateVideoPanel } from "@/components/editor/create-video-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/cn";
+import { getDemoProject } from "@/lib/demo-project-store";
 import { isRoutableProjectId, isUuid } from "@/lib/project-ids";
 import { getSupabaseUserContext } from "@/lib/supabase/domain";
+
+type SavedProject = {
+  title: string;
+  language: string;
+  aspectRatioMode: string;
+  contentRaw: string;
+};
 
 export default async function CreateVideoPage({
   params,
@@ -36,11 +44,12 @@ export default async function CreateVideoPage({
     notFound();
   }
 
+  let savedProject: SavedProject | null = null;
   const context = await getSupabaseUserContext();
   if (context && isUuid(projectId)) {
     const { data, error } = await context.supabase
       .from("projects")
-      .select("id")
+      .select("id, title, primary_language, content_raw, aspect_ratio_mode")
       .eq("id", projectId)
       .eq("user_id", context.user.id)
       .maybeSingle();
@@ -48,14 +57,26 @@ export default async function CreateVideoPage({
     if (error || !data) {
       notFound();
     }
+
+    savedProject = {
+      title: data.title,
+      language: data.primary_language,
+      aspectRatioMode: data.aspect_ratio_mode,
+      contentRaw: data.content_raw,
+    };
+  } else {
+    const demoProject = getDemoProject(session.email, projectId);
+    if (demoProject) {
+      savedProject = demoProject;
+    }
   }
 
   const query = await searchParams;
-  const title = query.title ?? "Untitled project";
-  const language = query.language ?? "typescript";
-  const aspect = query.aspect ?? "9:16";
+  const title = query.title ?? savedProject?.title ?? "Untitled project";
+  const language = query.language ?? savedProject?.language ?? "typescript";
+  const aspect = query.aspect ?? savedProject?.aspectRatioMode ?? "9:16";
   const focus = query.focus ? query.focus.split(",").filter(Boolean) : [];
-  const code = query.code ?? "";
+  const code = query.code ?? savedProject?.contentRaw ?? "";
   const normalSpeed = query.normalSpeed ?? "0.60";
   const focusSpeed = query.focusSpeed ?? "0.35";
   const sound = query.sound ?? "soft";

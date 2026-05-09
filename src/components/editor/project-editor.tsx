@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { detectImportantLines } from "@/lib/render/smart-focus";
-import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
+import { buildEditorDraft, type EditorDraft, useEditorStore } from "@/lib/editor-store";
 import { NEW_PROJECT_ID } from "@/lib/project-ids";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { validateCodePayload } from "@/lib/quotas/limits";
@@ -50,7 +50,15 @@ const codeFontOptions = [
 
 const FOCUS_LINES_PER_PAGE = 8;
 
-export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; projectId: string }) {
+export function ProjectEditor({
+  plan = "free",
+  projectId,
+  initialDraft,
+}: {
+  plan?: PlanCode;
+  projectId: string;
+  initialDraft?: Partial<EditorDraft>;
+}) {
   const router = useRouter();
   const limits = PLAN_CONFIG[plan];
   const storedDraft = useEditorStore((state) => state.drafts[projectId]);
@@ -62,7 +70,8 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const draft = storedDraft ?? defaultEditorDraft;
+  const fallbackDraft = useMemo(() => buildEditorDraft(initialDraft), [initialDraft]);
+  const draft = storedDraft ?? fallbackDraft;
   const title = draft.title;
   const language = draft.language;
   const aspectRatioMode = draft.aspect;

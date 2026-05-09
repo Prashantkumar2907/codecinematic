@@ -47,6 +47,9 @@ export function DashboardWorkspace({
   const createProject = useEditorStore((state) => state.createProject);
   const deleteProject = useEditorStore((state) => state.deleteProject);
   const [mounted, setMounted] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const recentProjects = projectOrder.map((id) => projects[id]).filter(Boolean).slice(0, 6);
 
   const metrics = [
@@ -63,6 +66,33 @@ export function DashboardWorkspace({
     });
 
     router.push(`/projects/${projectId}?tab=${tab}`);
+  }
+
+  async function confirmDeleteProject(projectId: string) {
+    setDeletingProjectId(projectId);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+        method: "DELETE",
+      });
+      const result = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: { message?: string } | string;
+      } | null;
+
+      if (!response.ok || !result?.ok) {
+        const message = typeof result?.error === "string" ? result.error : result?.error?.message;
+        throw new Error(message ?? "Could not delete project.");
+      }
+
+      deleteProject(projectId);
+      setPendingDeleteId(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Could not delete project.");
+    } finally {
+      setDeletingProjectId(null);
+    }
   }
 
   useEffect(() => {
@@ -152,6 +182,11 @@ export function DashboardWorkspace({
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {deleteError ? (
+                <div className="lg:col-span-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive" role="alert">
+                  {deleteError}
+                </div>
+              ) : null}
               {recentProjects.map((project) => (
                 <div key={project.id} className="rounded-lg border border-border/50 bg-card/45 p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -163,13 +198,46 @@ export function DashboardWorkspace({
                     </div>
                     <button
                       type="button"
-                      aria-label={`Delete ${project.title}`}
-                      onClick={() => deleteProject(project.id)}
+                      aria-label={`Ask to delete ${project.title}`}
+                      aria-expanded={pendingDeleteId === project.id}
+                      onClick={() => {
+                        setDeleteError(null);
+                        setPendingDeleteId((current) => current === project.id ? null : project.id);
+                      }}
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
+                  {pendingDeleteId === project.id ? (
+                    <div className="mt-3 rounded-md border border-destructive/25 bg-destructive/10 p-2" role="alert">
+                      <p className="text-xs font-medium text-foreground">Delete this project?</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        This removes the local draft and any demo-session copy.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px]"
+                          disabled={deletingProjectId === project.id}
+                          onClick={() => setPendingDeleteId(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-7 bg-destructive px-3 text-[11px] text-destructive-foreground hover:bg-destructive/90"
+                          disabled={deletingProjectId === project.id}
+                          onClick={() => void confirmDeleteProject(project.id)}
+                        >
+                          {deletingProjectId === project.id ? "Deleting..." : "Delete"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                   <Link
                     href={`/projects/${project.id}?tab=editor`}
                     className="mt-3 inline-flex h-8 items-center rounded-md border border-border/60 px-3 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-primary/10"

@@ -1,18 +1,18 @@
 import { apiError, apiSuccess } from "@/lib/api-response";
 
 export async function POST(request: Request) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  if (!stripeKey || stripeKey.startsWith("YOUR_") || !webhookSecret || webhookSecret.startsWith("YOUR_")) {
-    return apiError("not_configured", "Stripe not configured", 500);
-  }
-
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
 
   if (!signature) {
     return apiError("bad_request", "Missing signature", 400);
+  }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!stripeKey || stripeKey.startsWith("YOUR_") || !webhookSecret || webhookSecret.startsWith("YOUR_")) {
+    return apiError("not_configured", "Stripe not configured", 503);
   }
 
   try {

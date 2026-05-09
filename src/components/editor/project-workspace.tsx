@@ -1,23 +1,34 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 
-import { BollywoodPanel } from "@/components/editor/bollywood-panel";
-import { DidYouKnowPanel } from "@/components/editor/did-you-know-panel";
-import { FactsHindiPanel } from "@/components/editor/facts-hindi-panel";
 import { ProjectEditor } from "@/components/editor/project-editor";
-import { ShayariPanel } from "@/components/editor/shayari-panel";
-import { SuvicharPanel } from "@/components/editor/suvichar-panel";
-import { WordOfDayPanel } from "@/components/editor/word-of-day-panel";
+import type { EditorDraft } from "@/lib/editor-store";
 import type { PlanCode } from "@/lib/plans";
+
+const BollywoodPanel = dynamic(() => import("@/components/editor/bollywood-panel").then((mod) => mod.BollywoodPanel));
+const DidYouKnowPanel = dynamic(() => import("@/components/editor/did-you-know-panel").then((mod) => mod.DidYouKnowPanel));
+const FactsHindiPanel = dynamic(() => import("@/components/editor/facts-hindi-panel").then((mod) => mod.FactsHindiPanel));
+const ShayariPanel = dynamic(() => import("@/components/editor/shayari-panel").then((mod) => mod.ShayariPanel));
+const SuvicharPanel = dynamic(() => import("@/components/editor/suvichar-panel").then((mod) => mod.SuvicharPanel));
+const WordOfDayPanel = dynamic(() => import("@/components/editor/word-of-day-panel").then((mod) => mod.WordOfDayPanel));
 
 const tabIds = ["editor", "wordofday", "didyouknow", "shayari", "suvichar", "bollywood", "factshindi"] as const;
 
 type TabId = (typeof tabIds)[number];
 
-export function ProjectWorkspace({ plan, projectId }: { plan: PlanCode; projectId: string }) {
+export function ProjectWorkspace({
+  plan,
+  projectId,
+  initialDraft,
+}: {
+  plan: PlanCode;
+  projectId: string;
+  initialDraft?: Partial<EditorDraft>;
+}) {
   const searchParams = useSearchParams();
   const prefersReducedMotion = useReducedMotion();
   const initialTab = (searchParams.get("tab") as TabId) || "editor";
@@ -33,7 +44,7 @@ export function ProjectWorkspace({ plan, projectId }: { plan: PlanCode; projectI
   }, [searchParams]);
 
   const content = {
-    editor: <ProjectEditor plan={plan} projectId={projectId} />,
+    editor: <ProjectEditor plan={plan} projectId={projectId} initialDraft={initialDraft} />,
     wordofday: <WordOfDayPanel projectId={projectId} />,
     didyouknow: <DidYouKnowPanel projectId={projectId} />,
     shayari: <ShayariPanel projectId={projectId} />,

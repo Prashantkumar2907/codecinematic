@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { apiError, apiSuccess, readJsonBody } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
+import { saveDemoProject } from "@/lib/demo-project-store";
 import { validateCodePayload } from "@/lib/quotas/limits";
 import { getSupabaseUserContext } from "@/lib/supabase/domain";
 
@@ -69,10 +70,19 @@ export async function POST(request: Request) {
     });
   }
 
+  const projectId = randomUUID();
+  saveDemoProject(session.email, {
+    id: projectId,
+    title: parsed.data.title,
+    language: parsed.data.language,
+    aspectRatioMode: parsed.data.aspectRatioMode,
+    contentRaw: parsed.data.contentRaw,
+  });
+
   return apiSuccess({
-    projectId: randomUUID(),
+    projectId,
     mode: "demo",
-    message: "Project payload validated for current plan.",
+    message: "Project saved for this demo session.",
   });
 }
 

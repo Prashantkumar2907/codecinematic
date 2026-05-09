@@ -16,7 +16,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "oauth-missing-code": "Social login did not return a verification code. Please try again.",
   "supabase-not-configured": "Social login is not yet configured. Please sign in with email and password.",
   "oauth-failed": "Social login failed. Please try again or use email login.",
-  "supabase-unavailable": "Authentication service is unavailable. Please use email credentials.",
+  "supabase-unavailable": "Password login is not configured for this account. Use the Premium demo button or enable Supabase auth.",
+  "rate-limited": "Too many sign-in attempts. Please wait a few minutes and try again.",
 };
 
 const features = [
@@ -51,13 +52,16 @@ function LoginForm() {
 
     try {
       const res = await fetch("/api/auth/demo-login", { method: "POST", body: formData });
-      let data: { ok?: boolean; error?: string | { message?: string } } = {};
+      let data: { ok?: boolean; error?: string | { code?: string; message?: string } } = {};
       try { data = await res.json() as typeof data; } catch { data = { ok: false, error: "Unexpected server response." }; }
 
       if (data.ok) { window.location.href = nextPath; return; }
 
+      const errorCode = typeof data.error === "string" ? "" : data.error?.code ?? "";
       const rawError = typeof data.error === "string" ? data.error : data.error?.message ?? "";
-      if (rawError.toLowerCase().includes("supabase") || rawError.toLowerCase().includes("not configured")) {
+      if (errorCode === "rate_limited") {
+        setError(AUTH_ERROR_MESSAGES["rate-limited"]);
+      } else if (errorCode === "not_configured" || rawError.toLowerCase().includes("supabase") || rawError.toLowerCase().includes("not configured")) {
         setError(AUTH_ERROR_MESSAGES["supabase-unavailable"]);
       } else if (rawError.toLowerCase().includes("invalid") || rawError.toLowerCase().includes("wrong")) {
         setError("Incorrect email or password. Please try again.");

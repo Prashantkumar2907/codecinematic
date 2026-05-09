@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey || resendKey.startsWith("YOUR_")) {
-    return apiError("not_configured", "Resend not configured", 500);
+    return apiError("not_configured", "Resend not configured", 503);
   }
 
   try {

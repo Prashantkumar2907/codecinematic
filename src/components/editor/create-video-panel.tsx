@@ -232,7 +232,7 @@ export function CreateVideoPanel({
           : {
               status: "empty" as const,
               title: "No code payload",
-              description: "Go back to the editor, add code, and continue again.",
+              description: "Open the saved project in the editor, add code, and continue again from that workspace.",
             };
 
   useEffect(() => {

@@ -75,6 +75,7 @@ export function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
                 <Link
                   key={link.label}
                   href={link.href as Route}
+                  prefetch={false}
                   className={`block rounded-md px-3 py-2 text-xs font-medium transition ${
                     isActive
                       ? "bg-primary/15 text-primary"
@@ -100,6 +101,7 @@ export function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
               <Link
                 key={link.label}
                 href={link.href as Route}
+                prefetch={false}
                 className="relative whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium sm:px-3"
               >
                 {isActive && (

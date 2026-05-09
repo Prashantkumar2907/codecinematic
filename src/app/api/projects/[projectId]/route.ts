@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { apiError, apiSuccess, readJsonBody } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
+import { deleteDemoProject, getDemoProject, saveDemoProject } from "@/lib/demo-project-store";
 import { isRoutableProjectId, isUuid } from "@/lib/project-ids";
 import { validateCodePayload } from "@/lib/quotas/limits";
 import { getSupabaseUserContext } from "@/lib/supabase/domain";
@@ -29,33 +30,51 @@ export async function GET(_request: Request, { params }: Params) {
   }
 
   const context = await getSupabaseUserContext();
-  if (!context || !isUuid(projectId)) {
-    return apiError("not_found", "Project is stored locally in this browser.", 404);
+  if (context && isUuid(projectId)) {
+    const { data, error } = await context.supabase
+      .from("projects")
+      .select("id, title, primary_language, content_raw, aspect_ratio_mode, updated_at")
+      .eq("id", projectId)
+      .eq("user_id", context.user.id)
+      .maybeSingle();
+
+    if (error) {
+      return apiError("upstream_error", "Could not load project.", 502);
+    }
+
+    if (!data) {
+      return apiError("not_found", "Project not found.", 404);
+    }
+
+    return apiSuccess({
+      project: {
+        id: data.id,
+        title: data.title,
+        language: data.primary_language,
+        contentRaw: data.content_raw,
+        aspectRatioMode: data.aspect_ratio_mode,
+        updatedAt: data.updated_at,
+      },
+    });
   }
 
-  const { data, error } = await context.supabase
-    .from("projects")
-    .select("id, title, primary_language, content_raw, aspect_ratio_mode, updated_at")
-    .eq("id", projectId)
-    .eq("user_id", context.user.id)
-    .maybeSingle();
-
-  if (error) {
-    return apiError("upstream_error", "Could not load project.", 502);
-  }
-
-  if (!data) {
-    return apiError("not_found", "Project not found.", 404);
+  const demoProject = getDemoProject(session.email, projectId);
+  if (!demoProject) {
+    return apiError(
+      "not_found",
+      "Project is only available in local browser storage until it is saved from the editor.",
+      404,
+    );
   }
 
   return apiSuccess({
     project: {
-      id: data.id,
-      title: data.title,
-      language: data.primary_language,
-      contentRaw: data.content_raw,
-      aspectRatioMode: data.aspect_ratio_mode,
-      updatedAt: data.updated_at,
+      id: demoProject.id,
+      title: demoProject.title,
+      language: demoProject.language,
+      contentRaw: demoProject.contentRaw,
+      aspectRatioMode: demoProject.aspectRatioMode,
+      updatedAt: demoProject.updatedAt,
     },
   });
 }
@@ -112,11 +131,19 @@ export async function PUT(request: Request, { params }: Params) {
     if (!data) {
       return apiError("not_found", "Project not found.", 404);
     }
+  } else {
+    saveDemoProject(session.email, {
+      id: projectId,
+      title: parsed.data.title,
+      language: parsed.data.language,
+      aspectRatioMode: parsed.data.aspectRatioMode,
+      contentRaw: parsed.data.contentRaw,
+    });
   }
 
   return apiSuccess({
     projectId,
-    mode: context ? "supabase" : "demo",
+    mode: context && isUuid(projectId) ? "supabase" : "demo",
     message: "Project updated.",
   });
 }
@@ -143,11 +170,13 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (error) {
       return apiError("upstream_error", "Could not delete project.", 502);
     }
+  } else {
+    deleteDemoProject(session.email, projectId);
   }
 
   return apiSuccess({
     projectId,
-    mode: context ? "supabase" : "demo",
+    mode: context && isUuid(projectId) ? "supabase" : "demo",
     message: "Project deleted.",
   });
 }
