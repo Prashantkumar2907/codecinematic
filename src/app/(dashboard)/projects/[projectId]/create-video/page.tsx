@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { CreateVideoPanel } from "@/components/editor/create-video-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/cn";
+import { isRoutableProjectId, isUuid } from "@/lib/project-ids";
+import { getSupabaseUserContext } from "@/lib/supabase/domain";
 
 export default async function CreateVideoPage({
   params,
@@ -30,6 +32,24 @@ export default async function CreateVideoPage({
   }
 
   const { projectId } = await params;
+  if (!isRoutableProjectId(projectId)) {
+    notFound();
+  }
+
+  const context = await getSupabaseUserContext();
+  if (context && isUuid(projectId)) {
+    const { data, error } = await context.supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("user_id", context.user.id)
+      .maybeSingle();
+
+    if (error || !data) {
+      notFound();
+    }
+  }
+
   const query = await searchParams;
   const title = query.title ?? "Untitled project";
   const language = query.language ?? "typescript";

@@ -42,11 +42,6 @@ function isStandaloneMode() {
   return window.matchMedia("(display-mode: standalone)").matches || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 }
 
-function isLocalHost() {
-  if (typeof window === "undefined") return false;
-  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-}
-
 export function InstallPrompt() {
   const pathname = usePathname();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -54,7 +49,7 @@ export function InstallPrompt() {
   const [isIos, setIsIos] = useState(false);
 
   const isAppRoute = useMemo(
-    () => pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/dashboard") || pathname.startsWith("/projects"),
+    () => pathname === "/" || pathname.startsWith("/dashboard"),
     [pathname]
   );
 
@@ -76,8 +71,7 @@ export function InstallPrompt() {
     const ios = isIosDevice();
     setIsIos(ios);
 
-    const localHost = isLocalHost();
-    if (!isAppRoute || (!localHost && isStandaloneMode()) || isDismissedRecently()) {
+    if (!isAppRoute || isStandaloneMode() || isDismissedRecently()) {
       setVisible(false);
       return;
     }
@@ -90,12 +84,14 @@ export function InstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
-    const timer = window.setTimeout(() => {
-      setVisible(true);
-    }, 900);
+    const timer = ios
+      ? window.setTimeout(() => {
+          setVisible(true);
+        }, 8000)
+      : undefined;
 
     return () => {
-      window.clearTimeout(timer);
+      if (timer) window.clearTimeout(timer);
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
   }, [isAppRoute, pathname]);

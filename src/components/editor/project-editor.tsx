@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { detectImportantLines } from "@/lib/render/smart-focus";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
+import { NEW_PROJECT_ID } from "@/lib/project-ids";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { validateCodePayload } from "@/lib/quotas/limits";
 import { BG_PRESETS } from "@/components/editor/shared/canvas-utils";
@@ -54,7 +55,12 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   const limits = PLAN_CONFIG[plan];
   const storedDraft = useEditorStore((state) => state.drafts[projectId]);
   const setDraft = useEditorStore((state) => state.setDraft);
+  const createProject = useEditorStore((state) => state.createProject);
+  const ensureProject = useEditorStore((state) => state.ensureProject);
+  const touchProject = useEditorStore((state) => state.touchProject);
   const [focusPage, setFocusPage] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const draft = storedDraft ?? defaultEditorDraft;
   const title = draft.title;
@@ -70,6 +76,12 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   const codeFont = draft.codeFont ?? "ui-monospace";
   const cursorBlink = draft.cursorBlink ?? true;
   const focusFlash = draft.focusFlash ?? true;
+
+  useEffect(() => {
+    if (projectId !== NEW_PROJECT_ID && !storedDraft) {
+      ensureProject(projectId, draft);
+    }
+  }, [draft, ensureProject, projectId, storedDraft]);
 
   const focusLines = useMemo(() => detectImportantLines(code), [code]);
   const allLines = useMemo(
@@ -131,11 +143,63 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
   }
 
   function updateDraftField<K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) {
+    setSaveError(null);
     setDraft(projectId, { [key]: value } as Partial<typeof draft>);
   }
 
-  function handleContinue() {
-    if (!canContinue) {
+  async function persistProject() {
+    const payload = {
+      title,
+      language,
+      aspectRatioMode: aspectRatioMode,
+      contentRaw: code,
+    };
+
+    const response = projectId === NEW_PROJECT_ID
+      ? await fetch("/api/create-project", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+      : await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+    const data = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      data?: { projectId?: string };
+      error?: { message?: string } | string;
+    } | null;
+
+    if (!response.ok || !data?.ok) {
+      const message = typeof data?.error === "string" ? data.error : data?.error?.message;
+      throw new Error(message ?? "Could not save project.");
+    }
+
+    return data.data?.projectId ?? projectId;
+  }
+
+  async function handleContinue() {
+    if (!canContinue || saving) {
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    let savedProjectId = projectId;
+    try {
+      savedProjectId = await persistProject();
+      if (projectId === NEW_PROJECT_ID) {
+        createProject({ ...draft, focus: normalizedEnabledFocusLines }, savedProjectId);
+      } else {
+        touchProject(projectId, draft);
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Could not save project.");
+      setSaving(false);
       return;
     }
 
@@ -150,7 +214,7 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
       focus: normalizedEnabledFocusLines.join(",")
     });
 
-    router.push(`/projects/${projectId}/create-video?${params.toString()}`);
+    router.push(`/projects/${savedProjectId}/create-video?${params.toString()}`);
   }
 
   return (
@@ -276,6 +340,11 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                   Exceeds plan limits. Reduce line count or shorten lines.
                 </div>
               ) : null}
+              {saveError ? (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs font-medium text-destructive-foreground">
+                  {saveError}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -288,6 +357,7 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
                 {code.split("\n").map((_, i) => <div key={i} className="h-6 flex items-center justify-end">{i + 1}</div>)}
               </div>
               <Textarea
+                aria-label="Code input"
                 value={code}
                 onChange={(event) => updateDraftField("code", event.target.value)}
                 onScroll={(e) => {
@@ -354,9 +424,9 @@ export function ProjectEditor({ plan = "free", projectId }: { plan?: PlanCode; p
               <Button
                 className="w-full h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all"
                 onClick={handleContinue}
-                disabled={!canContinue}
+                disabled={!canContinue || saving}
               >
-                Continue to create video
+                {saving ? "Saving project..." : "Continue to create video"}
               </Button>
             </CardContent>
           </Card>

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { apiError, apiSuccess, readJsonBody } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG } from "@/lib/plans";
-import { getSupabaseUserContext, isUuid } from "@/lib/supabase/domain";
+import { isRoutableProjectId, isUuid } from "@/lib/project-ids";
+import { getSupabaseUserContext } from "@/lib/supabase/domain";
 
 const exportSchema = z.object({
   projectId: z
@@ -13,10 +14,16 @@ const exportSchema = z.object({
     .trim()
     .min(1)
     .max(120)
-    .refine((value) => isUuid(value) || /^[a-zA-Z0-9_-]+$/.test(value), {
+    .refine((value) => isRoutableProjectId(value), {
       message: "Project id must be a UUID or local project slug.",
     }),
-  aspectRatios: z.array(z.enum(["9:16", "16:9"])).min(1).max(2),
+  aspectRatios: z
+    .array(z.enum(["9:16", "16:9"]))
+    .min(1)
+    .max(2)
+    .refine((ratios) => new Set(ratios).size === ratios.length, {
+      message: "Choose each aspect ratio only once.",
+    }),
   format: z.enum(["mp4", "webm"]).default("mp4"),
 });
 

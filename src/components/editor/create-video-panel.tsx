@@ -57,6 +57,8 @@ const RECORDING_VIDEO_BITS_PER_SECOND: Record<string, number> = {
   "16:9": 7_000_000,
 };
 const VISIBLE_LINE_OVERSCAN = 8;
+const LONG_RENDER_WARNING_MS = 45_000;
+const MAX_RENDER_DURATION_MS = 3 * 60_000;
 
 // ── Code Color Themes ────────────────────────────────────────────────────
 type CodeTheme = {
@@ -185,25 +187,14 @@ export function CreateVideoPanel({
   );
   const hasRenderableCode = renderLineCount > 0;
 
-  const estimatedDuration = useMemo(() => {
-    const allLines = resolvedCode.split("\n");
-    const focusSet = new Set(resolvedFocus.map(Number).filter(n => !isNaN(n)));
-    let totalMs = 0;
-    for (let i = 0; i < allLines.length; i++) {
-      const chars = allLines[i]!.length;
-      const isFocused = focusSet.has(i + 1);
-      const mult = Math.max(0.25, Number(isFocused ? resolvedFocusSpeed : resolvedNormalSpeed) || 1);
-      if (chars === 0) { totalMs += Math.round(180 / mult); continue; }
-      const msPerChar = isFocused ? 150 : 110;
-      const pad = isFocused ? 280 : 160;
-      totalMs += Math.round((chars * msPerChar + pad) / mult);
-    }
-    const ms = Math.max(3000, totalMs);
-    const secs = Math.ceil(ms / 1000);
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m > 0 ? `~${m}m ${s}s` : `~${s}s`;
-  }, [resolvedCode, resolvedFocus, resolvedNormalSpeed, resolvedFocusSpeed]);
+  const estimatedDurationMs = useMemo(
+    () => calculateRenderDurationMs(resolvedCode, resolvedFocus, resolvedNormalSpeed, resolvedFocusSpeed),
+    [resolvedCode, resolvedFocus, resolvedNormalSpeed, resolvedFocusSpeed]
+  );
+  const estimatedDuration = formatDuration(estimatedDurationMs);
+  const renderTooLong = estimatedDurationMs > MAX_RENDER_DURATION_MS;
+  const renderLongEnoughToWarn = estimatedDurationMs > LONG_RENDER_WARNING_MS;
+  const canRender = hasRenderableCode && !renderTooLong;
   const renderStatus = error
     ? {
         status: "error" as const,
@@ -224,11 +215,19 @@ export function CreateVideoPanel({
             title: "Video ready",
             description: "Preview the export on the right or download the generated WebM file.",
           }
+        : renderTooLong
+          ? {
+              status: "error" as const,
+              title: "Render duration is too long",
+              description: "Increase typing speeds or reduce the project length before exporting.",
+            }
         : hasRenderableCode
           ? {
               status: "empty" as const,
               title: "Ready to render",
-              description: "Create a browser export job to generate the first video.",
+              description: renderLongEnoughToWarn
+                ? "This export runs in real time in the browser. Keep the tab active or increase typing speeds for a faster render."
+                : "Create a browser export job to generate the first video.",
             }
           : {
               status: "empty" as const,
@@ -412,7 +411,7 @@ export function CreateVideoPanel({
             </div>
 
             <div className="flex gap-2">
-              <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || !hasRenderableCode}>
+              <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || !canRender}>
                 {loading || rendering ? (
                   <>
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -422,7 +421,7 @@ export function CreateVideoPanel({
                   "Create video"
                 )}
               </Button>
-              <Button className="flex-1 h-9 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || !hasRenderableCode} variant="secondary">
+              <Button className="flex-1 h-9 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || !canRender} variant="secondary">
                 {rendering ? "Rendering..." : "Render again"}
               </Button>
               {rendering && (
@@ -1368,6 +1367,40 @@ function tokenize(line: string, theme: CodeTheme): Array<{ text: string; color: 
 
 function formatMultiplier(value: string) {
   return `${Number(value).toFixed(2)}x`;
+}
+
+function calculateRenderDurationMs(
+  code: string,
+  focus: string[],
+  normalSpeed: string,
+  focusSpeed: string,
+) {
+  const allLines = code.split("\n");
+  const focusSet = new Set(focus.map(Number).filter((line) => !Number.isNaN(line)));
+  let totalMs = 0;
+
+  for (let i = 0; i < allLines.length; i++) {
+    const chars = allLines[i]!.length;
+    const isFocused = focusSet.has(i + 1);
+    const mult = Math.max(0.25, Number(isFocused ? focusSpeed : normalSpeed) || 1);
+    if (chars === 0) {
+      totalMs += Math.round(180 / mult);
+      continue;
+    }
+
+    const msPerChar = isFocused ? 150 : 110;
+    const pad = isFocused ? 280 : 160;
+    totalMs += Math.round((chars * msPerChar + pad) / mult);
+  }
+
+  return Math.max(3000, totalMs);
+}
+
+function formatDuration(ms: number) {
+  const secs = Math.ceil(ms / 1000);
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `~${m}m ${s}s` : `~${s}s`;
 }
 
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

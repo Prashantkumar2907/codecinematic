@@ -5,6 +5,7 @@ type ApiErrorCode =
   | "forbidden"
   | "invalid_payload"
   | "invalid_session"
+  | "not_found"
   | "not_configured"
   | "quota_exceeded"
   | "rate_limited"

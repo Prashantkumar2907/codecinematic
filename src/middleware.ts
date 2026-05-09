@@ -6,12 +6,14 @@ import {
   decodeSessionCookie,
   getSafeRedirectPath,
 } from "@/lib/session-cookie";
+import { isRoutableProjectId } from "@/lib/project-ids";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/projects"];
 
 const PROTECTED_API_PREFIXES = [
   "/api/create-project",
   "/api/export",
+  "/api/projects",
   "/api/ai",
   "/api/history",
   "/api/email",
@@ -38,6 +40,16 @@ export async function middleware(request: NextRequest) {
   const isProtectedApi =
     PROTECTED_API_PATHS.includes(pathname) ||
     PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  if (pathname.startsWith("/projects/")) {
+    const projectId = pathname.split("/")[2] ?? "";
+    if (!isRoutableProjectId(projectId)) {
+      return new NextResponse("Project not found", {
+        status: 404,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
+  }
 
   if (!isProtectedPage && !isProtectedApi) {
     return NextResponse.next();
