@@ -5,7 +5,7 @@ import { Check, Sparkles, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 import { cn } from "@/lib/cn";
 
@@ -102,16 +102,15 @@ export default function PricingPage() {
                   </ul>
 
                   {/* CTA */}
-                  <Link href={(code === "free" ? "/login" : "/api/billing/checkout?plan=" + code) as Route}>
-                    <Button
-                      variant={popular ? "default" : "outline"}
-                      className={cn(
-                        "w-full h-9 text-xs font-semibold transition-all",
-                        popular ? "glow-primary-sm hover:glow-primary" : "border-border/60 hover:border-border"
-                      )}
-                    >
-                      {code === "free" ? "Start free" : "Subscribe"}
-                    </Button>
+                  <Link
+                    href={(code === "free" ? "/login" : "/api/billing/checkout?plan=" + code) as Route}
+                    className={cn(
+                      buttonVariants({ variant: popular ? "default" : "outline" }),
+                      "w-full h-9 text-xs font-semibold transition-all",
+                      popular ? "glow-primary-sm hover:glow-primary" : "border-border/60 hover:border-border",
+                    )}
+                  >
+                    {code === "free" ? "Start free" : "Subscribe"}
                   </Link>
                 </div>
               </motion.div>

@@ -11,10 +11,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Loader2, Play, Maximize2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/cn";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
 import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
@@ -434,10 +435,15 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
               {videoUrl && (
                 <div className="w-full space-y-2">
                   <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-border/50 bg-black" />
-                  <a href={videoUrl} download="shayari.webm">
-                    <Button className="w-full h-8 text-xs glow-primary-sm hover:glow-primary">
-                      <Download className="h-3.5 w-3.5 mr-1.5" />Download .webm
-                    </Button>
+                  <a
+                    href={videoUrl}
+                    download="shayari.webm"
+                    className={cn(
+                      buttonVariants(),
+                      "w-full h-8 text-xs glow-primary-sm hover:glow-primary",
+                    )}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />Download .webm
                   </a>
                 </div>
               )}

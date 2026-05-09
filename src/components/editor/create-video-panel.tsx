@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
 import type { Narration } from "@/lib/narration";
@@ -11,6 +12,7 @@ import { BG_PRESETS, type BgPreset, drawBackground } from "@/components/editor/s
 import { loadGoogleFonts } from "@/components/editor/shared/font-catalog";
 import { createWebmBlob, createWebmRecorder } from "@/components/editor/shared/media-recorder";
 import { RenderStatusPanel } from "@/components/editor/shared/render-status-panel";
+import { cn } from "@/lib/cn";
 
 type Job = {
   exportId: string;
@@ -411,9 +413,16 @@ export function CreateVideoPanel({
 
             <div className="flex gap-2">
               <Button className="flex-1 h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all" onClick={handleCreateAndRender} disabled={loading || rendering || !hasRenderableCode}>
-                {loading || rendering ? "Creating video..." : "Create video"}
+                {loading || rendering ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Creating video...
+                  </>
+                ) : (
+                  "Create video"
+                )}
               </Button>
-              <Button className="flex-1 h-8 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || !hasRenderableCode} variant="secondary">
+              <Button className="flex-1 h-9 text-xs font-semibold hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0" onClick={handleRenderVideos} disabled={rendering || jobs.length === 0 || !hasRenderableCode} variant="secondary">
                 {rendering ? "Rendering..." : "Render again"}
               </Button>
               {rendering && (
@@ -469,8 +478,15 @@ export function CreateVideoPanel({
               <div key={video.exportId} className="rounded-xl border border-primary/25 bg-primary/5 p-3 shadow-sm">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-primary">{video.aspectRatio} video ready</p>
-                  <a href={video.url} download={video.filename}>
-                    <Button size="sm" className="h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all">Download .{getFileExtension(video.format)}</Button>
+                  <a
+                    href={video.url}
+                    download={video.filename}
+                    className={cn(
+                      buttonVariants({ size: "sm" }),
+                      "h-7 text-[11px] px-3 glow-primary-sm hover:glow-primary transition-all",
+                    )}
+                  >
+                    Download .{getFileExtension(video.format)}
                   </a>
                 </div>
                 <video src={video.url} controls playsInline className="w-full rounded-lg border border-border/50 bg-black shadow-inner" />

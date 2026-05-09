@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { CreateVideoPanel } from "@/components/editor/create-video-panel";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
+import { cn } from "@/lib/cn";
 
 export default async function CreateVideoPage({
   params,
@@ -44,10 +45,14 @@ export default async function CreateVideoPage({
     <main className="flex-1 flex flex-col min-h-0 w-full max-w-[100rem] mx-auto p-3 gap-2">
       <div className="shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${projectId}`}>
-            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5">
-              <ArrowLeft className="h-3.5 w-3.5" />Back to editor
-            </Button>
+          <Link
+            href={`/projects/${projectId}`}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "h-8 text-xs gap-1.5",
+            )}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />Back to editor
           </Link>
           <h1 className="text-base font-semibold">Create video</h1>
         </div>

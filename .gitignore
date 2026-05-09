@@ -4,3 +4,4 @@ node_modules
 .env.local
 .DS_Store
 .codex-dev-server*.log
+.codex-start-*.log

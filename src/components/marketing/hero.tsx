@@ -4,7 +4,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Code2, Film, Zap } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 const container = {
   hidden: { opacity: 0 },
@@ -51,16 +52,21 @@ export function Hero() {
         </motion.p>
 
         <motion.div variants={item} className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link href="/login">
-            <Button size="lg" className="h-11 px-6 font-semibold group">
-              Get started free
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Button>
+          <Link
+            href="/login"
+            className={cn(buttonVariants({ size: "lg" }), "group h-11 px-6 font-semibold")}
+          >
+            Get started free
+            <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <Link href="/projects/new-project">
-            <Button size="lg" variant="outline" className="h-11 px-6 border-white/[0.08] hover:bg-white/[0.04]">
-              Try the editor
-            </Button>
+          <Link
+            href="/projects/new-project"
+            className={cn(
+              buttonVariants({ size: "lg", variant: "outline" }),
+              "h-11 px-6 border-white/[0.08] hover:bg-white/[0.04]",
+            )}
+          >
+            Try the editor
           </Link>
         </motion.div>
 

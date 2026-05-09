@@ -1,7 +1,8 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
+import { cn } from "@/lib/cn";
 import { PLAN_CONFIG } from "@/lib/plans";
 import { NavLinks } from "./nav-links";
 import { ProfileMenu } from "./profile-menu";
@@ -36,13 +37,14 @@ export async function SiteHeader() {
               isAdmin={session.isAdmin}
             />
           ) : (
-            <Link href="/login">
-              <Button
-                size="sm"
-                className="h-7 text-[10px] px-4 rounded-full font-medium shadow-sm shadow-primary/10 hover:shadow-primary/20 transition-all"
-              >
-                Sign in
-              </Button>
+            <Link
+              href="/login"
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "h-7 text-[10px] px-4 rounded-full font-medium shadow-sm shadow-primary/10 hover:shadow-primary/20 transition-all",
+              )}
+            >
+              Sign in
             </Link>
           )}
         </div>
