@@ -35,7 +35,10 @@ RLS is enabled on all app tables. Owner-scoped tables use `auth.uid()` policies,
 - Add owner/date composite indexes for user history views, such as `(user_id, created_at desc)` or `(user_id, updated_at desc)`.
 - Add status/date indexes for render queues, export history, and analysis jobs.
 - Add partial unique indexes for provider identifiers that must not duplicate, such as Stripe subscription ids.
+- Add provider lookup indexes for Stripe customer/subscription identifiers when billing sync needs to find records by webhook payloads.
+- Add owner/date indexes for new user-owned asset, audio, analysis, or export history surfaces before building list views.
 - Prefer `create index if not exists` in `supabase/update_001.sql` because the bootstrap may be re-run.
+- Drop an RLS policy with `drop policy if exists ... on ...;` immediately before recreating it. PostgreSQL does not support `create policy if not exists`, so unguarded policy creation makes reruns fail.
 
 ## Current Gaps
 

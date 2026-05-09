@@ -6,6 +6,16 @@ CodeCinematic is a creator SaaS for turning code snippets, inline explanations, 
 
 Primary users are developer educators, DevRel teams, course creators, indie hackers, and social-video creators who need polished technical or text-based clips for Shorts, Reels, TikTok, and presentations without a server-side video-rendering pipeline.
 
+## Latest Discovery Pass
+
+Reviewed on 2026-05-09 against the `codex/improve-codecinematic` branch.
+
+- Baseline `npm run lint` passed.
+- Baseline `npm run build` passed.
+- The app is a Next.js App Router product with Supabase-backed persistence when configured and demo-mode fallbacks when local credentials are absent.
+- The nested `codecinematic` repository is the active application repo; the outer workspace repo only sees it as an untracked directory.
+- Completed high-value improvement scope: login route validation/throttling, SQL bootstrap idempotency and index coverage, invalid nested button/link markup, legal-link destinations, render-screen polish, and refreshed LLM memory docs.
+
 ## Critical File Path
 
 1. App shell and metadata: `src/app/layout.tsx`
@@ -53,27 +63,38 @@ Supabase bootstrap defines identity, plans, plan features, subscriptions, usage 
 12. UI/UX: Page transitions, workspace tab transitions, dashboard surface animation, and render status panels prevent static-feeling workflows.
 13. Accessibility: The profile menu supports `aria-expanded`, menu roles, and Escape close; editor controls now expose labels/pressed states.
 14. Maintainability: `CreateVideoPanel` is still the largest file and should be the next extraction target.
+15. Security: The demo-login route now validates credential payloads, uses generic credential failures, and throttles repeated failed attempts per IP/email window.
+16. Database: SQL policies are dropped before recreation, making the bootstrap safer to rerun in local and staging environments.
+17. Database: Additional owner/date and provider indexes cover future project slug, asset, audio, analysis, usage-window, plan-sort, and Stripe-customer lookups.
+18. UI/UX: Login legal links now resolve to real Terms and Privacy pages.
+19. Accessibility: Button-like navigation and download actions now render as links with button styling instead of nested interactive elements.
+20. Auth architecture: Middleware only blocks missing-cookie protected requests; server components and API routes remain the authoritative signed-session validators.
 
 ## Identified Gaps
 
 ### Security Risks
 
 - The built-in demo admin account is intentional but must be changed before production launch.
+- The login route validates form data server-side and throttles repeated failed attempts in-process; production should replace or augment this with distributed rate limiting.
 - Stripe webhook events are verified and sanitized in logs, but subscription state sync is still not fully implemented.
 - Supabase OAuth now creates app sessions, but paid-plan assignment still depends on future subscription sync.
 
 ### Performance Bottlenecks
 
+- The Supabase bootstrap has broad foreign-key, owner/date, status/date, and provider lookup indexes; validate with real query plans once production traffic exists.
 - Browser rendering is CPU-heavy by design. The renderer uses cached tokenization and a singleton AudioContext, but `src/components/editor/create-video-panel.tsx` remains difficult to profile because it mixes UI, render orchestration, canvas painting, audio, and tokenization.
 - Creator-mode panels share similar MediaRecorder, font, image, and canvas logic. More extraction into `src/components/editor/shared` would reduce bundle and maintenance costs.
 
 ### UI/UX Dead Ends
 
 - The editor routes now have loading, empty, error, and success coverage, but the specialized creator panels still vary in how explicit their error states are during MediaRecorder failures.
+- The create-video action row now has consistent button heights and an explicit spinner while the browser render job starts.
 - Social auth is wired through the app callback, but pricing/subscription upgrade success still does not update the displayed plan until subscription persistence is completed.
 
 ### Code Smells
 
 - `CreateVideoPanel` is over 1,300 lines and should be split into render engine, tokenization/theme helpers, and UI shell.
+- Button-like links should use `buttonVariants()` with `cn()` directly on `Link`/`a`.
+- SQL policies are now dropped before recreation; keep this pattern when adding new RLS policies.
 - TypeScript and SQL plan definitions can drift. Plan limits should eventually be sourced from one canonical plan registry.
 - Some localized creator panels intentionally contain Hindi/Urdu text and non-ASCII punctuation; future edits should keep localized copy deliberate and avoid accidental mojibake.

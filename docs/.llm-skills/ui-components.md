@@ -20,6 +20,8 @@
 - Prefer local UI primitives in `src/components/ui` before adding new dependencies.
 - Use `cn()` from `src/lib/cn.ts` for conditional class composition.
 - Use Lucide icons in icon buttons or compact action buttons.
+- For button-like links, apply `buttonVariants()` and `cn()` directly to `Link` or `a`. Do not wrap `Button` inside `Link` or `a`.
+- For download links, style the `a` element itself with `buttonVariants()` so the browser gets a real link with a `download` attribute.
 - Keep dashboard/editor UI dense and work-focused. Avoid marketing-style cards inside cards.
 - Use existing transition classes and Framer Motion for purposeful movement.
 - Page-level motion lives in `PageTransition`; tab-level editor motion lives in `ProjectWorkspace`.
@@ -44,4 +46,5 @@ Route-level states now exist for the dashboard and project editor paths. Add mat
 - `ProjectEditor` stores drafts through Zustand in `src/lib/editor-store.ts`.
 - `CreateVideoPanel` is currently large and mixes rendering, API calls, audio, tokenization, and UI. Prefer extracting new behavior into helpers instead of making that file larger.
 - Keep inputs, selects, sliders, icon buttons, and swatches labelled with `aria-label`, `aria-pressed`, or native labels.
+- Login footer links resolve to `/terms` and `/privacy`; keep those destinations live if the footer copy changes.
 - Several creator panels duplicate canvas/font/render helpers. When changing one, check if the pattern should move into `src/components/editor/shared`.
