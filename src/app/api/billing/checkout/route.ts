@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
 
+const paidPlanCodes = ["basic", "medium", "high"] as const satisfies readonly PlanCode[];
+type PaidPlanCode = (typeof paidPlanCodes)[number];
+
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) {
@@ -10,9 +13,9 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const planCode = url.searchParams.get("plan") as PlanCode | null;
+  const planCode = url.searchParams.get("plan");
 
-  if (!planCode || !PLAN_CONFIG[planCode] || planCode === "free") {
+  if (!isPaidPlanCode(planCode)) {
     return NextResponse.redirect(new URL("/pricing?error=invalid-plan", request.url));
   }
 
@@ -25,7 +28,7 @@ export async function GET(request: Request) {
     const stripe = (await import("stripe")).default;
     const client = new stripe(stripeKey);
 
-    const priceMapping: Record<string, string> = {
+    const priceMapping: Record<PaidPlanCode, string> = {
       basic: process.env.STRIPE_PRICE_BASIC ?? "",
       medium: process.env.STRIPE_PRICE_MEDIUM ?? "",
       high: process.env.STRIPE_PRICE_HIGH ?? "",
@@ -52,4 +55,8 @@ export async function GET(request: Request) {
     console.error("Stripe checkout error:", err);
     return NextResponse.redirect(new URL("/pricing?error=checkout-failed", request.url));
   }
+}
+
+function isPaidPlanCode(value: string | null): value is PaidPlanCode {
+  return paidPlanCodes.some((code) => code === value);
 }

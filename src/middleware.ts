@@ -56,23 +56,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!session) {
-    if (isProtectedApi) {
-      const response = NextResponse.json(
-        { ok: false, error: { code: "invalid_session", message: "Session expired. Please log in again." } },
-        { status: 401 },
-      );
-      response.cookies.delete(SESSION_COOKIE);
-      return response;
-    }
-
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", `${pathname}${search}`);
-    const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete(SESSION_COOKIE);
-    return response;
-  }
-
+  // API routes and server components are the authoritative session validators.
+  // Middleware only handles missing-cookie redirects so Edge/runtime env drift
+  // cannot lock valid production users out before Node handlers can verify.
   return NextResponse.next();
 }
 

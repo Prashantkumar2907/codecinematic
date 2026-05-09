@@ -7,6 +7,7 @@ type ApiErrorCode =
   | "invalid_session"
   | "not_configured"
   | "quota_exceeded"
+  | "rate_limited"
   | "unauthorized"
   | "upstream_error";
 

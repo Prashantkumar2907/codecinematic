@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         const session = event.data.object;
         console.info("[Stripe] Checkout completed", {
           id: session.id,
-          plan: session.metadata?.plan,
+          hasPlanMetadata: Boolean(session.metadata?.plan),
         });
         break;
       }
