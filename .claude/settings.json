@@ -1,0 +1,26 @@
+{
+  "allowedTools": [
+    "read_file",
+    "create_file",
+    "replace_string_in_file",
+    "run_in_terminal",
+    "grep_search",
+    "semantic_search",
+    "file_search",
+    "get_errors"
+  ],
+  "contextFiles": [
+    "package.json",
+    "src/lib/api-response.ts",
+    "src/lib/auth.ts",
+    "src/lib/session-cookie.ts",
+    "src/middleware.ts",
+    "src/lib/editor-store.ts",
+    "src/lib/plans.ts",
+    "src/lib/project-ids.ts",
+    "src/components/editor/shared/media-recorder.ts",
+    "src/components/editor/shared/canvas-utils.ts",
+    "src/app/globals.css",
+    "supabase/update_001.sql"
+  ]
+}
