@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
 import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
+import { captureCanvasStream, closeImageBitmapSafely, stopMediaStream, stopRecorder } from "./shared/rendering-resources";
 
 const CINEMA_BG: BgPreset[] = [
   {
@@ -182,6 +183,10 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
     if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
   }, [uploadedImageUrl]);
 
+  useEffect(() => () => {
+    closeImageBitmapSafely(bgImage);
+  }, [bgImage]);
+
   // Refresh preview
   useEffect(() => {
     const c = previewRef.current;
@@ -194,10 +199,16 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
     drawCinemaFrame(ctx, 320, 568, bgPreset, bgImage, lines, movieTitle, movieYear, font, Math.round(fontSize * 0.42), filled, true, textColor, accentColor);
   }, [dialog, movieTitle, movieYear, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
 
-  function handleImageUpload(file: File) {
+  async function handleImageUpload(file: File) {
     const url = URL.createObjectURL(file);
     setUploadedImageUrl(url);
-    createImageBitmap(file).then(setBgImage);
+    try {
+      setBgImage(await createImageBitmap(file));
+    } catch {
+      URL.revokeObjectURL(url);
+      setUploadedImageUrl(null);
+      setBgImage(null);
+    }
   }
 
   function handleImageClear() {
@@ -232,21 +243,27 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
     const cumEnd = perLineDur.reduce<number[]>((acc, d, i) => [...acc, (acc[i - 1] ?? 0) + d + 600], []);
     const totalMs = (cumEnd[cumEnd.length - 1] ?? 3000) + 2000;
 
-    const vStream = (canvas as any).captureStream(0) as MediaStream;
-    const vTrack = vStream.getVideoTracks()[0] as any;
+    const capture = captureCanvasStream(canvas, 30);
+    const vStream = capture.stream;
     const chunks: Blob[] = [];
     const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
+    const done = new Promise<Blob>((resolve) => {
+      rec.onstop = () => {
+        stopMediaStream(vStream);
+        capture.stop();
+        resolve(createWebmBlob(chunks, rec.mimeType));
+      };
+    });
 
     rec.start(200);
     await new Promise<void>((r) => setTimeout(r, 300));
-    if (cancelRef.current) { rec.stop(); setRendering(false); return; }
+    if (cancelRef.current) { stopRecorder(rec); setRendering(false); return; }
 
     const t0 = performance.now();
     await new Promise<void>((resolve) => {
       function frame() {
-        if (cancelRef.current) { resolve(); return; }
+        if (cancelRef.current) { stopRecorder(rec); resolve(); return; }
         const elapsed = Math.min(performance.now() - t0, totalMs);
 
         const lineReveal = lines.map((l, i) => {
@@ -258,9 +275,9 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
         const showMeta = elapsed > (cumEnd[cumEnd.length - 1] ?? 0);
 
         drawCinemaFrame(ctx, dim.w, dim.h, bgPreset, bgImage, lines, movieTitle, movieYear, font, fontSize, lineReveal, showMeta, textColor, accentColor);
-        vTrack?.requestFrame?.();
+        capture.requestFrame();
 
-        if (elapsed >= totalMs) { rec.stop(); resolve(); }
+        if (elapsed >= totalMs) { stopRecorder(rec); resolve(); }
         else requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
@@ -310,7 +327,7 @@ export function BollywoodPanel({ projectId }: { projectId: string }) {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
-                <select value={aspect} onChange={(e) => setAspect(e.target.value as any)}
+                <select value={aspect} onChange={(e) => setAspect(e.target.value as "9:16" | "16:9")}
                   className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs">
                   <option value="9:16">Vertical 9:16</option>
                   <option value="16:9">Landscape 16:9</option>

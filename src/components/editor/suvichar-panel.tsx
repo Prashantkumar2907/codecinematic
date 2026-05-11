@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
 import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
+import { captureCanvasStream, closeImageBitmapSafely, stopMediaStream, stopRecorder } from "./shared/rendering-resources";
 
 const SUVICHAR_BG: BgPreset[] = [
   {
@@ -198,6 +199,10 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
     if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
   }, [uploadedImageUrl]);
 
+  useEffect(() => () => {
+    closeImageBitmapSafely(bgImage);
+  }, [bgImage]);
+
   useEffect(() => {
     const c = previewRef.current;
     if (!c) return;
@@ -207,7 +212,17 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
     drawSuvicharFrame(ctx, 320, 568, bgPreset, bgImage, resolvedTitle, quote, source, font, 1, 1, Math.round(fontSize * 0.4), accentColor, textColor);
   }, [quote, source, resolvedTitle, font, fontSize, accentColor, textColor, bgPreset, bgImage]);
 
-  function handleImageUpload(file: File) { const url = URL.createObjectURL(file); setUploadedImageUrl(url); createImageBitmap(file).then(setBgImage); }
+  async function handleImageUpload(file: File) {
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    try {
+      setBgImage(await createImageBitmap(file));
+    } catch {
+      URL.revokeObjectURL(url);
+      setUploadedImageUrl(null);
+      setBgImage(null);
+    }
+  }
   function handleImageClear() { setUploadedImageUrl(null); setBgImage(null); }
 
   const handleRender = useCallback(async () => {
@@ -232,30 +247,36 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
     const holdDur = 1500;
     const totalMs = titleDur + quoteDur + holdDur;
 
-    const vStream = (canvas as any).captureStream(0) as MediaStream;
-    const vTrack = vStream.getVideoTracks()[0] as any;
+    const capture = captureCanvasStream(canvas, fps);
+    const vStream = capture.stream;
     const chunks: Blob[] = [];
     const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
+    const done = new Promise<Blob>((resolve) => {
+      rec.onstop = () => {
+        stopMediaStream(vStream);
+        capture.stop();
+        resolve(createWebmBlob(chunks, rec.mimeType));
+      };
+    });
 
     rec.start(200);
     await new Promise<void>((r) => setTimeout(r, 300));
-    if (cancelRef.current) { rec.stop(); setRendering(false); return; }
+    if (cancelRef.current) { stopRecorder(rec); setRendering(false); return; }
 
     const t0 = performance.now();
     await new Promise<void>((resolve) => {
       function frame() {
-        if (cancelRef.current) { resolve(); return; }
+        if (cancelRef.current) { stopRecorder(rec); resolve(); return; }
         const elapsed = Math.min(performance.now() - t0, totalMs);
 
         const titleProg = Math.min(1, elapsed / titleDur);
         const quoteProg = elapsed > titleDur ? Math.min(1, (elapsed - titleDur) / quoteDur) : 0;
 
         drawSuvicharFrame(ctx, dim.w, dim.h, bgPreset, bgImage, resolvedTitle, quote, source, font, titleProg, quoteProg, fontSize, accentColor, textColor);
-        vTrack?.requestFrame?.();
+        capture.requestFrame();
 
-        if (elapsed >= totalMs) { rec.stop(); resolve(); }
+        if (elapsed >= totalMs) { stopRecorder(rec); resolve(); }
         else requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
@@ -289,7 +310,7 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">TITLE STYLE</span>
-                  <select value={titleMode} onChange={(e) => setTitleMode(e.target.value as any)}
+                  <select value={titleMode} onChange={(e) => setTitleMode(e.target.value as typeof TITLE_OPTIONS[number]["value"])}
                     className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1">
                     {TITLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
@@ -301,7 +322,7 @@ export function SuvicharPanel({ projectId }: { projectId: string }) {
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
-                  <select value={aspect} onChange={(e) => setAspect(e.target.value as any)}
+                  <select value={aspect} onChange={(e) => setAspect(e.target.value as "9:16" | "16:9")}
                     className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs">
                     {ASPECT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>

@@ -6,11 +6,12 @@ import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
+import { buildEditorDraft, useEditorStore, type EditorDraft } from "@/lib/editor-store";
 import type { Narration } from "@/lib/narration";
 import { BG_PRESETS, type BgPreset, drawBackground } from "@/components/editor/shared/canvas-utils";
 import { loadGoogleFonts } from "@/components/editor/shared/font-catalog";
 import { createWebmBlob, createWebmRecorder } from "@/components/editor/shared/media-recorder";
+import { captureCanvasStream, stopMediaStream, stopRecorder } from "@/components/editor/shared/rendering-resources";
 import { RenderStatusPanel } from "@/components/editor/shared/render-status-panel";
 import { cn } from "@/lib/cn";
 
@@ -130,7 +131,8 @@ export function CreateVideoPanel({
   normalSpeed,
   focusSpeed,
   sound,
-  soundVolume
+  soundVolume,
+  initialDraft,
 }: {
   projectId: string;
   title: string;
@@ -142,6 +144,7 @@ export function CreateVideoPanel({
   focusSpeed: string;
   sound: string;
   soundVolume: string;
+  initialDraft?: Partial<EditorDraft>;
 }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [videos, setVideos] = useState<RenderedVideo[]>([]);
@@ -152,8 +155,8 @@ export function CreateVideoPanel({
   const renderSignalRef = useRef<RenderSignal | null>(null);
   const videosRef = useRef<RenderedVideo[]>([]);
   const storedDraft = useEditorStore((state) => state.drafts[projectId]);
-  const resolvedDraft = storedDraft ?? {
-    ...defaultEditorDraft,
+  const resolvedDraft = storedDraft ?? buildEditorDraft({
+    ...initialDraft,
     title,
     language,
     aspect: aspect === "16:9" ? "16:9" : "9:16",
@@ -163,8 +166,8 @@ export function CreateVideoPanel({
     soundVolume,
     focus: focus.map((line) => Number(line)).filter((line) => !Number.isNaN(line)),
     code,
-    narration: null as Narration | null,
-  };
+    narration: initialDraft?.narration ?? null as Narration | null,
+  });
   const resolvedTitle = resolvedDraft.title;
   const resolvedLanguage = resolvedDraft.language;
   const resolvedAspect = resolvedDraft.aspect === "16:9" ? "16:9" : "9:16";
@@ -351,6 +354,8 @@ export function CreateVideoPanel({
           current.forEach((video) => URL.revokeObjectURL(video.url));
           return nextVideos;
         });
+      } else {
+        nextVideos.forEach((video) => URL.revokeObjectURL(video.url));
       }
     } catch (renderError) {
       if (!signal.cancelled) {
@@ -359,6 +364,9 @@ export function CreateVideoPanel({
     } finally {
       if (!signal.cancelled) {
         setRendering(false);
+      }
+      if (renderSignalRef.current === signal) {
+        renderSignalRef.current = null;
       }
     }
   }
@@ -596,15 +604,10 @@ async function renderVideoBlob(opts: {
   const effectivePreset = { ...preset, maxCharsPerLine: actualMaxChars };
 
   // ── Streams ──
-  let vStream = canvas.captureStream(0);
-  let vTrack = vStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
-  let manualFrameCapture = typeof vTrack?.requestFrame === "function";
-  if (!manualFrameCapture) {
-    vStream.getTracks().forEach((track) => track.stop());
-    vStream = canvas.captureStream(RECORDING_FPS);
-    vTrack = vStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
-    manualFrameCapture = false;
-  }
+  const capture = captureCanvasStream(canvas, RECORDING_FPS);
+  const vStream = capture.stream;
+  const vTrack = capture.track;
+  const manualFrameCapture = capture.manualFrameCapture;
   // Use singleton AudioContext (avoids Chrome 6-ctx-per-page limit on repeated renders)
   const audioCtx = acquireAudioCtx();
   if (audioCtx?.state === "suspended") await audioCtx.resume();
@@ -654,7 +657,8 @@ async function renderVideoBlob(opts: {
   // ── Start recording ──
   const done = new Promise<Blob>((resolve) => {
     rec.onstop = () => {
-      combined.getTracks().forEach((t) => t.stop());
+      stopMediaStream(combined);
+      capture.stop();
       // Note: audioCtx is a singleton — do NOT close it between renders
       resolve(createWebmBlob(chunks, rec.mimeType));
     };
@@ -665,7 +669,7 @@ async function renderVideoBlob(opts: {
   const STARTUP_MS = 350;
   await delay(STARTUP_MS);
   if (signal.cancelled) {
-    try { rec.stop(); } catch { /* ignore */ }
+    stopRecorder(rec);
     await done.catch(() => {});
     return createWebmBlob([], rec.mimeType);
   }
@@ -765,13 +769,13 @@ async function renderVideoBlob(opts: {
         focusSet, watermarked, subtitle, codeTheme, bgPreset, frameNum, cursorBlink, particles, resolvedFont);
 
       frameNum++;
-      if (manualFrameCapture && typeof vTrack?.requestFrame === "function") vTrack.requestFrame();
+      if (manualFrameCapture && typeof vTrack.requestFrame === "function") vTrack.requestFrame();
 
       if (ms >= totalMs) {
         stopped = true;
         if (ttsCleanup) ttsCleanup();
         // 400ms tail-buffer so recorder captures last frames
-        setTimeout(() => { rec.stop(); resolve(); }, 400);
+        setTimeout(() => { stopRecorder(rec); resolve(); }, 400);
       } else {
         requestAnimationFrame(rafFrame);
       }
@@ -780,7 +784,12 @@ async function renderVideoBlob(opts: {
     requestAnimationFrame(rafFrame);
   });
 
-  if (signal.cancelled) return createWebmBlob([], rec.mimeType);
+  if (signal.cancelled) {
+    if (ttsCleanup) ttsCleanup();
+    stopRecorder(rec);
+    await done.catch(() => createWebmBlob([], rec.mimeType));
+    return createWebmBlob([], rec.mimeType);
+  }
 
   const webmBlob = await done;
 

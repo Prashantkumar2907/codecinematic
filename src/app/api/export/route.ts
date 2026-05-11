@@ -43,15 +43,21 @@ type ExportRateWindow = {
   count: number;
   resetAt: number;
 };
+type ExportDailyUsageWindow = {
+  count: number;
+  resetAt: number;
+};
 type ApiErrorCode = Parameters<typeof apiError>[0];
 
 const EXPORT_IDEMPOTENCY_WINDOW_MS = 30_000;
 const EXPORT_RATE_LIMIT_WINDOW_MS = 60_000;
 const EXPORT_RATE_LIMIT_UNIQUE_REQUESTS = 20;
+const MAX_EXPORT_CACHE_ENTRIES = 1000;
 
 declare global {
   var __codecinematicExportRequests: Map<string, CachedExportRequest> | undefined;
   var __codecinematicExportRateWindows: Map<string, ExportRateWindow> | undefined;
+  var __codecinematicExportDailyUsage: Map<string, ExportDailyUsageWindow> | undefined;
 }
 
 const exportRequests =
@@ -60,6 +66,9 @@ const exportRequests =
 const exportRateWindows =
   globalThis.__codecinematicExportRateWindows ??
   (globalThis.__codecinematicExportRateWindows = new Map<string, ExportRateWindow>());
+const exportDailyUsage =
+  globalThis.__codecinematicExportDailyUsage ??
+  (globalThis.__codecinematicExportDailyUsage = new Map<string, ExportDailyUsageWindow>());
 
 class ExportRouteError extends Error {
   constructor(
@@ -107,6 +116,11 @@ export async function POST(request: Request) {
     );
   }
 
+  const dailyQuota = reserveDailyExportQuota(session.email, plan, parsed.data.aspectRatios.length);
+  if (!dailyQuota.ok) {
+    return apiError("quota_exceeded", "Daily export limit reached for the current plan.", 429, dailyQuota);
+  }
+
   const promise = createExportJobs(parsed.data, plan);
   exportRequests.set(cacheKey, {
     resetAt: Date.now() + EXPORT_IDEMPOTENCY_WINDOW_MS,
@@ -148,6 +162,40 @@ async function createExportJobs(
       throw new ExportRouteError("forbidden", "Project not found for this user.", 403);
     }
 
+    const utcDayStart = new Date();
+    utcDayStart.setUTCHours(0, 0, 0, 0);
+    const { count: dailyCount, error: dailyCountError } = await context.supabase
+      .from("exports")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", context.user.id)
+      .gte("created_at", utcDayStart.toISOString());
+
+    if (dailyCountError) {
+      throw new ExportRouteError("upstream_error", "Could not verify daily export usage.", 502);
+    }
+
+    if ((dailyCount ?? 0) + exportRequest.aspectRatios.length > plan.maxDailyDownloads) {
+      throw new ExportRouteError("quota_exceeded", "Daily export limit reached for the current plan.", 429, {
+        used: dailyCount ?? 0,
+        requested: exportRequest.aspectRatios.length,
+        limit: plan.maxDailyDownloads,
+      });
+    }
+
+    const { count: storedCount, error: storedCountError } = await context.supabase
+      .from("exports")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", context.user.id)
+      .not("storage_path", "is", null);
+
+    if (storedCountError) {
+      throw new ExportRouteError("upstream_error", "Could not verify stored export usage.", 502);
+    }
+
+    const storageAllowed =
+      plan.maxStoredExports > 0 &&
+      (storedCount ?? 0) + exportRequest.aspectRatios.length <= plan.maxStoredExports;
+
     const rows = exportRequest.aspectRatios.map((aspectRatio) => ({
       project_id: exportRequest.projectId,
       user_id: context.user.id,
@@ -158,7 +206,7 @@ async function createExportJobs(
       watermarked: plan.watermark,
       metadata: {
         requestedBy: "api/export",
-        storageAllowed: plan.maxStoredExports > 0,
+        storageAllowed,
       },
     }));
 
@@ -176,7 +224,7 @@ async function createExportJobs(
       aspectRatio: job.aspect_ratio,
       format: job.export_format,
       watermarked: job.watermarked,
-      storageAllowed: plan.maxStoredExports > 0,
+      storageAllowed,
     }));
   }
 
@@ -190,6 +238,7 @@ async function createExportJobs(
 }
 
 function getCachedExportRequest(cacheKey: string) {
+  pruneExportCaches();
   const cachedRequest = exportRequests.get(cacheKey);
   if (!cachedRequest) {
     return null;
@@ -214,6 +263,7 @@ function buildExportCacheKey(email: string, exportRequest: ExportRequest) {
 }
 
 function isExportRateLimited(email: string) {
+  pruneExportCaches();
   const key = email.toLowerCase();
   const now = Date.now();
   const current = exportRateWindows.get(key);
@@ -229,4 +279,74 @@ function isExportRateLimited(email: string) {
   const count = current.count + 1;
   exportRateWindows.set(key, { ...current, count });
   return count > EXPORT_RATE_LIMIT_UNIQUE_REQUESTS;
+}
+
+function reserveDailyExportQuota(
+  email: string,
+  plan: (typeof PLAN_CONFIG)[keyof typeof PLAN_CONFIG],
+  requestedCount: number,
+) {
+  pruneExportCaches();
+  const key = `${email.toLowerCase()}:${new Date().toISOString().slice(0, 10)}`;
+  const now = Date.now();
+  const resetAt = nextUtcMidnight();
+  const current = exportDailyUsage.get(key);
+
+  if (!current || current.resetAt <= now) {
+    if (requestedCount > plan.maxDailyDownloads) {
+      return { ok: false as const, used: 0, requested: requestedCount, limit: plan.maxDailyDownloads };
+    }
+
+    exportDailyUsage.set(key, { count: requestedCount, resetAt });
+    return { ok: true as const, used: requestedCount, requested: requestedCount, limit: plan.maxDailyDownloads };
+  }
+
+  if (current.count + requestedCount > plan.maxDailyDownloads) {
+    return {
+      ok: false as const,
+      used: current.count,
+      requested: requestedCount,
+      limit: plan.maxDailyDownloads,
+    };
+  }
+
+  exportDailyUsage.set(key, { ...current, count: current.count + requestedCount });
+  return {
+    ok: true as const,
+    used: current.count + requestedCount,
+    requested: requestedCount,
+    limit: plan.maxDailyDownloads,
+  };
+}
+
+function nextUtcMidnight() {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + 1);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function pruneExportCaches() {
+  const now = Date.now();
+  for (const [key, request] of exportRequests) {
+    if (request.resetAt <= now) exportRequests.delete(key);
+  }
+  for (const [key, window] of exportRateWindows) {
+    if (window.resetAt <= now) exportRateWindows.delete(key);
+  }
+  for (const [key, window] of exportDailyUsage) {
+    if (window.resetAt <= now) exportDailyUsage.delete(key);
+  }
+
+  trimMap(exportRequests, MAX_EXPORT_CACHE_ENTRIES);
+  trimMap(exportRateWindows, MAX_EXPORT_CACHE_ENTRIES);
+  trimMap(exportDailyUsage, MAX_EXPORT_CACHE_ENTRIES);
+}
+
+function trimMap<TKey, TValue>(map: Map<TKey, TValue>, maxSize: number) {
+  while (map.size > maxSize) {
+    const firstKey = map.keys().next().value as TKey | undefined;
+    if (firstKey === undefined) return;
+    map.delete(firstKey);
+  }
 }

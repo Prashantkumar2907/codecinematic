@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import type { Narration } from "@/lib/narration";
 import { NEW_PROJECT_ID } from "@/lib/project-ids";
+import type { WorkflowTab } from "@/lib/workflows";
 
 export type EditorDraft = {
   title: string;
@@ -30,9 +31,19 @@ export type ProjectSummary = {
   title: string;
   language: string;
   aspect: "9:16" | "16:9";
+  workflowTab: WorkflowTab;
+  storageMode: "local" | "demo" | "cloud";
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string;
+};
+
+type ProjectSummaryOptions = {
+  workflowTab?: WorkflowTab;
+  storageMode?: ProjectSummary["storageMode"];
+  createdAt?: string;
+  updatedAt?: string;
+  lastOpenedAt?: string;
 };
 
 type EditorStore = {
@@ -43,11 +54,11 @@ type EditorStore = {
   setDraft: (projectId: string, patch: Partial<EditorDraft>) => void;
   replaceDraft: (projectId: string, draft: EditorDraft) => void;
   getDraft: (projectId: string) => EditorDraft | null;
-  createProject: (draft?: Partial<EditorDraft>, projectId?: string) => string;
+  createProject: (draft?: Partial<EditorDraft>, projectId?: string, options?: ProjectSummaryOptions) => string;
   ensureDemoProjectSeed: () => void;
-  ensureProject: (projectId: string, draft?: Partial<EditorDraft>) => void;
+  ensureProject: (projectId: string, draft?: Partial<EditorDraft>, options?: ProjectSummaryOptions) => void;
   deleteProject: (projectId: string) => void;
-  touchProject: (projectId: string, draft?: Partial<EditorDraft>) => void;
+  touchProject: (projectId: string, draft?: Partial<EditorDraft>, options?: ProjectSummaryOptions) => void;
 };
 
 export const defaultEditorDraft: EditorDraft = {
@@ -102,6 +113,7 @@ export function buildEditorDraft(patch: Partial<EditorDraft> = {}): EditorDraft 
 }
 
 const DEMO_PROJECT_ID = "local-demo-api-gateway-explainer";
+const PERSISTENCE_KEY = "codecinematic-editor-store";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -111,15 +123,22 @@ function createId() {
   return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function summaryFromDraft(id: string, draft: EditorDraft, now = new Date().toISOString()): ProjectSummary {
+function summaryFromDraft(
+  id: string,
+  draft: EditorDraft,
+  now = new Date().toISOString(),
+  options: ProjectSummaryOptions = {},
+): ProjectSummary {
   return {
     id,
     title: draft.title.trim() || "Untitled project",
     language: draft.language,
     aspect: draft.aspect,
-    createdAt: now,
-    updatedAt: now,
-    lastOpenedAt: now,
+    workflowTab: options.workflowTab ?? "editor",
+    storageMode: options.storageMode ?? "local",
+    createdAt: options.createdAt ?? now,
+    updatedAt: options.updatedAt ?? now,
+    lastOpenedAt: options.lastOpenedAt ?? now,
   };
 }
 
@@ -161,7 +180,7 @@ export const useEditorStore = create<EditorStore>()(
           }
         })),
       getDraft: (projectId) => get().drafts[projectId] ?? null,
-      createProject: (draftPatch, projectId) => {
+      createProject: (draftPatch, projectId, options) => {
         const id = projectId ?? createId();
         const draft = buildEditorDraft(draftPatch);
         const now = new Date().toISOString();
@@ -173,7 +192,7 @@ export const useEditorStore = create<EditorStore>()(
           },
           projects: {
             ...state.projects,
-            [id]: summaryFromDraft(id, draft, now),
+            [id]: summaryFromDraft(id, draft, now, options),
           },
           projectOrder: [id, ...state.projectOrder.filter((existingId) => existingId !== id)],
         }));
@@ -201,13 +220,16 @@ export const useEditorStore = create<EditorStore>()(
             },
             projects: {
               ...state.projects,
-              [DEMO_PROJECT_ID]: summaryFromDraft(DEMO_PROJECT_ID, draft, now),
+              [DEMO_PROJECT_ID]: summaryFromDraft(DEMO_PROJECT_ID, draft, now, {
+                workflowTab: "editor",
+                storageMode: "local",
+              }),
             },
             projectOrder: [DEMO_PROJECT_ID],
           };
         });
       },
-      ensureProject: (projectId, draftPatch) => {
+      ensureProject: (projectId, draftPatch, options) => {
         if (projectId === NEW_PROJECT_ID) return;
 
         set((state) => {
@@ -229,10 +251,13 @@ export const useEditorStore = create<EditorStore>()(
                     title: draft.title.trim() || "Untitled project",
                     language: draft.language,
                     aspect: draft.aspect,
-                    updatedAt: now,
-                    lastOpenedAt: now,
+                    workflowTab: options?.workflowTab ?? existingProject.workflowTab ?? "editor",
+                    storageMode: options?.storageMode ?? existingProject.storageMode ?? "local",
+                    createdAt: options?.createdAt ?? existingProject.createdAt,
+                    updatedAt: options?.updatedAt ?? now,
+                    lastOpenedAt: options?.lastOpenedAt ?? now,
                   }
-                : summaryFromDraft(projectId, draft, now),
+                : summaryFromDraft(projectId, draft, now, options),
             },
             projectOrder: [projectId, ...state.projectOrder.filter((existingId) => existingId !== projectId)],
           };
@@ -249,13 +274,13 @@ export const useEditorStore = create<EditorStore>()(
             projectOrder: state.projectOrder.filter((existingId) => existingId !== projectId),
           };
         }),
-      touchProject: (projectId, draftPatch) => {
+      touchProject: (projectId, draftPatch, options) => {
         if (projectId === NEW_PROJECT_ID) return;
 
         set((state) => {
           const draft = buildEditorDraft({ ...(state.drafts[projectId] ?? defaultEditorDraft), ...draftPatch });
           const now = new Date().toISOString();
-          const project = state.projects[projectId] ?? summaryFromDraft(projectId, draft, now);
+          const project = state.projects[projectId] ?? summaryFromDraft(projectId, draft, now, options);
 
           return {
             projects: {
@@ -265,8 +290,11 @@ export const useEditorStore = create<EditorStore>()(
                 title: draft.title.trim() || "Untitled project",
                 language: draft.language,
                 aspect: draft.aspect,
-                updatedAt: now,
-                lastOpenedAt: now,
+                workflowTab: options?.workflowTab ?? project.workflowTab ?? "editor",
+                storageMode: options?.storageMode ?? project.storageMode ?? "local",
+                createdAt: options?.createdAt ?? project.createdAt,
+                updatedAt: options?.updatedAt ?? now,
+                lastOpenedAt: options?.lastOpenedAt ?? now,
               },
             },
             projectOrder: [projectId, ...state.projectOrder.filter((existingId) => existingId !== projectId)],
@@ -275,15 +303,71 @@ export const useEditorStore = create<EditorStore>()(
       },
     }),
     {
-      name: "codecinematic-editor-store",
-      storage: createJSONStorage(() => localStorage),
-      version: 2,
+      name: PERSISTENCE_KEY,
+      storage: createJSONStorage(() => createSafeLocalStorage()),
+      version: 3,
       partialize: (state) => ({
         drafts: state.drafts,
         projects: state.projects,
         projectOrder: state.projectOrder,
         demoProjectSeeded: state.demoProjectSeeded,
       }),
+      migrate: (persisted) => {
+        if (!persisted || typeof persisted !== "object") {
+          return persisted;
+        }
+
+        const state = persisted as Partial<EditorStore>;
+        const projects = Object.fromEntries(
+          Object.entries(state.projects ?? {}).map(([id, project]) => [
+            id,
+            {
+              ...project,
+              workflowTab: project.workflowTab ?? "editor",
+              storageMode: project.storageMode ?? "local",
+            },
+          ]),
+        );
+
+        return {
+          ...state,
+          projects,
+        };
+      },
     }
   )
 );
+
+function createSafeLocalStorage(): Storage {
+  return {
+    get length() {
+      return localStorage.length;
+    },
+    clear() {
+      localStorage.clear();
+    },
+    getItem(name) {
+      const value = localStorage.getItem(name);
+      if (name !== PERSISTENCE_KEY || value === null) {
+        return value;
+      }
+
+      try {
+        JSON.parse(value);
+        return value;
+      } catch {
+        localStorage.removeItem(name);
+        return null;
+      }
+    },
+    key(index) {
+      return localStorage.key(index);
+    },
+    removeItem(name) {
+      localStorage.removeItem(name);
+    },
+    setItem(name, value) {
+      localStorage.setItem(name, value);
+    },
+  };
+}

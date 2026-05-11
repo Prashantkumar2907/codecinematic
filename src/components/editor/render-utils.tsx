@@ -2,6 +2,7 @@
 
 import type { Narration } from "@/lib/narration";
 import { createWebmBlob, createWebmRecorder, pickWebmMimeType } from "./shared/media-recorder";
+import { captureCanvasStream, stopMediaStream, stopRecorder } from "./shared/rendering-resources";
 
 /**
  * Stripped-down render function for the pipeline flow.
@@ -49,11 +50,11 @@ export async function renderVideoBlobFromPipeline({
   if (!ctxRaw) throw new Error("Canvas 2D not available.");
   const ctx: CanvasRenderingContext2D = ctxRaw;
 
-  const videoStream = canvas.captureStream(30);
+  const capture = captureCanvasStream(canvas, 30);
   const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
   const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
   const stream = new MediaStream([
-    ...videoStream.getVideoTracks(),
+    ...capture.stream.getVideoTracks(),
     ...(audioDest ? audioDest.stream.getAudioTracks() : []),
   ]);
 
@@ -68,7 +69,8 @@ export async function renderVideoBlobFromPipeline({
 
   const done = new Promise<Blob>((resolve) => {
     recorder.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
+      stopMediaStream(stream);
+      capture.stop();
       if (audioCtx) void audioCtx.close();
       resolve(createWebmBlob(chunks, recorder.mimeType));
     };
@@ -92,11 +94,12 @@ export async function renderVideoBlobFromPipeline({
       const subtitle = narration ? findSubtitle(narration, state.activeLine) : null;
 
       paint(ctx, preset.width, preset.height, title, language, state.visible, state.activeLine, preset.maxVisibleLines, preset.fontSize, focusSet, watermarked, subtitle);
+      capture.requestFrame();
 
       if (elapsed < dur) {
         requestAnimationFrame(draw);
       } else {
-        setTimeout(() => { recorder.stop(); resolve(); }, 500);
+        setTimeout(() => { stopRecorder(recorder); resolve(); }, 500);
       }
     }
     requestAnimationFrame(draw);

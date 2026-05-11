@@ -6,8 +6,10 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 
 import { ProjectEditor } from "@/components/editor/project-editor";
-import type { EditorDraft } from "@/lib/editor-store";
+import { useEditorStore, type EditorDraft } from "@/lib/editor-store";
 import type { PlanCode } from "@/lib/plans";
+import { NEW_PROJECT_ID } from "@/lib/project-ids";
+import { isWorkflowTab, type WorkflowTab } from "@/lib/workflows";
 
 const BollywoodPanel = dynamic(() => import("@/components/editor/bollywood-panel").then((mod) => mod.BollywoodPanel));
 const DidYouKnowPanel = dynamic(() => import("@/components/editor/did-you-know-panel").then((mod) => mod.DidYouKnowPanel));
@@ -16,32 +18,37 @@ const ShayariPanel = dynamic(() => import("@/components/editor/shayari-panel").t
 const SuvicharPanel = dynamic(() => import("@/components/editor/suvichar-panel").then((mod) => mod.SuvicharPanel));
 const WordOfDayPanel = dynamic(() => import("@/components/editor/word-of-day-panel").then((mod) => mod.WordOfDayPanel));
 
-const tabIds = ["editor", "wordofday", "didyouknow", "shayari", "suvichar", "bollywood", "factshindi"] as const;
-
-type TabId = (typeof tabIds)[number];
-
 export function ProjectWorkspace({
   plan,
   projectId,
   initialDraft,
+  initialWorkflowTab = "editor",
 }: {
   plan: PlanCode;
   projectId: string;
   initialDraft?: Partial<EditorDraft>;
+  initialWorkflowTab?: WorkflowTab;
 }) {
   const searchParams = useSearchParams();
   const prefersReducedMotion = useReducedMotion();
-  const initialTab = (searchParams.get("tab") as TabId) || "editor";
-  const [activeTab, setActiveTab] = useState<TabId>(
-    tabIds.includes(initialTab) ? initialTab : "editor",
+  const touchProject = useEditorStore((state) => state.touchProject);
+  const requestedTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<WorkflowTab>(
+    isWorkflowTab(requestedTab) ? requestedTab : initialWorkflowTab,
   );
 
   useEffect(() => {
-    const tab = searchParams.get("tab") as TabId;
-    if (tab && tabIds.includes(tab)) {
+    const tab = searchParams.get("tab");
+    if (isWorkflowTab(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (projectId !== NEW_PROJECT_ID) {
+      touchProject(projectId, initialDraft, { workflowTab: activeTab });
+    }
+  }, [activeTab, initialDraft, projectId, touchProject]);
 
   const content = {
     editor: <ProjectEditor plan={plan} projectId={projectId} initialDraft={initialDraft} />,
@@ -51,7 +58,7 @@ export function ProjectWorkspace({
     suvichar: <SuvicharPanel projectId={projectId} />,
     bollywood: <BollywoodPanel projectId={projectId} />,
     factshindi: <FactsHindiPanel projectId={projectId} />,
-  } satisfies Record<TabId, ReactNode>;
+  } satisfies Record<WorkflowTab, ReactNode>;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">

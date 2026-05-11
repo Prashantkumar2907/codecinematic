@@ -20,8 +20,9 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { defaultEditorDraft, useEditorStore } from "@/lib/editor-store";
+import { defaultEditorDraft, type ProjectSummary, useEditorStore } from "@/lib/editor-store";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
+import { WORKFLOW_LABELS, type WorkflowTab } from "@/lib/workflows";
 
 const workflows = [
   { label: "Code Studio", desc: "Write code and render a cinematic typing video", tab: "editor", icon: Film },
@@ -37,10 +38,12 @@ export function DashboardWorkspace({
   userName,
   planCode,
   seedDemoProject = false,
+  cloudProjects = [],
 }: {
   userName: string;
   planCode: PlanCode;
   seedDemoProject?: boolean;
+  cloudProjects?: ProjectSummary[];
 }) {
   const router = useRouter();
   const plan = PLAN_CONFIG[planCode];
@@ -53,7 +56,16 @@ export function DashboardWorkspace({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const recentProjects = projectOrder.map((id) => projects[id]).filter(Boolean).slice(0, 6);
+  const [deletedCloudProjectIds, setDeletedCloudProjectIds] = useState<string[]>([]);
+  const deletedCloudProjectSet = new Set(deletedCloudProjectIds);
+  const localRecentProjects = projectOrder.map((id) => projects[id]).filter(Boolean);
+  const localProjectIds = new Set(localRecentProjects.map((project) => project.id));
+  const recentProjects = [
+    ...cloudProjects.filter((project) => !localProjectIds.has(project.id) && !deletedCloudProjectSet.has(project.id)),
+    ...localRecentProjects,
+  ]
+    .sort((a, b) => Date.parse(b.lastOpenedAt) - Date.parse(a.lastOpenedAt))
+    .slice(0, 6);
 
   const metrics = [
     { icon: Layers, label: "Stored exports", value: String(plan.maxStoredExports) },
@@ -62,10 +74,13 @@ export function DashboardWorkspace({
     { icon: Ruler, label: "Max chars / line", value: String(plan.maxLineLength) },
   ];
 
-  function startWorkflow(tab: (typeof workflows)[number]["tab"], label: string) {
+  function startWorkflow(tab: WorkflowTab, label: string) {
     const projectId = createProject({
       ...defaultEditorDraft,
       title: tab === "editor" ? defaultEditorDraft.title : `${label} video`,
+    }, undefined, {
+      workflowTab: tab,
+      storageMode: "local",
     });
 
     router.push(`/projects/${projectId}?tab=${tab}`);
@@ -90,6 +105,7 @@ export function DashboardWorkspace({
       }
 
       deleteProject(projectId);
+      setDeletedCloudProjectIds((current) => [...new Set([...current, projectId])]);
       setPendingDeleteId(null);
     } catch (error) {
       setDeleteError(error instanceof Error ? error.message : "Could not delete project.");
@@ -199,7 +215,8 @@ export function DashboardWorkspace({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{project.title}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        {project.language} - {project.aspect} - Updated {new Date(project.updatedAt).toLocaleDateString()}
+                        {WORKFLOW_LABELS[project.workflowTab ?? "editor"]} - {project.storageMode}
+                        {" "} - Updated {new Date(project.updatedAt).toLocaleDateString()}
                       </p>
                     </div>
                     <button
@@ -245,7 +262,7 @@ export function DashboardWorkspace({
                     </div>
                   ) : null}
                   <Link
-                    href={`/projects/${project.id}?tab=editor`}
+                    href={`/projects/${project.id}?tab=${project.workflowTab ?? "editor"}`}
                     className="mt-3 inline-flex h-8 items-center rounded-md border border-border/60 px-3 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-primary/10"
                   >
                     Open project

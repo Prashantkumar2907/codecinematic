@@ -14,6 +14,7 @@ import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground, wrapText } from "./shared/canvas-utils";
 import { playTypingPulse } from "./shared/audio-utils";
 import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
+import { captureCanvasStream, closeImageBitmapSafely, stopMediaStream, stopRecorder } from "./shared/rendering-resources";
 
 const ASPECT_OPTIONS = [
   { value: "9:16", label: "Vertical 9:16", w: 720, h: 1280 },
@@ -64,11 +65,22 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
   }, [uploadedImageUrl]);
 
+  useEffect(() => () => {
+    closeImageBitmapSafely(bgImage);
+  }, [bgImage]);
+
   // Handle image upload
-  function handleImageUpload(file: File) {
+  async function handleImageUpload(file: File) {
     const url = URL.createObjectURL(file);
     setUploadedImageUrl(url);
-    createImageBitmap(file).then(setBgImage);
+    try {
+      setBgImage(await createImageBitmap(file));
+    } catch {
+      URL.revokeObjectURL(url);
+      setUploadedImageUrl(null);
+      setBgImage(null);
+      setProgress("Could not load that image.");
+    }
   }
   function handleImageClear() {
     setUploadedImageUrl(null);
@@ -120,10 +132,9 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     const audioCtx = typeof AudioContext !== "undefined" ? new AudioContext() : null;
     const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
-    const videoStream = canvas.captureStream(0);
-    const videoTrack = videoStream.getVideoTracks()[0] as (MediaStreamTrack & { requestFrame?: () => void }) | undefined;
+    const capture = captureCanvasStream(canvas, fps);
     const combinedStream = new MediaStream([
-      ...videoStream.getVideoTracks(),
+      ...capture.stream.getVideoTracks(),
       ...(audioDest ? audioDest.stream.getAudioTracks() : []),
     ]);
 
@@ -134,7 +145,11 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
     const done = new Promise<Blob>((resolve) => {
-      recorder.onstop = () => resolve(createWebmBlob(chunks, recorder.mimeType));
+      recorder.onstop = () => {
+        stopMediaStream(combinedStream);
+        capture.stop();
+        resolve(createWebmBlob(chunks, recorder.mimeType));
+      };
     });
 
     // Schedule typing sounds: evenly spaced, one sound per character
@@ -178,7 +193,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       setProgress(`Rendering... ${Math.round((frame / totalFrames) * 100)}%`);
 
       // Explicitly capture the painted frame into the MediaRecorder stream
-      videoTrack?.requestFrame?.();
+      capture.requestFrame();
       // Pace to wall-clock time so recorded video matches real-time duration
       const targetWall = renderStart + (frame + 1) * (1000 / fps);
       const remainingMs = targetWall - performance.now();
@@ -187,7 +202,7 @@ export function WordOfDayPanel({ projectId }: { projectId: string }) {
       }
     }
 
-    recorder.stop();
+    stopRecorder(recorder);
     const blob = await done;
     if (audioCtx) audioCtx.close();
     const url = URL.createObjectURL(blob);

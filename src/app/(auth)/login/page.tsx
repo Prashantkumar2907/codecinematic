@@ -41,14 +41,13 @@ function LoginForm() {
     urlError ? (AUTH_ERROR_MESSAGES[urlError] ?? "An error occurred. Please try again.") : null
   );
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function signInWithCredentials(nextEmail: string, nextPassword: string) {
     setLoading(true);
     setError(null);
 
     const formData = new FormData();
-    formData.set("email", email);
-    formData.set("password", password);
+    formData.set("email", nextEmail);
+    formData.set("password", nextPassword);
 
     try {
       const res = await fetch("/api/auth/demo-login", { method: "POST", body: formData });
@@ -77,10 +76,16 @@ function LoginForm() {
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await signInWithCredentials(email, password);
+  }
+
   function usePremiumDemo() {
     setEmail(DEMO_PREMIUM_EMAIL);
     setPassword(DEMO_PREMIUM_PASSWORD);
     setError(null);
+    void signInWithCredentials(DEMO_PREMIUM_EMAIL, DEMO_PREMIUM_PASSWORD);
   }
 
   return (
@@ -197,11 +202,12 @@ function LoginForm() {
             <button
               type="button"
               onClick={usePremiumDemo}
+              disabled={loading}
               className="flex w-full items-center justify-between rounded-md border border-primary/25 bg-primary/8 px-3 py-2 text-left text-xs transition-colors hover:bg-primary/12"
             >
               <span className="flex items-center gap-2 font-semibold text-primary">
                 <Crown className="h-3.5 w-3.5" />
-                Premium demo
+                Sign in as premium demo
               </span>
               <span className="font-mono text-[10px] text-muted-foreground">{DEMO_PREMIUM_EMAIL}</span>
             </button>

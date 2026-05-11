@@ -164,6 +164,18 @@ export function ProjectEditor({
       language,
       aspectRatioMode: aspectRatioMode,
       contentRaw: code,
+      normalSpeed,
+      focusSpeed,
+      sound,
+      soundVolume,
+      focus: normalizedEnabledFocusLines,
+      narration: draft.narration,
+      bgPresetId,
+      theme,
+      codeFont,
+      cursorBlink,
+      focusFlash,
+      workflowTab: "editor",
     };
 
     const response = projectId === NEW_PROJECT_ID
@@ -180,7 +192,7 @@ export function ProjectEditor({
 
     const data = (await response.json().catch(() => null)) as {
       ok?: boolean;
-      data?: { projectId?: string };
+      data?: { projectId?: string; mode?: "supabase" | "demo" };
       error?: { message?: string } | string;
     } | null;
 
@@ -189,7 +201,10 @@ export function ProjectEditor({
       throw new Error(message ?? "Could not save project.");
     }
 
-    return data.data?.projectId ?? projectId;
+    return {
+      projectId: data.data?.projectId ?? projectId,
+      mode: data.data?.mode ?? "demo",
+    };
   }
 
   async function handleContinue() {
@@ -201,12 +216,21 @@ export function ProjectEditor({
     setSaveError(null);
 
     let savedProjectId = projectId;
+    let savedMode: "supabase" | "demo" = "demo";
     try {
-      savedProjectId = await persistProject();
+      const savedProject = await persistProject();
+      savedProjectId = savedProject.projectId;
+      savedMode = savedProject.mode;
       if (projectId === NEW_PROJECT_ID) {
-        createProject({ ...draft, focus: normalizedEnabledFocusLines }, savedProjectId);
+        createProject({ ...draft, focus: normalizedEnabledFocusLines }, savedProjectId, {
+          workflowTab: "editor",
+          storageMode: savedMode === "supabase" ? "cloud" : "demo",
+        });
       } else {
-        touchProject(projectId, draft);
+        touchProject(projectId, draft, {
+          workflowTab: "editor",
+          storageMode: savedMode === "supabase" ? "cloud" : "demo",
+        });
       }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Could not save project.");

@@ -1,18 +1,16 @@
-import { z } from "zod";
-
 import { apiError, apiSuccess, readJsonBody } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { deleteDemoProject, getDemoProject, saveDemoProject } from "@/lib/demo-project-store";
+import {
+  buildProjectStructuredContent,
+  editorDraftFromPayload,
+  editorProjectPayloadSchema,
+  mergeProjectDraft,
+  readProjectStructuredContent,
+} from "@/lib/editor-projects";
 import { isRoutableProjectId, isUuid } from "@/lib/project-ids";
 import { validateCodePayload } from "@/lib/quotas/limits";
 import { getSupabaseUserContext } from "@/lib/supabase/domain";
-
-const projectUpdateSchema = z.object({
-  title: z.string().trim().min(2).max(120),
-  language: z.string().trim().min(1).max(40),
-  aspectRatioMode: z.enum(["9:16", "16:9", "both"]),
-  contentRaw: z.string().min(1),
-});
 
 type Params = {
   params: Promise<{ projectId: string }>;
@@ -33,7 +31,7 @@ export async function GET(_request: Request, { params }: Params) {
   if (context && isUuid(projectId)) {
     const { data, error } = await context.supabase
       .from("projects")
-      .select("id, title, primary_language, content_raw, aspect_ratio_mode, updated_at")
+      .select("id, title, primary_language, content_raw, aspect_ratio_mode, content_structured, updated_at")
       .eq("id", projectId)
       .eq("user_id", context.user.id)
       .maybeSingle();
@@ -46,6 +44,16 @@ export async function GET(_request: Request, { params }: Params) {
       return apiError("not_found", "Project not found.", 404);
     }
 
+    const structured = mergeProjectDraft(
+      {
+        title: data.title,
+        language: data.primary_language,
+        code: data.content_raw,
+        aspect: data.aspect_ratio_mode === "16:9" ? "16:9" : "9:16",
+      },
+      data.content_structured,
+    );
+
     return apiSuccess({
       project: {
         id: data.id,
@@ -53,6 +61,8 @@ export async function GET(_request: Request, { params }: Params) {
         language: data.primary_language,
         contentRaw: data.content_raw,
         aspectRatioMode: data.aspect_ratio_mode,
+        editorDraft: structured.draft,
+        workflowTab: structured.workflowTab,
         updatedAt: data.updated_at,
       },
     });
@@ -67,6 +77,11 @@ export async function GET(_request: Request, { params }: Params) {
     );
   }
 
+  const demoStructured = readProjectStructuredContent({
+    workflowTab: demoProject.workflowTab,
+    editorDraft: demoProject.editorDraft,
+  });
+
   return apiSuccess({
     project: {
       id: demoProject.id,
@@ -74,6 +89,14 @@ export async function GET(_request: Request, { params }: Params) {
       language: demoProject.language,
       contentRaw: demoProject.contentRaw,
       aspectRatioMode: demoProject.aspectRatioMode,
+      editorDraft: {
+        title: demoProject.title,
+        language: demoProject.language,
+        code: demoProject.contentRaw,
+        aspect: demoProject.aspectRatioMode === "16:9" ? "16:9" : "9:16",
+        ...demoStructured.editorDraft,
+      },
+      workflowTab: demoStructured.workflowTab,
       updatedAt: demoProject.updatedAt,
     },
   });
@@ -90,7 +113,7 @@ export async function PUT(request: Request, { params }: Params) {
     return apiError("not_found", "Project not found.", 404);
   }
 
-  const parsed = projectUpdateSchema.safeParse(await readJsonBody(request));
+  const parsed = editorProjectPayloadSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return apiError("invalid_payload", "Invalid payload", 400, parsed.error.flatten());
   }
@@ -112,6 +135,7 @@ export async function PUT(request: Request, { params }: Params) {
         title: parsed.data.title,
         primary_language: parsed.data.language,
         content_raw: parsed.data.contentRaw,
+        content_structured: buildProjectStructuredContent(parsed.data, "api/projects/[projectId]"),
         aspect_ratio_mode: parsed.data.aspectRatioMode,
         max_line_count_applied: validation.limits.maxCodeLines,
         max_line_length_applied: validation.limits.maxLineLength,
@@ -138,6 +162,8 @@ export async function PUT(request: Request, { params }: Params) {
       language: parsed.data.language,
       aspectRatioMode: parsed.data.aspectRatioMode,
       contentRaw: parsed.data.contentRaw,
+      editorDraft: editorDraftFromPayload(parsed.data),
+      workflowTab: parsed.data.workflowTab ?? "editor",
     });
   }
 

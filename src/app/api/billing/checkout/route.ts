@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession, type AppSession } from "@/lib/auth";
 import type { PlanCode } from "@/lib/plans";
+import { getSupabaseUserContext } from "@/lib/supabase/domain";
 
 const paidPlanCodes = ["basic", "medium", "high"] as const satisfies readonly PlanCode[];
 type PaidPlanCode = (typeof paidPlanCodes)[number];
@@ -50,14 +51,22 @@ async function createCheckoutRedirect(request: Request, session: AppSession, pla
     }
 
     const appUrl = getAppUrl(requestOrigin);
+    const context = await getSupabaseUserContext();
+    const metadata = {
+      plan: planCode,
+      email: session.email,
+      ...(context?.user.id ? { userId: context.user.id } : {}),
+    };
     const checkoutSession = await client.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       customer_email: session.email,
+      client_reference_id: context?.user.id,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/dashboard?upgraded=true`,
       cancel_url: `${appUrl}/pricing`,
-      metadata: { plan: planCode, email: session.email },
+      metadata,
+      subscription_data: { metadata },
     });
 
     return NextResponse.redirect(checkoutSession.url ?? `${appUrl}/pricing`);

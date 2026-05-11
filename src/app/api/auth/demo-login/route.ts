@@ -26,6 +26,7 @@ const SESSION_COOKIE_OPTIONS = {
 
 const MAX_FAILED_ATTEMPTS = 6;
 const FAILED_ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
+const MAX_LOGIN_ATTEMPT_KEYS = 1000;
 
 type LoginAttempt = {
   count: number;
@@ -117,6 +118,7 @@ async function getLoginAttemptKey(email: string): Promise<string> {
 }
 
 function isRateLimited(key: string): boolean {
+  pruneLoginAttempts();
   const attempt = loginAttempts.get(key);
   if (!attempt) return false;
 
@@ -130,6 +132,7 @@ function isRateLimited(key: string): boolean {
 }
 
 function recordFailedAttempt(key: string) {
+  pruneLoginAttempts();
   const now = Date.now();
   const current = loginAttempts.get(key);
 
@@ -143,4 +146,21 @@ function recordFailedAttempt(key: string) {
 
 function clearFailedAttempts(key: string) {
   loginAttempts.delete(key);
+}
+
+function pruneLoginAttempts() {
+  const now = Date.now();
+  for (const [key, attempt] of loginAttempts) {
+    if (attempt.resetAt <= now) {
+      loginAttempts.delete(key);
+    }
+  }
+
+  if (loginAttempts.size <= MAX_LOGIN_ATTEMPT_KEYS) return;
+
+  const overflow = loginAttempts.size - MAX_LOGIN_ATTEMPT_KEYS;
+  [...loginAttempts.entries()]
+    .sort(([, a], [, b]) => a.resetAt - b.resetAt)
+    .slice(0, overflow)
+    .forEach(([key]) => loginAttempts.delete(key));
 }

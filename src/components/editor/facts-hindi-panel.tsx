@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
 import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
+import { captureCanvasStream, closeImageBitmapSafely, stopMediaStream, stopRecorder } from "./shared/rendering-resources";
 
 const FACTS_BG: BgPreset[] = [
   {
@@ -274,6 +275,10 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
   }, [uploadedImageUrl]);
 
+  useEffect(() => () => {
+    closeImageBitmapSafely(bgImage);
+  }, [bgImage]);
+
   useEffect(() => {
     if (titlePreset !== "custom") {
       setTitleText(TITLE_PRESETS.find((p) => p.value === titlePreset)?.label ?? "क्या आप जानते हैं?");
@@ -292,10 +297,16 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     drawFactFrame(ctx, 320, 568, bgPreset, bgImage, titleText, fact, 1, 1, font, Math.round(fontSize * 0.42), textColor, accentColor);
   }, [facts, visiblePreviewFactIdx, titleText, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
 
-  function handleImageUpload(file: File) {
+  async function handleImageUpload(file: File) {
     const url = URL.createObjectURL(file);
     setUploadedImageUrl(url);
-    createImageBitmap(file).then(setBgImage);
+    try {
+      setBgImage(await createImageBitmap(file));
+    } catch {
+      URL.revokeObjectURL(url);
+      setUploadedImageUrl(null);
+      setBgImage(null);
+    }
   }
 
   function handleImageClear() {
@@ -344,16 +355,22 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     const ms: number[] = validFacts.map((f) => Math.max(1200, Array.from(f.text).length * (55 / charSpeed) + 800));
     const totalMs = ms.reduce((a, b) => a + b, 0) + validFacts.length * 800 + 1500;
 
-    const vStream = (canvas as any).captureStream(0) as MediaStream;
-    const vTrack = vStream.getVideoTracks()[0] as any;
+    const capture = captureCanvasStream(canvas, 30);
+    const vStream = capture.stream;
     const chunks: Blob[] = [];
     const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
+    const done = new Promise<Blob>((resolve) => {
+      rec.onstop = () => {
+        stopMediaStream(vStream);
+        capture.stop();
+        resolve(createWebmBlob(chunks, rec.mimeType));
+      };
+    });
 
     rec.start(200);
     await new Promise<void>((r) => setTimeout(r, 300));
-    if (cancelRef.current) { rec.stop(); setRendering(false); return; }
+    if (cancelRef.current) { stopRecorder(rec); setRendering(false); return; }
 
     // Build cumulative timeline
     const titleDur = 900;
@@ -364,7 +381,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
     const t0 = performance.now();
     await new Promise<void>((resolve) => {
       function frame() {
-        if (cancelRef.current) { resolve(); return; }
+        if (cancelRef.current) { stopRecorder(rec); resolve(); return; }
         const elapsed = Math.min(performance.now() - t0, totalMs);
 
         const titleProg = Math.min(1, elapsed / titleDur);
@@ -375,9 +392,9 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
         const factProg = Math.min(1, Math.max(0, (elapsed - factStart) / factDur));
 
         drawFactFrame(ctx, dim.w, dim.h, bgPreset, bgImage, titleText, activeFact, factProg, titleProg, font, fontSize, textColor, accentColor);
-        vTrack?.requestFrame?.();
+        capture.requestFrame();
 
-        if (elapsed >= totalMs) { rec.stop(); resolve(); }
+        if (elapsed >= totalMs) { stopRecorder(rec); resolve(); }
         else requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
@@ -444,7 +461,7 @@ export function FactsHindiPanel({ projectId }: { projectId: string }) {
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
-                <select value={aspect} onChange={(e) => setAspect(e.target.value as any)}
+                <select value={aspect} onChange={(e) => setAspect(e.target.value as "9:16" | "16:9")}
                   className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs">
                   <option value="9:16">Vertical 9:16</option>
                   <option value="16:9">Landscape 16:9</option>

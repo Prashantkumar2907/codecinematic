@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { BgPicker } from "./shared/bg-picker";
 import { BG_PRESETS, type BgPreset, drawBackground } from "./shared/canvas-utils";
 import { createWebmBlob, createWebmRecorder } from "./shared/media-recorder";
+import { captureCanvasStream, closeImageBitmapSafely, stopMediaStream, stopRecorder } from "./shared/rendering-resources";
 
 // ── Shayari-specific background presets ─────────────────────────────────────
 const SHAYARI_BG: BgPreset[] = [
@@ -213,6 +214,10 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
     if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
   }, [uploadedImageUrl]);
 
+  useEffect(() => () => {
+    closeImageBitmapSafely(bgImage);
+  }, [bgImage]);
+
   // Live preview
   useEffect(() => {
     const c = previewRef.current;
@@ -224,10 +229,16 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
     drawFrame(ctx, 320, 568, bgPreset, bgImage, linesArr, author, font, textColor, accentColor, 1, linesArr.map(() => 1), Math.round(fontSize * 0.38));
   }, [lines, author, font, fontSize, textColor, accentColor, bgPreset, bgImage]);
 
-  function handleImageUpload(file: File) {
+  async function handleImageUpload(file: File) {
     const url = URL.createObjectURL(file);
     setUploadedImageUrl(url);
-    createImageBitmap(file).then(setBgImage);
+    try {
+      setBgImage(await createImageBitmap(file));
+    } catch {
+      URL.revokeObjectURL(url);
+      setUploadedImageUrl(null);
+      setBgImage(null);
+    }
   }
   function handleImageClear() { setUploadedImageUrl(null); setBgImage(null); }
 
@@ -259,23 +270,29 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
     const totalMs = acc + 1200; // outro hold
 
     // Streams
-    const vStream = (canvas as any).captureStream(0) as MediaStream;
-    const vTrack = vStream.getVideoTracks()[0] as any;
+    const capture = captureCanvasStream(canvas, fps);
+    const vStream = capture.stream;
     const chunks: Blob[] = [];
     const rec = createWebmRecorder(vStream, { videoBitsPerSecond: 6_000_000 });
     rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    const done = new Promise<Blob>((resolve) => { rec.onstop = () => resolve(createWebmBlob(chunks, rec.mimeType)); });
+    const done = new Promise<Blob>((resolve) => {
+      rec.onstop = () => {
+        stopMediaStream(vStream);
+        capture.stop();
+        resolve(createWebmBlob(chunks, rec.mimeType));
+      };
+    });
 
     rec.start(200);
     await new Promise<void>((res) => setTimeout(res, 300));
 
-    if (cancelRef.current) { rec.stop(); setRendering(false); return; }
+    if (cancelRef.current) { stopRecorder(rec); setRendering(false); return; }
 
     const t0 = performance.now();
 
     await new Promise<void>((resolve) => {
       function frame() {
-        if (cancelRef.current) { resolve(); return; }
+        if (cancelRef.current) { stopRecorder(rec); resolve(); return; }
         const elapsed = performance.now() - t0;
         const ms = Math.min(elapsed, totalMs);
 
@@ -291,10 +308,10 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
         drawFrame(ctx, dim.w, dim.h, bgPreset, bgImage, linesArr, author, font, textColor, accentColor,
           overallProgress, lineProgress, fontSize);
 
-        vTrack?.requestFrame?.();
+        capture.requestFrame();
 
         if (ms >= totalMs) {
-          rec.stop();
+          stopRecorder(rec);
           resolve();
         } else {
           requestAnimationFrame(frame);
@@ -338,7 +355,7 @@ export function ShayariPanel({ projectId }: { projectId: string }) {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">RATIO</span>
-                  <select value={aspect} onChange={(e) => setAspect(e.target.value as any)}
+                  <select value={aspect} onChange={(e) => setAspect(e.target.value as "9:16" | "16:9")}
                     className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1">
                     {ASPECT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>

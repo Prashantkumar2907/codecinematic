@@ -1,4 +1,4 @@
-const CACHE_NAME = "codecinematic-v1";
+const CACHE_NAME = "codecinematic-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 const PRIVATE_PREFIXES = ["/api/", "/dashboard", "/projects"];
 
@@ -43,14 +43,13 @@ self.addEventListener("fetch", (event) => {
 
   if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest") {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
+      fetch(request)
+        .then((response) => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           return response;
-        });
-      })
+        })
+        .catch(() => caches.match(request))
     );
   }
 });

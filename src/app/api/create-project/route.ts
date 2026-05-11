@@ -1,19 +1,11 @@
 import { randomUUID } from "crypto";
 
-import { z } from "zod";
-
 import { apiError, apiSuccess, readJsonBody } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { saveDemoProject } from "@/lib/demo-project-store";
+import { buildProjectStructuredContent, editorProjectPayloadSchema, editorDraftFromPayload } from "@/lib/editor-projects";
 import { validateCodePayload } from "@/lib/quotas/limits";
 import { getSupabaseUserContext } from "@/lib/supabase/domain";
-
-const projectSchema = z.object({
-  title: z.string().trim().min(2).max(120),
-  language: z.string().trim().min(1).max(40),
-  aspectRatioMode: z.enum(["9:16", "16:9", "both"]),
-  contentRaw: z.string().min(1),
-});
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -21,7 +13,7 @@ export async function POST(request: Request) {
     return apiError("unauthorized", "Unauthorized", 401);
   }
 
-  const parsed = projectSchema.safeParse(await readJsonBody(request));
+  const parsed = editorProjectPayloadSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return apiError("invalid_payload", "Invalid payload", 400, parsed.error.flatten());
   }
@@ -45,10 +37,7 @@ export async function POST(request: Request) {
         slug: slugify(parsed.data.title),
         primary_language: parsed.data.language,
         content_raw: parsed.data.contentRaw,
-        content_structured: {
-          source: "code_studio",
-          createdVia: "api/create-project",
-        },
+        content_structured: buildProjectStructuredContent(parsed.data, "api/create-project"),
         aspect_ratio_mode: parsed.data.aspectRatioMode,
         max_line_count_applied: validation.limits.maxCodeLines,
         max_line_length_applied: validation.limits.maxLineLength,
@@ -77,6 +66,8 @@ export async function POST(request: Request) {
     language: parsed.data.language,
     aspectRatioMode: parsed.data.aspectRatioMode,
     contentRaw: parsed.data.contentRaw,
+    editorDraft: editorDraftFromPayload(parsed.data),
+    workflowTab: parsed.data.workflowTab ?? "editor",
   });
 
   return apiSuccess({
