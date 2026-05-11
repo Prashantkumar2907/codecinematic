@@ -140,6 +140,7 @@ export function ProjectEditor({
     const available = new Set(allLines.map((line) => line.lineNumber));
     return enabledFocusLines.filter((line) => available.has(line));
   }, [allLines, enabledFocusLines]);
+  const visibleLineNumbers = useMemo(() => (code.trim().length > 0 ? code.split("\n") : []), [code]);
 
   const canContinue = validation.ok && title.trim().length > 1 && normalizedEnabledFocusLines.length > 0;
 
@@ -228,6 +229,7 @@ export function ProjectEditor({
 
   return (
     <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll xl:overflow-hidden">
+      <h1 className="sr-only">Code Studio editor</h1>
       <div className="grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] xl:flex-1 xl:h-[calc(100vh-5rem)]">
         
         {/* LEFT COLUMN: Settings + Code */}
@@ -363,7 +365,7 @@ export function ProjectEditor({
             </div>
             <div className="flex flex-1 overflow-auto app-scroll min-h-0">
               <div id="line-numbers" className="w-10 shrink-0 bg-muted/20 text-muted-foreground border-r border-white/5 text-[11px] leading-[1.5rem] font-mono text-right pt-2 pb-8 pr-2 select-none overflow-hidden" suppressHydrationWarning>
-                {code.split("\n").map((_, i) => <div key={i} className="h-6 flex items-center justify-end">{i + 1}</div>)}
+                {visibleLineNumbers.map((_, i) => <div key={i} className="h-6 flex items-center justify-end">{i + 1}</div>)}
               </div>
               <Textarea
                 aria-label="Code input"

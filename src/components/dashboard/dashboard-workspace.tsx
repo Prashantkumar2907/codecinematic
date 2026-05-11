@@ -36,9 +36,11 @@ const workflows = [
 export function DashboardWorkspace({
   userName,
   planCode,
+  seedDemoProject = false,
 }: {
   userName: string;
   planCode: PlanCode;
+  seedDemoProject?: boolean;
 }) {
   const router = useRouter();
   const plan = PLAN_CONFIG[planCode];
@@ -46,6 +48,7 @@ export function DashboardWorkspace({
   const projectOrder = useEditorStore((state) => state.projectOrder);
   const createProject = useEditorStore((state) => state.createProject);
   const deleteProject = useEditorStore((state) => state.deleteProject);
+  const ensureDemoProjectSeed = useEditorStore((state) => state.ensureDemoProjectSeed);
   const [mounted, setMounted] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
@@ -96,8 +99,11 @@ export function DashboardWorkspace({
   }
 
   useEffect(() => {
+    if (seedDemoProject) {
+      ensureDemoProjectSeed();
+    }
     setMounted(true);
-  }, []);
+  }, [ensureDemoProjectSeed, seedDemoProject]);
 
   if (!mounted) {
     return (

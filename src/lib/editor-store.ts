@@ -39,10 +39,12 @@ type EditorStore = {
   drafts: Record<string, EditorDraft>;
   projects: Record<string, ProjectSummary>;
   projectOrder: string[];
+  demoProjectSeeded: boolean;
   setDraft: (projectId: string, patch: Partial<EditorDraft>) => void;
   replaceDraft: (projectId: string, draft: EditorDraft) => void;
   getDraft: (projectId: string) => EditorDraft | null;
   createProject: (draft?: Partial<EditorDraft>, projectId?: string) => string;
+  ensureDemoProjectSeed: () => void;
   ensureProject: (projectId: string, draft?: Partial<EditorDraft>) => void;
   deleteProject: (projectId: string) => void;
   touchProject: (projectId: string, draft?: Partial<EditorDraft>) => void;
@@ -99,6 +101,8 @@ export function buildEditorDraft(patch: Partial<EditorDraft> = {}): EditorDraft 
   };
 }
 
+const DEMO_PROJECT_ID = "local-demo-api-gateway-explainer";
+
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -125,6 +129,7 @@ export const useEditorStore = create<EditorStore>()(
       drafts: {},
       projects: {},
       projectOrder: [],
+      demoProjectSeeded: false,
       setDraft: (projectId, patch) =>
         set((state) => ({
           drafts: {
@@ -174,6 +179,33 @@ export const useEditorStore = create<EditorStore>()(
         }));
 
         return id;
+      },
+      ensureDemoProjectSeed: () => {
+        set((state) => {
+          if (state.demoProjectSeeded) {
+            return state;
+          }
+
+          if (state.projectOrder.length > 0) {
+            return { demoProjectSeeded: true };
+          }
+
+          const draft = cloneEditorDraft(defaultEditorDraft);
+          const now = new Date().toISOString();
+
+          return {
+            demoProjectSeeded: true,
+            drafts: {
+              ...state.drafts,
+              [DEMO_PROJECT_ID]: draft,
+            },
+            projects: {
+              ...state.projects,
+              [DEMO_PROJECT_ID]: summaryFromDraft(DEMO_PROJECT_ID, draft, now),
+            },
+            projectOrder: [DEMO_PROJECT_ID],
+          };
+        });
       },
       ensureProject: (projectId, draftPatch) => {
         if (projectId === NEW_PROJECT_ID) return;
@@ -250,6 +282,7 @@ export const useEditorStore = create<EditorStore>()(
         drafts: state.drafts,
         projects: state.projects,
         projectOrder: state.projectOrder,
+        demoProjectSeeded: state.demoProjectSeeded,
       }),
     }
   )

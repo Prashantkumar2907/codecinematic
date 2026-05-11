@@ -7,5 +7,5 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <DashboardWorkspace userName={session.name} planCode={session.plan} />;
+  return <DashboardWorkspace userName={session.name} planCode={session.plan} seedDemoProject={session.isAdmin} />;
 }

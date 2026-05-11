@@ -5,7 +5,8 @@ export function getEffectiveLimits(plan: PlanCode) {
 }
 
 export function validateCodePayload(plan: PlanCode, code: string) {
-  const lines = code.split("\n");
+  const hasContent = code.trim().length > 0;
+  const lines = hasContent ? code.split("\n") : [];
   const maxLineLength = Math.max(...lines.map((line) => line.length), 0);
   const limits = getEffectiveLimits(plan);
 

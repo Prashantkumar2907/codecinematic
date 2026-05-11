@@ -24,7 +24,7 @@ export async function SiteHeader() {
         </Link>
 
         {/* Center: nav tabs */}
-        <div className="flex min-w-0 justify-center overflow-hidden">
+        <div className="flex min-w-0 justify-center overflow-visible sm:overflow-hidden">
           <NavLinks isLoggedIn={!!session} />
         </div>
 
