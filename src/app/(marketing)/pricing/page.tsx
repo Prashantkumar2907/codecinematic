@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import { Check, Sparkles, Zap } from "lucide-react";
 import Link from "next/link";
-import type { Route } from "next";
 
 import { buttonVariants } from "@/components/ui/button";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
@@ -101,17 +100,33 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  {/* CTA */}
-                  <Link
-                    href={(code === "free" ? "/login" : "/api/billing/checkout?plan=" + code) as Route}
-                    className={cn(
-                      buttonVariants({ variant: popular ? "default" : "outline" }),
-                      "w-full h-9 text-xs font-semibold transition-all",
-                      popular ? "glow-primary-sm hover:glow-primary" : "border-border/60 hover:border-border",
-                    )}
-                  >
-                    {code === "free" ? "Start free" : "Subscribe"}
-                  </Link>
+                  {code === "free" ? (
+                    <Link
+                      href="/login"
+                      prefetch={false}
+                      className={cn(
+                        buttonVariants({ variant: popular ? "default" : "outline" }),
+                        "w-full h-9 text-xs font-semibold transition-all",
+                        popular ? "glow-primary-sm hover:glow-primary" : "border-border/60 hover:border-border",
+                      )}
+                    >
+                      Start free
+                    </Link>
+                  ) : (
+                    <form action="/api/billing/checkout" method="POST" className="w-full">
+                      <input type="hidden" name="plan" value={code} />
+                      <button
+                        type="submit"
+                        className={cn(
+                          buttonVariants({ variant: popular ? "default" : "outline" }),
+                          "w-full h-9 text-xs font-semibold transition-all",
+                          popular ? "glow-primary-sm hover:glow-primary" : "border-border/60 hover:border-border",
+                        )}
+                      >
+                        Subscribe
+                      </button>
+                    </form>
+                  )}
                 </div>
               </motion.div>
             );

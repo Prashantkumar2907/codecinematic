@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { getDemoProject } from "@/lib/demo-project-store";
 import { isRoutableProjectId, isUuid } from "@/lib/project-ids";
+import { detectImportantLines } from "@/lib/render/smart-focus";
 import { getSupabaseUserContext } from "@/lib/supabase/domain";
 
 type SavedProject = {
@@ -75,7 +76,11 @@ export default async function CreateVideoPage({
   const title = query.title ?? savedProject?.title ?? "Untitled project";
   const language = query.language ?? savedProject?.language ?? "typescript";
   const aspect = query.aspect ?? savedProject?.aspectRatioMode ?? "9:16";
-  const focus = query.focus ? query.focus.split(",").filter(Boolean) : [];
+  const focus = query.focus
+    ? query.focus.split(",").filter(Boolean)
+    : savedProject?.contentRaw
+      ? detectImportantLines(savedProject.contentRaw).map((line) => String(line.line))
+      : [];
   const code = query.code ?? savedProject?.contentRaw ?? "";
   const normalSpeed = query.normalSpeed ?? "0.60";
   const focusSpeed = query.focusSpeed ?? "0.35";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
 import { detectImportantLines } from "@/lib/render/smart-focus";
@@ -213,111 +214,106 @@ export function ProjectEditor({
       return;
     }
 
-    const params = new URLSearchParams({
-      title,
-      language,
-      aspect: aspectRatioMode,
-      normalSpeed,
-      focusSpeed,
-      sound,
-      soundVolume,
-      focus: normalizedEnabledFocusLines.join(",")
-    });
+    const createVideoPath = `/projects/${savedProjectId}/create-video` as Route;
+    if (projectId === NEW_PROJECT_ID) {
+      router.replace(createVideoPath);
+      return;
+    }
 
-    router.push(`/projects/${savedProjectId}/create-video?${params.toString()}`);
+    router.push(createVideoPath);
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 space-y-2 overflow-y-auto app-scroll xl:overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-col space-y-2 overflow-y-auto app-scroll xl:overflow-hidden">
       <h1 className="sr-only">Code Studio editor</h1>
-      <div className="grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] xl:flex-1 xl:h-[calc(100vh-5rem)]">
+      <div className="grid min-h-0 min-w-0 gap-2 xl:h-[calc(100vh-5rem)] xl:flex-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
         
         {/* LEFT COLUMN: Settings + Code */}
-        <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-col space-y-2 xl:overflow-hidden">
           
-          <Card className="shrink-0 border-border/40 bg-card shadow-sm">
-            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-border/30 mb-2">
+          <Card className="min-w-0 shrink-0 overflow-hidden border-border/40 bg-card shadow-sm">
+            <CardHeader className="mb-2 flex flex-col items-start gap-2 border-b border-border/30 px-3 py-2 min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between">
               <CardTitle className="text-sm font-semibold">Project settings</CardTitle>
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 min-[360px]:w-auto min-[360px]:justify-end">
                 <MetricBadge label="Lines" value={`${validation.lineCount}/${limits.maxCodeLines}`} status={validation.lineCount > limits.maxCodeLines ? "danger" : "default"} />
                 <MetricBadge label="Max Char" value={`${validation.longestLine}/${limits.maxLineLength}`} status={validation.longestLine > limits.maxLineLength ? "danger" : "default"} />
               </div>
             </CardHeader>
             <CardContent className="px-3 pb-3 space-y-3">
-              <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-                <div className="space-y-1 lg:col-span-2">
+              <div className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+                <div className="min-w-0 space-y-1 lg:col-span-2">
                   <span className="text-[10px] font-semibold text-muted-foreground">Title</span>
-                  <Input value={title} onChange={(e) => updateDraftField("title", e.target.value)} aria-label="Project title" className="h-7 text-xs border-input shadow-sm focus-visible:ring-1" placeholder="Project title" />
+                  <Input value={title} onChange={(e) => updateDraftField("title", e.target.value)} aria-label="Project title" className="h-8 min-w-0 text-xs border-input shadow-sm focus-visible:ring-1" placeholder="Project title" />
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Language</span>
-                  <select value={language} onChange={(e) => updateDraftField("language", e.target.value)} aria-label="Programming language" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={language} onChange={(e) => updateDraftField("language", e.target.value)} aria-label="Programming language" className="flex h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {languageOptions.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Ratio</span>
-                  <select value={aspectRatioMode} onChange={(e) => updateDraftField("aspect", e.target.value as AspectValue)} aria-label="Aspect ratio" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={aspectRatioMode} onChange={(e) => updateDraftField("aspect", e.target.value as AspectValue)} aria-label="Aspect ratio" className="flex h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {aspectOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 pt-1">
-                <div className="space-y-1">
+              <div className="grid min-w-0 grid-cols-1 gap-2 pt-1 md:grid-cols-2 lg:grid-cols-4">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Normal speed</span>
                   <SpeedSlider label="Normal typing speed" value={normalSpeed} onChange={(v) => updateDraftField("normalSpeed", v)} min="0.25" max="3.00" step="0.05" />
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Focus speed</span>
                   <SpeedSlider label="Focused line typing speed" value={focusSpeed} onChange={(v) => updateDraftField("focusSpeed", v)} min="0.25" max="3.00" step="0.05" />
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Sound pattern</span>
-                  <select value={sound} onChange={(e) => updateDraftField("sound", e.target.value as SoundValue)} aria-label="Typing sound pattern" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={sound} onChange={(e) => updateDraftField("sound", e.target.value as SoundValue)} aria-label="Typing sound pattern" className="flex h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {soundOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Volume</span>
                   <Slider label="Typing sound volume" value={soundVolume} onChange={(v) => updateDraftField("soundVolume", v)} min="0.00" max="1.00" step="0.05" formatter={(val) => `${Math.round(Number(val) * 100)}%`} />
                 </div>
               </div>
 
               {/* Row 3: Theme + Font + Effects */}
-              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 pt-1">
-                <div className="space-y-1">
+              <div className="grid min-w-0 grid-cols-1 gap-2 pt-1 min-[360px]:grid-cols-2 md:grid-cols-4">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Color theme</span>
-                  <select value={theme} onChange={(e) => updateDraftField("theme", e.target.value)} aria-label="Code color theme" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={theme} onChange={(e) => updateDraftField("theme", e.target.value)} aria-label="Code color theme" className="flex h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {themeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Code font</span>
-                  <select value={codeFont} onChange={(e) => updateDraftField("codeFont", e.target.value)} aria-label="Code font" className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
+                  <select value={codeFont} onChange={(e) => updateDraftField("codeFont", e.target.value)} aria-label="Code font" className="flex h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors">
                     {codeFontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Cursor blink</span>
                   <button
                     type="button"
                     onClick={() => updateDraftField("cursorBlink", !cursorBlink)}
                     aria-label="Toggle cursor blink"
                     aria-pressed={cursorBlink}
-                    className={`flex h-7 w-full items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${cursorBlink ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
+                    className={`flex h-8 w-full min-w-0 items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${cursorBlink ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
                   >
                     {cursorBlink ? "On" : "Off"}
                   </button>
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <span className="text-[10px] font-semibold text-muted-foreground">Focus flash</span>
                   <button
                     type="button"
                     onClick={() => updateDraftField("focusFlash", !focusFlash)}
                     aria-label="Toggle focus flash"
                     aria-pressed={focusFlash}
-                    className={`flex h-7 w-full items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${focusFlash ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
+                    className={`flex h-8 w-full min-w-0 items-center justify-center rounded-md border text-[11px] font-medium transition-colors ${focusFlash ? "border-primary bg-primary/10 text-primary" : "border-input bg-background text-muted-foreground"}`}
                   >
                     {focusFlash ? "On" : "Off"}
                   </button>
@@ -339,7 +335,7 @@ export function ProjectEditor({
                       aria-label={`Use ${preset.label} background`}
                       aria-pressed={bgPresetId === preset.id}
                       onClick={() => updateDraftField("bgPresetId", preset.id)}
-                      className={`w-6 h-6 rounded-md border-2 transition-all ${bgPresetId === preset.id ? "border-primary shadow-md scale-110" : "border-transparent hover:border-white/30"}`}
+                      className={`h-8 w-8 rounded-md border-2 transition-all ${bgPresetId === preset.id ? "border-primary shadow-md scale-105" : "border-transparent hover:border-white/30"}`}
                       style={{ background: preset.preview }}
                     />
                   ))}
@@ -359,11 +355,11 @@ export function ProjectEditor({
             </CardContent>
           </Card>
 
-          <Card className="flex-1 flex flex-col min-h-[300px] xl:min-h-0 border-border/40 bg-card shadow-sm overflow-hidden">
+          <Card className="flex min-h-[300px] min-w-0 flex-1 flex-col overflow-hidden border-border/40 bg-card shadow-sm xl:min-h-0">
             <div className="bg-muted/30 px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider border-b border-border/30 flex items-center justify-between">
               <span className="text-muted-foreground font-mono tracking-widest">// code input</span>
             </div>
-            <div className="flex flex-1 overflow-auto app-scroll min-h-0">
+            <div className="flex min-h-0 min-w-0 flex-1 overflow-auto app-scroll">
               <div id="line-numbers" className="w-10 shrink-0 bg-muted/20 text-muted-foreground border-r border-white/5 text-[11px] leading-[1.5rem] font-mono text-right pt-2 pb-8 pr-2 select-none overflow-hidden" suppressHydrationWarning>
                 {visibleLineNumbers.map((_, i) => <div key={i} className="h-6 flex items-center justify-end">{i + 1}</div>)}
               </div>
@@ -375,7 +371,7 @@ export function ProjectEditor({
                   const el = document.getElementById("line-numbers");
                   if (el) el.scrollTop = e.currentTarget.scrollTop;
                 }}
-                className="flex-1 h-full min-h-0 font-mono text-[11px] leading-6 border-0 focus-visible:ring-0 rounded-none bg-transparent resize-none pt-2 pb-8 px-2 whitespace-pre"
+                className="h-full min-h-0 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-2 pb-8 pt-2 font-mono text-[11px] leading-6 focus-visible:ring-0"
                 spellCheck={false}
               />
             </div>
@@ -383,13 +379,13 @@ export function ProjectEditor({
         </div>
 
         {/* RIGHT COLUMN: Focus Map */}
-        <div className="flex flex-col min-h-0 space-y-2 xl:overflow-hidden">
-          <Card className="flex-1 flex flex-col min-h-[250px] xl:min-h-0 border-border/40 bg-card shadow-sm">
+        <div className="flex min-h-0 min-w-0 flex-col space-y-2 xl:overflow-hidden">
+          <Card className="flex min-h-[250px] min-w-0 flex-1 flex-col overflow-hidden border-border/40 bg-card shadow-sm xl:min-h-0">
             <CardHeader className="py-2 px-3 flex flex-row items-center justify-between border-b border-border/30 mb-2">
               <CardTitle className="text-sm font-semibold">Focus map</CardTitle>
               <Badge className="text-[9px] px-1.5 py-0 bg-secondary/50 text-secondary-foreground">{normalizedEnabledFocusLines.length} active</Badge>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto app-scroll space-y-2 px-3 pb-3">
+            <CardContent className="flex-1 min-w-0 overflow-y-auto app-scroll space-y-2 px-3 pb-3">
               {allLines.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
                   Add code to build a focus map.
@@ -405,7 +401,7 @@ export function ProjectEditor({
                     key={lineNumber}
                     type="button"
                     onClick={() => handleToggleFocusLine(lineNumber)}
-                    className={`group w-full rounded-md border p-2 text-left transition hover:border-primary/50 relative overflow-hidden ${
+                    className={`group relative w-full min-w-0 overflow-hidden rounded-md border p-2 text-left transition hover:border-primary/50 ${
                       active ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-card"
                     }`}
                   >
@@ -414,7 +410,7 @@ export function ProjectEditor({
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-medium pl-2">Line {lineNumber}</span>
                       <div className="flex items-center gap-1">
-                        <Badge className="text-[9px] px-1.5 py-0 bg-secondary/50 text-secondary-foreground">{detected ? detected.rule : "manual"}</Badge>
+                        <Badge className="max-w-[9rem] truncate px-1.5 py-0 text-[9px] bg-secondary/50 text-secondary-foreground">{detected ? detected.rule : "manual"}</Badge>
                       </div>
                     </div>
                     <p className="mt-1 font-mono text-[10px] text-muted-foreground truncate pl-2">{preview}</p>
@@ -430,7 +426,7 @@ export function ProjectEditor({
             </CardContent>
           </Card>
 
-          <Card className="border-border/40 bg-card shadow-sm shrink-0">
+          <Card className="min-w-0 shrink-0 border-border/40 bg-card shadow-sm">
             <CardContent className="py-2 px-3 space-y-2">
               <Button
                 className="w-full h-9 text-xs font-semibold glow-primary-sm hover:glow-primary transition-all"
@@ -450,7 +446,7 @@ export function ProjectEditor({
 
 function MetricBadge({ label, value, status = "default" }: { label: string; value: string; status?: "default" | "danger" }) {
   return (
-    <div className={`flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[10px] font-semibold ${status === "danger" ? "border-destructive/50 bg-destructive/10 text-destructive-foreground" : "border-border bg-secondary/20 text-muted-foreground shadow-sm"}`}>
+    <div className={`flex min-w-0 items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[10px] font-semibold ${status === "danger" ? "border-destructive/50 bg-destructive/10 text-destructive-foreground" : "border-border bg-secondary/20 text-muted-foreground shadow-sm"}`}>
       <span className="uppercase tracking-wider opacity-60">{label}</span>
       <span className="text-foreground">{value}</span>
     </div>
@@ -475,8 +471,8 @@ function Slider({
   formatter?: (val: string) => string;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 rounded-md border border-border bg-card p-1.5 flex flex-col justify-center h-7 relative shadow-sm hover:border-primary/50 transition-colors">
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="relative flex h-8 min-w-0 flex-1 flex-col justify-center rounded-md border border-border bg-card p-1.5 shadow-sm transition-colors hover:border-primary/50">
         <input
           type="range"
           min={min}
@@ -487,7 +483,7 @@ function Slider({
           aria-label={label}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         />
-        <div className="h-[4px] w-full bg-muted rounded-full overflow-hidden">
+        <div className="h-[4px] w-full overflow-hidden rounded-full bg-muted">
           <div className="h-full bg-primary transition-all" style={{ width: `${((Number(value) - Number(min)) / (Number(max) - Number(min))) * 100}%` }} />
         </div>
       </div>
@@ -521,14 +517,14 @@ function SpeedSlider({
   }
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
           onClick={() => adjust(-Number(nudge))}
           aria-label={`Decrease ${label}`}
-          className="h-5 w-5 shrink-0 rounded border border-border bg-muted/40 text-[11px] font-bold flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-colors leading-none"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-muted/40 text-[13px] font-bold leading-none transition-colors hover:border-primary/50 hover:bg-primary/20"
         >-</button>
-        <div className="flex-1 rounded-md border border-border bg-card p-1.5 flex flex-col justify-center h-7 relative shadow-sm hover:border-primary/50 transition-colors">
+        <div className="relative flex h-8 min-w-0 flex-1 flex-col justify-center rounded-md border border-border bg-card p-1.5 shadow-sm transition-colors hover:border-primary/50">
           <input
             type="range"
             min={min}
@@ -539,7 +535,7 @@ function SpeedSlider({
             aria-label={label}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
           />
-          <div className="h-[4px] w-full bg-muted rounded-full overflow-hidden">
+          <div className="h-[4px] w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full bg-primary transition-all" style={{ width: `${((Number(value) - Number(min)) / (Number(max) - Number(min))) * 100}%` }} />
           </div>
         </div>
@@ -547,7 +543,7 @@ function SpeedSlider({
           type="button"
           onClick={() => adjust(Number(nudge))}
           aria-label={`Increase ${label}`}
-          className="h-5 w-5 shrink-0 rounded border border-border bg-muted/40 text-[11px] font-bold flex items-center justify-center hover:bg-primary/20 hover:border-primary/50 transition-colors leading-none"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-muted/40 text-[13px] font-bold leading-none transition-colors hover:border-primary/50 hover:bg-primary/20"
         >+</button>
         <div className="w-10 shrink-0 text-right text-[11px] font-bold text-primary">{Number(value).toFixed(2)}x</div>
       </div>

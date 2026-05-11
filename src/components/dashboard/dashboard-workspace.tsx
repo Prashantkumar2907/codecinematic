@@ -261,7 +261,7 @@ export function DashboardWorkspace({
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Plan limits - {plan.name}
             </h2>
-            <Link href="/pricing" className="text-[11px] text-primary/70 transition-colors hover:text-primary">
+            <Link href="/pricing" className="inline-flex min-h-8 items-center text-[11px] text-primary/70 transition-colors hover:text-primary">
               Upgrade plan -&gt;
             </Link>
           </div>

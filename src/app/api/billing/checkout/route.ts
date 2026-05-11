@@ -1,23 +1,33 @@
 import { NextResponse } from "next/server";
 
-import { getSession } from "@/lib/auth";
-import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
+import { getSession, type AppSession } from "@/lib/auth";
+import type { PlanCode } from "@/lib/plans";
 
 const paidPlanCodes = ["basic", "medium", "high"] as const satisfies readonly PlanCode[];
 type PaidPlanCode = (typeof paidPlanCodes)[number];
 
-export async function GET(request: Request) {
+export function GET(request: Request) {
+  return NextResponse.redirect(new URL("/pricing", request.url));
+}
+
+export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login?next=%2Fpricing", request.url));
   }
 
-  const url = new URL(request.url);
-  const planCode = url.searchParams.get("plan");
+  const formData = await request.formData().catch(() => null);
+  const planCode = formData?.get("plan");
 
-  if (!isPaidPlanCode(planCode)) {
+  if (typeof planCode !== "string" || !isPaidPlanCode(planCode)) {
     return NextResponse.redirect(new URL("/pricing?error=invalid-plan", request.url));
   }
+
+  return createCheckoutRedirect(request, session, planCode);
+}
+
+async function createCheckoutRedirect(request: Request, session: AppSession, planCode: PaidPlanCode) {
+  const requestOrigin = new URL(request.url).origin;
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey || stripeKey.startsWith("YOUR_")) {
@@ -39,7 +49,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL("/pricing?error=price-not-configured", request.url));
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = getAppUrl(requestOrigin);
     const checkoutSession = await client.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -59,4 +69,17 @@ export async function GET(request: Request) {
 
 function isPaidPlanCode(value: string | null): value is PaidPlanCode {
   return paidPlanCodes.some((code) => code === value);
+}
+
+function getAppUrl(fallbackOrigin: string) {
+  const configured = process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured || configured.startsWith("YOUR_")) {
+    return fallbackOrigin;
+  }
+
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return fallbackOrigin;
+  }
 }

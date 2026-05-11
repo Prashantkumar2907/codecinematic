@@ -16,7 +16,7 @@ export async function SiteHeader() {
         {/* Left: logo */}
         <Link
           href="/"
-          className="group flex shrink-0 items-center gap-2 text-[13px] font-bold uppercase tracking-widest text-foreground/80 transition-colors hover:text-foreground"
+          className="group flex min-h-8 shrink-0 items-center gap-2 rounded-full px-1 text-[13px] font-bold uppercase tracking-widest text-foreground/80 transition-colors hover:text-foreground"
         >
           <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all shadow-lg shadow-primary/20" />
           <span className="hidden sm:inline">CodeCinematic</span>
