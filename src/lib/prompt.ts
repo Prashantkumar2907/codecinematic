@@ -1,0 +1,241 @@
+import type { Subject } from "@/lib/state";
+
+const SCENE_SHAPE = `
+Scene kinds (every scene has "kind" and a unique kebab-case "id"). Narration is split into BEATS —
+each beat is one spoken chunk ("say"/"narration", 1-2 sentences, <=320 chars) that plays EXACTLY while
+its visual element appears. Write every beat about the element it accompanies and nothing else.
+
+- {"kind":"bigtext","narration":"...","text":"<=80 chars","sub":"<=110 optional"} — hook or section card
+- {"kind":"bullets","sayIntro":"optional lead-in","title":"<=60","items":[{"text":"<=110","say":"spoken while THIS item appears"}, 2-5 items]}
+- {"kind":"code","sayIntro":"optional setup line spoken over an empty editor","lang":"js|ts|python|sql|bash|yaml|text","title":"filename or panel title","code":"<=22 lines, EVERY line <=46 chars","segments":[{"fromLine":1,"toLine":4,"say":"spoken while lines 1-4 type"}, ...contiguous, covering every line exactly once],"focusLines":[optional emphasis],"expectedOutput":"exact stdout if executable code prints"} — typing panel; with lang "text" it is a typed worked-example/derivation panel
+- {"kind":"terminal","narration":"...","lines":["$ command","output", 1-10 lines, each <=60 chars]}
+- {"kind":"diagram","sayIntro":"optional","title":"<=60","nodes":[{"id","label":"<=28","x":0-11,"y":0-11,"w":2-12,"h":1-4,"accent":bool}],"arrows":[{"from","to","label":"<=24 optional"}],"steps":[{"reveal":[node ids],"highlight":[node ids],"say":"spoken while THIS step reveals/highlights"}, 1-8 steps]} — 12x12 grid, nodes must not overlap; tell the story step by step (also perfect for timelines, maps-as-boxes, flows, hierarchies)
+- {"kind":"compare","sayIntro":"optional","title":"<=60","left":{"title":"<=30","items":["<=70",1-4],"say":"spoken while the LEFT panel shows"},"right":{same with its own "say"},"verdict":"<=110 optional","sayVerdict":"spoken while the verdict appears"}
+- {"kind":"question","narration":"...","text":"<=180","hint":"<=110 optional"} — ending challenge for comments
+- {"kind":"timeline","sayIntro":"optional","title":"<=60","events":[{"when":"<=18 date/era/marker","label":"<=52","say":"spoken as THIS event appears"}, 2-6 chronological events]} — dated vertical spine; ideal for history, the evolution of an idea, a sequence of events
+- {"kind":"stat","narration":"...","value":"<=14 (e.g. \\"₹1.2 Cr\\", \\"40%\\", \\"8 min\\", \\"1 in 9\\")","label":"<=60 what the number measures","context":"<=100 optional framing"} — ONE huge number made visceral; use for a stunning figure or the payoff of a calculation
+- {"kind":"steps","sayIntro":"optional","title":"<=60","steps":[{"text":"<=80","detail":"<=90 optional sub-line","say":"spoken as THIS step appears"}, 2-5 ordered steps]} — numbered spine; use for a how-to, an algorithm, or a worked method (slow way then fast way)
+- {"kind":"quiz","question":"<=120","options":[{"text":"<=52","correct":true|false}, 2-4 options with EXACTLY ONE correct],"sayQuestion":"spoken as the question+options appear","sayReveal":"spoken as the correct answer highlights"} — a mid-video multiple-choice check
+- {"kind":"vocab","sayIntro":"optional","word":"<=28","pron":"<=32 optional e.g. /ˈɛləkwənt/","pos":"<=16 optional noun/verb/adj","meaning":"<=90","examples":[{"text":"<=90 a real sentence USING the word","say":"spoken as THIS example appears"}, 1-3],"synonym":"<=48 optional"} — English-vocabulary flashcard; the word is auto-highlighted inside each example
+- {"kind":"chart","sayIntro":"optional","title":"<=60","items":[{"label":"<=24","value":number (plain number, no commas),"unit":"<=8 optional e.g. %, Cr, km","say":"spoken as THIS bar grows"}, 2-6 items]} — animated horizontal bar comparison with counting values; perfect for rankings, sizes, before/after numbers
+- {"kind":"quote","narration":"...","text":"<=200 the exact quotation","author":"<=40 optional"} — styled quotation card; ONLY real, correctly attributed quotes (or mark as proverb/saying)
+- {"kind":"mythfact","myth":"<=140 the common false belief","fact":"<=160 the correction","sayMyth":"spoken while the myth card shows","sayFact":"spoken while the myth is struck out and the fact appears"} — myth-buster reveal; high-engagement way to correct a misconception`;
+
+const NARRATION_RULES = `
+Narration rules (neural TTS voice; each beat is voiced separately):
+- LOCKSTEP is the #1 rule: a beat may only talk about the element on screen during that beat.
+- Conversational, confident, warm — a great teacher at a whiteboard. Short sentences.
+- No emojis, no markdown, no "let's dive in", no "in this video". Plain speakable text.
+- Beat lengths drive pacing: a beat's visuals stay on screen exactly as long as its audio.
+  Keep beats tight (5-12s spoken). One idea per beat.`;
+
+const CODING_RULES = `
+Code rules (js/python/sql code is EXECUTED to verify your claimed output — it must be real):
+- Self-contained, standard library only. No network, no filesystem, no external packages.
+- Deterministic: never use random, dates, times, or anything that changes between runs.
+- If the code prints, "expectedOutput" must be EXACTLY what it prints (every character, every newline).
+- "segments" must start at line 1, be contiguous, and cover every line exactly once (3-15s of speech each).
+- Line limit: aim <=46 characters per line, <=22 lines. Break lines rather than exceed width.
+- sql means SQLite syntax (it runs under sqlite3). bash/yaml/text are display-only (not executed).`;
+
+const NON_CODING_RULES = `
+Visual rules for this subject (no executable code, no terminal scenes):
+- Reach for the RICH scene kinds, not just bullets+diagram: timeline (chronology), stat (one stunning
+  number), chart (compared numbers), steps (a worked method), compare (side by side), mythfact
+  (bust a misconception), quiz (a check), quote (a real quotation), and — for English — vocab.
+  A code scene with lang "text" still works for a calculation or quoted lines.
+- Numbers, dates and names must be historically/factually accurate — if unsure of an exact figure,
+  say "around" rather than inventing precision.`;
+
+const VARIETY_RULE = `
+Scene variety (this is a hard quality bar — a monotonous script is a bad script):
+- Do NOT build the whole video from one or two scene kinds. A short must use at least 3 DIFFERENT
+  kinds; a long must use at least 6. Lean on the kinds your subject playbook recommends below.
+- Open with the strongest possible hook for THIS subject (a stat, a mythfact, a bold bigtext claim).
+- Vary the rhythm: after two dense scenes (diagram/code/chart), give one light scene (stat/quote/quiz).`;
+
+/** Per-subject scene-kind strategy. Keyed by subject.id (see content/subjects.json). */
+const SUBJECT_PLAYBOOKS: Record<string, string> = {
+  coding: `Coding playbook: teach the MECHANISM. Use a "code" scene as minimal runnable proof and a
+"terminal" scene for the real output. Use "diagram" for architecture/data-flow, "compare" for
+approach-vs-approach (e.g. array vs linked list), "steps" for an algorithm walk-through, "chart" for
+benchmark/complexity numbers, "mythfact" for a widespread wrong belief. Prove it, do not just assert it.`,
+  history: `History playbook: make it a thriller. Use a "timeline" for the sequence of events, a
+"diagram" for cause->effect chains or who-fought-whom, a "stat" for the number that stuns (army
+sizes, death tolls, distances), a "chart" to compare empires/armies/economies, and a real "quote"
+from the era when one exists. "mythfact" for popular history myths. End with a "quiz" or "question"
+that makes people argue. Dates and figures must be accurate.`,
+  geography: `Geography playbook: explain WHY the place is the way it is. Use a "diagram" for physical
+processes (monsoon, plate tectonics, river systems) and maps-as-boxes, a "chart" for rankings
+(longest rivers, rainfall, populations), a "stat" for one jaw-dropping scale number, "compare" for
+two regions, "steps" for a process (how a delta forms), "mythfact" for geo-myths.`,
+  math: `Math & Aptitude playbook: trick-first. Use a "steps" scene to show the slow way then the fast
+way, a "code" scene with lang "text" for the worked calculation, a "stat" for the punchline
+number/time saved, and a "chart" when comparing methods or growth rates. ALWAYS end with a "quiz"
+or "question" giving one practice problem.`,
+  science: `Science playbook: everyday-phenomenon first. Open with a "stat", "mythfact" or bold
+"bigtext" wow-fact, use a "diagram" for the mechanism, "steps" for a process (how vision works),
+"chart" for scale comparisons (speeds, sizes, energies), "compare" for misconception-vs-reality.
+One vivid real-world anchor per video.`,
+  finance: `Money & Finance playbook: make rupees visceral. Use a "stat" for the big compounding
+number (₹), a "chart" to compare returns/costs across options or years, a "steps" scene for the
+how-to (start an SIP), a "code" scene with lang "text" for the compounding math, "mythfact" for
+money myths (e.g. "renting is wasted money"), "compare" for two instruments. Concepts only, never
+stock tips.`,
+  english: `English & Communication playbook: For VOCABULARY sub-modules (power words, idioms), build
+the video around "vocab" scenes — one per word, each with pronunciation, part of speech, a crisp
+meaning, 2-3 real usage sentences, and a synonym. For "Confusing Word Pairs" use "compare". For
+GRAMMAR use "steps" (state the rule, then examples), "mythfact" for grammar myths, and a "quiz" to
+test it. Keep one clear rule or set of words per video; correct common Indian-English mistakes kindly.`,
+  gk: `GK & Amazing Facts playbook: hook with the unbelievable "stat" or bigtext fact, then a "diagram"
+or "timeline" explaining the mechanism behind it. Use "chart" for rankings and records, "mythfact"
+for widely believed nonsense. ALWAYS end with a "quiz".`,
+  psychology: `Psychology playbook: name the bias/effect, then make the viewer FEEL it with a relatable
+scenario. Use "mythfact" for pop-psychology myths (10% of the brain, learning styles), "steps" for
+the mechanism or the fix, "stat"/"chart" for the striking experimental numbers, "quiz" to let viewers
+test themselves mid-video, "diagram" for loops (habit loop, feedback). One practical takeaway at the
+end; never preachy, never clinical advice.`,
+  business: `Business & Startups playbook: case-first. Open with a company and a stunning "stat"
+(revenue, users, valuation), dissect the model with a "diagram" (who pays whom), use "chart" for
+scale comparisons and growth, "timeline" for rise/fall stories, "compare" for two strategies, a
+"quote" from a founder when real. Mix Indian (Jio, UPI, Zomato) and global (Apple, Netflix) cases.
+Explain incentives and moats, not buzzwords.`,
+  health: `Health & Body playbook: mechanism-first — show what actually happens inside the body with a
+"diagram" or "steps". Bust one popular myth per video with "mythfact" (detox, spot reduction,
+8-glasses). Use "stat"/"chart" for evidence numbers with "about/around" hedging. "compare" for
+this-vs-that (whey vs food protein). Educational tone only — explain evidence, never prescribe;
+no miracle claims ever.`,
+  philosophy: `Philosophy playbook: start from a modern, concrete dilemma, then bring in the thinker or
+school that cracks it. Use a "quote" (real and correctly attributed) as an anchor, "compare" for two
+schools answering the same question, "diagram" for thought experiments (trolley tracks as boxes),
+"steps" for an argument laid out premise by premise, "mythfact" for misread ideas ("Stoicism = no
+emotions"). ALWAYS end with a "question" people will argue about.`,
+  lifeskills: `Life Skills playbook: one skill per video with a concrete method. Show the failure mode
+first (bigtext or mythfact), then the fix as a "steps" scene the viewer can copy today. Use "stat"
+for the cost of doing it wrong, "chart" to compare methods, "quiz" to check understanding, and end
+with a 24-hour challenge in the "question" scene. Practical over motivational — no platitudes.`,
+  mythology: `Mythology & Epics playbook: storytelling-first, like a gripping narrator. Use "timeline"
+for the arc of an episode, "diagram" for family trees and who-cursed-whom chains, a "quote" for a
+famous verse or line (translated, attributed), "compare" for parallel myths across cultures,
+"mythfact" to separate later additions from the original texts. Respect the tradition; clearly
+separate story, symbolism and history. End with the lesson or an open question.`,
+};
+
+export function buildTopicsPrompt(opts: {
+  subject: Subject;
+  moduleLabel: string;
+  submoduleLabel: string;
+  covered: string[];
+}): string {
+  const { subject, moduleLabel, submoduleLabel, covered } = opts;
+  const exclusions = covered.length
+    ? `\nAlready covered (EXCLUDE these and near-duplicates):\n${covered.map((t) => `- ${t}`).join("\n")}`
+    : "";
+  return `You plan content for a YouTube education channel.
+
+Audience: ${subject.audience}.
+Subject: ${subject.label} → Module: ${moduleLabel} → Sub-module: ${submoduleLabel}.
+Teaching style: ${subject.style}.
+
+Propose the 10 BEST video topics for this sub-module right now, ordered from most fundamental to most advanced. Great topics:
+- answer a question the audience actually types into YouTube
+- teach ONE mechanism/idea deeply (not "top 10 tips")
+- have a hook angle that creates curiosity
+- can be taught visually with diagrams/examples in 60s (short) or 8 minutes (long)
+${exclusions}
+
+Return STRICT JSON only:
+{"topics":[{"title":"<=100 chars, specific and curiosity-driven","angle":"<=140 chars — the hook/approach"}]}`;
+}
+
+export function buildScriptPrompt(opts: {
+  subject: Subject;
+  moduleLabel: string;
+  submoduleLabel: string;
+  format: "short" | "long";
+  topic: string;
+  angle?: string;
+  recentTopics: string[];
+}): string {
+  const { subject, moduleLabel, submoduleLabel, format, topic, angle, recentTopics } = opts;
+  const isCoding = subject.id === "coding";
+  const playbook = SUBJECT_PLAYBOOKS[subject.id] ?? "";
+  const structure =
+    format === "short"
+      ? `Structure for a SHORT (45-90s, 9:16 vertical, 4-8 scenes):
+1. a hook that fits this subject — a bold "bigtext" claim, a "stat" wow-number, or a sharp question
+2-3. the core idea told visually, using 2+ of the scene kinds your playbook recommends
+4. a concrete example or proof${isCoding ? " (code -> terminal output)" : ""}, or a quick "quiz"
+5. a "question" scene — a challenge worth arguing about in the comments`
+      : `Structure for a LONG video (6-12 min, 16:9 landscape, 14-32 scenes):
+- open with a hook ("bigtext" claim, a "stat", or a "mythfact"), then a "bullets" of "what you'll walk away knowing"
+- 3-5 sections, each a "bigtext" section card then 2-3 scenes drawn from your playbook's kinds
+  (diagram / timeline / steps / compare / stat / chart / mythfact / quote${isCoding ? " / code -> terminal" : " / vocab"} as fits the point)
+- escalate difficulty: fundamentals early, nuance/tradeoffs/consequences later
+- near the end: a "bullets" of common mistakes and a "quiz" to test the idea
+- "bigtext" recap, then a "question" scene
+- bigtext section cards double as YouTube chapters — give them crisp 2-5 word titles`;
+
+  const avoid = recentTopics.length
+    ? `Recently covered in this sub-module (do NOT repeat): ${recentTopics.join("; ")}`
+    : "";
+
+  return `You are the content engine for a YouTube education channel.
+
+Audience: ${subject.audience}.
+Teaching style: ${subject.style}.
+
+Write a complete video script as STRICT JSON (no prose, no markdown fences) for:
+- Subject: ${subject.label} → Module: ${moduleLabel} → Sub-module: ${submoduleLabel}
+- Topic: ${topic}${angle ? `\n- Angle: ${angle}` : ""}
+- Format: ${format}
+
+${structure}
+
+${SCENE_SHAPE}
+${NARRATION_RULES}
+${VARIETY_RULE}
+${isCoding ? CODING_RULES : NON_CODING_RULES}
+
+Your subject playbook — favour these scene kinds and this teaching pattern:
+${playbook}
+
+Teaching quality bar (viewers range from beginners to experts — beginners must follow, experts must not be bored):
+- Teach the MECHANISM or the WHY, never just surface facts.
+- Use one concrete anchor: a real number, a vivid comparison, or a story detail that makes it visceral.
+- Include one insight that would make an expert nod ("ah, that's why").
+- The ending question must be answerable from what was taught; make it the kind people argue about in comments.
+
+Also produce "meta" for YouTube:
+- "title": 30-95 chars, curiosity-driven, includes the concrete topic${format === "short" ? ', ends with " #Shorts"' : ""}
+- "description": line 1 a hook that earns the click; then 2-4 lines on what the viewer learns; no link placeholders
+- "tags": 4-15 plain keywords
+- "hashtags": 3-6 like #JavaScript or #IndianHistory — first three are the visible ones
+
+Top-level JSON shape:
+{"format":"${format}","subject":"${subject.label}","module":"${moduleLabel}","submodule":"${submoduleLabel}","topic":"${topic}","scenes":[...],"meta":{"title":"...","description":"...","tags":[...],"hashtags":["#..."]}}
+
+${avoid}
+
+HARD LIMITS — validated mechanically, the script is REJECTED on any violation, so re-check every scene:
+- code: max 22 lines, EVERY line max 46 characters (count them; break long lines)
+- code segments: contiguous from line 1, cover every line exactly once
+- terminal lines: max 60 characters each
+- every "say"/beat: max 320 chars; scene "narration": max 400 chars
+- bigtext.text 80 / bullets item text 110 / node label 28 / compare item 70 / question.text 180
+- timeline: when 18, label 52 / stat: value 14, label 60 / steps: text 80, detail 90
+- quiz: question 120, option 52, EXACTLY one correct / vocab: word 28, meaning 90, example 90
+- chart: label 24, unit 8, value is a plain number / quote: text 200, author 40 / mythfact: myth 140, fact 160
+
+Return ONLY the JSON object.`;
+}
+
+export function buildRepairPrompt(originalJson: string, errors: string): string {
+  return `The JSON video script below failed schema validation. Fix ONLY the listed problems and return the corrected complete JSON object (no prose, no markdown fences). Keep everything that was valid unchanged.
+
+Validation errors:
+${errors}
+
+Script:
+${originalJson}`;
+}

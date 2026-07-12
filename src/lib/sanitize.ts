@@ -1,0 +1,186 @@
+/**
+ * Deterministic pre-validation cleanup of a raw Gemini script: display-only
+ * strings are clamped to schema limits so the model-repair round only has to
+ * fix meaning-critical failures (code shape, narration length, structure).
+ * Code and narration are never touched here.
+ */
+
+const ELLIPSIS = "…";
+
+function clamp(value: unknown, max: number): unknown {
+  if (typeof value !== "string" || value.length <= max) return value;
+  return value.slice(0, max - 1).trimEnd() + ELLIPSIS;
+}
+
+function clampArray(value: unknown, maxItems: number, maxLen: number): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.slice(0, maxItems).map((v) => clamp(v, maxLen));
+}
+
+/**
+ * Models reliably fail at tiling line ranges exactly, so segments are snapped
+ * deterministically: each starts where the previous ended, the last one covers
+ * the final line. The narration text ("say") is never altered.
+ */
+function normalizeSegments(scene: Record<string, unknown>) {
+  if (typeof scene.code !== "string" || !Array.isArray(scene.segments) || scene.segments.length === 0) return;
+  const lineCount = scene.code.split("\n").length;
+  const segments = (scene.segments as Record<string, unknown>[])
+    .filter((s) => s && typeof s === "object")
+    .sort((a, b) => (Number(a.fromLine) || 0) - (Number(b.fromLine) || 0));
+
+  let cursor = 1;
+  const tiled: Record<string, unknown>[] = [];
+  for (const [i, seg] of segments.entries()) {
+    if (cursor > lineCount) break;
+    const isLast = i === segments.length - 1;
+    const requestedTo = Number(seg.toLine) || cursor;
+    const toLine = isLast ? lineCount : Math.min(Math.max(requestedTo, cursor), lineCount);
+    tiled.push({ ...seg, fromLine: cursor, toLine });
+    cursor = toLine + 1;
+  }
+  const last = tiled[tiled.length - 1];
+  if (last && Number(last.toLine) < lineCount) last.toLine = lineCount;
+  if (tiled.length > 0) scene.segments = tiled;
+}
+
+export function sanitizeScript(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const script = raw as Record<string, unknown>;
+  if (Array.isArray(script.scenes)) {
+    script.scenes = script.scenes.map((s) => sanitizeScene(s));
+  }
+  const meta = script.meta as Record<string, unknown> | undefined;
+  if (meta && typeof meta === "object") {
+    meta.title = clamp(meta.title, 95);
+    meta.description = clamp(meta.description, 3500);
+    meta.tags = clampArray(meta.tags, 15, 30);
+  }
+  return script;
+}
+
+function sanitizeScene(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const scene = { ...(raw as Record<string, unknown>) };
+  switch (scene.kind) {
+    case "bigtext":
+      scene.text = clamp(scene.text, 80);
+      scene.sub = clamp(scene.sub, 110);
+      break;
+    case "bullets":
+      scene.title = clamp(scene.title, 60);
+      if (Array.isArray(scene.items)) {
+        scene.items = scene.items.slice(0, 5).map((item) =>
+          typeof item === "object" && item !== null
+            ? { ...item, text: clamp((item as Record<string, unknown>).text, 110) }
+            : item
+        );
+      }
+      break;
+    case "code":
+      scene.title = clamp(scene.title, 40);
+      normalizeSegments(scene);
+      break;
+    case "terminal":
+      scene.lines = clampArray(scene.lines, 10, 60);
+      break;
+    case "diagram": {
+      scene.title = clamp(scene.title, 60);
+      if (Array.isArray(scene.nodes)) {
+        scene.nodes = scene.nodes.map((n) =>
+          typeof n === "object" && n !== null ? { ...n, label: clamp((n as Record<string, unknown>).label, 28) } : n
+        );
+      }
+      if (Array.isArray(scene.arrows)) {
+        scene.arrows = scene.arrows.map((a) =>
+          typeof a === "object" && a !== null ? { ...a, label: clamp((a as Record<string, unknown>).label, 24) } : a
+        );
+      }
+      break;
+    }
+    case "compare": {
+      scene.title = clamp(scene.title, 60);
+      scene.verdict = clamp(scene.verdict, 110);
+      for (const side of ["left", "right"]) {
+        const panel = scene[side] as Record<string, unknown> | undefined;
+        if (panel && typeof panel === "object") {
+          panel.title = clamp(panel.title, 30);
+          panel.items = clampArray(panel.items, 4, 70);
+        }
+      }
+      break;
+    }
+    case "question":
+      scene.text = clamp(scene.text, 180);
+      scene.hint = clamp(scene.hint, 110);
+      break;
+    case "timeline":
+      scene.title = clamp(scene.title, 60);
+      if (Array.isArray(scene.events)) {
+        scene.events = scene.events.slice(0, 6).map((e) =>
+          typeof e === "object" && e !== null
+            ? { ...e, when: clamp((e as Record<string, unknown>).when, 18), label: clamp((e as Record<string, unknown>).label, 52) }
+            : e
+        );
+      }
+      break;
+    case "stat":
+      scene.value = clamp(scene.value, 14);
+      scene.label = clamp(scene.label, 60);
+      scene.context = clamp(scene.context, 100);
+      break;
+    case "steps":
+      scene.title = clamp(scene.title, 60);
+      if (Array.isArray(scene.steps)) {
+        scene.steps = scene.steps.slice(0, 5).map((s) =>
+          typeof s === "object" && s !== null
+            ? { ...s, text: clamp((s as Record<string, unknown>).text, 80), detail: clamp((s as Record<string, unknown>).detail, 90) }
+            : s
+        );
+      }
+      break;
+    case "quiz":
+      scene.question = clamp(scene.question, 120);
+      if (Array.isArray(scene.options)) {
+        scene.options = scene.options.slice(0, 4).map((o) =>
+          typeof o === "object" && o !== null ? { ...o, text: clamp((o as Record<string, unknown>).text, 52) } : o
+        );
+      }
+      break;
+    case "vocab":
+      scene.word = clamp(scene.word, 28);
+      scene.pron = clamp(scene.pron, 32);
+      scene.pos = clamp(scene.pos, 16);
+      scene.meaning = clamp(scene.meaning, 90);
+      scene.synonym = clamp(scene.synonym, 48);
+      if (Array.isArray(scene.examples)) {
+        scene.examples = scene.examples.slice(0, 3).map((e) =>
+          typeof e === "object" && e !== null ? { ...e, text: clamp((e as Record<string, unknown>).text, 90) } : e
+        );
+      }
+      break;
+    case "chart":
+      scene.title = clamp(scene.title, 60);
+      if (Array.isArray(scene.items)) {
+        scene.items = scene.items.slice(0, 6).map((it) =>
+          typeof it === "object" && it !== null
+            ? {
+                ...it,
+                label: clamp((it as Record<string, unknown>).label, 24),
+                unit: clamp((it as Record<string, unknown>).unit, 8),
+              }
+            : it
+        );
+      }
+      break;
+    case "quote":
+      scene.text = clamp(scene.text, 200);
+      scene.author = clamp(scene.author, 40);
+      break;
+    case "mythfact":
+      scene.myth = clamp(scene.myth, 140);
+      scene.fact = clamp(scene.fact, 160);
+      break;
+  }
+  return scene;
+}

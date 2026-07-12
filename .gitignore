@@ -1,5 +1,11 @@
-.next
-node_modules
+node_modules/
+.next/
 .env
-.env.local
+.env*.local
+output/
+content/videos/
+content/news/
+*.log
+.venv/
+tsconfig.tsbuildinfo
 .DS_Store

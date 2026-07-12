@@ -1,0 +1,40 @@
+{
+  "categories": [
+    "Indian Politics",
+    "International",
+    "Economy",
+    "Sports",
+    "Technology",
+    "Entertainment",
+    "Education",
+    "Health & Environment",
+    "Horoscope",
+    "All"
+  ],
+  "channels": [
+    {
+      "id": "en",
+      "label": "Bharat Briefs (English)",
+      "lang": "en",
+      "voice": "en-IN-NeerjaNeural",
+      "defaultCategories": ["Indian Politics", "International", "Sports", "Economy", "Entertainment", "Technology"],
+      "creds": {
+        "clientId": "EN_YT_CLIENT_ID",
+        "clientSecret": "EN_YT_CLIENT_SECRET",
+        "refreshToken": "EN_YT_REFRESH_TOKEN"
+      }
+    },
+    {
+      "id": "hi",
+      "label": "Bharat Briefs हिंदी",
+      "lang": "hi",
+      "voice": "hi-IN-SwaraNeural",
+      "defaultCategories": ["Indian Politics", "International", "Sports", "Economy", "Entertainment", "Technology"],
+      "creds": {
+        "clientId": "HI_YT_CLIENT_ID",
+        "clientSecret": "HI_YT_CLIENT_SECRET",
+        "refreshToken": "HI_YT_REFRESH_TOKEN"
+      }
+    }
+  ]
+}
