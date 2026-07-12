@@ -4,7 +4,8 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { resolveChannel, newsDir, slugify, writeNewsInfo, type NewsInfo } from "@/lib/news";
+import { resolveChannel, newsDir, slugify, writeNewsInfo, type NewsInfo, type NewsStory } from "@/lib/news";
+import { enhanceNewsMeta, ytCategoryFor } from "@/lib/newsMeta";
 
 const execFileAsync = promisify(execFile);
 
@@ -65,9 +66,18 @@ export async function POST(req: Request) {
       title: string;
       description: string;
       tags: string[];
-      stories: string[];
+      stories: (string | NewsStory)[];
     };
     const stat = await fs.stat(path.join(out, "short.mp4"));
+    const stories: NewsStory[] = (metaRaw.stories ?? []).map((s) =>
+      typeof s === "string" ? { title: s } : { title: s.title, bullets: s.bullets }
+    );
+    const meta = await enhanceNewsMeta({
+      lang: channel.lang,
+      category,
+      stories,
+      fallback: { title: metaRaw.title, description: metaRaw.description, tags: metaRaw.tags ?? [] },
+    });
     const info: NewsInfo = {
       slug,
       channelId,
@@ -75,10 +85,12 @@ export async function POST(req: Request) {
       category,
       lang: channel.lang,
       createdAt: new Date().toISOString(),
-      title: metaRaw.title,
-      description: metaRaw.description,
-      tags: metaRaw.tags ?? [],
-      stories: (metaRaw.stories ?? []).map((t) => ({ title: t })),
+      title: meta.title,
+      description: meta.description,
+      tags: meta.tags,
+      categoryId: ytCategoryFor(category),
+      metaSource: meta.source,
+      stories,
       videoBytes: stat.size,
     };
     await writeNewsInfo(info);

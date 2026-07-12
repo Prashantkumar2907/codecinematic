@@ -337,7 +337,7 @@ def main():
             + f"#Shorts #IndiaNews #{CATEGORY.replace(' ', '')} #News #BharatBriefs #DailyNews"
         ),
         'tags': ['India news', 'news', 'shorts', CATEGORY, 'daily news', 'bharat briefs', 'headlines'],
-        'stories': [s.get('title') for s in stories],
+        'stories': [{'title': s.get('title'), 'bullets': (s.get('bullets') or [])[:3]} for s in stories],
     }
     with open(os.path.join(OUT, 'meta.json'), 'w') as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)

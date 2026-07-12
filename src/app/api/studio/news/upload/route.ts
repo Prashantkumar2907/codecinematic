@@ -69,7 +69,7 @@ export async function POST(req: Request) {
           title: info.title.slice(0, 100),
           description: info.description.slice(0, 4900),
           tags: info.tags,
-          categoryId: NEWS_CATEGORY_ID,
+          categoryId: info.categoryId ?? NEWS_CATEGORY_ID,
         },
         status,
       },

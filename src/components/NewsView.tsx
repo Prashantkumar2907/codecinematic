@@ -11,7 +11,7 @@ type Channel = {
   hasCreds: boolean;
 };
 
-type NewsStory = { title: string };
+type NewsStory = { title: string; bullets?: string[] };
 type NewsInfo = {
   slug: string;
   channelId: string;
@@ -22,6 +22,8 @@ type NewsInfo = {
   title: string;
   description: string;
   tags: string[];
+  categoryId?: string;
+  metaSource?: "gemini" | "template";
   stories: NewsStory[];
   videoBytes: number;
   videoId?: string;
@@ -29,6 +31,15 @@ type NewsInfo = {
   privacy?: string;
   publishAt?: string;
 };
+
+const YT_CATEGORY_LABELS: Record<string, string> = {
+  "17": "Sports",
+  "24": "Entertainment",
+  "25": "News & Politics",
+  "27": "Education",
+  "28": "Science & Technology",
+};
+const COPIED_MS = 1500;
 
 type Privacy = "private" | "unlisted" | "public";
 
@@ -59,6 +70,8 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
   const [privacy, setPrivacy] = useState<Privacy>("public");
   const [scheduleAt, setScheduleAt] = useState("");
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<NewsInfo | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const busy = rendering || uploading;
   const channel = channels.find((c) => c.id === channelId) ?? null;
@@ -94,6 +107,36 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
     setCurrent(info);
     setUploadUrl(info.videoId ? `https://youtu.be/${info.videoId}` : null);
     setError(null);
+  };
+
+  const copyText = async (key: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), COPIED_MS);
+    } catch {
+      setError("Clipboard unavailable — copy manually.");
+    }
+  };
+
+  const deleteNews = async (slug: string) => {
+    setConfirmDelete(null);
+    const res = await fetch("/api/studio/news/drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", slug }),
+    });
+    if (res.ok) {
+      if (current?.slug === slug) {
+        setCurrent(null);
+        setUploadUrl(null);
+      }
+      onToast("News short deleted");
+      void refreshDrafts();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? `delete failed (${res.status})`);
+    }
   };
 
   const generate = async () => {
@@ -263,7 +306,9 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
 
             <h3 className="news-title">{current.title}</h3>
             <div className="smut">
-              {current.channelLabel} · {current.category} · {fmtBytes(current.videoBytes)}
+              {current.channelLabel} · {current.category} · {fmtBytes(current.videoBytes)} · YT category:{" "}
+              {YT_CATEGORY_LABELS[current.categoryId ?? "25"] ?? current.categoryId}
+              {current.metaSource ? (current.metaSource === "gemini" ? " · metadata: AI-optimized" : " · metadata: template") : ""}
             </div>
 
             {current.stories.length ? (
@@ -273,6 +318,34 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
                 ))}
               </ol>
             ) : null}
+
+            <div className="copy-field">
+              <div className="cf-head">
+                <span className="cf-label">Title</span>
+                <button className={`btn btn-sm${copied === "title" ? " copied" : ""}`} onClick={() => void copyText("title", current.title)}>
+                  {copied === "title" ? "✓ Copied" : "⧉ Copy"}
+                </button>
+              </div>
+              <div className="cf-value">{current.title}</div>
+            </div>
+            <div className="copy-field">
+              <div className="cf-head">
+                <span className="cf-label">Description</span>
+                <button className={`btn btn-sm${copied === "desc" ? " copied" : ""}`} onClick={() => void copyText("desc", current.description)}>
+                  {copied === "desc" ? "✓ Copied" : "⧉ Copy"}
+                </button>
+              </div>
+              <div className="cf-value">{current.description}</div>
+            </div>
+            <div className="copy-field">
+              <div className="cf-head">
+                <span className="cf-label">Tags</span>
+                <button className={`btn btn-sm${copied === "tags" ? " copied" : ""}`} onClick={() => void copyText("tags", current.tags.join(", "))}>
+                  {copied === "tags" ? "✓ Copied" : "⧉ Copy"}
+                </button>
+              </div>
+              <div className="cf-value">{current.tags.join(", ")}</div>
+            </div>
 
             <div className="detail-actions-col">
               <div className="row" style={{ alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -307,17 +380,22 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
                 <div className="smut">Scheduled uploads go up private, then auto-publish at the set time.</div>
               ) : null}
 
-              <button
-                className="btn btn-primary"
-                disabled={busy || Boolean(current.videoId)}
-                onClick={() => void upload()}
-              >
-                {uploading
-                  ? "Uploading…"
-                  : current.videoId
-                    ? "Already uploaded"
-                    : `Upload to ${current.channelLabel}`}
-              </button>
+              <div className="row" style={{ gap: 10 }}>
+                <button
+                  className="btn btn-primary"
+                  disabled={busy || Boolean(current.videoId)}
+                  onClick={() => void upload()}
+                >
+                  {uploading
+                    ? "Uploading…"
+                    : current.videoId
+                      ? "Already uploaded"
+                      : `Upload to ${current.channelLabel}`}
+                </button>
+                <button className="btn btn-danger" disabled={busy} onClick={() => setConfirmDelete(current)}>
+                  Delete
+                </button>
+              </div>
 
               {uploadUrl ? (
                 <div className="okb">
@@ -329,6 +407,29 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
           </div>
         )}
       </div>
+
+      {confirmDelete ? (
+        <div className="scrim" onClick={() => setConfirmDelete(null)}>
+          <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="news-del-title" onClick={(e) => e.stopPropagation()}>
+            <span className="tt" id="news-del-title">
+              Delete “{confirmDelete.category} · {confirmDelete.channelLabel}”?
+            </span>
+            <span className="smut">
+              The video file and its metadata are removed permanently
+              {confirmDelete.videoId ? " (the YouTube upload itself stays live)" : ""}. You can regenerate this
+              category anytime.
+            </span>
+            <div className="row row-end">
+              <button className="btn btn-sm" onClick={() => setConfirmDelete(null)} autoFocus>
+                Cancel
+              </button>
+              <button className="btn btn-danger btn-sm" onClick={() => void deleteNews(confirmDelete.slug)}>
+                Delete news short
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

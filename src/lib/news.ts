@@ -33,7 +33,7 @@ export type ChannelPublic = {
   hasCreds: boolean;
 };
 
-export type NewsStory = { title: string };
+export type NewsStory = { title: string; bullets?: string[] };
 export type NewsInfo = {
   slug: string;
   channelId: string;
@@ -44,6 +44,10 @@ export type NewsInfo = {
   title: string;
   description: string;
   tags: string[];
+  /** YouTube categoryId for the upload (mapped from the news category). */
+  categoryId?: string;
+  /** Whether title/description/tags were AI-optimized or fell back to the template. */
+  metaSource?: "gemini" | "template";
   stories: NewsStory[];
   videoBytes: number;
   videoId?: string;
@@ -118,6 +122,10 @@ export async function markNewsUploaded(
   const info = await readNewsInfo(slug);
   if (!info) return;
   await writeNewsInfo({ ...info, ...patch });
+}
+
+export async function deleteNewsDraft(slug: string): Promise<void> {
+  await fs.rm(path.join(NEWS_DIR, slug), { recursive: true, force: true });
 }
 
 export async function listNewsDrafts(): Promise<NewsInfo[]> {

@@ -112,8 +112,14 @@ pixel-identical to the current channel uploads.
   Action.
 - Routes: `news/config` (channels+categories), `news/render` (runs the Python
   renderer into `content/news/<slug>/`), `news/upload` (per-channel upload),
-  `news/drafts`, `news/file` (Range-streamed mp4 preview). `src/lib/news.ts`
-  owns channel resolution and news-draft state.
+  `news/drafts` (list + delete), `news/file` (Range-streamed mp4 preview).
+  `src/lib/news.ts` owns channel resolution and news-draft state.
+- After each render, Gemini rewrites the title/description/tags for CTR and
+  search (headline-led title ending in #Shorts, keyword hook line, entity
+  tags; Hindi metadata for the Hindi channel) — `src/lib/newsMeta.ts`; if the
+  call fails the renderer's template metadata is kept (`metaSource` on the
+  draft says which you got). The YouTube category is mapped from the news
+  category (Sports→17, Technology→28, Entertainment/Horoscope→24, else 25).
 
 ## Publishing & scheduling
 
@@ -132,9 +138,10 @@ UIs expose a privacy select + a "Schedule at" datetime picker.
   frame-by-frame rendering, keep Shorts as-is).
 - Generated code runs locally under a 10s timeout with stdlib only — review
   scenes before rendering; never expose these routes beyond localhost.
-- **Music bed**: if `public/music.mp3` exists it is mixed under the narration
-  at low volume (fade in/out) in playback and the recording. Swap the file to
-  change the track; delete it for narration-only videos.
+- **Music bed**: no track ships. Drop any track you like (e.g. from the
+  YouTube Audio Library, which is free for monetized videos) at
+  `public/music.mp3` and it is mixed under the narration at low volume with
+  fade in/out, in playback and the recording. No file = narration-only.
 - **Pacing**: scripts carry a hard word budget (short 130-220, long 950-1700
   words), shorts are voiced at +5% rate and use tighter beat/scene gaps.
 - `?demo=1&auto=1` URL params: load the hardcoded demo script and auto
