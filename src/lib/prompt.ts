@@ -142,6 +142,10 @@ Propose the 10 BEST video topics for this sub-module right now, ordered from mos
 - teach ONE mechanism/idea deeply (not "top 10 tips")
 - have a hook angle that creates curiosity
 - can be taught visually with diagrams/examples in 60s (short) or 8 minutes (long)
+- vary the title shapes across the 10 — mix "Why X ...", "How X actually works", "X vs Y", "The X
+  mistake everyone makes", "What happens when ..." — never 10 titles with the same shape
+- format titles as "Punchy headline: the specifics" — the part BEFORE the colon is <=6 words and
+  works alone as a thumbnail headline
 ${exclusions}
 
 Return STRICT JSON only:
@@ -166,7 +170,9 @@ export function buildScriptPrompt(opts: {
 1. a hook that fits this subject — a bold "bigtext" claim, a "stat" wow-number, or a sharp question
 2-3. the core idea told visually, using 2+ of the scene kinds your playbook recommends
 4. a concrete example or proof${isCoding ? " (code -> terminal output)" : ""}, or a quick "quiz"
-5. a "question" scene — a challenge worth arguing about in the comments`
+5. a "question" scene — a challenge worth arguing about in the comments
+PACING BUDGET (the video runs exactly as long as the narration): total spoken words across ALL
+beats must be 130-220. Count them. Over 220 words the Short overruns 90 seconds and dies.`
       : `Structure for a LONG video (6-12 min, 16:9 landscape, 14-32 scenes):
 - open with a hook ("bigtext" claim, a "stat", or a "mythfact"), then a "bullets" of "what you'll walk away knowing"
 - 3-5 sections, each a "bigtext" section card then 2-3 scenes drawn from your playbook's kinds
@@ -174,7 +180,9 @@ export function buildScriptPrompt(opts: {
 - escalate difficulty: fundamentals early, nuance/tradeoffs/consequences later
 - near the end: a "bullets" of common mistakes and a "quiz" to test the idea
 - "bigtext" recap, then a "question" scene
-- bigtext section cards double as YouTube chapters — give them crisp 2-5 word titles`;
+- bigtext section cards double as YouTube chapters — give them crisp 2-5 word titles
+PACING BUDGET (the video runs exactly as long as the narration): total spoken words across ALL
+beats must be 950-1700 (≈7-11 minutes at teaching pace).`;
 
   const avoid = recentTopics.length
     ? `Recently covered in this sub-module (do NOT repeat): ${recentTopics.join("; ")}`
@@ -201,6 +209,9 @@ Your subject playbook — favour these scene kinds and this teaching pattern:
 ${playbook}
 
 Teaching quality bar (viewers range from beginners to experts — beginners must follow, experts must not be bored):
+- The FIRST beat is the retention decision: at most 2 short sentences that open a loop the scene does
+  not close — a question, an assumption about to break, or a number that seems impossible. Never open
+  with a definition, a greeting, or background.
 - Teach the MECHANISM or the WHY, never just surface facts.
 - Use one concrete anchor: a real number, a vivid comparison, or a story detail that makes it visceral.
 - Include one insight that would make an expert nod ("ah, that's why").

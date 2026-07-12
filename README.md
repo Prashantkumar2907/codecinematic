@@ -132,5 +132,10 @@ UIs expose a privacy select + a "Schedule at" datetime picker.
   frame-by-frame rendering, keep Shorts as-is).
 - Generated code runs locally under a 10s timeout with stdlib only — review
   scenes before rendering; never expose these routes beyond localhost.
+- **Music bed**: if `public/music.mp3` exists it is mixed under the narration
+  at low volume (fade in/out) in playback and the recording. Swap the file to
+  change the track; delete it for narration-only videos.
+- **Pacing**: scripts carry a hard word budget (short 130-220, long 950-1700
+  words), shorts are voiced at +5% rate and use tighter beat/scene gaps.
 - `?demo=1&auto=1` URL params: load the hardcoded demo script and auto
   render+save (used by `scripts/spike.mjs`).

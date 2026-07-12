@@ -33,6 +33,9 @@ export type RenderHandle = {
 const MIN_SCENE_MS = 2800;
 const INTER_BEAT_GAP_MS = 180;
 const SCENE_TAIL_MS = 750;
+/* Shorts live or die on pace — trim the pauses between beats and scenes. */
+const SHORT_INTER_BEAT_GAP_MS = 140;
+const SHORT_SCENE_TAIL_MS = 450;
 const TRANSITION_MS = 420;
 const END_HOLD_MS = 600;
 const VIDEO_BPS = 12_000_000;
@@ -41,6 +44,8 @@ const FPS = 30;
 
 export function computeTimings(script: SceneScript, audio: BeatAudio[]): SceneTiming[] {
   const byBeatId = new Map(audio.map((a) => [a.beatId, a.durationMs]));
+  const gapMs = script.format === "short" ? SHORT_INTER_BEAT_GAP_MS : INTER_BEAT_GAP_MS;
+  const tailMs = script.format === "short" ? SHORT_SCENE_TAIL_MS : SCENE_TAIL_MS;
   const timings: SceneTiming[] = [];
   let cursor = 0;
   for (const scene of script.scenes) {
@@ -49,9 +54,9 @@ export function computeTimings(script: SceneScript, audio: BeatAudio[]): SceneTi
     for (const { beatId } of sceneBeats(scene)) {
       const durationMs = byBeatId.get(beatId) ?? 1200;
       beats.push({ startMs: beatCursor, durationMs });
-      beatCursor += durationMs + INTER_BEAT_GAP_MS;
+      beatCursor += durationMs + gapMs;
     }
-    const durationMs = Math.max(MIN_SCENE_MS, beatCursor - INTER_BEAT_GAP_MS + SCENE_TAIL_MS);
+    const durationMs = Math.max(MIN_SCENE_MS, beatCursor - gapMs + tailMs);
     timings.push({ sceneId: scene.id, startMs: cursor, durationMs, beats });
     cursor += durationMs;
   }
@@ -109,6 +114,41 @@ async function scheduleNarration(
     if (dest) gain.connect(dest);
     gain.connect(audioCtx.destination);
     source.start(startAt + offset / 1000);
+  }
+}
+
+/** Quiet music bed under the narration; fades in/out with the video. */
+const MUSIC_GAIN = 0.05;
+const MUSIC_FADE_IN_S = 0.8;
+const MUSIC_FADE_OUT_S = 1.5;
+
+/** Mixes public/music.mp3 (if present) into playback + recording. Absent file = silent no-op. */
+async function scheduleMusic(
+  audioCtx: AudioContext,
+  dest: MediaStreamAudioDestinationNode | null,
+  startAt: number,
+  totalMs: number
+) {
+  try {
+    const res = await fetch("/music.mp3");
+    if (!res.ok) return;
+    const buffer = await audioCtx.decodeAudioData(await res.arrayBuffer());
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const gain = audioCtx.createGain();
+    const totalS = totalMs / 1000;
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(MUSIC_GAIN, startAt + MUSIC_FADE_IN_S);
+    gain.gain.setValueAtTime(MUSIC_GAIN, startAt + Math.max(MUSIC_FADE_IN_S, totalS - MUSIC_FADE_OUT_S));
+    gain.gain.linearRampToValueAtTime(0, startAt + totalS);
+    source.connect(gain);
+    if (dest) gain.connect(dest);
+    gain.connect(audioCtx.destination);
+    source.start(startAt);
+    source.stop(startAt + totalS + 0.1);
+  } catch {
+    /* no or undecodable music file — render narration-only */
   }
 }
 
@@ -228,6 +268,7 @@ export function runPlan(
     const startAt = audioCtx.currentTime + AUDIO_LEAD_S;
     try {
       await scheduleNarration(audioCtx, audioDest, plan, startAt);
+      await scheduleMusic(audioCtx, audioDest, startAt, total);
     } catch (err) {
       if (recorder && recorder.state !== "inactive") recorder.stop();
       await audioCtx.close().catch(() => {});

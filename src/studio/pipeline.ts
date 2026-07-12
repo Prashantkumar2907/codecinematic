@@ -8,12 +8,16 @@ const TTS_CHUNK_SIZE = 12;
    The abort turns a wedged request into a visible error instead of an endless "voicing". */
 const TTS_CHUNK_TIMEOUT_MS = 200_000;
 
+/** Shorts are narrated a touch brisker; beat windows follow the real audio, so sync holds. */
+const SHORT_TTS_RATE = "+5%";
+
 export async function fetchNarration(
   script: SceneScript,
   voice?: string,
   onProgress?: (voiced: number, total: number) => void
 ): Promise<BeatAudio[]> {
   const beats = script.scenes.flatMap((s) => sceneBeats(s));
+  const rate = script.format === "short" ? SHORT_TTS_RATE : undefined;
   onProgress?.(0, beats.length);
 
   const audioCtx = new AudioContext();
@@ -27,6 +31,7 @@ export async function fetchNarration(
         body: JSON.stringify({
           segments: chunk.map((b) => ({ id: b.beatId, text: b.text })),
           voice,
+          rate,
         }),
         signal: AbortSignal.timeout(TTS_CHUNK_TIMEOUT_MS),
       }).catch((err) => {
