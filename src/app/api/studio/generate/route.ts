@@ -73,12 +73,11 @@ export async function POST(req: Request) {
             // Both drive a repair round but never hard-fail: a complete video beats none.
             const words = narrationWordCount(validated.data);
             if (words < budget.min || words > budget.max) {
+              const target = Math.round((budget.min + budget.max) / 2);
               issues.push(
-                `total spoken narration across all beats is ${words} words but a ${format} needs ${budget.min}-${budget.max} — ${
-                  words > budget.max
-                    ? "tighten every beat: cut filler words, keep every scene's meaning"
-                    : "deepen the teaching with substance (concrete facts, not padding)"
-                }`
+                words > budget.max
+                  ? `total spoken narration is ${words} words but a ${format} must be ${budget.min}-${budget.max} — cut about ${words - budget.max} words: tighten every beat, keep every scene's meaning`
+                  : `total spoken narration is only ${words} words but a ${format} must be ${budget.min}-${budget.max}: add about ${target - words} more words of REAL teaching. Expand each teaching scene's beats to 3-5 full sentences that explain the mechanism and the why (define the core term, walk the example step by step, name the trade-off). Do NOT add filler, new sign-off cards, or repeat yourself — deepen the existing scenes and add a missing mechanism step.`
               );
             }
             const bt = firstAdjacentBigtext(validated.data);

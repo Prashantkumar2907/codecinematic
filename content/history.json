@@ -40,6 +40,14 @@
             "format": "long",
             "slug": "2026-07-13-13-55-long-caching-queues-how-redis-makes-apps-100x-faster",
             "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "Caching & Queues: How Redis makes apps 100x faster",
+            "title": "Caching and Queues: How Redis Makes Applications 100x Faster",
+            "format": "long",
+            "slug": "2026-07-13-14-34-long-caching-queues-how-redis-makes-apps-100x-faster",
+            "status": "draft"
           }
         ]
       },

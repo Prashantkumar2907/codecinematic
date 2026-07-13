@@ -222,15 +222,27 @@ function sanitizeScene(raw: unknown): unknown {
     case "chart":
       scene.title = clamp(scene.title, 60);
       if (Array.isArray(scene.items)) {
-        scene.items = scene.items.slice(0, 6).map((it) =>
-          typeof it === "object" && it !== null
-            ? {
-                ...it,
-                label: clamp((it as Record<string, unknown>).label, 24),
-                unit: clamp((it as Record<string, unknown>).unit, 8),
+        scene.items = scene.items.slice(0, 6).map((it) => {
+          if (typeof it !== "object" || it === null) return it;
+          const item = it as Record<string, unknown>;
+          // Models often write value as a string with the unit baked in
+          // ("100x", "200 ms", "1,000"). Coerce to a plain number and lift a
+          // trailing unit into `unit` so the bar chart renders instead of failing.
+          let value = item.value;
+          let unit = item.unit;
+          if (typeof value === "string") {
+            const match = value.replace(/,/g, "").match(/-?\d+\.?\d*/);
+            if (match) {
+              const num = parseFloat(match[0]);
+              const suffix = value.replace(/,/g, "").replace(match[0], "").trim();
+              if (!Number.isNaN(num)) {
+                value = num;
+                if (!unit && suffix) unit = suffix;
               }
-            : it
-        );
+            }
+          }
+          return { ...item, value, unit: clamp(unit, 8), label: clamp(item.label, 24) };
+        });
       }
       break;
     case "quote":

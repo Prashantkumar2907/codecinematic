@@ -35,9 +35,16 @@ Narration rules (neural TTS voice; each beat is voiced separately):
 const TEACHING_METHOD = `
 How to teach (dual-track rule — a total newcomer AND a practitioner are both watching; both must
 stay hooked, so every idea runs on two tracks at once: plain words + the precise term):
+- FOUNDATION FIRST: before any mechanism, one early beat must answer "what IS this thing, in one
+  plain sentence, and what problem does it exist to solve?" for the video's core subject. If the
+  video is about Redis, say it plainly ("Redis is a database that keeps data in memory instead of on
+  disk — a giant labelled locker wall your app reads from in under a millisecond") BEFORE showing a
+  request flow. Never open the mechanics assuming the viewer already knows what the thing is. The
+  hook can tease; the very next teaching beat must ground the fundamental.
 - ONE concrete running example threads the WHOLE video (a real name, place or number — resolving
-  "youtube.com", investing "₹10,000", the year 1857). Every diagram step, chart bar, code line and
-  steps item narrates what happens to THAT example — never an abstraction like "a domain" or "a user".
+  "youtube.com", investing "₹10,000", caching user "42" named Priya, the year 1857). Every diagram
+  step, chart bar, code line and steps item narrates what happens to THAT example — never an
+  abstraction like "a domain" or "a user".
 - The first time ANY technical term appears, the SAME beat anchors it in everyday words
   ("the root server — think of it as the phone book's front desk"). Term + plain-words anchor
   together, every single time. Never define a term using another undefined term.
@@ -66,7 +73,14 @@ Code rules (js/python/sql code is EXECUTED to verify your claimed output — it 
 - If the code prints, "expectedOutput" must be EXACTLY what it prints (every character, every newline).
 - "segments" must start at line 1, be contiguous, and cover every line exactly once (3-15s of speech each).
 - Line limit: aim <=46 characters per line, <=22 lines. Break lines rather than exceed width.
-- sql means SQLite syntax (it runs under sqlite3). bash/yaml/text are display-only (not executed).`;
+- sql means SQLite syntax (it runs under sqlite3). bash/yaml/text are display-only (not executed).
+- REALISM OVER EXECUTABILITY: the code must show the ACTUAL concept, idiomatic to how a pro writes it.
+  If the topic centres on a library/tool NOT in the js/python/sql standard library (redis, react,
+  express, pandas, fastapi, kafka...), do NOT fake it with a stdlib mock — e.g. never simulate a cache
+  with "time.sleep(0.2)" or a dict pretending to be Redis. That misteaches the concept. Instead use
+  lang "text" to DISPLAY the real, idiomatic library code (r.set("user:42", data, ex=3600); r.get(...))
+  — display-only code can show the genuine API. Reserve executable js/python/sql for logic that is
+  truly self-contained (an algorithm, a SQL query, a pure function) where running it proves something.`;
 
 const NON_CODING_RULES = `
 Visual rules for this subject (no executable code, no terminal scenes):
@@ -223,11 +237,16 @@ beats must be 130-220. Count them. Over 220 words the Short overruns 90 seconds 
   bullets/compare/diagram scene, not just a card.
 - escalate difficulty: fundamentals early, nuance/tradeoffs/consequences later
 - near the end: a "bullets" of common mistakes and a "quiz" to test the idea
-- close with a "bigtext" recap then a "question" scene (this recap is the ONE allowed bigtext not
-  followed by a content scene, because the question follows it)
+- close with a "bigtext" recap then a "question" scene as the FINAL scene (this recap is the ONE
+  allowed bigtext not followed by a content scene). NOTHING comes after the question — no "see you
+  next time", no sign-off card, no "pro tip" outro. The question is the finale.
 - bigtext section cards double as YouTube chapters — give them crisp 2-5 word titles
 PACING BUDGET (the video runs exactly as long as the narration): total spoken words across ALL
-beats must be 950-1700 (≈7-11 minutes at teaching pace).`;
+beats must be 950-1700 (≈7-11 minutes at teaching pace). This is a hard floor: a "long" with
+one-sentence beats becomes a thin 3-minute video that underdelivers versus the real YouTube
+tutorials it competes with. Each teaching scene's beats should be 3-5 full sentences of genuine
+explanation — narrate the WHY and the mechanism, not a caption. Count your words; if you are under
+950 you have skipped depth the topic deserves — add the missing mechanism, not filler.`;
 
   const avoid = recentTopics.length
     ? `Recently covered in this sub-module (do NOT repeat): ${recentTopics.join("; ")}`
