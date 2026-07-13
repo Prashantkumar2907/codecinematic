@@ -21,27 +21,5 @@
     "slug": "2026-07-10-11-23-short-horizontal-vs-vertical-scaling-the-cost-of-your-architecture",
     "status": "uploaded",
     "videoId": "6rIbezK5xbw"
-  },
-  {
-    "date": "2026-07-12",
-    "subject": "Coding",
-    "module": "Frontend",
-    "submodule": "JavaScript",
-    "topic": "The prototype chain: how objects find their methods",
-    "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-    "format": "short",
-    "slug": "2026-07-12-18-21-short-the-prototype-chain-how-objects-find-their-methods",
-    "status": "draft"
-  },
-  {
-    "date": "2026-07-12",
-    "subject": "Coding",
-    "module": "Frontend",
-    "submodule": "JavaScript",
-    "topic": "The prototype chain: how objects find their methods",
-    "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-    "format": "short",
-    "slug": "2026-07-12-18-35-short-the-prototype-chain-how-objects-find-their-methods",
-    "status": "draft"
   }
 ]

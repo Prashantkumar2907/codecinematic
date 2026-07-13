@@ -1,6 +1,7 @@
 {
   "date": "2026-07-12",
   "used": {
-    "gemini-3.1-flash-lite": 1
+    "gemini-3.1-flash-lite": 5,
+    "gemini-3.5-flash": 3
   }
 }

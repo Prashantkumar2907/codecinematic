@@ -218,9 +218,14 @@ Teaching quality bar (viewers range from beginners to experts — beginners must
 - The ending question must be answerable from what was taught; make it the kind people argue about in comments.
 
 Also produce "meta" for YouTube:
-- "title": 30-95 chars, curiosity-driven, includes the concrete topic${format === "short" ? ', ends with " #Shorts"' : ""}
-- "description": line 1 a hook that earns the click; then 2-4 lines on what the viewer learns; no link placeholders
-- "tags": 4-15 plain keywords
+- "title": 35-90 chars${format === "short" ? ', ends with " #Shorts"' : ""} — lead with the exact phrase people search
+  (the concrete concept), then the curiosity gap; proven shapes: "How X actually works", "Why X ...",
+  "X vs Y", "The X mistake ..."; no clickbait lies, no ALL-CAPS words
+- "description": lines 1-2 restate the topic with the exact phrases viewers type into search (they are
+  the visible snippet); then 3-5 lines on what the viewer learns using the video's concrete facts; end
+  by inviting a comment answer to the ending question; no links, no timestamps
+- "tags": 10-15 — broad subject terms + the exact topic phrase + specific concepts covered + 2-3
+  learner phrases ("<topic> tutorial", "learn <submodule>")
 - "hashtags": 3-6 like #JavaScript or #IndianHistory — first three are the visible ones
 
 Top-level JSON shape:

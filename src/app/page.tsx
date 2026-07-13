@@ -11,7 +11,7 @@ import NewsView from "@/components/NewsView";
 type Format = "short" | "long";
 type View = "create" | "library" | "news";
 type Stage = "idle" | "topics" | "generating" | "scripted" | "voicing" | "rendering" | "rendered" | "saving" | "uploading" | "uploaded";
-type GenStage = "writing" | "validating" | "repairing";
+type GenStage = "writing" | "validating" | "repairing" | "optimizing";
 
 type Submodule = { id: string; label: string };
 type Module = { id: string; label: string; submodules: Submodule[] };
@@ -327,7 +327,12 @@ export default function Studio() {
         let finished = false;
         const handleEvent = async (event: Record<string, unknown>) => {
           if (event.quota && typeof event.quota === "object") setQuota(event.quota as Quota);
-          if (event.stage === "writing" || event.stage === "validating" || event.stage === "repairing") {
+          if (
+            event.stage === "writing" ||
+            event.stage === "validating" ||
+            event.stage === "repairing" ||
+            event.stage === "optimizing"
+          ) {
             setGenStage(event.stage);
             if (event.stage === "repairing" && typeof event.round === "number") setGenRound(event.round);
             return;
@@ -670,7 +675,7 @@ export default function Studio() {
   })();
 
   const genChecklist: { key: GenStage; label: string; state: "done" | "current" | "pending" }[] = (() => {
-    const order: GenStage[] = ["writing", "validating", "repairing"];
+    const order: GenStage[] = ["writing", "validating", "repairing", "optimizing"];
     const currentIdx = genStage ? order.indexOf(genStage) : -1;
     return order.map((key, i) => {
       const label =
@@ -678,9 +683,11 @@ export default function Studio() {
           ? `writing scenes (${format === "short" ? "4–8" : "14–32"} planned)`
           : key === "validating"
             ? "validating structure"
-            : genRound > 0
-              ? `repairing — round ${genRound}/2`
-              : "repairing (only if needed)";
+            : key === "optimizing"
+              ? "optimizing title, description & tags"
+              : genRound > 0
+                ? `repairing — round ${genRound}/2`
+                : "repairing (only if needed)";
       const state: "done" | "current" | "pending" =
         i === currentIdx ? "current" : i < currentIdx || (key === "repairing" && genRound > 0 && genStage !== "repairing") ? "done" : "pending";
       return { key, label, state };

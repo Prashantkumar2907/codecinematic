@@ -4,6 +4,7 @@ import { sceneScriptSchema } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
 import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
+import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
 
 const requestSchema = z.object({
@@ -82,7 +83,9 @@ export async function POST(req: Request) {
           submodule: submodule.label,
           topic,
         };
-        emit({ done: true, script, topic, quota: await quota() });
+        emit({ stage: "optimizing" });
+        const { meta, source: metaSource } = await enhanceVideoMeta(script);
+        emit({ done: true, script: { ...script, meta }, topic, metaSource, quota: await quota() });
       } catch (err) {
         const message = err instanceof GeminiError ? err.message : `generation failed: ${String(err).slice(0, 300)}`;
         emit({ error: message, quota: await quota() });
