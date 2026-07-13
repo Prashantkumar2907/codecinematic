@@ -22,7 +22,7 @@ const CHANNELS_PATH = path.join(ROOT, "content", "channels.json");
 
 const channelId = process.argv[2];
 if (!channelId) {
-  console.error("Usage: node scripts/news/get_yt_token.mjs <channelId>  (e.g. en, hi)");
+  console.error("Usage: node scripts/news/get_yt_token.mjs <channelId>  (e.g. en, hi, lore, grow)");
   process.exit(1);
 }
 

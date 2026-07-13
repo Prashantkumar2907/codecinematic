@@ -117,6 +117,12 @@ pixel-identical to the current channel uploads.
   default categories. Add a channel = add an entry + its three secrets. The
   channel is selected purely by which refresh token is used, exactly like the
   Action.
+- **Teaching channels route by subject**: entries with `"type": "teaching"`
+  carry a `subjects` list (labels); Create/Library uploads publish each video
+  to the channel owning its subject (Coding → DebHarbour, curiosity subjects →
+  LoreHarbour, self-growth subjects → GrowHarbour; unmapped subjects fall back
+  to the `YT_*` env triple). The UI shows "→ channel" next to Upload. Mint a
+  new channel's refresh token with `node scripts/news/get_yt_token.mjs <id>`.
 - Routes: `news/config` (channels+categories), `news/render` (runs the Python
   renderer into `content/news/<slug>/`), `news/upload` (per-channel upload),
   `news/drafts` (list + delete), `news/file` (Range-streamed mp4 preview).

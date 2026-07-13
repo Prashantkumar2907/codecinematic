@@ -128,6 +128,7 @@ export default function Studio() {
   const [genRound, setGenRound] = useState(0);
   const [genWarning, setGenWarning] = useState<string | null>(null);
   const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
+  const [uploadChannels, setUploadChannels] = useState<Record<string, string>>({});
   const [genStartedAt, setGenStartedAt] = useState<number | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyingSceneId, setVerifyingSceneId] = useState<string | null>(null);
@@ -185,6 +186,7 @@ export default function Studio() {
       if (res.ok) {
         setSubjects(data.subjects);
         if (data.quota) setQuota(data.quota as Quota);
+        if (data.uploadChannels) setUploadChannels(data.uploadChannels as Record<string, string>);
       }
     } catch {
       /* retry on next mount; create flow shows empty pickers meanwhile */
@@ -1197,6 +1199,9 @@ export default function Studio() {
                 {stage === "uploading" ? <span className="spinner" aria-hidden /> : null}
                 {stage === "uploading" ? "Uploading…" : "Upload to YouTube"}
               </button>
+              {script && uploadChannels[script.subject] ? (
+                <span className="smut">→ {uploadChannels[script.subject]}</span>
+              ) : null}
               {!videoBlob ? <span className="note">← unlocks after render</span> : null}
             </div>
 
@@ -1319,6 +1324,9 @@ export default function Studio() {
                         {stage === "uploading" ? <span className="spinner" aria-hidden /> : null}
                         {stage === "uploading" ? "Uploading…" : selectedDraft.videoId ? "Already uploaded" : "Upload to YouTube"}
                       </button>
+                      {uploadChannels[selectedDraft.subject] ? (
+                        <span className="smut">→ {uploadChannels[selectedDraft.subject]}</span>
+                      ) : null}
                       <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(selectedDraft)} disabled={busy}>
                         Delete
                       </button>

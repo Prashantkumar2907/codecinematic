@@ -6,6 +6,7 @@ import { google } from "googleapis";
 import { z } from "zod";
 import { sceneScriptSchema } from "@/studio/schema";
 import { markUploaded, videosDir } from "@/lib/state";
+import { channelCreds, teachingChannelForSubject } from "@/lib/news";
 
 const requestSchema = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/),
@@ -20,11 +21,6 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "expected {slug, privacy?}" }, { status: 400 });
   }
-  const { YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN } = process.env;
-  if (!YT_CLIENT_ID || !YT_CLIENT_SECRET || !YT_REFRESH_TOKEN) {
-    return NextResponse.json({ error: "YT_CLIENT_ID / YT_CLIENT_SECRET / YT_REFRESH_TOKEN missing in .env.local" }, { status: 500 });
-  }
-
   const dir = path.join(videosDir(), parsed.data.slug);
   const videoPath = path.join(dir, "video.webm");
   let script;
@@ -35,8 +31,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `draft ${parsed.data.slug} not found or invalid` }, { status: 404 });
   }
 
-  const auth = new google.auth.OAuth2(YT_CLIENT_ID, YT_CLIENT_SECRET);
-  auth.setCredentials({ refresh_token: YT_REFRESH_TOKEN });
+  // The video's subject decides the channel (channels.json teaching entries);
+  // subjects without a mapping fall back to the default YT_* credentials.
+  const channel = await teachingChannelForSubject(script.subject);
+  const creds = channel
+    ? channelCreds(channel)
+    : process.env.YT_CLIENT_ID && process.env.YT_CLIENT_SECRET && process.env.YT_REFRESH_TOKEN
+      ? {
+          clientId: process.env.YT_CLIENT_ID,
+          clientSecret: process.env.YT_CLIENT_SECRET,
+          refreshToken: process.env.YT_REFRESH_TOKEN,
+        }
+      : null;
+  if (!creds) {
+    const which = channel
+      ? `${channel.creds.clientId} / ${channel.creds.clientSecret} / ${channel.creds.refreshToken} (channel "${channel.label}")`
+      : "YT_CLIENT_ID / YT_CLIENT_SECRET / YT_REFRESH_TOKEN";
+    return NextResponse.json({ error: `missing credentials in .env.local: ${which}` }, { status: 500 });
+  }
+
+  const auth = new google.auth.OAuth2(creds.clientId, creds.clientSecret);
+  auth.setCredentials({ refresh_token: creds.refreshToken });
   const youtube = google.youtube({ version: "v3", auth });
 
   const description = `${script.meta.description}\n\n${script.meta.hashtags.join(" ")}`;
@@ -88,6 +103,7 @@ export async function POST(req: Request) {
       thumbnailSet,
       scheduled: Boolean(publishAt),
       privacy: effectivePrivacy,
+      channel: channel?.label ?? "default (YT_*)",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

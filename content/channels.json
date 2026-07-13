@@ -14,6 +14,7 @@
   "channels": [
     {
       "id": "en",
+      "type": "news",
       "label": "Bharat Briefs (English)",
       "lang": "en",
       "voice": "en-IN-NeerjaNeural",
@@ -26,6 +27,7 @@
     },
     {
       "id": "hi",
+      "type": "news",
       "label": "Bharat Briefs हिंदी",
       "lang": "hi",
       "voice": "hi-IN-SwaraNeural",
@@ -34,6 +36,63 @@
         "clientId": "HI_YT_CLIENT_ID",
         "clientSecret": "HI_YT_CLIENT_SECRET",
         "refreshToken": "HI_YT_REFRESH_TOKEN"
+      }
+    },
+    {
+      "id": "deb",
+      "type": "teaching",
+      "label": "DebHarbour",
+      "lang": "en",
+      "voice": "en-US-AndrewMultilingualNeural",
+      "defaultCategories": [],
+      "subjects": ["Coding"],
+      "creds": {
+        "clientId": "YT_CLIENT_ID",
+        "clientSecret": "YT_CLIENT_SECRET",
+        "refreshToken": "YT_REFRESH_TOKEN"
+      }
+    },
+    {
+      "id": "lore",
+      "type": "teaching",
+      "label": "LoreHarbour",
+      "lang": "en",
+      "voice": "en-US-AndrewMultilingualNeural",
+      "defaultCategories": [],
+      "subjects": [
+        "History",
+        "Geography",
+        "Science",
+        "GK & Amazing Facts",
+        "Mythology & Epics",
+        "Philosophy & Big Ideas"
+      ],
+      "creds": {
+        "clientId": "LORE_YT_CLIENT_ID",
+        "clientSecret": "LORE_YT_CLIENT_SECRET",
+        "refreshToken": "LORE_YT_REFRESH_TOKEN"
+      }
+    },
+    {
+      "id": "grow",
+      "type": "teaching",
+      "label": "GrowHarbour",
+      "lang": "en",
+      "voice": "en-US-AndrewMultilingualNeural",
+      "defaultCategories": [],
+      "subjects": [
+        "Money & Finance",
+        "Business & Startups",
+        "Psychology & the Mind",
+        "Health & Body",
+        "Life Skills & Productivity",
+        "English & Communication",
+        "Math & Aptitude"
+      ],
+      "creds": {
+        "clientId": "GROW_YT_CLIENT_ID",
+        "clientSecret": "GROW_YT_CLIENT_SECRET",
+        "refreshToken": "GROW_YT_REFRESH_TOKEN"
       }
     }
   ]

@@ -15,10 +15,14 @@ const NEWS_DIR = path.join(CONTENT_DIR, "news");
 export type ChannelCredEnv = { clientId: string; clientSecret: string; refreshToken: string };
 export type ChannelConfig = {
   id: string;
+  /** "news" channels appear in the News tab; "teaching" channels receive Create uploads by subject. */
+  type?: "news" | "teaching";
   label: string;
   lang: string;
   voice: string;
   defaultCategories: string[];
+  /** Teaching channels: subject LABELS whose videos publish to this channel. */
+  subjects?: string[];
   creds: ChannelCredEnv;
 };
 type ChannelsFile = { categories: string[]; channels: ChannelConfig[] };
@@ -76,14 +80,16 @@ export function channelCreds(ch: ChannelConfig): ChannelCredEnv | null {
 
 export async function listChannels(): Promise<ChannelPublic[]> {
   const { channels } = await readChannelsFile();
-  return channels.map((c) => ({
-    id: c.id,
-    label: c.label,
-    lang: c.lang,
-    voice: c.voice,
-    defaultCategories: c.defaultCategories,
-    hasCreds: channelCreds(c) !== null,
-  }));
+  return channels
+    .filter((c) => (c.type ?? "news") === "news")
+    .map((c) => ({
+      id: c.id,
+      label: c.label,
+      lang: c.lang,
+      voice: c.voice,
+      defaultCategories: c.defaultCategories,
+      hasCreds: channelCreds(c) !== null,
+    }));
 }
 
 export async function resolveChannel(id: string): Promise<ChannelConfig> {
@@ -91,6 +97,23 @@ export async function resolveChannel(id: string): Promise<ChannelConfig> {
   const ch = channels.find((c) => c.id === id);
   if (!ch) throw new Error(`unknown channel: ${id}`);
   return ch;
+}
+
+/** Teaching channel that owns a subject label, or null (caller falls back to YT_* env). */
+export async function teachingChannelForSubject(subjectLabel: string): Promise<ChannelConfig | null> {
+  const { channels } = await readChannelsFile();
+  return channels.find((c) => c.type === "teaching" && c.subjects?.includes(subjectLabel)) ?? null;
+}
+
+/** subject label → teaching channel label, for showing where a video will publish. */
+export async function teachingChannelMap(): Promise<Record<string, string>> {
+  const { channels } = await readChannelsFile();
+  const map: Record<string, string> = {};
+  for (const c of channels) {
+    if (c.type !== "teaching") continue;
+    for (const s of c.subjects ?? []) map[s] = c.label;
+  }
+  return map;
 }
 
 export function newsDir(slug: string): string {
