@@ -98,23 +98,49 @@ export function paintVocab(ctx: CanvasRenderingContext2D, scene: VocabScene, env
   ctx.save();
   ctx.globalAlpha = clamp01(sub(env.p, 0.2, 0.25));
   ctx.textAlign = "center";
-  ctx.font = `600 ${unit * 1.15}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
+  let mpx = unit * 1.15;
+  ctx.font = `600 ${mpx}px ${FONT_SANS}`;
   const meaningText = scene.synonym ? `${scene.meaning}  ·  syn. ${scene.synonym}` : scene.meaning;
-  const mLines = wrapText(ctx, meaningText, contentW * 0.9);
+  let mLines = wrapText(ctx, meaningText, contentW * 0.9);
+  if (mLines.length > 2) {
+    mpx = unit * 0.98;
+    ctx.font = `600 ${mpx}px ${FONT_SANS}`;
+    mLines = wrapText(ctx, meaningText, contentW * 0.9);
+  }
+  ctx.fillStyle = THEME.text;
   const mTop = contentY + unit * 5.1;
-  mLines.forEach((line, i) => ctx.fillText(line, cx, mTop + i * unit * 1.5));
+  const mLineH = mpx * 1.32;
+  mLines.forEach((line, i) => ctx.fillText(line, cx, mTop + i * mLineH));
   ctx.restore();
   ctx.textAlign = "start";
 
-  const exTop = contentY + unit * 7.6;
+  // Examples start below the measured meaning (a fixed offset used to collide
+  // with 3-line meanings) and the block centers in the remaining space.
+  const availTop = mTop + mLines.length * mLineH + unit * 0.6;
   const nEx = scene.examples.length;
   const exGap = unit * 0.8;
-  const exH = Math.min((contentH - (exTop - contentY) - (nEx - 1) * exGap) / nEx, unit * (layout.vertical ? 3.6 : 2.7));
+  const exH = Math.min((contentH - (availTop - contentY) - (nEx - 1) * exGap) / nEx, unit * (layout.vertical ? 3.6 : 2.7));
+  const exBlockH = nEx * exH + (nEx - 1) * exGap;
+  const exTop = availTop + Math.max(0, (contentY + contentH - availTop - exBlockH) / 2);
 
   scene.examples.forEach((ex, i) => {
     const t = beatT(env.beats, offset + i, totalBeats, env.p);
-    if (t <= 0) return;
+    const ghostY = exTop + i * (exH + exGap);
+    if (t <= 0) {
+      const ghostIn = easeOutCubic(clamp01(env.p / 0.12));
+      if (ghostIn > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.16 * ghostIn;
+        roundRect(ctx, contentX, ghostY, contentW, exH, unit * 0.4);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = unit * 0.05;
+        ctx.setLineDash([unit * 0.3, unit * 0.28]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      return;
+    }
     const appear = easeOutCubic(Math.min(1, t * 3));
     const isCurrent = active === offset + i;
     const y = exTop + i * (exH + exGap);

@@ -23,18 +23,43 @@ type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number
 
 const GRID = 12;
 
-function nodeRect(node: Node, layout: Layout, titleBand: number): Rect {
+type GridMap = { ox: number; oy: number; cw: number; ch: number };
+
+/**
+ * Models rarely use the full 12x12 grid — un-remapped, a diagram drawn in rows
+ * 0-6 bunches at the top of a 9:16 frame. Center the used extent and scale it
+ * up modestly (never distorting node aspect more than the grid itself does).
+ */
+function gridMap(nodes: Node[], layout: Layout, titleBand: number): GridMap {
   const areaX = layout.contentX;
   const areaY = layout.contentY + titleBand;
   const areaW = layout.contentW;
   const areaH = layout.contentH - titleBand;
   const cellW = areaW / GRID;
   const cellH = areaH / GRID;
-  const pad = Math.min(cellW, cellH) * 0.12;
-  const x = areaX + node.x * cellW + pad;
-  const y = areaY + node.y * cellH + pad;
-  const w = node.w * cellW - pad * 2;
-  const h = node.h * cellH - pad * 2;
+  const minX = Math.min(...nodes.map((n) => n.x));
+  const maxX = Math.max(...nodes.map((n) => n.x + n.w));
+  const minY = Math.min(...nodes.map((n) => n.y));
+  const maxY = Math.max(...nodes.map((n) => n.y + n.h));
+  const usedW = Math.max(maxX - minX, 1);
+  const usedH = Math.max(maxY - minY, 1);
+  const f = Math.min(GRID / usedW, GRID / usedH, 1.3);
+  const cw = cellW * f;
+  const ch = cellH * f;
+  return {
+    cw,
+    ch,
+    ox: areaX + (areaW - usedW * cw) / 2 - minX * cw,
+    oy: areaY + (areaH - usedH * ch) / 2 - minY * ch,
+  };
+}
+
+function nodeRect(node: Node, map: GridMap): Rect {
+  const pad = Math.min(map.cw, map.ch) * 0.12;
+  const x = map.ox + node.x * map.cw + pad;
+  const y = map.oy + node.y * map.ch + pad;
+  const w = node.w * map.cw - pad * 2;
+  const h = node.h * map.ch - pad * 2;
   return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
 }
 
@@ -78,8 +103,9 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const map = gridMap(scene.nodes, layout, titleBand);
   const rects = new Map<string, Rect>();
-  for (const node of scene.nodes) rects.set(node.id, nodeRect(node, layout, titleBand));
+  for (const node of scene.nodes) rects.set(node.id, nodeRect(node, map));
   const reveals = revealTimes(scene, env, offset, totalBeats);
   const highlights = activeStep >= 0 && !inTail ? new Set(scene.steps[Math.min(activeStep, scene.steps.length - 1)]?.highlight ?? []) : new Set<string>();
 
@@ -128,7 +154,35 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const rect = rects.get(node.id)!;
     const revealAt = reveals.get(node.id) ?? 0;
     const t = sub(env.p, revealAt, 0.1);
-    if (t <= 0) continue;
+    if (t <= 0) {
+      // Blueprint ghost: before its reveal the node is faintly present, so an
+      // intro beat never plays over an empty frame and reveals still pop.
+      const ghostIn = easeOutCubic(sub(env.p, 0, 0.1));
+      if (ghostIn <= 0) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.14 * ghostIn;
+      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * 0.45);
+      ctx.fillStyle = THEME.panel;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(148,163,184,0.7)";
+      ctx.lineWidth = unit * 0.05;
+      ctx.setLineDash([unit * 0.35, unit * 0.3]);
+      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * 0.45);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.22 * ghostIn;
+      ctx.fillStyle = THEME.textDim;
+      const gpx = unit * 0.72;
+      ctx.font = `700 ${gpx}px ${FONT_SANS}`;
+      const gLines = wrapText(ctx, node.label, rect.w - unit * 0.8).slice(0, 2);
+      ctx.textAlign = "center";
+      const gLineH = gpx * 1.25;
+      const gStartY = rect.cy - ((gLines.length - 1) * gLineH) / 2 + gpx * 0.35;
+      gLines.forEach((line, i) => ctx.fillText(line, rect.cx, gStartY + i * gLineH));
+      ctx.textAlign = "start";
+      ctx.restore();
+      continue;
+    }
     const pop = easeOutBack(clamp01(t));
     const highlighted = highlights.has(node.id);
     const dimmed = !highlighted && highlights.size > 0;

@@ -1,8 +1,8 @@
 {
   "date": "2026-07-13",
   "used": {
-    "gemini-3.1-flash-lite": 11,
-    "gemini-3.5-flash": 11,
-    "gemini-3-flash-preview": 1
+    "gemini-3.1-flash-lite": 26,
+    "gemini-3.5-flash": 13,
+    "gemini-3-flash-preview": 13
   }
 }

@@ -39,7 +39,26 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
 
   panels.forEach(({ side, x, y, dir, color, glow, beatIdx }) => {
     const bt = beatT(env.beats, beatIdx, totalBeats, env.p);
-    if (bt <= 0) return;
+    if (bt <= 0) {
+      // Ghost panel + side title, so an intro beat never plays over a frame
+      // that is empty below the scene title.
+      const ghostIn = easeOutCubic(sub(env.p, 0, 0.12));
+      if (ghostIn > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.18 * ghostIn;
+        roundRect(ctx, x, y, pw, ph, unit * 0.7);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = unit * 0.05;
+        ctx.setLineDash([unit * 0.35, unit * 0.3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = `800 ${unit * 1.05}px ${FONT_SANS}`;
+        ctx.fillStyle = color;
+        ctx.fillText(side.title, x + unit, y + unit * 1.5);
+        ctx.restore();
+      }
+      return;
+    }
     const appear = easeOutCubic(Math.min(1, bt * 2.5));
     const isCurrent = active === beatIdx;
     const alpha = isCurrent || active >= verdictBeat && verdictBeat > 0 ? 1 : active > beatIdx ? DIM_ALPHA : 1;

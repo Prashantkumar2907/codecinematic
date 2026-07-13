@@ -37,13 +37,30 @@ export function paintBullets(ctx: CanvasRenderingContext2D, scene: BulletsScene,
   scene.items.forEach((item, i) => {
     const beatIdx = offset + i;
     const t = beatT(env.beats, beatIdx, totalBeats, env.p);
-    if (t <= 0) return;
+    const y = listTop + i * rowGap;
+    const cy = y + unit * 0.75;
+    if (t <= 0) {
+      // Ghost marker for the not-yet-revealed item — the list's full extent
+      // shows from the start instead of leaving the lower rows empty.
+      const ghostIn = easeOutCubic(sub(env.p, 0, 0.12));
+      if (ghostIn > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.16 * ghostIn;
+        ctx.beginPath();
+        ctx.arc(contentX + markR, cy, Math.max(markR, unit * 0.34), 0, Math.PI * 2);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = unit * 0.06;
+        ctx.setLineDash([unit * 0.22, unit * 0.22]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      return;
+    }
     const appear = easeOutCubic(Math.min(1, t * 3));
     const pop = easeOutBack(Math.min(1, t * 3));
     const isCurrent = active === beatIdx;
     const alpha = isCurrent ? 1 : DIM_ALPHA;
-    const y = listTop + i * rowGap;
-    const cy = y + unit * 0.75;
 
     ctx.save();
     ctx.globalAlpha = appear * alpha;

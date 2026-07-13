@@ -1,5 +1,5 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type TimelineScene = Extract<Scene, { kind: "timeline" }>;
@@ -23,11 +23,33 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
 
   scene.events.forEach((e, i) => {
     const t = beatT(env.beats, offset + i, totalBeats, env.p);
-    if (t <= 0) return;
+    const y = listTop + i * rowGap + rowGap * 0.5;
+    if (t <= 0) {
+      // Ghost dot + date: the spine's full chronology is faintly visible
+      // before each event's beat, so the frame is never half empty.
+      const ghostIn = easeOutCubic(sub(env.p, 0, 0.12));
+      if (ghostIn > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.2 * ghostIn;
+        ctx.beginPath();
+        ctx.arc(spineX, y, dotR, 0, Math.PI * 2);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = unit * 0.07;
+        ctx.setLineDash([unit * 0.2, unit * 0.2]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.textAlign = "right";
+        ctx.font = `800 ${unit * 0.8}px ${FONT_SANS}`;
+        ctx.fillStyle = THEME.textDim;
+        ctx.fillText(e.when, spineX - unit * 0.95, y + unit * 0.28);
+        ctx.textAlign = "start";
+        ctx.restore();
+      }
+      return;
+    }
     const appear = easeOutCubic(Math.min(1, t * 3));
     const pop = easeOutBack(Math.min(1, t * 3));
     const isCurrent = active === offset + i;
-    const y = listTop + i * rowGap + rowGap * 0.5;
 
     if (i > 0) {
       const prevY = listTop + (i - 1) * rowGap + rowGap * 0.5;

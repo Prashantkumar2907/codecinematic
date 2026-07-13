@@ -27,8 +27,27 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
   const t1 = beatT(env.beats, 1, 2, env.p);
 
   const gap = unit * (vertical ? 1.1 : 1.0);
-  const cardH = (contentH - gap) / 2;
-  const mythY = contentY + unit * 0.3;
+
+  // Cards hug their text and the pair centers vertically — fixed half-height
+  // cards left a 9:16 frame mostly empty panel.
+  const textW = contentW - unit * 2;
+  let fontPx = unit * 1.05;
+  ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
+  let mLines = wrapText(ctx, scene.myth, textW);
+  let fLines = wrapText(ctx, scene.fact, textW);
+  if (Math.max(mLines.length, fLines.length) > 3) {
+    fontPx = unit * 0.9;
+    ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
+    mLines = wrapText(ctx, scene.myth, textW);
+    fLines = wrapText(ctx, scene.fact, textW);
+  }
+  mLines = mLines.slice(0, 5);
+  fLines = fLines.slice(0, 5);
+  const lineStep = fontPx * 1.4;
+  const textTop = unit * 3.0;
+  const neededH = (lines: number) => textTop + (lines - 1) * lineStep + fontPx + unit * 0.9;
+  const cardH = Math.min((contentH - gap) / 2, Math.max(neededH(mLines.length), neededH(fLines.length), unit * 5.4));
+  const mythY = contentY + (contentH - (cardH * 2 + gap)) / 2;
   const factY = mythY + cardH + gap;
 
   // ── Myth card ──────────────────────────────────────────────────────────────
@@ -49,17 +68,16 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
 
     chip(ctx, contentX + unit * 0.9, mythY + unit * 1.45, "MYTH", DANGER, unit);
 
-    ctx.font = `700 ${unit * 1.05}px ${FONT_SANS}`;
+    ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;
-    const mLines = wrapText(ctx, scene.myth, contentW - unit * 2).slice(0, 3);
-    mLines.forEach((line, i) => ctx.fillText(line, contentX + unit, mythY + unit * 3.0 + i * unit * 1.45));
+    mLines.forEach((line, i) => ctx.fillText(line, contentX + unit, mythY + textTop + i * lineStep));
 
     // strike-through on bust
     if (busted) {
       const strike = easeOutCubic(clamp01(t1 * 2.5));
       ctx.strokeStyle = rgba(DANGER, 0.8);
       ctx.lineWidth = unit * 0.12;
-      const sy = mythY + unit * 3.0 + ((mLines.length - 1) * unit * 1.45) / 2 - unit * 0.35;
+      const sy = mythY + textTop + ((mLines.length - 1) * lineStep) / 2 - fontPx * 0.33;
       ctx.beginPath();
       ctx.moveTo(contentX + unit, sy);
       ctx.lineTo(contentX + unit + (contentW - unit * 2) * strike, sy);
@@ -121,10 +139,9 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
     ctx.restore();
     ctx.textAlign = "start";
 
-    ctx.font = `700 ${unit * 1.05}px ${FONT_SANS}`;
+    ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;
-    const fLines = wrapText(ctx, scene.fact, contentW - unit * 2).slice(0, 3);
-    fLines.forEach((line, i) => ctx.fillText(line, contentX + unit, factY + unit * 3.0 + i * unit * 1.45));
+    fLines.forEach((line, i) => ctx.fillText(line, contentX + unit, factY + textTop + i * lineStep));
     ctx.restore();
   }
 }

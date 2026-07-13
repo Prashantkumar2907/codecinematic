@@ -26,23 +26,162 @@
         ]
       },
       "CS Fundamentals": {
-        "Networking & the Internet": [
-        ]
+        "Networking & the Internet": []
       },
       "Frontend": {
         "JavaScript": [
+          {
+            "date": "2026-07-13",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-05-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-11-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-23-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-37-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-51-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          }
+        ]
+      },
+      "Database": {
+        "Indexing & Performance": [
+          {
+            "date": "2026-07-13",
+            "topic": "Composite Indexes: The art of order",
+            "title": "Composite Index Column Order: The Performance Mistake #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-14-short-composite-indexes-the-art-of-order",
+            "status": "draft"
+          }
         ]
       }
     },
     "Money & Finance": {
       "Investing": {
-        "Power of Compounding": [
+        "Power of Compounding": []
+      },
+      "Psychology of Money": {
+        "Spending Traps": [
+          {
+            "date": "2026-07-13",
+            "topic": "Lifestyle Inflation: How your salary hike keeps you broke",
+            "title": "Lifestyle Inflation: Why your salary hike keeps you broke #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-48-short-lifestyle-inflation-how-your-salary-hike-keeps-you-broke",
+            "status": "draft"
+          }
         ]
       }
     },
     "Psychology & the Mind": {
       "Biases & Decisions": {
-        "Anchoring & Framing": [
+        "Anchoring & Framing": []
+      }
+    },
+    "History": {
+      "Medieval India": {
+        "Vijayanagara Empire": [
+          {
+            "date": "2026-07-13",
+            "topic": "Why Hampi fell: The mystery of the Battle of Talikota",
+            "title": "Why the Vijayanagara Empire Fell: The Battle of Talikota #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-20-short-why-hampi-fell-the-mystery-of-the-battle-of-talikota",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Geography": {
+      "Earth in Action": {
+        "Volcanoes & Earthquakes": [
+          {
+            "date": "2026-07-13",
+            "topic": "The Ring of Fire: Why 75% of volcanoes are here",
+            "title": "The Ring of Fire: Why 75% of Volcanoes Are Here #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-26-short-the-ring-of-fire-why-75-of-volcanoes-are-here",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Math & Aptitude": {
+      "Arithmetic": {
+        "Percentages": [
+          {
+            "date": "2026-07-13",
+            "topic": "Successive percentage changes: The mistake everyone makes",
+            "title": "Successive Percentage Change: The Common Mistake #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-33-short-successive-percentage-changes-the-mistake-everyone-makes",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Science": {
+      "How Things Work": {
+        "Flight & Vehicles": [
+          {
+            "date": "2026-07-13",
+            "topic": "The Turbulence Myth: What happens when planes hit bumps",
+            "title": "Why Turbulence Is Not an Air Pocket #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-43-short-the-turbulence-myth-what-happens-when-planes-hit-bumps",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "English & Communication": {
+      "Vocabulary": {
+        "Power Words": [
+          {
+            "date": "2026-07-13",
+            "topic": "Stop saying 'Very': Use these precise adjectives",
+            "title": "Stop saying Very: Use these precise Power Words #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-54-short-stop-saying-very-use-these-precise-adjectives",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "Stop saying 'Very': Use these precise adjectives",
+            "title": "Stop Saying Very: Use These 3 Precise Adjectives #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-12-59-short-stop-saying-very-use-these-precise-adjectives",
+            "status": "draft"
+          }
         ]
       }
     }

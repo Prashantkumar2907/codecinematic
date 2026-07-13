@@ -1,5 +1,5 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type StepsScene = Extract<Scene, { kind: "steps" }>;
@@ -24,11 +24,33 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
 
   scene.steps.forEach((s, i) => {
     const t = beatT(env.beats, offset + i, totalBeats, env.p);
-    if (t <= 0) return;
+    const cyc = listTop + i * rowGap + rowGap * 0.42;
+    if (t <= 0) {
+      // Ghost of the upcoming step number, so the spine's full extent is
+      // visible from the start instead of an empty lower half.
+      const ghostIn = easeOutCubic(sub(env.p, 0, 0.12));
+      if (ghostIn > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.18 * ghostIn;
+        ctx.beginPath();
+        ctx.arc(numX, cyc, numR, 0, Math.PI * 2);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = unit * 0.06;
+        ctx.setLineDash([unit * 0.25, unit * 0.25]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = accent;
+        ctx.font = `800 ${unit}px ${FONT_SANS}`;
+        ctx.textAlign = "center";
+        ctx.fillText(String(i + 1), numX, cyc + unit * 0.36);
+        ctx.textAlign = "start";
+        ctx.restore();
+      }
+      return;
+    }
     const appear = easeOutCubic(Math.min(1, t * 3));
     const pop = easeOutBack(Math.min(1, t * 3));
     const isCurrent = active === offset + i;
-    const cyc = listTop + i * rowGap + rowGap * 0.42;
 
     if (i < n - 1) {
       const nextC = listTop + (i + 1) * rowGap + rowGap * 0.42;

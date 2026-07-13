@@ -16,19 +16,27 @@ export function paintQuiz(ctx: CanvasRenderingContext2D, scene: QuizScene, env: 
   const revealing = active >= 1;
 
   const qIn = easeOutCubic(sub(env.p, 0, 0.16));
+  ctx.font = `800 ${unit * 1.35}px ${FONT_SANS}`;
+  const qLines = wrapText(ctx, scene.question, contentW * 0.96);
+  const m = scene.options.length;
+  const gap = unit * 0.7;
+  const rowH = Math.min(
+    (contentH - (qLines.length * unit * 1.7 + unit * 1.1) - (m - 1) * gap) / m,
+    unit * (vertical ? 3.0 : 2.3)
+  );
+  // Center the question+options block — a 2-option quiz otherwise leaves the
+  // bottom half of a 9:16 frame empty.
+  const blockH = qLines.length * unit * 1.7 + unit * 1.1 + m * rowH + (m - 1) * gap;
+  const qTop = contentY + Math.max(unit * 1.4, (contentH - blockH) / 2);
+
   ctx.save();
   ctx.globalAlpha = qIn;
   ctx.font = `800 ${unit * 1.35}px ${FONT_SANS}`;
   ctx.fillStyle = THEME.text;
-  const qLines = wrapText(ctx, scene.question, contentW * 0.96);
-  const qTop = contentY + unit * 1.4;
-  qLines.forEach((line, i) => ctx.fillText(line, contentX, qTop + i * unit * 1.7));
+  qLines.forEach((line, i) => ctx.fillText(line, contentX, qTop + unit * 1.05 + i * unit * 1.7));
   ctx.restore();
 
-  const optsTop = qTop + qLines.length * unit * 1.7 + unit * 1.1;
-  const m = scene.options.length;
-  const gap = unit * 0.7;
-  const rowH = Math.min((contentH - (optsTop - contentY) - (m - 1) * gap) / m, unit * (vertical ? 3.0 : 2.3));
+  const optsTop = qTop + unit * 1.05 + qLines.length * unit * 1.7 + unit * 0.75;
   const beat0T = beatT(env.beats, 0, totalBeats, env.p);
 
   scene.options.forEach((opt, i) => {

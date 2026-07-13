@@ -5,9 +5,9 @@ import type { PaintEnv } from "./index";
 type ChartScene = Extract<Scene, { kind: "chart" }>;
 
 /** Count-up value: integers stay integers, fractional values keep one decimal. */
-function fmtValue(target: number, t: number): string {
+function fmtValue(target: number, t: number, locale: string): string {
   const v = target * t;
-  if (Number.isInteger(target)) return Math.round(v).toLocaleString("en-US");
+  if (Number.isInteger(target)) return Math.round(v).toLocaleString(locale);
   return v.toFixed(1);
 }
 
@@ -40,7 +40,25 @@ export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env
 
   scene.items.forEach((item, i) => {
     const t = beatT(env.beats, offset + i, totalBeats, env.p);
-    if (t <= 0) return;
+    if (t <= 0) {
+      // Ghost track + label so the chart's full shape is visible before each
+      // bar's beat instead of bars materialising into an empty lower half.
+      const ghostIn = easeOutCubic(clamp01(env.p / 0.12));
+      if (ghostIn > 0) {
+        const rowY = listTop + i * rowGap;
+        const barY = rowY + unit * 1.15;
+        ctx.save();
+        ctx.globalAlpha = 0.35 * ghostIn;
+        ctx.font = `600 ${unit * 0.85}px ${FONT_SANS}`;
+        ctx.fillStyle = THEME.textFaint;
+        ctx.fillText(item.label, trackX, rowY + unit * 0.75);
+        roundRect(ctx, trackX, barY, trackW, barH, barH / 2);
+        ctx.fillStyle = "rgba(148,163,184,0.07)";
+        ctx.fill();
+        ctx.restore();
+      }
+      return;
+    }
     const appear = easeOutCubic(Math.min(1, t * 3));
     const grow = easeOutCubic(clamp01(t * 1.6));
     const isCurrent = active === offset + i;
@@ -73,9 +91,11 @@ export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env
     ctx.shadowBlur = 0;
 
     const u = item.unit?.trim() ?? "";
+    // ₹ amounts group Indian-style (₹23,00,000), everything else Western.
+    const locale = u === "₹" ? "en-IN" : "en-US";
     const valueText = /^[₹$€£]$/.test(u)
-      ? `${u}${fmtValue(item.value, grow)}`
-      : `${fmtValue(item.value, grow)}${u ? (u.startsWith("%") ? u : ` ${u}`) : ""}`;
+      ? `${u}${fmtValue(item.value, grow, locale)}`
+      : `${fmtValue(item.value, grow, locale)}${u ? (u.startsWith("%") ? u : ` ${u}`) : ""}`;
     ctx.font = `800 ${unit * 0.85}px ${FONT_SANS}`;
     const vw = ctx.measureText(valueText).width;
     const inside = barW > vw + unit * 1.2;

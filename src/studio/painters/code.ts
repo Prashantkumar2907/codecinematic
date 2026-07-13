@@ -67,7 +67,18 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   const frameIn = easeOutCubic(sub(env.p, 0, 0.1));
   const fx = contentX;
   const fw = contentW;
-  const fh = contentH * (vertical ? 0.92 : 0.96);
+  const barH = unit * 1.7;
+  const sbH = unit * 1.0;
+  const gutterW = unit * 1.9;
+  const codeW = fw - gutterW - unit * 1.1;
+  const longestLine = Math.max(BASE_COLS, ...scene.code.split("\n").map((l) => Array.from(l).length));
+  const fontPx = Math.min((codeW / longestLine) * 1.62, vertical ? unit * 1.15 : unit * 0.95);
+  const lineH = fontPx * 1.55;
+  const lineCount = scene.code.split("\n").length;
+  // Panel hugs the code instead of always filling the frame — a 8-line snippet
+  // in 9:16 otherwise leaves the bottom two thirds of the editor empty.
+  const maxFh = contentH * (vertical ? 0.92 : 0.96);
+  const fh = Math.min(maxFh, barH + lineH * (lineCount + 1.2) + sbH);
   const fy = contentY + (contentH - fh) / 2;
 
   ctx.save();
@@ -92,7 +103,6 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   ctx.strokeStyle = THEME.panelBorder;
   ctx.stroke();
 
-  const barH = unit * 1.7;
   ctx.save();
   roundRect(ctx, fx, fy, fw, barH, unit * 0.7);
   ctx.clip();
@@ -135,11 +145,6 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   ctx.fillStyle = rgba(accent, 0.75);
   ctx.fillText(langTxt, fx + fw - lw - unit * 0.25, fy + barH / 2 + unit * 0.22);
 
-  const gutterW = unit * 1.9;
-  const codeW = fw - gutterW - unit * 1.1;
-  const longestLine = Math.max(BASE_COLS, ...scene.code.split("\n").map((l) => Array.from(l).length));
-  const fontPx = Math.min((codeW / longestLine) * 1.62, vertical ? unit * 1.15 : unit * 0.95);
-  const lineH = fontPx * 1.55;
   const codeTop = fy + barH + lineH * 0.4;
   const codeAreaH = fh - barH - unit * 1.4;
   const maxVisible = Math.floor(codeAreaH / lineH);
@@ -213,7 +218,6 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   }
   ctx.restore();
 
-  const sbH = unit * 1.0;
   ctx.fillStyle = "#161b22";
   roundRect(ctx, fx, fy + fh - sbH, fw, sbH, unit * 0.35);
   ctx.fill();
