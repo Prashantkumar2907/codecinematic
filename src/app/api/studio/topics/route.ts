@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       parsed.data.submodule
     );
     const covered = await coveredTopics(subject.label, module_.label, submodule.label);
+    const siblingLabels = module_.submodules.filter((s) => s.id !== submodule.id).map((s) => s.label);
     // topics are the easy call — run them on the high-quota lite chain first
     const raw = await generateJson(
       buildTopicsPrompt({
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
         moduleStyle: module_.style,
         submoduleStyle: submodule.style,
         covered,
+        siblingLabels,
       }),
       "fast"
     );

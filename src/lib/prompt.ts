@@ -194,10 +194,14 @@ export function buildTopicsPrompt(opts: {
   moduleStyle?: string;
   submoduleStyle?: string;
   covered: string[];
+  siblingLabels?: string[];
 }): string {
-  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, covered } = opts;
+  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, covered, siblingLabels } = opts;
   const exclusions = covered.length
     ? `\nAlready covered (EXCLUDE these and near-duplicates):\n${covered.map((t) => `- ${t}`).join("\n")}`
+    : "";
+  const lanes = siblingLabels?.length
+    ? `\nSTAY IN YOUR LANE: sibling sub-modules cover ${siblingLabels.join(", ")} — a topic that belongs to one of those (e.g. a squaring trick under "Squares & Cubes", a famous paradox under a "Paradoxes" module) must NOT appear here. Propose only topics that are unmistakably about ${submoduleLabel}.`
     : "";
   return `You plan content for a YouTube education channel.
 
@@ -216,8 +220,9 @@ Propose the 10 BEST video topics for this sub-module right now, ordered from mos
 - vary the title shapes across the 10 — mix "Why X ...", "How X actually works", "X vs Y", "The X
   mistake everyone makes", "What happens when ..." — never 10 titles with the same shape
 - format titles as "Punchy headline: the specifics" — the part BEFORE the colon is <=6 words and
-  works alone as a thumbnail headline
-${exclusions}
+  works alone as a thumbnail headline; every title must be COMPLETE (never end mid-phrase or with a
+  dangling colon and no specifics)
+${lanes}${exclusions}
 
 Return STRICT JSON only:
 {"topics":[{"title":"<=100 chars, specific and curiosity-driven","angle":"<=140 chars — the hook/approach"}]}`;
