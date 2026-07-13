@@ -315,6 +315,20 @@ export const NARRATION_BUDGET = {
   long: { min: 850, max: 1900 },
 } as const;
 
+/**
+ * Index of the first scene that is a "bigtext" immediately followed by another
+ * "bigtext", or -1. A bare section card with no teaching scene beneath it teaches
+ * nothing; a legitimate recap is a single card before the ending question, which
+ * never lands two side by side. Soft-checked in the generate route (drives a
+ * repair round) rather than hard-rejected, so a stubborn script still ships.
+ */
+export function firstAdjacentBigtext(script: SceneScript): number {
+  for (let i = 0; i + 1 < script.scenes.length; i++) {
+    if (script.scenes[i].kind === "bigtext" && script.scenes[i + 1].kind === "bigtext") return i;
+  }
+  return -1;
+}
+
 export function narrationWordCount(script: SceneScript): number {
   let words = 0;
   for (const scene of script.scenes) {

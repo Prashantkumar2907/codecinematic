@@ -23,6 +23,24 @@
             "status": "uploaded",
             "videoId": "6rIbezK5xbw"
           }
+        ],
+        "Caching & Queues": [
+          {
+            "date": "2026-07-13",
+            "topic": "Caching & Queues: How Redis makes apps 100x faster",
+            "title": "Caching and Queues: How Redis Makes Applications 100x Faster",
+            "format": "long",
+            "slug": "2026-07-13-13-40-long-caching-queues-how-redis-makes-apps-100x-faster",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "Caching & Queues: How Redis makes apps 100x faster",
+            "title": "Redis Caching: How to make your database 100x faster",
+            "format": "long",
+            "slug": "2026-07-13-13-55-long-caching-queues-how-redis-makes-apps-100x-faster",
+            "status": "draft"
+          }
         ]
       },
       "CS Fundamentals": {
@@ -68,6 +86,14 @@
             "title": "Your object doesn't own its methods — JS prototypes #Shorts",
             "format": "short",
             "slug": "2026-07-13-12-51-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-59-short-the-prototype-chain-how-objects-find-their-methods",
             "status": "draft"
           }
         ]

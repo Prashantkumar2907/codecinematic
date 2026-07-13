@@ -12,7 +12,15 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   const { accent } = env.palette;
 
   const frameIn = easeOutCubic(sub(env.p, 0, 0.15));
-  const fh = Math.min(contentH * 0.86, unit * 2.4 * (scene.lines.length + 2) + unit * 2.6);
+  const barH = unit * 1.6;
+  const longestChars = Math.max(8, ...scene.lines.map((l) => Array.from(l).length + (l.startsWith("$") ? 2 : 0)));
+  const textAvailW = contentW - unit * 2.0;
+  const MONO_ADVANCE = 0.62;
+  const fontPx = Math.min(vertical ? unit * 0.95 : unit * 0.85, textAvailW / (longestChars * MONO_ADVANCE));
+  const lineH = fontPx * 1.9;
+  // Panel hugs its lines (bar + one lead gap + n lines + tail) so a 2-line
+  // output doesn't sit in a frame-tall empty box.
+  const fh = Math.min(contentH * 0.86, barH + lineH * (scene.lines.length + 1.6));
   const fy = contentY + (contentH - fh) / 2;
 
   ctx.save();
@@ -31,7 +39,6 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  const barH = unit * 1.6;
   ctx.save();
   roundRect(ctx, contentX, fy, contentW, barH, unit * 0.7);
   ctx.clip();
@@ -50,12 +57,7 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   ctx.fillText("terminal", contentX + contentW / 2, fy + barH * 0.66);
   ctx.textAlign = "start";
 
-  const longestChars = Math.max(8, ...scene.lines.map((l) => Array.from(l).length + (l.startsWith("$") ? 2 : 0)));
-  const textAvailW = contentW - unit * 2.0;
-  const MONO_ADVANCE = 0.62;
-  const fontPx = Math.min(vertical ? unit * 0.95 : unit * 0.85, textAvailW / (longestChars * MONO_ADVANCE));
   ctx.font = `500 ${fontPx}px ${FONT_MONO}`;
-  const lineH = fontPx * 1.9;
   const textX = contentX + unit * 1.1;
   let y = fy + barH + lineH;
 

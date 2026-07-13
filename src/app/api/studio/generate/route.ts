@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sceneScriptSchema, narrationWordCount, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
+import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
 import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
@@ -67,28 +67,41 @@ export async function POST(req: Request) {
           if (!validated.success) {
             issues = validated.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
           } else {
-            // Schema-valid — enforce the narration word budget (video length IS narration length).
+            // Schema-valid — enforce soft quality gates (word budget, no bare section cards).
+            // Both drive a repair round but never hard-fail: a complete video beats none.
             const words = narrationWordCount(validated.data);
             if (words < budget.min || words > budget.max) {
-              issues = [
+              issues.push(
                 `total spoken narration across all beats is ${words} words but a ${format} needs ${budget.min}-${budget.max} — ${
                   words > budget.max
                     ? "tighten every beat: cut filler words, keep every scene's meaning"
                     : "deepen the teaching with substance (concrete facts, not padding)"
-                }`,
-              ];
-            } else {
+                }`
+              );
+            }
+            const bt = firstAdjacentBigtext(validated.data);
+            if (bt >= 0) {
+              issues.push(
+                `scenes ${bt + 1}-${bt + 2} are both "bigtext" section cards with no teaching scene between them — replace the second card, or the content it introduces, with a real diagram/bullets/compare/chart/steps scene (a bare title card teaches nothing)`
+              );
+            }
+            if (issues.length === 0) {
               accepted = validated.data;
               break;
             }
           }
           if (round >= REPAIR_ROUNDS) {
             if (validated.success) {
-              // Only the word budget is off after all repairs — ship it with an honest warning.
+              // Soft gates still off after all repairs — ship with honest warnings.
               const words = narrationWordCount(validated.data);
-              warnings.push(
-                `narration is ${words} words (target ${budget.min}-${budget.max}) — the video may run ${words > budget.max ? "long" : "short"}`
-              );
+              if (words < budget.min || words > budget.max) {
+                warnings.push(
+                  `narration is ${words} words (target ${budget.min}-${budget.max}) — the video may run ${words > budget.max ? "long" : "short"}`
+                );
+              }
+              if (firstAdjacentBigtext(validated.data) >= 0) {
+                warnings.push("two section cards appear back to back with no teaching scene between them");
+              }
               accepted = validated.data;
               break;
             }

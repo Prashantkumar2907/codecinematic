@@ -215,11 +215,16 @@ PACING BUDGET (the video runs exactly as long as the narration): total spoken wo
 beats must be 130-220. Count them. Over 220 words the Short overruns 90 seconds and dies.`
       : `Structure for a LONG video (6-12 min, 16:9 landscape, 14-32 scenes):
 - open with a hook ("bigtext" claim, a "stat", or a "mythfact"), then a "bullets" of "what you'll walk away knowing"
-- 3-5 sections, each a "bigtext" section card then 2-3 scenes drawn from your playbook's kinds
-  (diagram / timeline / steps / compare / stat / chart / mythfact / quote${isCoding ? " / code -> terminal" : " / vocab"} as fits the point)
+- 3-5 sections, each a "bigtext" section card FOLLOWED BY 2-3 teaching scenes drawn from your
+  playbook's kinds (diagram / timeline / steps / compare / stat / chart / mythfact / quote${isCoding ? " / code -> terminal" : " / vocab"} as fits the point)
+- HARD RULE: a "bigtext" section card must ALWAYS be followed by at least one non-bigtext teaching
+  scene. NEVER place two "bigtext" scenes back to back — a title card with no content beneath it
+  teaches nothing. Every "Common mistakes" / "Trade-offs" / "Pitfalls" section needs a real
+  bullets/compare/diagram scene, not just a card.
 - escalate difficulty: fundamentals early, nuance/tradeoffs/consequences later
 - near the end: a "bullets" of common mistakes and a "quiz" to test the idea
-- "bigtext" recap, then a "question" scene
+- close with a "bigtext" recap then a "question" scene (this recap is the ONE allowed bigtext not
+  followed by a content scene, because the question follows it)
 - bigtext section cards double as YouTube chapters — give them crisp 2-5 word titles
 PACING BUDGET (the video runs exactly as long as the narration): total spoken words across ALL
 beats must be 950-1700 (≈7-11 minutes at teaching pace).`;
