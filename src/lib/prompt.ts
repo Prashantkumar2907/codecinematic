@@ -27,7 +27,10 @@ Narration rules (neural TTS voice; each beat is voiced separately):
 - Conversational, confident, warm — a great teacher at a whiteboard. Short sentences.
 - No emojis, no markdown, no "let's dive in", no "in this video". Plain speakable text.
 - Beat lengths drive pacing: a beat's visuals stay on screen exactly as long as its audio.
-  Keep beats tight (5-12s spoken). One idea per beat.`;
+  Keep beats tight (5-12s spoken). One idea per beat.
+- Sound like a person who has lived this, not a script: vary sentence length, allow one small aside
+  ("yes, your browser has been lying to you"), and never use formulaic transitions like "Next,",
+  "Now let's look at", "In conclusion" — a knowledgeable friend explaining, not a narrator.`;
 
 const TEACHING_METHOD = `
 How to teach (dual-track rule — a total newcomer AND a practitioner are both watching; both must
@@ -43,6 +46,17 @@ stay hooked, so every idea runs on two tracks at once: plain words + the precise
   someone has to know").
 - After the mechanism, pay off the practitioner: one non-obvious consequence, trade-off or real
   failure ("this is why the internet slows down when a root server is attacked").
+- COMPLETENESS: teach the mechanism as it REALLY happens, end to end, in true order — including the
+  cache layers, fast paths and short-circuits real systems use (DNS resolution is browser cache →
+  OS cache and the hosts file → the ISP or public resolver's cache → and only on a miss root → TLD →
+  authoritative; compound interest includes the tax drag; a battle includes the supply lines).
+  Skipping a real step to "simplify" is a factual error an expert viewer will call out in the
+  comments. Every real step must be VISIBLE on screen — its own node/row, or a grouped one that
+  NAMES each layer (a "Cache: browser → OS → resolver" node given one fast beat) — never silently
+  dropped into a vague clause like "if it's not cached".
+- CREDIBILITY: include one or two details only practitioners know — a real file name (/etc/hosts),
+  a port number, a typical latency, the exact command, the clause number, the actual price — chosen
+  where they sharpen the point. These are what make the video feel hand-made by an expert.
 - Never say "simply", "just" or "obviously" — if it were obvious the viewer would not be watching.`;
 
 const CODING_RULES = `
