@@ -1,5 +1,5 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutCubic, sub, clamp01, roundRect, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutCubic, clamp01, roundRect, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type ChartScene = Extract<Scene, { kind: "chart" }>;
@@ -20,20 +20,14 @@ export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env
   const totalBeats = offset + scene.items.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const titleIn = easeOutCubic(sub(env.p, 0, 0.12));
-  ctx.save();
-  ctx.globalAlpha = titleIn;
-  ctx.font = `800 ${unit * 1.5}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(scene.title, contentX, contentY + unit * 1.3);
-  ctx.fillStyle = accent;
-  ctx.fillRect(contentX, contentY + unit * 1.8, unit * 3 * titleIn, unit * 0.2);
-  ctx.restore();
+  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3;
 
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
-  const listTop = contentY + unit * 3.1;
   const n = scene.items.length;
-  const rowGap = Math.min((contentH - (listTop - contentY)) / n, unit * (vertical ? 4.0 : 3.1));
+  const availH = contentH - band;
+  const rowGap = Math.min(availH / n, unit * (vertical ? 4.0 : 3.1));
+  // Center the bar block vertically so sparse charts don't bunch at the top.
+  const listTop = contentY + band + Math.max(0, (availH - n * rowGap) / 2);
   const barH = Math.min(rowGap * 0.42, unit * 1.35);
 
   ctx.font = `600 ${unit * 0.85}px ${FONT_SANS}`;
@@ -78,7 +72,8 @@ export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    const valueText = `${fmtValue(item.value, grow)}${item.unit ? item.unit : ""}`;
+    const unitText = item.unit ? (item.unit.trim().startsWith("%") ? item.unit.trim() : ` ${item.unit.trim()}`) : "";
+    const valueText = `${fmtValue(item.value, grow)}${unitText}`;
     ctx.font = `800 ${unit * 0.85}px ${FONT_SANS}`;
     const vw = ctx.measureText(valueText).width;
     const inside = barW > vw + unit * 1.2;

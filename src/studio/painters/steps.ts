@@ -1,5 +1,5 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type StepsScene = Extract<Scene, { kind: "steps" }>;
@@ -13,19 +13,11 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const titleIn = easeOutCubic(sub(env.p, 0, 0.12));
-  ctx.save();
-  ctx.globalAlpha = titleIn;
-  ctx.font = `800 ${unit * 1.5}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(scene.title, contentX, contentY + unit * 1.3);
-  ctx.fillStyle = accent;
-  ctx.fillRect(contentX, contentY + unit * 1.8, unit * 3 * titleIn, unit * 0.2);
-  ctx.restore();
-
-  const listTop = contentY + unit * 3.0;
+  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3;
   const n = scene.steps.length;
-  const rowGap = Math.min((contentH - (listTop - contentY)) / n, unit * (vertical ? 4.2 : 3.2));
+  const availH = contentH - band;
+  const rowGap = Math.min(availH / n, unit * (vertical ? 4.2 : 3.2));
+  const listTop = contentY + band + Math.max(0, (availH - n * rowGap) / 2);
   const numX = contentX + unit * 1.4;
   const numR = unit * 1.0;
   const textX = numX + numR + unit * 1.1;
@@ -87,7 +79,8 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
     if (s.detail) {
       ctx.font = `500 ${unit * 0.82}px ${FONT_SANS}`;
       ctx.fillStyle = THEME.textFaint;
-      const dLine = wrapText(ctx, s.detail, maxTextW)[0] ?? "";
+      const dLines = wrapText(ctx, s.detail, maxTextW);
+      const dLine = dLines.length > 1 ? `${dLines[0].replace(/\s+\S*$/, "")}…` : dLines[0] ?? "";
       ctx.fillText(dLine, textX, baseY + lines.length * unit * 1.3 + unit * 0.1);
     }
     ctx.restore();

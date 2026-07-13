@@ -277,6 +277,45 @@ export function fitFontSize(
   return minPx;
 }
 
+/**
+ * Scene title that can never overflow the frame: shrinks to fit one line,
+ * falls back to a two-line wrap, draws the accent underline, and returns the
+ * band height consumed below contentY so painters can lay out beneath it.
+ */
+export function drawSceneTitle(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  layout: Layout,
+  p: number,
+  accent: string,
+  opts: { centered?: boolean } = {}
+): number {
+  const { unit, contentX, contentY, contentW, w } = layout;
+  const titleIn = easeOutCubic(sub(p, 0, 0.12));
+  ctx.save();
+  ctx.globalAlpha = titleIn;
+  let px = fitFontSize(ctx, text, { maxW: contentW, startPx: unit * 1.5, minPx: unit * 1.05, weight: 800 });
+  ctx.font = `800 ${px}px ${FONT_SANS}`;
+  let lines = [text];
+  if (ctx.measureText(text).width > contentW) {
+    px = unit * 0.95;
+    ctx.font = `800 ${px}px ${FONT_SANS}`;
+    lines = wrapText(ctx, text, contentW).slice(0, 2);
+  }
+  const lineH = px * 1.22;
+  const x = opts.centered ? w / 2 : contentX;
+  if (opts.centered) ctx.textAlign = "center";
+  ctx.fillStyle = THEME.text;
+  lines.forEach((line, i) => ctx.fillText(line, x, contentY + px + i * lineH));
+  const lastBaseline = contentY + px + (lines.length - 1) * lineH;
+  ctx.fillStyle = accent;
+  const underW = unit * 3 * titleIn;
+  ctx.fillRect(opts.centered ? w / 2 - underW / 2 : contentX, lastBaseline + unit * 0.45, underW, unit * 0.2);
+  ctx.textAlign = "start";
+  ctx.restore();
+  return lastBaseline + unit * 1.1 - contentY;
+}
+
 export function drawArrowhead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, size: number) {
   ctx.save();
   ctx.translate(x, y);

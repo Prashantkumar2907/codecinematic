@@ -1,5 +1,5 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type TimelineScene = Extract<Scene, { kind: "timeline" }>;
@@ -13,19 +13,11 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
   const totalBeats = offset + scene.events.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const titleIn = easeOutCubic(sub(env.p, 0, 0.12));
-  ctx.save();
-  ctx.globalAlpha = titleIn;
-  ctx.font = `800 ${unit * 1.5}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(scene.title, contentX, contentY + unit * 1.3);
-  ctx.fillStyle = accent;
-  ctx.fillRect(contentX, contentY + unit * 1.8, unit * 3 * titleIn, unit * 0.2);
-  ctx.restore();
-
-  const listTop = contentY + unit * 3.0;
+  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3;
   const n = scene.events.length;
-  const rowGap = Math.min((contentH - (listTop - contentY)) / n, unit * (vertical ? 3.9 : 3.0));
+  const availH = contentH - band;
+  const rowGap = Math.min(availH / n, unit * (vertical ? 3.9 : 3.0));
+  const listTop = contentY + band + Math.max(0, (availH - n * rowGap) / 2);
   const spineX = contentX + unit * 3.0;
   const dotR = unit * 0.42;
 

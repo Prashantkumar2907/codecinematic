@@ -34,6 +34,14 @@
             "format": "short",
             "slug": "2026-07-13-09-46-short-dns-how-the-internet-finds-ip-addresses",
             "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "TCP vs UDP: Which protocol is actually faster?",
+            "title": "TCP vs UDP: Which protocol is actually faster? #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-10-18-short-tcp-vs-udp-which-protocol-is-actually-faster",
+            "status": "draft"
           }
         ]
       },
@@ -45,6 +53,34 @@
             "title": "Your object doesn't own its methods — JS prototypes #Shorts",
             "format": "short",
             "slug": "2026-07-13-09-56-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Money & Finance": {
+      "Investing": {
+        "Power of Compounding": [
+          {
+            "date": "2026-07-13",
+            "topic": "Compounding explained: how money grows exponentially",
+            "title": "Power of Compounding: Exponential vs Linear Growth #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-10-33-short-compounding-explained-how-money-grows-exponentially",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Psychology & the Mind": {
+      "Biases & Decisions": {
+        "Anchoring & Framing": [
+          {
+            "date": "2026-07-13",
+            "topic": "The First Number: Why your brain gets stuck on anchoring",
+            "title": "Anchoring Bias: Why the First Number You See Traps You #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-10-35-short-the-first-number-why-your-brain-gets-stuck-on-anchoring",
             "status": "draft"
           }
         ]

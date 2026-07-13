@@ -313,7 +313,7 @@ export const metaSchema = z.object({
   title: z.string().min(10).max(95),
   description: z.string().min(40).max(3500),
   tags: z.array(z.string().min(2).max(30)).min(4).max(15),
-  hashtags: z.array(z.string().regex(/^#[A-Za-z0-9]+$/)).min(3).max(6),
+  hashtags: z.array(z.string().regex(/^#[A-Za-z0-9]+$/)).min(3).max(8),
 });
 export type VideoMeta = z.infer<typeof metaSchema>;
 

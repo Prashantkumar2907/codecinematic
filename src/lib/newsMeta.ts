@@ -52,9 +52,11 @@ Rules:
 - "description": line 1 is a hook with the main search keywords (this line decides search ranking);
   then one short line per story starting with "• "; nothing else. Do NOT include links or hashtags —
   they are appended automatically.
-- "tags": 10-15 — mix broad (india news, daily news, ${category.toLowerCase()}) with the specific
-  entities in these stories (people, companies, places, events).
-- "hashtags": 3-6, first "#Shorts", then topical ones like #IndiaNews #${category.replace(/[^A-Za-z0-9ऀ-ॿ]/g, "")}.
+- "tags": 12-15 — the FIRST tag is the main search phrase for today's lead story; then broad terms
+  (india news, daily news, ${category.toLowerCase()}) and the specific entities in these stories
+  (people, companies, places, events).
+- "hashtags": 5-8, first "#Shorts", then topical ones like #IndiaNews #${category.replace(/[^A-Za-z0-9ऀ-ॿ]/g, "")}
+  plus 1-2 entity tags from the lead stories (#Cricket, #ISRO) — order by relevance.
 
 Return STRICT JSON only:
 {"title":"...","description":"...","tags":["..."],"hashtags":["#..."]}`;

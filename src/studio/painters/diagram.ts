@@ -9,6 +9,7 @@ import {
   wrapText,
   roundRect,
   drawArrowhead,
+  drawSceneTitle,
   strokePolylineProgress,
   beatWindow,
   activeBeatIndex,
@@ -76,17 +77,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
   const activeStep = active - offset;
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
-  const titleIn = easeOutCubic(sub(env.p, 0, 0.12));
-  ctx.save();
-  ctx.globalAlpha = titleIn;
-  ctx.font = `800 ${unit * 1.4}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(scene.title, contentX, contentY + unit * 1.3);
-  ctx.fillStyle = accent;
-  ctx.fillRect(contentX, contentY + unit * 1.8, unit * 3 * titleIn, unit * 0.2);
-  ctx.restore();
-
-  const titleBand = unit * 2.8;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
   const rects = new Map<string, Rect>();
   for (const node of scene.nodes) rects.set(node.id, nodeRect(node, layout, titleBand));
   const reveals = revealTimes(scene, env, offset, totalBeats);

@@ -51,8 +51,8 @@ function sceneInventory(script: SceneScript): string {
 const responseSchema = z.object({
   title: z.string().min(10).max(120),
   description: z.string().min(40).max(3800),
-  tags: z.array(z.string().min(2).max(40)).min(4).max(20),
-  hashtags: z.array(z.string()).min(2).max(10),
+  tags: z.array(z.string().min(2).max(40)).min(4).max(24),
+  hashtags: z.array(z.string()).min(2).max(12),
 });
 
 function buildMetaPrompt(script: SceneScript): string {
@@ -71,19 +71,26 @@ description: ${script.meta.description.split("\n").slice(0, 4).join(" / ")}
 tags: ${script.meta.tags.join(", ")}
 
 Rules:
-- "title": 35-90 chars${isShort ? ', MUST end with " #Shorts"' : ""}. Lead with the exact phrase people
+- "title": 35-${isShort ? "70" : "90"} chars${isShort ? ', MUST end with " #Shorts"' : ""}. Lead with the exact phrase people
   search (the concrete concept), then the curiosity gap. Proven shapes: "How X actually works",
   "Why X ...", "X vs Y: ...", "The X mistake ...", "What happens when ...". Use a number only if the
-  video truly shows it. No clickbait lies, no ALL-CAPS words, no emoji.
+  video truly shows it. No clickbait lies, no ALL-CAPS words, no emoji.${
+    isShort ? "\n  Shorts titles get truncated in the feed — front-load the payoff in the first ~40 chars." : ""
+  }
 - "description": lines 1-2 are the search hook — restate the topic using the exact phrases viewers
   type into YouTube (these first ~120 chars are the snippet). Then 3-5 short lines on what the viewer
-  will learn, using the concrete facts covered above. End with one line inviting them to answer the
-  ending question in the comments. NO links, NO hashtags, NO timestamps (those are added automatically).
-- "tags": 10-15, each under 30 chars — mix broad subject terms, the exact topic phrase, the specific
-  concepts/entities covered, and 2-3 learner search phrases (e.g. "${script.submodule.toLowerCase()} tutorial",
-  "learn ${script.submodule.toLowerCase()}").
-- "hashtags": 3-6, ASCII letters/digits only (like #JavaScript, #IndianHistory) — first three are shown
-  above the title.
+  will learn, using the concrete facts covered above. Then ONE line inviting them to answer the
+  ending question in the comments. Close with one natural sentence that weaves in 2-3 RELATED search
+  phrases (things people also search around this topic) — a sentence, not a keyword dump.
+  NO links, NO hashtags, NO timestamps (those are added automatically).
+- "tags": 12-15, each under 30 chars. The FIRST tag must be the exact main search phrase for this
+  video. Then: broad subject terms, the specific concepts/entities covered, common variations
+  (singular/plural, abbreviation vs full form), and 2-3 learner phrases
+  (e.g. "${script.submodule.toLowerCase()} tutorial", "learn ${script.submodule.toLowerCase()}").
+- "hashtags": 5-8, ASCII letters/digits only. Mix reach and niche: ${
+    isShort ? '"#Shorts" first, then ' : ""
+  }1-2 broad (#Coding, #Science), 2-3 topic-specific (#JavaScript, #DNS), 1-2 audience ones
+  (#LearnToCode, #ExamPrep). The first three are shown above the title — order them by relevance.
 
 Return STRICT JSON only: {"title":"...","description":"...","tags":["..."],"hashtags":["#..."]}`;
 }
@@ -112,7 +119,7 @@ export async function enhanceVideoMeta(
       title: title.slice(0, TITLE_MAX),
       description: parsed.description.trim().slice(0, 3500),
       tags: parsed.tags.map((t) => t.trim().slice(0, 30)).filter((t) => t.length >= 2).slice(0, 15),
-      hashtags: parsed.hashtags.map((h) => h.trim()).filter((h) => HASHTAG_RE.test(h)).slice(0, 6),
+      hashtags: parsed.hashtags.map((h) => h.trim()).filter((h) => HASHTAG_RE.test(h)).slice(0, 8),
     });
     return { meta: candidate, source: "gemini" };
   } catch {

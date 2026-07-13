@@ -1,5 +1,5 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, clamp01, wrapText, roundRect, beatWindow, beatT, activeBeatIndex } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, clamp01, wrapText, roundRect, drawSceneTitle, beatWindow, beatT, activeBeatIndex } from "./common";
 import type { PaintEnv } from "./index";
 
 type CompareScene = Extract<Scene, { kind: "compare" }>;
@@ -15,16 +15,8 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const verdictBeat = scene.sayVerdict ? offset + 2 : -1;
 
-  const titleIn = easeOutCubic(sub(env.p, 0, 0.12));
-  ctx.save();
-  ctx.globalAlpha = titleIn;
-  ctx.textAlign = "center";
-  ctx.font = `800 ${unit * 1.5}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(scene.title, w / 2, contentY + unit * 1.4);
-  ctx.restore();
-
-  const panelsTop = contentY + unit * 2.6;
+  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent, { centered: true });
+  const panelsTop = contentY + band + unit * 0.3;
   const verdictBand = scene.verdict ? unit * 3.2 : unit * 0.5;
   const gap = unit * (vertical ? 0.9 : 1.4);
 

@@ -268,7 +268,8 @@ Also produce "meta" for YouTube:
   by inviting a comment answer to the ending question; no links, no timestamps
 - "tags": 10-15 — broad subject terms + the exact topic phrase + specific concepts covered + 2-3
   learner phrases ("<topic> tutorial", "learn <submodule>")
-- "hashtags": 3-6 like #JavaScript or #IndianHistory — first three are the visible ones
+- "hashtags": 5-8 like #JavaScript or #IndianHistory — mix broad reach, topic-specific and audience
+  tags${format === "short" ? ' ("#Shorts" first)' : ""}; first three are the visible ones, order by relevance
 
 Top-level JSON shape:
 {"format":"${format}","subject":"${subject.label}","module":"${moduleLabel}","submodule":"${submoduleLabel}","topic":"${topic}","scenes":[...],"meta":{"title":"...","description":"...","tags":[...],"hashtags":["#..."]}}
