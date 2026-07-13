@@ -126,6 +126,8 @@ export default function Studio() {
   const [stageError, setStageError] = useState<string | null>(null);
   const [genStage, setGenStage] = useState<GenStage | null>(null);
   const [genRound, setGenRound] = useState(0);
+  const [genWarning, setGenWarning] = useState<string | null>(null);
+  const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
   const [genStartedAt, setGenStartedAt] = useState<number | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyingSceneId, setVerifyingSceneId] = useState<string | null>(null);
@@ -157,7 +159,10 @@ export default function Studio() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderHandle = useRef<RenderHandle | null>(null);
 
-  const busy = ["topics", "generating", "voicing", "rendering", "saving", "uploading"].includes(stage) || verifying;
+  const busy =
+    ["topics", "generating", "voicing", "rendering", "saving", "uploading"].includes(stage) ||
+    verifying ||
+    regenSceneId !== null;
   const pipelineLocked = ["voicing", "rendering", "saving", "uploading"].includes(stage);
   const aspect = ASPECTS[format];
   const subject = subjects.find((s) => s.id === subjectId);
@@ -298,6 +303,28 @@ export default function Studio() {
     setStage("scripted");
   }, []);
 
+  const regenScene = async (sceneId: string) => {
+    if (!script) return;
+    setRegenSceneId(sceneId);
+    setStageError(null);
+    try {
+      const res = await fetch("/api/studio/regen-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script, sceneId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setRegenSceneId(null);
+      await adoptScript(data.script as SceneScript);
+      setToast("Scene rewritten — code scenes re-verified");
+    } catch (err) {
+      setStageError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRegenSceneId(null);
+    }
+  };
+
   const runGenerate = useCallback(
     async (body: { subject: string; module: string; submodule: string; format: Format; topic: string; angle?: string }) => {
       setTopicsError(null);
@@ -309,6 +336,7 @@ export default function Studio() {
       setShowJson(false);
       setGenStage(null);
       setGenRound(0);
+      setGenWarning(null);
       setGenStartedAt(Date.now());
       setStage("generating");
       try {
@@ -339,6 +367,7 @@ export default function Studio() {
           }
           if (event.done && event.script) {
             finished = true;
+            setGenWarning(Array.isArray(event.warnings) ? (event.warnings as string[]).join(" · ") : null);
             await adoptScript(event.script as SceneScript);
             return;
           }
@@ -991,6 +1020,7 @@ export default function Studio() {
                     {showJson ? "Hide JSON" : "Edit JSON"}
                   </button>
                 </div>
+                {genWarning ? <span className="note">⚠ {genWarning}</span> : null}
 
                 <div className="scene-list">
                   {script.scenes.map((scene, i) => {
@@ -1005,6 +1035,15 @@ export default function Studio() {
                         ) : v ? (
                           <span className={`badge b-${v.status[0]}`} title={v.detail}>{v.status}</span>
                         ) : null}
+                        <button
+                          className="btn btn-sm"
+                          title="Rewrite this scene with Gemini (keeps the rest of the script)"
+                          aria-label={`Regenerate scene ${i + 1}`}
+                          disabled={busy}
+                          onClick={() => void regenScene(scene.id)}
+                        >
+                          {regenSceneId === scene.id ? <span className="spinner spinner-muted" aria-hidden /> : "↻"}
+                        </button>
                       </div>
                     );
                   })}

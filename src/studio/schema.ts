@@ -309,6 +309,22 @@ export function introBeatCount(scene: Scene): number {
 const SHORT_SCENES = { min: 4, max: 8 } as const;
 const LONG_SCENES = { min: 14, max: 32 } as const;
 
+/** Video length IS narration length; scripts outside these word budgets get a repair round. */
+export const NARRATION_BUDGET = {
+  short: { min: 110, max: 240 },
+  long: { min: 850, max: 1900 },
+} as const;
+
+export function narrationWordCount(script: SceneScript): number {
+  let words = 0;
+  for (const scene of script.scenes) {
+    for (const { text } of sceneBeats(scene)) {
+      words += text.trim().split(/\s+/).filter(Boolean).length;
+    }
+  }
+  return words;
+}
+
 export const metaSchema = z.object({
   title: z.string().min(10).max(95),
   description: z.string().min(40).max(3500),

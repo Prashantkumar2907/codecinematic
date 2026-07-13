@@ -289,6 +289,47 @@ HARD LIMITS — validated mechanically, the script is REJECTED on any violation,
 Return ONLY the JSON object.`;
 }
 
+export function buildRegenScenePrompt(opts: {
+  format: "short" | "long";
+  subject: string;
+  moduleLabel: string;
+  submoduleLabel: string;
+  topic: string;
+  sceneJson: string;
+  sceneId: string;
+  sceneIndex: number;
+  sceneCount: number;
+  beforeSummary?: string;
+  afterSummary?: string;
+}): string {
+  const { format, subject, moduleLabel, submoduleLabel, topic, sceneJson, sceneId, sceneIndex, sceneCount, beforeSummary, afterSummary } = opts;
+  return `You are improving ONE scene of an existing YouTube ${format} teaching video. The rest of the
+script stays untouched, so the rewritten scene must still flow from the previous scene into the next.
+
+Video: ${subject} → ${moduleLabel} → ${submoduleLabel} — "${topic}"
+This is scene ${sceneIndex + 1} of ${sceneCount}.${beforeSummary ? `\nPrevious scene: ${beforeSummary}` : ""}${afterSummary ? `\nNext scene: ${afterSummary}` : ""}
+
+Rewrite the scene below to teach its point BETTER: more concrete, more visual, sharper narration.
+Keep its teaching purpose and roughly its narration length. Keep "id" EXACTLY "${sceneId}".
+You may change "kind" if a different scene kind teaches this point better.
+
+Current scene:
+${sceneJson}
+
+${SCENE_SHAPE}
+${NARRATION_RULES}
+${TEACHING_METHOD}
+
+HARD LIMITS (mechanically validated): code max 22 lines, every line max 46 chars, segments contiguous
+from line 1 covering all lines; terminal lines max 60 chars; say max 320; narration max 400;
+bigtext.text 80; bullets item 110; node label 28; compare item 70; question.text 180; timeline when
+18/label 52; stat value 14/label 60; steps text 80/detail 90; quiz question 120/option 52, exactly one
+correct; vocab word 28/meaning 90/example 90; chart label 24/unit 8, value plain number; quote text
+200/author 40; mythfact myth 140/fact 160.
+
+Return ONLY the JSON object of the ONE rewritten scene.`;
+}
+
 export function buildRepairPrompt(originalJson: string, errors: string): string {
   return `The JSON video script below failed schema validation. Fix ONLY the listed problems and return the corrected complete JSON object (no prose, no markdown fences). Keep everything that was valid unchanged.
 

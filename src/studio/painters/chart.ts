@@ -72,8 +72,10 @@ export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    const unitText = item.unit ? (item.unit.trim().startsWith("%") ? item.unit.trim() : ` ${item.unit.trim()}`) : "";
-    const valueText = `${fmtValue(item.value, grow)}${unitText}`;
+    const u = item.unit?.trim() ?? "";
+    const valueText = /^[₹$€£]$/.test(u)
+      ? `${u}${fmtValue(item.value, grow)}`
+      : `${fmtValue(item.value, grow)}${u ? (u.startsWith("%") ? u : ` ${u}`) : ""}`;
     ctx.font = `800 ${unit * 0.85}px ${FONT_SANS}`;
     const vw = ctx.measureText(valueText).width;
     const inside = barW > vw + unit * 1.2;

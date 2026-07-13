@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sceneScriptSchema } from "@/studio/schema";
+import { sceneScriptSchema, narrationWordCount, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
 import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
@@ -56,30 +56,57 @@ export async function POST(req: Request) {
         });
         emit({ stage: "writing" });
         let raw = sanitizeScript(await generateJson(prompt));
-        emit({ stage: "validating" });
-        let validated = sceneScriptSchema.safeParse(raw);
+        const budget = NARRATION_BUDGET[format];
+        const warnings: string[] = [];
+        let accepted: SceneScript | null = null;
 
-        for (let round = 0; round < REPAIR_ROUNDS && !validated.success; round++) {
-          const errors = validated.error.issues
-            .map((i) => `${i.path.join(".")}: ${i.message}`)
-            .join("\n");
-          emit({ stage: "repairing", round: round + 1 });
-          raw = sanitizeScript(await generateJson(buildRepairPrompt(JSON.stringify(raw), errors)));
+        for (let round = 0; ; round++) {
           emit({ stage: "validating" });
-          validated = sceneScriptSchema.safeParse(raw);
+          const validated = sceneScriptSchema.safeParse(raw);
+          let issues: string[] = [];
+          if (!validated.success) {
+            issues = validated.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+          } else {
+            // Schema-valid — enforce the narration word budget (video length IS narration length).
+            const words = narrationWordCount(validated.data);
+            if (words < budget.min || words > budget.max) {
+              issues = [
+                `total spoken narration across all beats is ${words} words but a ${format} needs ${budget.min}-${budget.max} — ${
+                  words > budget.max
+                    ? "tighten every beat: cut filler words, keep every scene's meaning"
+                    : "deepen the teaching with substance (concrete facts, not padding)"
+                }`,
+              ];
+            } else {
+              accepted = validated.data;
+              break;
+            }
+          }
+          if (round >= REPAIR_ROUNDS) {
+            if (validated.success) {
+              // Only the word budget is off after all repairs — ship it with an honest warning.
+              const words = narrationWordCount(validated.data);
+              warnings.push(
+                `narration is ${words} words (target ${budget.min}-${budget.max}) — the video may run ${words > budget.max ? "long" : "short"}`
+              );
+              accepted = validated.data;
+              break;
+            }
+            emit({
+              error: `Script failed validation after ${REPAIR_ROUNDS} repairs`,
+              details: issues.slice(0, 8),
+              raw: JSON.stringify(raw, null, 2),
+              quota: await quota(),
+            });
+            return;
+          }
+          emit({ stage: "repairing", round: round + 1 });
+          raw = sanitizeScript(await generateJson(buildRepairPrompt(JSON.stringify(raw), issues.join("\n"))));
         }
-        if (!validated.success) {
-          const errors = validated.error.issues.slice(0, 8).map((i) => `${i.path.join(".")}: ${i.message}`);
-          emit({
-            error: `Script failed validation after ${REPAIR_ROUNDS} repairs`,
-            details: errors,
-            raw: JSON.stringify(raw, null, 2),
-            quota: await quota(),
-          });
-          return;
-        }
+
+        if (!accepted) throw new Error("validation loop exited without a script");
         const script = {
-          ...validated.data,
+          ...accepted,
           subject: subject.label,
           module: module_.label,
           submodule: submodule.label,
@@ -87,7 +114,14 @@ export async function POST(req: Request) {
         };
         emit({ stage: "optimizing" });
         const { meta, source: metaSource } = await enhanceVideoMeta(script);
-        emit({ done: true, script: { ...script, meta }, topic, metaSource, quota: await quota() });
+        emit({
+          done: true,
+          script: { ...script, meta },
+          topic,
+          metaSource,
+          warnings: warnings.length ? warnings : undefined,
+          quota: await quota(),
+        });
       } catch (err) {
         const message = err instanceof GeminiError ? err.message : `generation failed: ${String(err).slice(0, 300)}`;
         emit({ error: message, quota: await quota() });
