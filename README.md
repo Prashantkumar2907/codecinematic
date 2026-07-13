@@ -9,7 +9,12 @@ Money & Finance, English & Communication, GK & Amazing Facts, Psychology &
 the Mind, Business & Startups, Health & Body, Philosophy & Big Ideas, Life
 Skills & Productivity, and Mythology & Epics — edit `content/subjects.json`
 to add more (give new subjects a palette in `src/studio/painters/common.ts`
-and a playbook in `src/lib/prompt.ts`).
+and a playbook in `src/lib/prompt.ts`). Any module or sub-module may also
+carry an optional `"style"` string in subjects.json — it is injected into the
+topics and script prompts as a brief for exactly that slice of the taxonomy.
+Scripts follow a dual-track teaching method: one concrete example runs
+through the whole video, and every technical term is anchored in plain words
+in the same breath, so newcomers follow while practitioners still learn.
 
 ## Run
 
@@ -84,7 +89,9 @@ script otherwise).
 4. **Library & upload** — saving writes the draft (webm + script + generated
    thumbnail; long videos also get YouTube chapters from real render timings)
    to `content/videos/<slug>/` and records it in `content/history.json`
-   (status: draft). The Library tab lists drafts (`/api/studio/drafts`),
+   (v2 format: entries grouped subject → module → sub-module so per-submodule
+   history is a direct lookup; legacy flat arrays are auto-converted on read;
+   status: draft). The Library tab lists drafts (`/api/studio/drafts`),
    streams files with Range support (`/api/studio/file`), and offers copy
    (title/description+hashtags/tags), downloads (.webm — YouTube-supported —
    and .png), upload (marks history uploaded + videoId; sets the thumbnail on

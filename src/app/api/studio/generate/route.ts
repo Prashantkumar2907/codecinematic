@@ -47,6 +47,8 @@ export async function POST(req: Request) {
           subject,
           moduleLabel: module_.label,
           submoduleLabel: submodule.label,
+          moduleStyle: module_.style,
+          submoduleStyle: submodule.style,
           format,
           topic,
           angle,

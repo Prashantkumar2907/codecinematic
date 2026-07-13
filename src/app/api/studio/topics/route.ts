@@ -31,7 +31,14 @@ export async function POST(req: Request) {
     const covered = await coveredTopics(subject.label, module_.label, submodule.label);
     // topics are the easy call — run them on the high-quota lite chain first
     const raw = await generateJson(
-      buildTopicsPrompt({ subject, moduleLabel: module_.label, submoduleLabel: submodule.label, covered }),
+      buildTopicsPrompt({
+        subject,
+        moduleLabel: module_.label,
+        submoduleLabel: submodule.label,
+        moduleStyle: module_.style,
+        submoduleStyle: submodule.style,
+        covered,
+      }),
       "fast"
     );
     const topics = topicsSchema.safeParse(raw);

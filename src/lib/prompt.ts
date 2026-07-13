@@ -29,6 +29,22 @@ Narration rules (neural TTS voice; each beat is voiced separately):
 - Beat lengths drive pacing: a beat's visuals stay on screen exactly as long as its audio.
   Keep beats tight (5-12s spoken). One idea per beat.`;
 
+const TEACHING_METHOD = `
+How to teach (dual-track rule — a total newcomer AND a practitioner are both watching; both must
+stay hooked, so every idea runs on two tracks at once: plain words + the precise term):
+- ONE concrete running example threads the WHOLE video (a real name, place or number — resolving
+  "youtube.com", investing "₹10,000", the year 1857). Every diagram step, chart bar, code line and
+  steps item narrates what happens to THAT example — never an abstraction like "a domain" or "a user".
+- The first time ANY technical term appears, the SAME beat anchors it in everyday words
+  ("the root server — think of it as the phone book's front desk"). Term + plain-words anchor
+  together, every single time. Never define a term using another undefined term.
+- Before any diagram/steps/code/chart scene, one beat must say in plain words what PROBLEM this
+  solves and why the viewer should care ("your browser has no idea where youtube.com lives —
+  someone has to know").
+- After the mechanism, pay off the practitioner: one non-obvious consequence, trade-off or real
+  failure ("this is why the internet slows down when a root server is attacked").
+- Never say "simply", "just" or "obviously" — if it were obvious the viewer would not be watching.`;
+
 const CODING_RULES = `
 Code rules (js/python/sql code is EXECUTED to verify your claimed output — it must be real):
 - Self-contained, standard library only. No network, no filesystem, no external packages.
@@ -125,17 +141,22 @@ export function buildTopicsPrompt(opts: {
   subject: Subject;
   moduleLabel: string;
   submoduleLabel: string;
+  moduleStyle?: string;
+  submoduleStyle?: string;
   covered: string[];
 }): string {
-  const { subject, moduleLabel, submoduleLabel, covered } = opts;
+  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, covered } = opts;
   const exclusions = covered.length
     ? `\nAlready covered (EXCLUDE these and near-duplicates):\n${covered.map((t) => `- ${t}`).join("\n")}`
     : "";
   return `You plan content for a YouTube education channel.
 
-Audience: ${subject.audience}.
+Audience: ${subject.audience}. Videos teach on two tracks at once — a total newcomer must follow,
+a practitioner must still learn something new — so topics need angles that work for both.
 Subject: ${subject.label} → Module: ${moduleLabel} → Sub-module: ${submoduleLabel}.
-Teaching style: ${subject.style}.
+Teaching style: ${subject.style}.${moduleStyle ? `\nModule brief: ${moduleStyle}` : ""}${
+    submoduleStyle ? `\nSub-module brief: ${submoduleStyle}` : ""
+  }
 
 Propose the 10 BEST video topics for this sub-module right now, ordered from most fundamental to most advanced. Great topics:
 - answer a question the audience actually types into YouTube
@@ -156,12 +177,14 @@ export function buildScriptPrompt(opts: {
   subject: Subject;
   moduleLabel: string;
   submoduleLabel: string;
+  moduleStyle?: string;
+  submoduleStyle?: string;
   format: "short" | "long";
   topic: string;
   angle?: string;
   recentTopics: string[];
 }): string {
-  const { subject, moduleLabel, submoduleLabel, format, topic, angle, recentTopics } = opts;
+  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, format, topic, angle, recentTopics } = opts;
   const isCoding = subject.id === "coding";
   const playbook = SUBJECT_PLAYBOOKS[subject.id] ?? "";
   const structure =
@@ -192,6 +215,10 @@ beats must be 950-1700 (≈7-11 minutes at teaching pace).`;
 
 Audience: ${subject.audience}.
 Teaching style: ${subject.style}.
+For THIS video assume the viewer has heard of ${submoduleLabel} but never truly understood it —
+while a practitioner watching alongside must still learn one new thing.${
+    moduleStyle ? `\nModule brief (${moduleLabel}): ${moduleStyle}` : ""
+  }${submoduleStyle ? `\nSub-module brief (${submoduleLabel}): ${submoduleStyle}` : ""}
 
 Write a complete video script as STRICT JSON (no prose, no markdown fences) for:
 - Subject: ${subject.label} → Module: ${moduleLabel} → Sub-module: ${submoduleLabel}
@@ -202,6 +229,7 @@ ${structure}
 
 ${SCENE_SHAPE}
 ${NARRATION_RULES}
+${TEACHING_METHOD}
 ${VARIETY_RULE}
 ${isCoding ? CODING_RULES : NON_CODING_RULES}
 

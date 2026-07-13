@@ -12,8 +12,8 @@ const HISTORY_PATH = path.join(CONTENT_DIR, "history.json");
 const SUBJECTS_PATH = path.join(CONTENT_DIR, "subjects.json");
 const QUOTA_PATH = path.join(CONTENT_DIR, "quota.json");
 
-export type Submodule = { id: string; label: string };
-export type Module = { id: string; label: string; submodules: Submodule[] };
+export type Submodule = { id: string; label: string; style?: string };
+export type Module = { id: string; label: string; style?: string; submodules: Submodule[] };
 export type Subject = {
   id: string;
   label: string;
@@ -52,33 +52,75 @@ export async function resolveTaxonomy(subjectId: string, moduleId: string, submo
   return { subject, module: module_, submodule };
 }
 
-export async function readHistory(): Promise<HistoryEntry[]> {
+/**
+ * history.json v2: entries live in a tree keyed subject → module → submodule,
+ * so per-submodule history is a direct lookup (no scan) and the file reads as
+ * an organized ledger. Stored rows omit the three key fields; the flat view
+ * reinjects them. Legacy v1 flat arrays are converted transparently on read.
+ */
+type StoredHistoryEntry = Omit<HistoryEntry, "subject" | "module" | "submodule">;
+type HistoryTree = Record<string, Record<string, Record<string, StoredHistoryEntry[]>>>;
+
+function treeFromFlat(entries: HistoryEntry[]): HistoryTree {
+  const tree: HistoryTree = {};
+  for (const { subject, module: moduleLabel, submodule, ...rest } of entries) {
+    (((tree[subject] ??= {})[moduleLabel] ??= {})[submodule] ??= []).push(rest);
+  }
+  return tree;
+}
+
+async function readHistoryTree(): Promise<HistoryTree> {
   try {
-    const parsed = JSON.parse(await fs.readFile(HISTORY_PATH, "utf8")) as HistoryEntry[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(await fs.readFile(HISTORY_PATH, "utf8")) as unknown;
+    if (Array.isArray(parsed)) return treeFromFlat(parsed as HistoryEntry[]);
+    const file = parsed as { version?: number; subjects?: HistoryTree };
+    if (file && typeof file === "object" && file.version === 2 && file.subjects) return file.subjects;
+    return {};
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw err;
   }
 }
 
-async function writeHistory(entries: HistoryEntry[]): Promise<void> {
-  await fs.writeFile(HISTORY_PATH, JSON.stringify(entries, null, 2));
+async function writeHistoryTree(tree: HistoryTree): Promise<void> {
+  await fs.writeFile(HISTORY_PATH, JSON.stringify({ version: 2, subjects: tree }, null, 2));
+}
+
+/** Flat view for by-slug lookups (Library); tree keys are reinjected per entry. */
+export async function readHistory(): Promise<HistoryEntry[]> {
+  const tree = await readHistoryTree();
+  const out: HistoryEntry[] = [];
+  for (const [subject, modules] of Object.entries(tree)) {
+    for (const [moduleLabel, submodules] of Object.entries(modules)) {
+      for (const [submodule, entries] of Object.entries(submodules)) {
+        for (const entry of entries) out.push({ ...entry, subject, module: moduleLabel, submodule });
+      }
+    }
+  }
+  return out;
 }
 
 export async function appendHistory(entry: HistoryEntry): Promise<void> {
-  const history = await readHistory();
-  history.push(entry);
-  await writeHistory(history);
+  const tree = await readHistoryTree();
+  const { subject, module: moduleLabel, submodule, ...rest } = entry;
+  (((tree[subject] ??= {})[moduleLabel] ??= {})[submodule] ??= []).push(rest);
+  await writeHistoryTree(tree);
 }
 
 export async function markUploaded(slug: string, videoId: string): Promise<void> {
-  const history = await readHistory();
-  const entry = history.find((h) => h.slug === slug);
-  if (entry) {
-    entry.status = "uploaded";
-    entry.videoId = videoId;
-    await writeHistory(history);
+  const tree = await readHistoryTree();
+  for (const modules of Object.values(tree)) {
+    for (const submodules of Object.values(modules)) {
+      for (const entries of Object.values(submodules)) {
+        const entry = entries.find((e) => e.slug === slug);
+        if (entry) {
+          entry.status = "uploaded";
+          entry.videoId = videoId;
+          await writeHistoryTree(tree);
+          return;
+        }
+      }
+    }
   }
 }
 
@@ -113,12 +155,10 @@ export async function geminiUsageToday(): Promise<Record<string, number>> {
   return (await readQuota()).used;
 }
 
-/** Topics already made for a submodule (any status) — used to exclude repeats. */
+/** Topics already made for a submodule (any status) — direct tree lookup, no scan. */
 export async function coveredTopics(subjectLabel: string, moduleLabel: string, submoduleLabel: string): Promise<string[]> {
-  const history = await readHistory();
-  return history
-    .filter((h) => h.subject === subjectLabel && h.module === moduleLabel && h.submodule === submoduleLabel)
-    .map((h) => h.topic);
+  const tree = await readHistoryTree();
+  return (tree[subjectLabel]?.[moduleLabel]?.[submoduleLabel] ?? []).map((e) => e.topic);
 }
 
 export type DraftInfo = {
