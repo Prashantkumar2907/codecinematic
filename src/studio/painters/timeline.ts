@@ -18,7 +18,11 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
   const availH = contentH - band;
   const rowGap = Math.min(availH / n, unit * (vertical ? 3.9 : 3.0));
   const listTop = contentY + band + Math.max(0, (availH - n * rowGap) / 2);
-  const spineX = contentX + unit * 3.0;
+  // The spine sits right of the widest date so long markers ("2018-2020")
+  // never run off the left frame edge.
+  ctx.font = `800 ${unit * 0.8}px ${FONT_SANS}`;
+  const maxWhenW = Math.max(...scene.events.map((e) => ctx.measureText(e.when).width));
+  const spineX = Math.min(contentX + Math.max(unit * 3.0, maxWhenW + unit * 1.1), contentX + contentW * 0.42);
   const dotR = unit * 0.42;
 
   scene.events.forEach((e, i) => {

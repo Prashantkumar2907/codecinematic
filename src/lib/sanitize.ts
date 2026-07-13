@@ -7,9 +7,21 @@
 
 const ELLIPSIS = "…";
 
+/** Strip leaked markdown emphasis (*word*, **word**, _word_) the model sometimes
+ *  emits despite the "no markdown" rule — it renders literally on canvas and is
+ *  read aloud as "asterisk" by TTS. Real prose asterisks/underscores are rare. */
+function stripEmphasis(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/(^|\s)_([^_\n]+)_(?=\s|$|[.,!?])/g, "$1$2");
+}
+
 function clamp(value: unknown, max: number): unknown {
-  if (typeof value !== "string" || value.length <= max) return value;
-  return value.slice(0, max - 1).trimEnd() + ELLIPSIS;
+  if (typeof value !== "string") return value;
+  const cleaned = stripEmphasis(value);
+  if (cleaned.length <= max) return cleaned;
+  return cleaned.slice(0, max - 1).trimEnd() + ELLIPSIS;
 }
 
 function clampArray(value: unknown, maxItems: number, maxLen: number): unknown {

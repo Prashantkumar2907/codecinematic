@@ -22,14 +22,37 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
 
   const stacked = vertical;
   const pw = stacked ? contentW : (contentW - gap) / 2;
-  const ph = stacked ? (contentH - (panelsTop - contentY) - verdictBand - gap) / 2 : contentH - (panelsTop - contentY) - verdictBand;
+  const availH = contentH - (panelsTop - contentY) - verdictBand;
+
+  // Height a panel actually needs for its title + items, so a 2-item panel in
+  // a stacked layout hugs its content instead of ballooning to half the frame.
+  const panelContentH = (items: string[]): number => {
+    ctx.font = `500 ${unit * 0.85}px ${FONT_SANS}`;
+    let h = unit * 2.8;
+    for (const item of items) {
+      const lines = Math.min(wrapText(ctx, item, pw - unit * 3).length, 2);
+      h += unit * 1.2 * lines + unit * 0.6;
+    }
+    return h + unit * 0.6;
+  };
+
+  let ph: number;
+  let blockTop = panelsTop;
+  if (stacked) {
+    const need = Math.max(panelContentH(scene.left.items), panelContentH(scene.right.items));
+    ph = Math.min(need, (availH - gap) / 2);
+    // Center the two-panel stack in the available height.
+    blockTop = panelsTop + Math.max(0, (availH - (ph * 2 + gap)) / 2);
+  } else {
+    ph = availH;
+  }
 
   const panels = [
-    { side: scene.left, x: contentX, y: panelsTop, dir: -1, color: accent, glow: accentGlow, beatIdx: offset },
+    { side: scene.left, x: contentX, y: blockTop, dir: -1, color: accent, glow: accentGlow, beatIdx: offset },
     {
       side: scene.right,
       x: stacked ? contentX : contentX + pw + gap,
-      y: stacked ? panelsTop + ph + gap : panelsTop,
+      y: stacked ? blockTop + ph + gap : panelsTop,
       dir: 1,
       color: secondary,
       glow: secondaryGlow,
@@ -109,7 +132,7 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
   const vsIn = easeOutBack(sub(env.p, rightWin.start, 0.1));
   if (vsIn > 0) {
     const vx = stacked ? contentX + contentW / 2 : contentX + pw + gap / 2;
-    const vy = stacked ? panelsTop + ph + gap / 2 : panelsTop + ph / 2;
+    const vy = stacked ? blockTop + ph + gap / 2 : panelsTop + ph / 2;
     ctx.save();
     ctx.translate(vx, vy);
     ctx.scale(vsIn, vsIn);

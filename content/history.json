@@ -105,6 +105,18 @@
     "Psychology & the Mind": {
       "Biases & Decisions": {
         "Anchoring & Framing": []
+      },
+      "Habits & Motivation": {
+        "Dopamine & Rewards": [
+          {
+            "date": "2026-07-13",
+            "topic": "Variable Rewards: the psychological trick behind every slot machine",
+            "title": "Variable Rewards: How Apps Use Slot Machine Psychology #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-07-short-variable-rewards-the-psychological-trick-behind-every-slot-m",
+            "status": "draft"
+          }
+        ]
       }
     },
     "History": {
@@ -180,6 +192,106 @@
             "title": "Stop Saying Very: Use These 3 Precise Adjectives #Shorts",
             "format": "short",
             "slug": "2026-07-13-12-59-short-stop-saying-very-use-these-precise-adjectives",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "GK & Amazing Facts": {
+      "How the World Runs": {
+        "Shipping & Trade": [
+          {
+            "date": "2026-07-13",
+            "topic": "Flags of convenience: why every ship is registered in Panama",
+            "title": "Why ships use Flags of Convenience: Panama vs Home Country #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-04-short-flags-of-convenience-why-every-ship-is-registered-in-panama",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Business & Startups": {
+      "Business Models": {
+        "How X Makes Money": [
+          {
+            "date": "2026-07-13",
+            "topic": "Jio's Data Strategy: Why they gave away the internet",
+            "title": "Why Jio Gave Away Free Internet: The Ecosystem Strategy #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-11-short-jio-s-data-strategy-why-they-gave-away-the-internet",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Health & Body": {
+      "How Your Body Works": {
+        "Sleep": [
+          {
+            "date": "2026-07-13",
+            "topic": "The caffeine trap: how adenosine receptors lie",
+            "title": "Why Caffeine Actually Makes You Tired: The Adenosine Trap #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-15-short-the-caffeine-trap-how-adenosine-receptors-lie",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Philosophy & Big Ideas": {
+      "Thought Experiments": {
+        "Identity & the Ship of Theseus": [
+          {
+            "date": "2026-07-13",
+            "topic": "The Teleporter Problem: Would you survive digital teleportation?",
+            "title": "Would YOU survive digital teleportation? #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-19-short-the-teleporter-problem-would-you-survive-digital-teleportati",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Life Skills & Productivity": {
+      "Learning How to Learn": {
+        "Memory Techniques": [
+          {
+            "date": "2026-07-13",
+            "topic": "The Memory Palace: Building a mental filing cabinet",
+            "title": "The Memory Palace: How to Build Your Mental Filing Cabinet #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-21-short-the-memory-palace-building-a-mental-filing-cabinet",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The Memory Palace: Building a mental filing cabinet",
+            "title": "The Memory Palace: How to Actually Remember Everything #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-24-short-the-memory-palace-building-a-mental-filing-cabinet",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Mythology & Epics": {
+      "World Mythology": {
+        "Norse": [
+          {
+            "date": "2026-07-13",
+            "topic": "The Viking Afterlife: Why Valhalla is not heaven",
+            "title": "Why Valhalla Is Not Heaven: The Viking Afterlife Explained #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-27-short-the-viking-afterlife-why-valhalla-is-not-heaven",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-13",
+            "topic": "The Viking Afterlife: Why Valhalla is not heaven",
+            "title": "Why Valhalla is Not Actually Heaven #Shorts",
+            "format": "short",
+            "slug": "2026-07-13-13-31-short-the-viking-afterlife-why-valhalla-is-not-heaven",
             "status": "draft"
           }
         ]

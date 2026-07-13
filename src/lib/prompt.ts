@@ -81,6 +81,9 @@ const VARIETY_RULE = `
 Scene variety (this is a hard quality bar — a monotonous script is a bad script):
 - Do NOT build the whole video from one or two scene kinds. A short must use at least 3 DIFFERENT
   kinds; a long must use at least 6. Lean on the kinds your subject playbook recommends below.
+- NEVER use the same scene kind twice in a row, and in a short use no single kind more than twice
+  total — two "steps" scenes back to back look identical and bore the viewer. If you need two
+  processes, make the second a "diagram", "compare" or "chart" instead.
 - Open with the strongest possible hook for THIS subject (a stat, a mythfact, a bold bigtext claim).
 - Vary the rhythm: after two dense scenes (diagram/code/chart), give one light scene (stat/quote/quiz).`;
 
