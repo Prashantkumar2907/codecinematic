@@ -24,6 +24,23 @@ function clamp(value: unknown, max: number): unknown {
   return cleaned.slice(0, max - 1).trimEnd() + ELLIPSIS;
 }
 
+/**
+ * Spoken text (narration/beats) is voiced by TTS, so it can't take a "…" and must
+ * end cleanly. Over-limit spoken strings used to be left for a model-repair round,
+ * which unreliably trimmed them and could fail a whole video; clamping to the last
+ * sentence (or word) boundary before `max` turns that hard-fail into a clean trim.
+ */
+function clampSpeech(value: unknown, max: number): unknown {
+  if (typeof value !== "string") return value;
+  const cleaned = stripEmphasis(value);
+  if (cleaned.length <= max) return cleaned;
+  const window = cleaned.slice(0, max);
+  const sentenceEnd = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));
+  if (sentenceEnd >= max * 0.5) return window.slice(0, sentenceEnd + 1).trimEnd();
+  const wordEnd = window.lastIndexOf(" ");
+  return (wordEnd > 0 ? window.slice(0, wordEnd) : window).trimEnd();
+}
+
 function clampArray(value: unknown, maxItems: number, maxLen: number): unknown {
   if (!Array.isArray(value)) return value;
   return value.slice(0, maxItems).map((v) => clamp(v, maxLen));
@@ -71,9 +88,40 @@ export function sanitizeScript(raw: unknown): unknown {
   return script;
 }
 
+const MAX_NARRATION = 400;
+const MAX_BEAT = 320;
+
+/** Clamp a spoken "say" on an item/panel object in place (used for arrays). */
+function clampItemSay(item: unknown): unknown {
+  if (typeof item !== "object" || item === null) return item;
+  const rec = item as Record<string, unknown>;
+  if (typeof rec.say === "string") return { ...rec, say: clampSpeech(rec.say, MAX_BEAT) };
+  return item;
+}
+
 function sanitizeScene(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null) return raw;
   const scene = { ...(raw as Record<string, unknown>) };
+
+  // Spoken fields are voiced by TTS and drive beat timing; over-limit ones used
+  // to force a model-repair round that could fail the whole video. Clamp them
+  // deterministically at a sentence/word boundary across every kind.
+  for (const key of ["narration"]) {
+    if (typeof scene[key] === "string") scene[key] = clampSpeech(scene[key], MAX_NARRATION);
+  }
+  for (const key of ["sayIntro", "sayMyth", "sayFact", "sayQuestion", "sayReveal", "sayVerdict"]) {
+    if (typeof scene[key] === "string") scene[key] = clampSpeech(scene[key], MAX_BEAT);
+  }
+  for (const key of ["items", "steps", "events", "examples", "segments"]) {
+    if (Array.isArray(scene[key])) scene[key] = (scene[key] as unknown[]).map(clampItemSay);
+  }
+  for (const side of ["left", "right"]) {
+    const panel = scene[side];
+    if (panel && typeof panel === "object" && typeof (panel as Record<string, unknown>).say === "string") {
+      scene[side] = clampItemSay(panel);
+    }
+  }
+
   switch (scene.kind) {
     case "bigtext":
       scene.text = clamp(scene.text, 80);

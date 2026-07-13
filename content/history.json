@@ -157,6 +157,18 @@
             "status": "draft"
           }
         ]
+      },
+      "Modern India": {
+        "Freedom Struggle": [
+          {
+            "date": "2026-07-13",
+            "topic": "The Freedom Struggle: How 1857 changed India forever",
+            "title": "The 1857 Revolt: How a Sepoy Mutiny Actually Changed India Forever",
+            "format": "long",
+            "slug": "2026-07-13-14-14-long-the-freedom-struggle-how-1857-changed-india-forever",
+            "status": "draft"
+          }
+        ]
       }
     },
     "Geography": {

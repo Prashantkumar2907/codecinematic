@@ -16,7 +16,9 @@ const requestSchema = z.object({
   angle: z.string().max(160).optional(),
 });
 
-const REPAIR_ROUNDS = 2;
+/* Soft gates (word budget, bare section cards) often need more than two tries —
+ * the third round is only spent when the first two leave a real issue. */
+const REPAIR_ROUNDS = 3;
 
 /**
  * NDJSON stream so the 30–180s wait can show true pipeline stages:
