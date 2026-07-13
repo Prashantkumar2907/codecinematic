@@ -13,7 +13,7 @@ its visual element appears. Write every beat about the element it accompanies an
 - {"kind":"compare","sayIntro":"optional","title":"<=60","left":{"title":"<=30","items":["<=70",1-4],"say":"spoken while the LEFT panel shows"},"right":{same with its own "say"},"verdict":"<=110 optional","sayVerdict":"spoken while the verdict appears"}
 - {"kind":"question","narration":"...","text":"<=180","hint":"<=110 optional"} — ending challenge for comments
 - {"kind":"timeline","sayIntro":"optional","title":"<=60","events":[{"when":"<=18 date/era/marker","label":"<=52","say":"spoken as THIS event appears"}, 2-6 chronological events]} — dated vertical spine; ideal for history, the evolution of an idea, a sequence of events
-- {"kind":"stat","narration":"...","value":"<=14 (e.g. \\"₹1.2 Cr\\", \\"40%\\", \\"8 min\\", \\"1 in 9\\")","label":"<=60 what the number measures","context":"<=100 optional framing"} — ONE huge number made visceral; use for a stunning figure or the payoff of a calculation
+- {"kind":"stat","narration":"...","value":"<=14 (e.g. \\"₹1.2 Cr\\", \\"40%\\", \\"8 min\\", \\"1 in 9\\")","label":"<=60 what the number measures","context":"<=100 optional framing"} — ONE huge number made visceral; use for a stunning figure or the payoff of a calculation. The value MUST be an actual number/quantity you are confident is TRUE — never a word like "Higher" or "Faster", and never a figure invented for impact (a wrong "wow" number is a factual error that destroys trust). If you are not certain of a real figure, use a different scene kind instead of guessing.
 - {"kind":"steps","sayIntro":"optional","title":"<=60","steps":[{"text":"<=80","detail":"<=90 optional sub-line","say":"spoken as THIS step appears"}, 2-5 ordered steps]} — numbered spine; use for a how-to, an algorithm, or a worked method (slow way then fast way)
 - {"kind":"quiz","question":"<=120","options":[{"text":"<=52","correct":true|false}, 3-4 options with EXACTLY ONE correct (2 only for a genuine true/false)],"sayQuestion":"spoken as the question+options appear","sayReveal":"spoken as the correct answer highlights"} — a mid-video multiple-choice check; wrong options must be plausible, each a real misconception
 - {"kind":"vocab","sayIntro":"optional","word":"<=28","pron":"<=32 optional e.g. /ˈɛləkwənt/","pos":"<=16 optional noun/verb/adj","meaning":"<=90","examples":[{"text":"<=90 a real sentence that LITERALLY CONTAINS the word/phrase, used naturally","say":"spoken as THIS example appears"}, 1-3],"synonym":"<=48 optional"} — English-vocabulary flashcard; the word is auto-highlighted inside each example, so each example text MUST include the exact word/phrase (a sentence that only describes the meaning without using the word is wrong and teaches nothing)
@@ -308,7 +308,8 @@ ${playbook}
 Teaching quality bar (viewers range from beginners to experts — beginners must follow, experts must not be bored):
 - The FIRST beat is the retention decision: at most 2 short sentences that open a loop the scene does
   not close — a question, an assumption about to break, or a number that seems impossible. Never open
-  with a definition, a greeting, or background.
+  with a definition, a greeting, or background. Do NOT open with the tired "Have you ever wondered…"
+  or "Did you know…" — start in the middle of the intrigue instead ("Your balloon just defied gravity").
 - Teach the MECHANISM or the WHY, never just surface facts.
 - Use one concrete anchor: a real number, a vivid comparison, or a story detail that makes it visceral.
 - Include one insight that would make an expert nod ("ah, that's why").
@@ -320,7 +321,11 @@ Teaching quality bar (viewers range from beginners to experts — beginners must
 - EVERY SCENE EARNS ITS PLACE: this is the bar between good and great. If a scene only restates the
   previous one in a new format, cut it or replace it with the NEXT idea (the edge case, the
   consequence, the counter-example). No two scenes may make the same point.
-- The ending question must be answerable from what was taught; make it the kind people argue about in comments.
+- The ending question must be answerable from what was taught, and it must be CLEAN: pose a genuine
+  puzzle, but never introduce a brand-new claim, a fabricated "scientists argue about this"
+  controversy, or a physics/logic statement that is itself wrong or muddled. (E.g. in a collision
+  both bodies feel EQUAL force by Newton's third law — don't imply the heavier one feels more.) If
+  the puzzle needs a fact, that fact must be true and ideally already shown in the video.
 
 Also produce "meta" for YouTube:
 - "title": 35-90 chars${format === "short" ? ', ends with " #Shorts"' : ""} — lead with the exact phrase people search

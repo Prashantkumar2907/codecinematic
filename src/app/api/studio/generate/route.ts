@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
+import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, bigtextAfterLastQuestion, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
 import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
@@ -92,6 +92,12 @@ export async function POST(req: Request) {
                 `the vocab scene "${vId}" has example sentences that never actually use its word/phrase — rewrite every example so it literally contains the word, used naturally in a real sentence (not a description of the meaning)`
               );
             }
+            const outro = bigtextAfterLastQuestion(validated.data);
+            if (outro >= 0) {
+              issues.push(
+                `scene ${outro + 1} is a "bigtext" that comes AFTER the ending question — delete it. The question is the finale; no "thank you for watching", "stay curious" or recap card may follow it`
+              );
+            }
             if (issues.length === 0) {
               accepted = validated.data;
               break;
@@ -111,6 +117,9 @@ export async function POST(req: Request) {
               }
               if (vocabExampleMissingWord(validated.data)) {
                 warnings.push("a vocab example does not use the word it teaches");
+              }
+              if (bigtextAfterLastQuestion(validated.data) >= 0) {
+                warnings.push("a section/outro card appears after the ending question");
               }
               accepted = validated.data;
               break;

@@ -352,6 +352,24 @@ export function vocabExampleMissingWord(script: SceneScript): string | null {
   return null;
 }
 
+/**
+ * The ending "question" is meant to be the finale, but longs keep appending a
+ * "thank you for watching / stay curious" bigtext outro after it. Returns the
+ * index of a bigtext scene that appears after the last question scene, or -1.
+ * Soft-checked in the generate route (drives a repair, never hard-fails).
+ */
+export function bigtextAfterLastQuestion(script: SceneScript): number {
+  let lastQ = -1;
+  script.scenes.forEach((s, i) => {
+    if (s.kind === "question") lastQ = i;
+  });
+  if (lastQ < 0) return -1;
+  for (let i = lastQ + 1; i < script.scenes.length; i++) {
+    if (script.scenes[i].kind === "bigtext") return i;
+  }
+  return -1;
+}
+
 export function narrationWordCount(script: SceneScript): number {
   let words = 0;
   for (const scene of script.scenes) {
