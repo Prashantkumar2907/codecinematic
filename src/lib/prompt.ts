@@ -16,7 +16,7 @@ its visual element appears. Write every beat about the element it accompanies an
 - {"kind":"stat","narration":"...","value":"<=14 (e.g. \\"₹1.2 Cr\\", \\"40%\\", \\"8 min\\", \\"1 in 9\\")","label":"<=60 what the number measures","context":"<=100 optional framing"} — ONE huge number made visceral; use for a stunning figure or the payoff of a calculation
 - {"kind":"steps","sayIntro":"optional","title":"<=60","steps":[{"text":"<=80","detail":"<=90 optional sub-line","say":"spoken as THIS step appears"}, 2-5 ordered steps]} — numbered spine; use for a how-to, an algorithm, or a worked method (slow way then fast way)
 - {"kind":"quiz","question":"<=120","options":[{"text":"<=52","correct":true|false}, 3-4 options with EXACTLY ONE correct (2 only for a genuine true/false)],"sayQuestion":"spoken as the question+options appear","sayReveal":"spoken as the correct answer highlights"} — a mid-video multiple-choice check; wrong options must be plausible, each a real misconception
-- {"kind":"vocab","sayIntro":"optional","word":"<=28","pron":"<=32 optional e.g. /ˈɛləkwənt/","pos":"<=16 optional noun/verb/adj","meaning":"<=90","examples":[{"text":"<=90 a real sentence USING the word","say":"spoken as THIS example appears"}, 1-3],"synonym":"<=48 optional"} — English-vocabulary flashcard; the word is auto-highlighted inside each example
+- {"kind":"vocab","sayIntro":"optional","word":"<=28","pron":"<=32 optional e.g. /ˈɛləkwənt/","pos":"<=16 optional noun/verb/adj","meaning":"<=90","examples":[{"text":"<=90 a real sentence that LITERALLY CONTAINS the word/phrase, used naturally","say":"spoken as THIS example appears"}, 1-3],"synonym":"<=48 optional"} — English-vocabulary flashcard; the word is auto-highlighted inside each example, so each example text MUST include the exact word/phrase (a sentence that only describes the meaning without using the word is wrong and teaches nothing)
 - {"kind":"chart","sayIntro":"optional","title":"<=60","items":[{"label":"<=24","value":number (plain number, no commas),"unit":"<=8 optional e.g. %, Cr, km","say":"spoken as THIS bar grows"}, 2-6 items]} — animated horizontal bar comparison with counting values; perfect for rankings, sizes, before/after numbers
 - {"kind":"quote","narration":"...","text":"<=200 the exact quotation","author":"<=40 optional"} — styled quotation card; ONLY real, correctly attributed quotes (or mark as proverb/saying)
 - {"kind":"mythfact","myth":"<=140 the common false belief","fact":"<=160 the correction","sayMyth":"spoken while the myth card shows","sayFact":"spoken while the myth is struck out and the fact appears"} — myth-buster reveal; high-engagement way to correct a misconception`;
@@ -129,11 +129,30 @@ number (₹), a "chart" to compare returns/costs across options or years, a "ste
 how-to (start an SIP), a "code" scene with lang "text" for the compounding math, "mythfact" for
 money myths (e.g. "renting is wasted money"), "compare" for two instruments. Concepts only, never
 stock tips.`,
-  english: `English & Communication playbook: For VOCABULARY sub-modules (power words, idioms), build
-the video around "vocab" scenes — one per word, each with pronunciation, part of speech, a crisp
-meaning, 2-3 real usage sentences, and a synonym. For "Confusing Word Pairs" use "compare". For
-GRAMMAR use "steps" (state the rule, then examples), "mythfact" for grammar myths, and a "quiz" to
-test it. Keep one clear rule or set of words per video; correct common Indian-English mistakes kindly.`,
+  english: `English & Communication playbook — teach like a charismatic creator, NOT a dictionary.
+The enemy is dryness: stating one rule three times across mythfact + steps + compare is boring and
+low-value. Every scene must add something NEW — the rule, THEN a tricky edge case, THEN real usage,
+THEN a memory trick — never restate the same point in a new format.
+- IDIOMS & PHRASES: open on the vivid literal image, then actually DELIVER the origin or "why this
+  metaphor" that your hook promises — never tease "why do we say X?" and leave it unanswered. Then
+  show the phrase used VERBATIM in 2-3 natural sentences a real person would say, in different
+  settings (office, family, news headline). Close with the common misuse. If the true origin is
+  uncertain, say "the story goes…" — never invent a false etymology.
+- VOCABULARY & ETYMOLOGY: this is the #1 rule — every "vocab" example sentence MUST literally
+  contain the target word/phrase, used naturally in a real sentence ("She finally addressed the
+  elephant in the room and asked about the layoffs"). An example that only describes the meaning
+  ("everyone knew but nobody said it") is worthless — the viewer never hears the word in action.
+  Add a memory hook: a mnemonic, the root it comes from, or a vivid association that makes it stick.
+- CONFUSING PAIRS: "compare" with ONE crisp discriminator (direction, countability, location) and
+  one sticky test the viewer keeps forever ("if you can count it, use fewer"). Real Indian examples.
+- GRAMMAR: state the rule ONCE, then spend the rest of the video on the EDGE CASES and the specific
+  mistakes people actually make — not re-explaining the basic rule. "mythfact" for a real myth, and
+  a "quiz" on a genuinely tricky case, not an obvious one.
+- SPOKEN & DAILY CONVERSATION: teach FUNCTIONAL language for a real situation — ordering food,
+  disagreeing politely, small talk, a phone call, an interview answer — with word-for-word phrases
+  the viewer can copy and say today, then a native-sounding upgrade. This is NOT a grammar lesson;
+  model the actual spoken sentences.
+- Correct common Indian-English mistakes warmly, and use Indian names, ₹ and contexts in examples.`,
   gk: `GK & Amazing Facts playbook: hook with the unbelievable "stat" or bigtext fact, then a "diagram"
 or "timeline" explaining the mechanism behind it. Use "chart" for rankings and records, "mythfact"
 for widely believed nonsense. ALWAYS end with a "quiz".`,

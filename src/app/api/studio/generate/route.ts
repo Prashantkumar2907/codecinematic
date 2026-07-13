@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
+import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
 import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
@@ -86,6 +86,12 @@ export async function POST(req: Request) {
                 `scenes ${bt + 1}-${bt + 2} are both "bigtext" section cards with no teaching scene between them — replace the second card, or the content it introduces, with a real diagram/bullets/compare/chart/steps scene (a bare title card teaches nothing)`
               );
             }
+            const vId = vocabExampleMissingWord(validated.data);
+            if (vId) {
+              issues.push(
+                `the vocab scene "${vId}" has example sentences that never actually use its word/phrase — rewrite every example so it literally contains the word, used naturally in a real sentence (not a description of the meaning)`
+              );
+            }
             if (issues.length === 0) {
               accepted = validated.data;
               break;
@@ -102,6 +108,9 @@ export async function POST(req: Request) {
               }
               if (firstAdjacentBigtext(validated.data) >= 0) {
                 warnings.push("two section cards appear back to back with no teaching scene between them");
+              }
+              if (vocabExampleMissingWord(validated.data)) {
+                warnings.push("a vocab example does not use the word it teaches");
               }
               accepted = validated.data;
               break;

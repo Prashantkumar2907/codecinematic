@@ -432,10 +432,11 @@
         {
           "id": "spoken",
           "label": "Spoken English",
+          "style": "functional real-life speaking, not grammar theory: teach copy-and-say phrases for actual situations, then a natural-sounding upgrade",
           "submodules": [
-            { "id": "daily-conversations", "label": "Daily Conversations" },
-            { "id": "interview-english", "label": "Interview English" },
-            { "id": "fluency-tips", "label": "Fluency Tips" }
+            { "id": "daily-conversations", "label": "Daily Conversations", "style": "everyday situations — greetings and small talk, ordering food, shopping, phone calls, asking directions, agreeing or disagreeing politely; teach the exact phrases to say, never verb-tense rules" },
+            { "id": "interview-english", "label": "Interview English", "style": "answering real interview questions (tell me about yourself, strengths and weaknesses, why this role), professional phrasing and confident framing" },
+            { "id": "fluency-tips", "label": "Fluency Tips", "style": "sounding natural and fluent — connected speech, thinking-time phrases, avoiding fillers, sentence stress and rhythm; practical habits not grammar theory" }
           ]
         },
         {

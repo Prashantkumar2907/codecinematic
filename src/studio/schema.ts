@@ -329,6 +329,29 @@ export function firstAdjacentBigtext(script: SceneScript): number {
   return -1;
 }
 
+/**
+ * A "vocab" example must actually use the word it teaches — models often write
+ * examples that only paraphrase the meaning ("everyone knew but nobody said it"
+ * for "elephant in the room"), which defeats the auto-highlight and teaches
+ * nothing. Returns the id of the first vocab scene whose examples ALL omit the
+ * word, or null. Matched loosely (case-insensitive, ignoring "the "/"a " and
+ * trailing punctuation) so inflections like borrow/borrowed still count only
+ * when the stem appears. Soft-checked in the generate route.
+ */
+export function vocabExampleMissingWord(script: SceneScript): string | null {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  for (const scene of script.scenes) {
+    if (scene.kind !== "vocab") continue;
+    const word = norm(scene.word).replace(/^(the|a|an) /, "");
+    const stem = word.split(" ")[0]?.slice(0, 5) ?? word;
+    const key = word.includes(" ") ? word : stem; // phrase: match whole; single word: match stem
+    if (!key) continue;
+    const anyUses = scene.examples.some((e) => norm(e.text).includes(key));
+    if (!anyUses) return scene.id;
+  }
+  return null;
+}
+
 export function narrationWordCount(script: SceneScript): number {
   let words = 0;
   for (const scene of script.scenes) {
