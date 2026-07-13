@@ -30,7 +30,11 @@ Narration rules (neural TTS voice; each beat is voiced separately):
   Keep beats tight (5-12s spoken). One idea per beat.
 - Sound like a person who has lived this, not a script: vary sentence length, allow one small aside
   ("yes, your browser has been lying to you"), and never use formulaic transitions like "Next,",
-  "Now let's look at", "In conclusion" — a knowledgeable friend explaining, not a narrator.`;
+  "Now let's look at", "In conclusion" — a knowledgeable friend explaining, not a narrator.
+- Talk like a top creator, NOT a textbook. Ban academic register: no "possesses", "utilize",
+  "furthermore", "this mechanism relies on", "it is imperative". Say "has", "use", "and", "here's
+  how". Every scene should land ONE concrete, sticky image or turn of phrase the viewer repeats to a
+  friend ("a ballpark figure keeps you in the game"), not a definition they forget in five seconds.`;
 
 const TEACHING_METHOD = `
 How to teach (dual-track rule — a total newcomer AND a practitioner are both watching; both must
@@ -308,6 +312,14 @@ Teaching quality bar (viewers range from beginners to experts — beginners must
 - Teach the MECHANISM or the WHY, never just surface facts.
 - Use one concrete anchor: a real number, a vivid comparison, or a story detail that makes it visceral.
 - Include one insight that would make an expert nod ("ah, that's why").
+- NUMERIC CLARITY: every number must be unambiguous. Never reuse the same figure for two different
+  quantities in one video without distinguishing them (e.g. don't say the plate moves "5" and the
+  peak rises "5" and leave the viewer conflating cm/yr with mm/yr). A "stat" scene's value must be
+  the exact number its label describes — if you say money doubles, the stat is the doubled figure,
+  not a later one. Round sensibly and say "about" when it's an estimate.
+- EVERY SCENE EARNS ITS PLACE: this is the bar between good and great. If a scene only restates the
+  previous one in a new format, cut it or replace it with the NEXT idea (the edge case, the
+  consequence, the counter-example). No two scenes may make the same point.
 - The ending question must be answerable from what was taught; make it the kind people argue about in comments.
 
 Also produce "meta" for YouTube:
