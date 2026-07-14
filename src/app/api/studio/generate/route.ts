@@ -14,6 +14,7 @@ const requestSchema = z.object({
   format: z.enum(["short", "long"]),
   topic: z.string().min(3).max(120),
   angle: z.string().max(160).optional(),
+  lang: z.enum(["en", "hi"]).default("en"),
 });
 
 /* Soft gates (word budget, bare section cards) often need more than two tries —
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
   }
-  const { format, topic, angle } = parsed.data;
+  const { format, topic, angle, lang } = parsed.data;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
           topic,
           angle,
           recentTopics,
+          lang,
         });
         emit({ stage: "writing" });
         let raw = sanitizeScript(await generateJson(prompt));
@@ -148,6 +150,7 @@ export async function POST(req: Request) {
         if (!accepted) throw new Error("validation loop exited without a script");
         const script = {
           ...accepted,
+          lang,
           subject: subject.label,
           module: module_.label,
           submodule: submodule.label,

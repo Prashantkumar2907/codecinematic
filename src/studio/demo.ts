@@ -3,6 +3,7 @@ import type { SceneScript } from "./schema";
 /** Hardcoded script for the render spike and manual smoke-testing (no Gemini call). */
 export const DEMO_SCRIPT: SceneScript = {
   format: "short",
+  lang: "en",
   subject: "Coding",
   module: "Frontend",
   submodule: "JavaScript",

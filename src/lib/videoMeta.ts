@@ -57,8 +57,14 @@ const responseSchema = z.object({
 
 function buildMetaPrompt(script: SceneScript): string {
   const isShort = script.format === "short";
+  const hi = (script as { lang?: string }).lang === "hi";
+  const langLine = hi
+    ? `\nLANGUAGE: this is a HINDI video. Write the title and description in natural Hindi (Devanagari),
+keeping searched English/proper terms as-is (Article 21, UPSC, GDP). tags & hashtags: include BOTH
+Hindi and English search phrases people actually type. Hashtags stay ASCII (#UPSC, #Polity, #Hindi).\n`
+    : "";
   return `You optimize YouTube metadata for an education channel so videos rank in search AND earn the click.
-
+${langLine}
 Video: ${isShort ? "9:16 Short (45-90s)" : "16:9 long-form (6-12 min)"}
 Subject: ${script.subject} → ${script.module} → ${script.submodule}
 Topic: ${script.topic}

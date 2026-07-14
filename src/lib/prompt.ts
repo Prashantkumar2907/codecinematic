@@ -197,6 +197,27 @@ no-confidence), "timeline" for constitutional history, "stat" for the memorable 
 government). ALWAYS include a "quiz" — aspirants crave self-testing — and end with a mains-style
 "question" that demands an opinion with reasoning. Explain the WHY behind every provision (why
 bicameral, why a collegium, why Article 356 exists), never just the fact.`,
+  economy: `Economy playbook (UPSC-grade): decode the jargon. First anchor the term in one plain
+sentence ("inflation is your money buying less each year"), then the mechanism with a REAL Indian
+number and the body that controls it (RBI repo rate, SEBI, the Union Budget, FRBM Act). Use
+"diagram" for flows (how repo rate cools inflation, how a budget deficit is financed), "compare" for
+exam confusions (fiscal vs monetary policy, CRR vs SLR, direct vs indirect tax), "chart" for real
+figures (GDP growth, inflation prints), "stat" for the striking number, "mythfact" for economic
+myths ("printing money makes a country rich"). ALWAYS a "quiz". Figures must be real — hedge with
+"around" if unsure. End with a mains-style "question".`,
+  environment: `Environment & Ecology playbook (UPSC-grade): mechanism then policy. Explain the
+ecological process with a "diagram" or "steps" (how a food chain concentrates toxins, how the carbon
+cycle warms the planet), then name the exact Indian law, institution or global convention (Wildlife
+Protection Act 1972, NGT, CITES, Ramsar, Montreal vs Kyoto vs Paris). "compare" for confusions
+(national park vs sanctuary vs biosphere reserve), "stat"/"chart" for real figures (forest cover %,
+tiger numbers) hedged with "around", "mythfact" for green myths. ALWAYS a "quiz"; end with a
+mains-style "question". Species, dates and figures must be accurate.`,
+  artculture: `Art & Culture playbook: vivid and precise, like a great museum guide. Name the
+dynasty/period/patron, the 2-3 defining features, and ONE iconic surviving example (Kailasa temple
+at Ellora, the Nataraja bronze). Use "compare" for style contrasts (Nagara vs Dravida temples,
+Bharatanatyam vs Odissi), "timeline" for how a form evolved, "diagram" for the parts of a structure
+(shikhara, gopuram, mandapa), "mythfact" for common mix-ups, a "quiz" for the exam. Distinguish
+styles crisply; dates, dynasties and names must be accurate. End with a "question".`,
   mindset: `Mindset & Self-Growth playbook: transformation-first, zero platitudes. Open with the
 painful, hyper-specific moment (your mind going blank on stage, the 2 AM scroll-envy spiral), then
 name the real psychological mechanism behind it — never say "just be confident". Use "mythfact" to
@@ -263,8 +284,9 @@ export function buildScriptPrompt(opts: {
   topic: string;
   angle?: string;
   recentTopics: string[];
+  lang?: "en" | "hi";
 }): string {
-  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, format, topic, angle, recentTopics } = opts;
+  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, format, topic, angle, recentTopics, lang } = opts;
   const isCoding = subject.id === "coding";
   const playbook = SUBJECT_PLAYBOOKS[subject.id] ?? "";
   const structure =
@@ -301,6 +323,25 @@ explanation — narrate the WHY and the mechanism, not a caption. Count your wor
     ? `Recently covered in this sub-module (do NOT repeat): ${recentTopics.join("; ")}`
     : "";
 
+  const langBlock =
+    lang === "hi"
+      ? `
+LANGUAGE — HINDI (this whole video is in Hindi for an Indian audience):
+- Write EVERY spoken beat (narration/say/sayIntro/sayMyth/sayFact/sayQuestion/sayReveal/sayVerdict)
+  and EVERY on-screen text (text/sub/title/label/items/steps/events/meaning/examples/options/verdict)
+  in natural, conversational Hindi in Devanagari script — the way an Indian teacher actually speaks,
+  NOT stiff literary Hindi.
+- Keep established technical, legal and constitutional terms in their standard recognised form:
+  proper nouns, Article numbers, and English terms with no natural Hindi equivalent stay as-is
+  ("Article 21", "GDP", "RBI") but are written so a Hindi TTS voice reads them correctly.
+- Hinglish is natural for this audience — a common English word mid-sentence is fine when that is
+  how people really say it; do not force an obscure Sanskrit word where nobody uses one.
+- The "meta" (title/description/tags/hashtags) stays in a search-friendly mix: title in Hindi (may
+  keep the key English term), tags/hashtags include both Hindi and English phrases people search.
+- Numbers may use Indian words (सौ, हज़ार, लाख, करोड़) or digits, whichever a speaker would say.
+`
+      : "";
+
   return `You are the content engine for a YouTube education channel.
 
 Audience: ${subject.audience}.
@@ -314,7 +355,7 @@ Write a complete video script as STRICT JSON (no prose, no markdown fences) for:
 - Subject: ${subject.label} → Module: ${moduleLabel} → Sub-module: ${submoduleLabel}
 - Topic: ${topic}${angle ? `\n- Angle: ${angle}` : ""}
 - Format: ${format}
-
+${langBlock}
 ${structure}
 
 ${SCENE_SHAPE}
@@ -366,7 +407,7 @@ Also produce "meta" for YouTube:
   tags${format === "short" ? ' ("#Shorts" first)' : ""}; first three are the visible ones, order by relevance
 
 Top-level JSON shape:
-{"format":"${format}","subject":"${subject.label}","module":"${moduleLabel}","submodule":"${submoduleLabel}","topic":"${topic}","scenes":[...],"meta":{"title":"...","description":"...","tags":[...],"hashtags":["#..."]}}
+{"format":"${format}","lang":"${lang ?? "en"}","subject":"${subject.label}","module":"${moduleLabel}","submodule":"${submoduleLabel}","topic":"${topic}","scenes":[...],"meta":{"title":"...","description":"...","tags":[...],"hashtags":["#..."]}}
 
 ${avoid}
 

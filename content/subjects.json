@@ -1809,6 +1809,246 @@
           ]
         }
       ]
+    },
+    {
+      "id": "economy",
+      "label": "Economy",
+      "audience": "UPSC/PSC aspirants and anyone decoding India's economy — India-first",
+      "style": "exam-precise and current: define the term, show the mechanism with a real Indian example and number, cite the body/act (RBI, SEBI, FRBM); hedge estimates with 'around'",
+      "modules": [
+        {
+          "id": "basics",
+          "label": "Economic Basics",
+          "submodules": [
+            {
+              "id": "gdp-growth",
+              "label": "GDP & Growth"
+            },
+            {
+              "id": "inflation-types",
+              "label": "Inflation & Its Types"
+            },
+            {
+              "id": "fiscal-monetary",
+              "label": "Fiscal vs Monetary Policy"
+            }
+          ]
+        },
+        {
+          "id": "money-banking",
+          "label": "Money & Banking",
+          "submodules": [
+            {
+              "id": "rbi-role",
+              "label": "RBI & Its Tools"
+            },
+            {
+              "id": "banking-system",
+              "label": "Banking System"
+            },
+            {
+              "id": "financial-markets",
+              "label": "Financial Markets & SEBI"
+            }
+          ]
+        },
+        {
+          "id": "india-economy",
+          "label": "Indian Economy",
+          "submodules": [
+            {
+              "id": "budget-taxation",
+              "label": "Budget & Taxation"
+            },
+            {
+              "id": "planning-schemes",
+              "label": "Planning & Flagship Schemes"
+            },
+            {
+              "id": "agriculture-economy",
+              "label": "Agriculture & Economy"
+            }
+          ]
+        },
+        {
+          "id": "external",
+          "label": "External Sector",
+          "submodules": [
+            {
+              "id": "bop-trade",
+              "label": "Balance of Payments & Trade"
+            },
+            {
+              "id": "forex-rupee",
+              "label": "Forex & the Rupee"
+            },
+            {
+              "id": "global-bodies",
+              "label": "IMF, World Bank & WTO"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environment",
+      "label": "Environment & Ecology",
+      "audience": "UPSC/PSC aspirants and eco-curious citizens — India-first",
+      "style": "mechanism + policy: explain the ecological process, then the Indian law/convention/institution (Wildlife Act, CITES, NGT); accurate species/figures, hedge when unsure",
+      "modules": [
+        {
+          "id": "ecology",
+          "label": "Ecology Basics",
+          "submodules": [
+            {
+              "id": "ecosystems",
+              "label": "Ecosystems & Food Chains"
+            },
+            {
+              "id": "biodiversity",
+              "label": "Biodiversity & Hotspots"
+            },
+            {
+              "id": "nutrient-cycles",
+              "label": "Nutrient Cycles"
+            }
+          ]
+        },
+        {
+          "id": "climate",
+          "label": "Climate & Pollution",
+          "submodules": [
+            {
+              "id": "climate-change",
+              "label": "Climate Change"
+            },
+            {
+              "id": "pollution-types",
+              "label": "Pollution & Control"
+            },
+            {
+              "id": "carbon-cycle",
+              "label": "Carbon Cycle & Warming"
+            }
+          ]
+        },
+        {
+          "id": "conservation",
+          "label": "Conservation",
+          "submodules": [
+            {
+              "id": "protected-areas",
+              "label": "Protected Areas & Reserves"
+            },
+            {
+              "id": "wildlife-species",
+              "label": "Endangered Species"
+            },
+            {
+              "id": "conventions",
+              "label": "Environmental Conventions"
+            }
+          ]
+        },
+        {
+          "id": "india-env",
+          "label": "India & Environment",
+          "submodules": [
+            {
+              "id": "env-laws",
+              "label": "Environmental Laws & NGT"
+            },
+            {
+              "id": "renewable-energy",
+              "label": "Renewable Energy"
+            },
+            {
+              "id": "sustainable-dev",
+              "label": "Sustainable Development"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "artculture",
+      "label": "Art & Culture",
+      "audience": "UPSC/PSC aspirants and culture-curious viewers — Indian heritage in depth",
+      "style": "vivid and precise: name the dynasty/period/patron, the defining features and one iconic example; distinguish styles clearly; dates and names accurate",
+      "modules": [
+        {
+          "id": "architecture",
+          "label": "Architecture",
+          "submodules": [
+            {
+              "id": "temple-styles",
+              "label": "Temple Architecture"
+            },
+            {
+              "id": "indo-islamic",
+              "label": "Indo-Islamic Architecture"
+            },
+            {
+              "id": "colonial-modern",
+              "label": "Colonial & Modern"
+            }
+          ]
+        },
+        {
+          "id": "performing",
+          "label": "Performing Arts",
+          "submodules": [
+            {
+              "id": "classical-dance",
+              "label": "Classical Dance Forms"
+            },
+            {
+              "id": "classical-music",
+              "label": "Classical Music"
+            },
+            {
+              "id": "theatre-puppetry",
+              "label": "Theatre & Puppetry"
+            }
+          ]
+        },
+        {
+          "id": "visual-arts",
+          "label": "Visual & Folk Arts",
+          "submodules": [
+            {
+              "id": "painting-schools",
+              "label": "Painting Schools"
+            },
+            {
+              "id": "folk-tribal",
+              "label": "Folk & Tribal Art"
+            },
+            {
+              "id": "handicrafts",
+              "label": "Handicrafts & GI Tags"
+            }
+          ]
+        },
+        {
+          "id": "heritage",
+          "label": "Heritage & Traditions",
+          "submodules": [
+            {
+              "id": "unesco-sites",
+              "label": "UNESCO Sites in India"
+            },
+            {
+              "id": "festivals-fairs",
+              "label": "Festivals & Fairs"
+            },
+            {
+              "id": "literature-languages",
+              "label": "Literature & Languages"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

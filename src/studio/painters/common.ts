@@ -71,6 +71,9 @@ const SUBJECT_PALETTES: Record<string, Palette> = {
   "Mythology & Epics": makePalette("#f43f5e", "#fbbf24"),
   "Polity & Governance": makePalette("#f97316", "#38bdf8"),
   "Mindset & Self-Growth": makePalette("#e879f9", "#34d399"),
+  Economy: makePalette("#10b981", "#f59e0b"),
+  "Environment & Ecology": makePalette("#22c55e", "#14b8a6"),
+  "Art & Culture": makePalette("#e11d48", "#f59e0b"),
 };
 
 export function paletteForSubject(subjectLabel: string): Palette {

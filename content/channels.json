@@ -82,7 +82,10 @@
         "GK & Amazing Facts",
         "Mythology & Epics",
         "Philosophy & Big Ideas",
-        "Polity & Governance"
+        "Polity & Governance",
+        "Economy",
+        "Environment & Ecology",
+        "Art & Culture"
       ],
       "creds": {
         "clientId": "LORE_YT_CLIENT_ID",

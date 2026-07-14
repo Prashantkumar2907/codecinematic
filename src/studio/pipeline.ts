@@ -11,6 +11,13 @@ const TTS_CHUNK_TIMEOUT_MS = 200_000;
 /** Shorts are narrated a touch brisker; beat windows follow the real audio, so sync holds. */
 const SHORT_TTS_RATE = "+5%";
 
+/** Indian native voices per content language. Hindi uses an Indian speaker so
+ *  Devanagari and constitutional/legal terms are pronounced correctly. */
+const VOICE_BY_LANG: Record<string, string> = {
+  en: "en-US-AndrewMultilingualNeural",
+  hi: "hi-IN-MadhurNeural",
+};
+
 export async function fetchNarration(
   script: SceneScript,
   voice?: string,
@@ -18,6 +25,7 @@ export async function fetchNarration(
 ): Promise<BeatAudio[]> {
   const beats = script.scenes.flatMap((s) => sceneBeats(s));
   const rate = script.format === "short" ? SHORT_TTS_RATE : undefined;
+  const resolvedVoice = voice ?? VOICE_BY_LANG[(script as { lang?: string }).lang ?? "en"];
   onProgress?.(0, beats.length);
 
   const audioCtx = new AudioContext();
@@ -30,7 +38,7 @@ export async function fetchNarration(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           segments: chunk.map((b) => ({ id: b.beatId, text: b.text })),
-          voice,
+          voice: resolvedVoice,
           rate,
         }),
         signal: AbortSignal.timeout(TTS_CHUNK_TIMEOUT_MS),

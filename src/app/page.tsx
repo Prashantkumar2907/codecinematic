@@ -328,7 +328,7 @@ export default function Studio() {
   };
 
   const runGenerate = useCallback(
-    async (body: { subject: string; module: string; submodule: string; format: Format; topic: string; angle?: string }) => {
+    async (body: { subject: string; module: string; submodule: string; format: Format; topic: string; angle?: string; lang?: "en" | "hi" }) => {
       setTopicsError(null);
       setGenerateError(null);
       setStageError(null);
@@ -606,6 +606,7 @@ export default function Studio() {
       const moduleDef = subjectDef.modules.find((x) => x.id === m);
       const sub = params.get("sub") || moduleDef?.submodules[0]?.id || "";
       const f = params.get("format") === "long" ? "long" : "short";
+      const lang = params.get("lang") === "hi" ? "hi" : "en";
       setSubjectId(s);
       setModuleId(m);
       setSubmoduleId(sub);
@@ -631,7 +632,7 @@ export default function Studio() {
         }
         if (topic) {
           setCustomTopic(topic);
-          await runGenerate({ subject: s, module: m, submodule: sub, format: f, topic, angle });
+          await runGenerate({ subject: s, module: m, submodule: sub, format: f, topic, angle, lang });
         }
       })();
     }

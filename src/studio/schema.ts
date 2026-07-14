@@ -385,7 +385,7 @@ export function bigtextAfterLastQuestion(script: SceneScript): number {
  * until every video sounds identical. Returns the offending opener if the first
  * beat uses one, else null. Soft-checked so it drives a repair, never hard-fails.
  */
-const FORMULAIC_OPENER = /^\s*(have you ever|did you know|think you|you think|imagine (that|a |you)|picture this|let'?s (talk|dive|explore))/i;
+const FORMULAIC_OPENER = /^\s*(have you ever|did you know|think you|you think|imagine (that|a |you)|picture this|let'?s (talk|dive|explore)|क्या आप जानते|क्या आपने कभी|कल्पना कीज)/i;
 export function firstBeatFormulaic(script: SceneScript): string | null {
   const first = script.scenes[0];
   if (!first) return null;
@@ -411,9 +411,13 @@ export const metaSchema = z.object({
 });
 export type VideoMeta = z.infer<typeof metaSchema>;
 
+export const CONTENT_LANGS = ["en", "hi"] as const;
+export type ContentLang = (typeof CONTENT_LANGS)[number];
+
 export const sceneScriptSchema = z
   .object({
     format: z.enum(["short", "long"]),
+    lang: z.enum(CONTENT_LANGS).default("en"),
     subject: z.string().min(2).max(60),
     module: z.string().min(2).max(60),
     submodule: z.string().min(2).max(60),
