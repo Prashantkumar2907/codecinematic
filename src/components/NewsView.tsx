@@ -30,6 +30,10 @@ type NewsInfo = {
   uploadedAt?: string;
   privacy?: string;
   publishAt?: string;
+  social?: {
+    instagram?: { mediaId: string; postedAt: string };
+    facebook?: { videoId: string; postedAt: string };
+  };
 };
 
 const YT_CATEGORY_LABELS: Record<string, string> = {
@@ -183,6 +187,30 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
+    }
+  };
+
+  const [socialBusy, setSocialBusy] = useState(false);
+  const postSocial = async () => {
+    if (!current) return;
+    setError(null);
+    setSocialBusy(true);
+    try {
+      const res = await fetch("/api/studio/news/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: current.slug }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.errors ? JSON.stringify(data.errors) : data.error);
+      const where = Object.keys(data.results ?? {}).join(" + ");
+      const failed = data.errors ? ` (failed: ${Object.keys(data.errors).join(", ")})` : "";
+      onToast(`Posted to ${where || "nothing"}${failed}`);
+      void refreshDrafts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSocialBusy(false);
     }
   };
 
@@ -391,6 +419,18 @@ export default function NewsView({ onToast }: { onToast: (msg: string) => void }
                     : current.videoId
                       ? "Already uploaded"
                       : `Upload to ${current.channelLabel}`}
+                </button>
+                <button
+                  className="btn"
+                  disabled={busy || socialBusy}
+                  onClick={() => void postSocial()}
+                  title="Publish this MP4 as an Instagram Reel + Facebook Reel (needs META_* keys in .env.local)"
+                >
+                  {socialBusy
+                    ? "Posting…"
+                    : current.social?.instagram || current.social?.facebook
+                      ? "Posted to Insta/FB ✓"
+                      : "Post to Insta + FB"}
                 </button>
                 <button className="btn btn-danger" disabled={busy} onClick={() => setConfirmDelete(current)}>
                   Delete

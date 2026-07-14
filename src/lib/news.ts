@@ -58,6 +58,11 @@ export type NewsInfo = {
   uploadedAt?: string;
   privacy?: string;
   publishAt?: string;
+  /** Meta publishing results, keyed by platform. */
+  social?: {
+    instagram?: { mediaId: string; postedAt: string };
+    facebook?: { videoId: string; postedAt: string };
+  };
 };
 
 async function readChannelsFile(): Promise<ChannelsFile> {
@@ -145,6 +150,12 @@ export async function markNewsUploaded(
   const info = await readNewsInfo(slug);
   if (!info) return;
   await writeNewsInfo({ ...info, ...patch });
+}
+
+export async function markNewsSocial(slug: string, patch: NonNullable<NewsInfo["social"]>): Promise<void> {
+  const info = await readNewsInfo(slug);
+  if (!info) return;
+  await writeNewsInfo({ ...info, social: { ...info.social, ...patch } });
 }
 
 export async function deleteNewsDraft(slug: string): Promise<void> {

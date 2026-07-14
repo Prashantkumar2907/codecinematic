@@ -17,7 +17,7 @@
       "type": "news",
       "label": "Bharat Briefs (English)",
       "lang": "en",
-      "voice": "en-IN-NeerjaNeural",
+      "voice": "en-IN-NeerjaExpressiveNeural",
       "defaultCategories": [
         "Indian Politics",
         "International",
