@@ -91,8 +91,9 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
     ctx.translate(dir * (1 - appear) * unit * 1.6, 0);
 
     if (isCurrent) {
+      // Breathing glow while this panel is the one being narrated.
       ctx.shadowColor = glow;
-      ctx.shadowBlur = unit * 0.8;
+      ctx.shadowBlur = unit * (0.75 + 0.3 * Math.sin(env.elapsedMs / 240));
     }
     roundRect(ctx, x, y, pw, ph, unit * 0.7);
     ctx.fillStyle = THEME.panel;
@@ -125,14 +126,20 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
     side.items.forEach((item, i) => {
       const it = clamp01(bt * side.items.length - i * 0.5);
       if (it <= 0) return;
-      ctx.globalAlpha = appear * alpha * easeOutCubic(it);
+      const ease = easeOutCubic(it);
+      const slide = (1 - ease) * unit * 1.4 * dir;
+      const pop = easeOutBack(clamp01(it * 1.6));
+      ctx.save();
+      ctx.translate(slide, 0);
+      ctx.globalAlpha = appear * alpha * ease;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(x + unit * 1.2, iy - unit * 0.28, unit * 0.16, 0, Math.PI * 2);
+      ctx.arc(x + unit * 1.2, iy - unit * 0.28, unit * 0.16 * Math.max(0.01, pop), 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = THEME.text;
       const lines = wrapText(ctx, item, pw - unit * 3);
       lines.slice(0, 2).forEach((line, li) => ctx.fillText(line, x + unit * 1.9, iy + li * unit * 1.2));
+      ctx.restore();
       iy += unit * 1.2 * Math.min(lines.length, 2) + unit * 0.6;
     });
     ctx.restore();
@@ -143,9 +150,12 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
   if (vsIn > 0) {
     const vx = stacked ? contentX + contentW / 2 : contentX + pw + gap / 2;
     const vy = stacked ? blockTop + ph + gap / 2 : panelsTop + ph / 2;
+    const vsPulse = 1 + 0.05 * Math.sin(env.elapsedMs / 260);
     ctx.save();
     ctx.translate(vx, vy);
-    ctx.scale(vsIn, vsIn);
+    ctx.scale(vsIn * vsPulse, vsIn * vsPulse);
+    ctx.shadowColor = accentGlow;
+    ctx.shadowBlur = unit * 0.6;
     ctx.beginPath();
     ctx.arc(0, 0, unit * 1.05, 0, Math.PI * 2);
     ctx.fillStyle = "#06121a";

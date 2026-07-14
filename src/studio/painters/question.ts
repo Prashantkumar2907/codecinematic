@@ -14,25 +14,46 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
   ctx.save();
   ctx.textAlign = "center";
   ctx.translate(w / 2, h * 0.24);
+  // Expanding pulse rings radiate behind the mark so the ending feels alive.
+  const ringPhase = (env.elapsedMs % 2200) / 2200;
+  for (const off of [0, 0.5]) {
+    const rp = (ringPhase + off) % 1;
+    ctx.beginPath();
+    ctx.arc(0, unit * 0.4, unit * (1.6 + rp * 3.2), 0, Math.PI * 2);
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = 0.35 * (1 - rp) * markIn;
+    ctx.lineWidth = unit * 0.09;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   ctx.scale(markIn * pulse, markIn * pulse);
+  const wob = 0.06 * Math.sin(env.elapsedMs / 700);
+  ctx.rotate(wob);
   ctx.font = `900 ${unit * 5}px ${FONT_SANS}`;
   ctx.fillStyle = accentSoft;
   ctx.fillText("?", 0, unit * 1.6);
   ctx.font = `900 ${unit * 3.6}px ${FONT_SANS}`;
   ctx.fillStyle = accent;
+  ctx.shadowColor = accentGlow;
+  ctx.shadowBlur = unit * 0.8;
   ctx.fillText("?", 0, unit * 1.2);
   ctx.restore();
 
-  const textIn = easeOutCubic(sub(env.p, 0.16, 0.3));
   ctx.save();
   ctx.textAlign = "center";
-  ctx.globalAlpha = textIn;
   ctx.font = `800 ${unit * 1.5}px ${FONT_SANS}`;
   ctx.fillStyle = THEME.text;
   const lines = wrapText(ctx, scene.text, contentW * 0.9);
   const lineH = unit * 2.0;
   const startY = h * 0.42;
-  lines.forEach((line, i) => ctx.fillText(line, w / 2, startY + i * lineH));
+  // Lines cascade up one by one instead of fading in as a slab.
+  lines.forEach((line, i) => {
+    const tIn = easeOutCubic(sub(env.p, 0.14 + i * 0.05, 0.22));
+    ctx.globalAlpha = tIn;
+    ctx.fillText(line, w / 2, startY + i * lineH + (1 - tIn) * unit * 0.9);
+  });
+  const textIn = easeOutCubic(sub(env.p, 0.16, 0.3));
+  ctx.globalAlpha = textIn;
 
   let cursor = startY + lines.length * lineH + unit * 0.6;
   if (scene.hint) {
@@ -53,7 +74,9 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
     const bw = tw + padX * 2;
     const bh = unit * 2.2;
     const bx = w / 2 - bw / 2;
-    const by = Math.max(cursor + unit * 0.8, h * 0.68);
+    // Gentle bob keeps the CTA alive once it has landed.
+    const bob = ctaIn >= 1 ? Math.sin(env.elapsedMs / 380) * unit * 0.18 : 0;
+    const by = Math.max(cursor + unit * 0.8, h * 0.68) + bob;
     ctx.save();
     ctx.globalAlpha = Math.min(1, ctaIn);
     ctx.translate(w / 2, by + bh / 2);

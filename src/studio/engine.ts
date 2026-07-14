@@ -32,6 +32,9 @@ export type RenderHandle = {
 
 const MIN_SCENE_MS = 2800;
 const INTER_BEAT_GAP_MS = 180;
+/** Thinking time between a quiz question and its answer reveal — the painter
+ *  shows a countdown ring over this window so viewers actually get to guess. */
+export const QUIZ_THINK_MS = 3200;
 const SCENE_TAIL_MS = 750;
 /* Shorts live or die on pace — trim the pauses between beats and scenes. */
 const SHORT_INTER_BEAT_GAP_MS = 140;
@@ -51,11 +54,13 @@ export function computeTimings(script: SceneScript, audio: BeatAudio[]): SceneTi
   for (const scene of script.scenes) {
     const beats: { startMs: number; durationMs: number }[] = [];
     let beatCursor = 0;
-    for (const { beatId } of sceneBeats(scene)) {
+    sceneBeats(scene).forEach(({ beatId }, k) => {
       const durationMs = byBeatId.get(beatId) ?? 1200;
       beats.push({ startMs: beatCursor, durationMs });
-      beatCursor += durationMs + gapMs;
-    }
+      // Quiz gets a think-time window between question and reveal.
+      const thinkMs = scene.kind === "quiz" && k === 0 ? QUIZ_THINK_MS : 0;
+      beatCursor += durationMs + gapMs + thinkMs;
+    });
     const durationMs = Math.max(MIN_SCENE_MS, beatCursor - gapMs + tailMs);
     timings.push({ sceneId: scene.id, startMs: cursor, durationMs, beats });
     cursor += durationMs;

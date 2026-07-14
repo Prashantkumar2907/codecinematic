@@ -119,6 +119,22 @@
             "format": "short",
             "slug": "2026-07-14-12-58-short-the-prototype-chain-how-objects-find-their-methods",
             "status": "draft"
+          },
+          {
+            "date": "2026-07-14",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-14-13-42-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-14",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-14-13-47-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
           }
         ]
       },
@@ -441,6 +457,20 @@
             "title": "Why Valhalla is Not Actually Heaven #Shorts",
             "format": "short",
             "slug": "2026-07-13-13-31-short-the-viking-afterlife-why-valhalla-is-not-heaven",
+            "status": "draft"
+          }
+        ]
+      }
+    },
+    "Polity & Governance": {
+      "States & Local Government": {
+        "State Government": [
+          {
+            "date": "2026-07-14",
+            "topic": "Why Governors have discretionary powers: The Article 163 nuance",
+            "title": "Governor Discretionary Powers: Why Article 163 Matters #Shorts",
+            "format": "short",
+            "slug": "2026-07-14-13-33-short-why-governors-have-discretionary-powers-the-article-163-nuan",
             "status": "draft"
           }
         ]

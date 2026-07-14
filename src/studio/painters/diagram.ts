@@ -193,23 +193,6 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
       ctx.restore();
     }
 
-    if (arrow.label && t >= 1) {
-      const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[Math.floor(pts.length / 2) - 1];
-      const labelIn = sub(env.p, startAt + 0.09, 0.08);
-      ctx.globalAlpha = labelIn;
-      ctx.font = `600 ${unit * 0.62}px ${FONT_SANS}`;
-      const tw = ctx.measureText(arrow.label).width;
-      roundRect(ctx, mid.x - tw / 2 - unit * 0.4, mid.y - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.3);
-      ctx.fillStyle = "#0a0e13";
-      ctx.fill();
-      ctx.strokeStyle = THEME.panelBorder;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.fillStyle = THEME.textDim;
-      ctx.textAlign = "center";
-      ctx.fillText(arrow.label, mid.x, mid.y + unit * 0.22);
-      ctx.textAlign = "start";
-    }
     ctx.restore();
   }
 
@@ -309,6 +292,34 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
       startY = top + iconPx * 1.25 + fontPx * 0.8;
     }
     lines.forEach((line, i) => ctx.fillText(line, rect.cx, startY + i * lineH));
+    ctx.restore();
+  }
+
+  // Arrow labels go on TOP of everything — drawn inside the arrow pass they
+  // were painted over by node boxes whenever the layout was tight.
+  for (const arrow of scene.arrows) {
+    if (!arrow.label) continue;
+    const from = rects.get(arrow.from);
+    const to = rects.get(arrow.to);
+    if (!from || !to) continue;
+    const startAt = Math.max(reveals.get(arrow.from) ?? 0, reveals.get(arrow.to) ?? 0) + 0.02;
+    if (sub(env.p, startAt, 0.09) < 1) continue;
+    const pts = arrowPath(from, to);
+    const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[Math.floor(pts.length / 2) - 1];
+    const labelIn = sub(env.p, startAt + 0.09, 0.08);
+    ctx.save();
+    ctx.globalAlpha = labelIn;
+    ctx.font = `600 ${unit * 0.62}px ${FONT_SANS}`;
+    const tw = ctx.measureText(arrow.label).width;
+    roundRect(ctx, mid.x - tw / 2 - unit * 0.4, mid.y - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.3);
+    ctx.fillStyle = "#0a0e13";
+    ctx.fill();
+    ctx.strokeStyle = THEME.panelBorder;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = THEME.textDim;
+    ctx.textAlign = "center";
+    ctx.fillText(arrow.label, mid.x, mid.y + unit * 0.22);
     ctx.restore();
   }
   ctx.textAlign = "start";

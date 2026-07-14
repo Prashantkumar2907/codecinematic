@@ -54,9 +54,12 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
   const mythIn = easeOutCubic(clamp01(t0 * 2.2));
   if (mythIn > 0) {
     const busted = t1 > 0;
+    // Impact shake for ~0.35s as the bust lands.
+    const shakeT = clamp01(t1 * 3);
+    const shake = busted && shakeT < 1 ? Math.sin(shakeT * 28) * unit * 0.14 * (1 - shakeT) : 0;
     ctx.save();
-    ctx.globalAlpha = mythIn * (busted ? 0.66 : 1);
-    ctx.translate(0, (1 - mythIn) * unit * 1.2);
+    ctx.globalAlpha = mythIn * (busted ? 0.72 : 1);
+    ctx.translate(shake, (1 - mythIn) * unit * 1.2);
 
     roundRect(ctx, contentX, mythY, contentW, cardH, unit * 0.6);
     ctx.fillStyle = THEME.panel;
@@ -85,25 +88,39 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
     }
     ctx.restore();
 
-    // ❌ stamp
+    // ❌ badge: red ring seals in, then the cross strokes draw on.
     if (busted) {
       const stampIn = easeOutBack(clamp01(t1 * 2.2));
+      const r = unit * 0.85;
       ctx.save();
-      ctx.translate(contentX + contentW - unit * 2.4, mythY + unit * 2.2);
-      ctx.rotate(-0.18);
+      ctx.translate(contentX + contentW - unit * 1.9, mythY + unit * 1.35);
+      ctx.rotate(-0.12 * (1 - clamp01(t1 * 2.5)));
       ctx.scale(Math.max(0.01, stampIn), Math.max(0.01, stampIn));
-      ctx.strokeStyle = DANGER;
-      ctx.lineWidth = unit * 0.28;
-      ctx.lineCap = "round";
-      ctx.shadowColor = rgba(DANGER, 0.5);
-      ctx.shadowBlur = unit * 0.7;
-      const r = unit * 0.9;
+      ctx.shadowColor = rgba(DANGER, 0.55);
+      ctx.shadowBlur = unit * 0.8;
       ctx.beginPath();
-      ctx.moveTo(-r, -r);
-      ctx.lineTo(r, r);
-      ctx.moveTo(r, -r);
-      ctx.lineTo(-r, r);
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(DANGER, 0.16);
+      ctx.fill();
+      ctx.strokeStyle = DANGER;
+      ctx.lineWidth = unit * 0.14;
       ctx.stroke();
+      ctx.shadowBlur = 0;
+      const draw = clamp01(t1 * 3 - 0.4);
+      const a = r * 0.48;
+      ctx.lineWidth = unit * 0.22;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-a, -a);
+      ctx.lineTo(-a + 2 * a * Math.min(1, draw * 2), -a + 2 * a * Math.min(1, draw * 2));
+      ctx.stroke();
+      if (draw > 0.5) {
+        const d2 = (draw - 0.5) * 2;
+        ctx.beginPath();
+        ctx.moveTo(a, -a);
+        ctx.lineTo(a - 2 * a * d2, -a + 2 * a * d2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   }
@@ -128,16 +145,43 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
 
     chip(ctx, contentX + unit * 0.9, factY + unit * 1.45, "FACT", THEME.good, unit);
 
+    // ✓ badge: green disc pops, then the tick draws on stroke by stroke.
     const checkIn = easeOutBack(clamp01(t1 * 2.5 - 0.3));
-    ctx.save();
-    ctx.translate(contentX + contentW - unit * 1.9, factY + unit * 1.25);
-    ctx.scale(Math.max(0.01, checkIn), Math.max(0.01, checkIn));
-    ctx.font = `900 ${unit * 1.5}px ${FONT_SANS}`;
-    ctx.fillStyle = THEME.good;
-    ctx.textAlign = "center";
-    ctx.fillText("✓", 0, unit * 0.5);
-    ctx.restore();
-    ctx.textAlign = "start";
+    if (checkIn > 0) {
+      const r = unit * 0.85;
+      ctx.save();
+      ctx.translate(contentX + contentW - unit * 1.9, factY + unit * 1.35);
+      ctx.scale(Math.max(0.01, checkIn), Math.max(0.01, checkIn));
+      ctx.shadowColor = rgba(THEME.good, 0.6);
+      ctx.shadowBlur = unit * 0.9;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = THEME.good;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      const draw = clamp01(t1 * 3 - 0.6);
+      if (draw > 0) {
+        ctx.strokeStyle = "#06121a";
+        ctx.lineWidth = unit * 0.2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        const p1 = { x: -r * 0.45, y: r * 0.05 };
+        const p2 = { x: -r * 0.1, y: r * 0.42 };
+        const p3 = { x: r * 0.5, y: -r * 0.35 };
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        if (draw < 0.45) {
+          const f = draw / 0.45;
+          ctx.lineTo(p1.x + (p2.x - p1.x) * f, p1.y + (p2.y - p1.y) * f);
+        } else {
+          ctx.lineTo(p2.x, p2.y);
+          const f = (draw - 0.45) / 0.55;
+          ctx.lineTo(p2.x + (p3.x - p2.x) * f, p2.y + (p3.y - p2.y) * f);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;

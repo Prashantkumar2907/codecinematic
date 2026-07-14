@@ -98,11 +98,16 @@ export const DEMO_SCRIPT: SceneScript = {
       ],
     },
     {
-      kind: "quote",
-      id: "principle",
-      narration: "It all comes down to one sentence: objects don't own behaviour, they look it up.",
-      text: "Objects don't own their behaviour — they look it up, one link at a time.",
-      author: "The prototype mental model",
+      kind: "quiz",
+      id: "check",
+      question: "Where does greet actually live?",
+      options: [
+        { text: "Copied onto every Person object", correct: false },
+        { text: "Once, on Person.prototype", correct: true },
+        { text: "Recreated on every call", correct: false },
+      ],
+      sayQuestion: "Quick check — where does greet actually live? Lock in your guess.",
+      sayReveal: "It lives once on Person dot prototype. Every object just borrows it through the chain.",
     },
     {
       kind: "question",

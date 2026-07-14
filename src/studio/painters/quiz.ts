@@ -1,5 +1,5 @@
 import type { Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutCubic, sub, clamp01, wrapText, roundRect, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutCubic, sub, clamp01, wrapText, roundRect, beatWindow, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type QuizScene = Extract<Scene, { kind: "quiz" }>;
@@ -38,6 +38,43 @@ export function paintQuiz(ctx: CanvasRenderingContext2D, scene: QuizScene, env: 
 
   const optsTop = qTop + unit * 1.05 + qLines.length * unit * 1.7 + unit * 0.75;
   const beat0T = beatT(env.beats, 0, totalBeats, env.p);
+
+  // Think-time countdown: the engine leaves a gap between the question beat
+  // and the reveal beat — draw a depleting ring + seconds so viewers guess.
+  const w0 = beatWindow(env.beats, 0, totalBeats);
+  const w1 = beatWindow(env.beats, 1, totalBeats);
+  if (!revealing && env.p >= w0.end && w1.start > w0.end) {
+    const tt = clamp01((env.p - w0.end) / (w1.start - w0.end));
+    const secsLeft = Math.max(1, Math.ceil(((w1.start - env.p) * env.durationMs) / 1000));
+    // Centered below the options — top-right collided with long question lines.
+    const cx = contentX + contentW / 2;
+    const cy = optsTop + m * rowH + (m - 1) * gap + unit * 1.7;
+    const r = unit * 1.05;
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(13,17,23,0.9)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(148,163,184,0.25)";
+    ctx.lineWidth = unit * 0.14;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (1 - tt) * Math.PI * 2);
+    ctx.strokeStyle = accent;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    const tick = 1 + 0.12 * Math.max(0, 1 - ((env.elapsedMs % 1000) / 1000) * 4);
+    ctx.font = `900 ${unit * 1.0 * tick}px ${FONT_SANS}`;
+    ctx.fillStyle = THEME.text;
+    ctx.textAlign = "center";
+    ctx.fillText(String(secsLeft), cx, cy + unit * 0.36);
+    ctx.font = `700 ${unit * 0.52}px ${FONT_SANS}`;
+    ctx.fillStyle = THEME.textDim;
+    ctx.fillText("GUESS!", cx, cy + r + unit * 0.75);
+    ctx.textAlign = "start";
+    ctx.restore();
+  }
 
   scene.options.forEach((opt, i) => {
     const appear = easeOutCubic(clamp01(beat0T * 2.5 - i * 0.35));
