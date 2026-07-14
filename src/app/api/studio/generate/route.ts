@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, bigtextAfterLastQuestion, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
+import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, bigtextAfterLastQuestion, firstBeatFormulaic, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
 import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
@@ -98,6 +98,12 @@ export async function POST(req: Request) {
                 `scene ${outro + 1} is a "bigtext" that comes AFTER the ending question — delete it. The question is the finale; no "thank you for watching", "stay curious" or recap card may follow it`
               );
             }
+            const hook = firstBeatFormulaic(validated.data);
+            if (hook) {
+              issues.push(
+                `the opening beat "${hook}…" uses a tired formulaic hook — rewrite the first beat with a fresh opener (a shocking number, a concrete mini-scene, or a blunt myth-strike), NOT "Have you ever…/Did you know…/Think you…/You think…"`
+              );
+            }
             if (issues.length === 0) {
               accepted = validated.data;
               break;
@@ -120,6 +126,9 @@ export async function POST(req: Request) {
               }
               if (bigtextAfterLastQuestion(validated.data) >= 0) {
                 warnings.push("a section/outro card appears after the ending question");
+              }
+              if (firstBeatFormulaic(validated.data)) {
+                warnings.push("the opening hook uses a formulaic opener");
               }
               accepted = validated.data;
               break;

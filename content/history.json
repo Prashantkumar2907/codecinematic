@@ -117,6 +117,19 @@
             "status": "draft"
           }
         ]
+      },
+      "DSA & Interviews": {
+        "Arrays & Strings": [
+          {
+            "date": "2026-07-14",
+            "topic": "Two-pointer patterns: how to solve array problems faster",
+            "title": "Two-Pointer Technique: Solve Array Problems Faster #Shorts",
+            "format": "short",
+            "slug": "2026-07-14-04-59-short-two-pointer-patterns-how-to-solve-array-problems-faster",
+            "status": "uploaded",
+            "videoId": "OEqEsREA7Io"
+          }
+        ]
       }
     },
     "Money & Finance": {

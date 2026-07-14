@@ -307,9 +307,14 @@ ${playbook}
 
 Teaching quality bar (viewers range from beginners to experts — beginners must follow, experts must not be bored):
 - The FIRST beat is the retention decision: at most 2 short sentences that open a loop the scene does
-  not close — a question, an assumption about to break, or a number that seems impossible. Never open
-  with a definition, a greeting, or background. Do NOT open with the tired "Have you ever wondered…"
-  or "Did you know…" — start in the middle of the intrigue instead ("Your balloon just defied gravity").
+  not close. Never open with a definition, a greeting, or background. Ban the tired crutches:
+  "Have you ever wondered…", "Did you know…", and the rhetorical-negation formula "Think you need X?
+  / You think X? Wrong." — the model overuses these until every video sounds identical. Instead pick a
+  DIFFERENT archetype each time from: (a) a shocking specific number ("₹150 a day becomes ₹10 lakh"),
+  (b) a concrete mini-scene ("Your salary just rose ₹5,000. You're already poorer."), (c) a blunt
+  myth-strike ("Saving whatever's left never works."), (d) a stakes question naming a real thing
+  ("Which costs you more — the SIP you skipped or the EMI you took?"). Rotate archetypes; never lean
+  on one opener shape.
 - Teach the MECHANISM or the WHY, never just surface facts.
 - Use one concrete anchor: a real number, a vivid comparison, or a story detail that makes it visceral.
 - Include one insight that would make an expert nod ("ah, that's why").

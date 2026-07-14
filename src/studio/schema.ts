@@ -370,6 +370,20 @@ export function bigtextAfterLastQuestion(script: SceneScript): number {
   return -1;
 }
 
+/**
+ * The opening beat is the retention decision. Models fall back on a few tired
+ * crutches ("Have you ever wondered", "Think you need X? / You think X? Wrong")
+ * until every video sounds identical. Returns the offending opener if the first
+ * beat uses one, else null. Soft-checked so it drives a repair, never hard-fails.
+ */
+const FORMULAIC_OPENER = /^\s*(have you ever|did you know|think you|you think|imagine (that|a |you)|picture this|let'?s (talk|dive|explore))/i;
+export function firstBeatFormulaic(script: SceneScript): string | null {
+  const first = script.scenes[0];
+  if (!first) return null;
+  const opener = sceneBeats(first)[0]?.text ?? "";
+  return FORMULAIC_OPENER.test(opener) ? opener.slice(0, 60) : null;
+}
+
 export function narrationWordCount(script: SceneScript): number {
   let words = 0;
   for (const scene of script.scenes) {
