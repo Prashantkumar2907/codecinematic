@@ -77,20 +77,36 @@ try {
   console.log(`⚠ could not check permissions: ${e.message}`);
 }
 
-// 3. Pages this token manages.
+// 3. Resolve the Page + its page-access-token.
+let page;
 const pages = (await graph("me/accounts", { access_token: userToken, fields: "id,name,access_token" })).data ?? [];
-if (!pages.length) {
-  console.error("✘ this token manages no Facebook Pages. Create a Page first (facebook.com/pages/create), then regenerate the token.");
+if (pages.length) {
+  console.log(`✔ pages found: ${pages.map((p) => `${p.name} (${p.id})`).join(", ")}`);
+  page = pageArg ? pages.find((p) => p.id === pageArg) : pages[0];
+  if (!page) {
+    console.error(`✘ --page ${pageArg} is not among the pages above`);
+    process.exit(1);
+  }
+  if (pages.length > 1 && !pageArg) console.log(`ℹ using the first page — pass --page <id> to pick another`);
+} else if (pageArg) {
+  // /me/accounts is empty (e.g. the token identity is the Page itself, not the
+  // admin user). If the Page was granted as an asset, we can still fetch its
+  // page-access-token directly by id.
+  console.log("ℹ /me/accounts returned no pages — fetching the page token directly by --page id");
+  const direct = await graph(pageArg, { access_token: userToken, fields: "id,name,access_token" });
+  if (!direct.access_token) {
+    console.error("✘ the page returned no access_token for this user token.");
+    console.error("  In Graph API Explorer, generate the token while logged in as your PERSONAL profile");
+    console.error("  (the popup should say 'Continue as <Your Name>', not 'Continue as Bharat Briefs').");
+    console.error("  Switch profiles at facebook.com top-right, then regenerate and rerun.");
+    process.exit(1);
+  }
+  page = direct;
+} else {
+  console.error("✘ this token manages no Facebook Pages and no --page id was given.");
+  console.error("  Rerun adding: --page 1236065149586101   (your Bharat-Briefs Page id from the consent screen)");
   process.exit(1);
 }
-console.log(`✔ pages found: ${pages.map((p) => `${p.name} (${p.id})`).join(", ")}`);
-
-const page = pageArg ? pages.find((p) => p.id === pageArg) : pages[0];
-if (!page) {
-  console.error(`✘ --page ${pageArg} is not among the pages above`);
-  process.exit(1);
-}
-if (pages.length > 1 && !pageArg) console.log(`ℹ using the first page — pass --page <id> to pick another`);
 console.log(`✔ using page: ${page.name} (${page.id}), page token ${mask(page.access_token)}`);
 
 // 4. Linked Instagram professional account.
