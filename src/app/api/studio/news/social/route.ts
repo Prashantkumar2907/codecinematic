@@ -27,6 +27,9 @@ const execFileAsync = promisify(execFile);
  * .env.local: META_ACCESS_TOKEN, META_PAGE_ID, META_IG_USER_ID.
  */
 
+/** Re-encode + IG ingest can take minutes; keep the route alive for it. */
+export const maxDuration = 300;
+
 const requestSchema = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/),
   targets: z.array(z.enum(["instagram", "facebook"])).min(1).default(["instagram", "facebook"]),
@@ -34,8 +37,9 @@ const requestSchema = z.object({
 
 const V = process.env.META_GRAPH_VERSION || "v21.0";
 const GRAPH = `https://graph.facebook.com/${V}`;
-const IG_STATUS_TRIES = 40;
-const IG_STATUS_INTERVAL_MS = 3000;
+/** IG ingest of a fresh clip can take a few minutes; poll generously (~5 min). */
+const IG_STATUS_TRIES = 75;
+const IG_STATUS_INTERVAL_MS = 4000;
 
 type GraphError = { error?: { message?: string } };
 
@@ -62,7 +66,7 @@ async function ensureSocialMp4(dir: string): Promise<string> {
     ffmpegBin,
     [
       "-y", "-i", src,
-      "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p",
+      "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high", "-pix_fmt", "yuv420p",
       "-crf", "20", "-maxrate", "8M", "-bufsize", "12M", "-r", "30",
       "-c:a", "aac", "-ac", "2", "-ar", "48000", "-b:a", "128k",
       "-movflags", "+faststart",
