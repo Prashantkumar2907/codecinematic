@@ -46,20 +46,28 @@ async function graph(pathname, params = {}) {
 let userToken = token0;
 
 // 1. Extend to a long-lived user token when app credentials are given.
+// Non-fatal: if the token was already exchanged/invalidated (or is already a
+// page token), keep using it as-is so a working post is still reachable.
 if (appArg) {
   const [appId, appSecret] = appArg.split(":");
   if (!appId || !appSecret) {
     console.error("--app expects APP_ID:APP_SECRET (from your app's Settings → Basic)");
     process.exit(1);
   }
-  const ext = await graph("oauth/access_token", {
-    grant_type: "fb_exchange_token",
-    client_id: appId,
-    client_secret: appSecret,
-    fb_exchange_token: token0,
-  });
-  userToken = ext.access_token;
-  console.log(`✔ exchanged for a long-lived user token ${mask(userToken)}`);
+  try {
+    const ext = await graph("oauth/access_token", {
+      grant_type: "fb_exchange_token",
+      client_id: appId,
+      client_secret: appSecret,
+      fb_exchange_token: token0,
+    });
+    userToken = ext.access_token;
+    console.log(`✔ exchanged for a long-lived user token ${mask(userToken)}`);
+  } catch (e) {
+    console.log(`⚠ long-lived exchange failed (${e.message.split(":").slice(1).join(":").trim() || e.message}).`);
+    console.log("  Continuing with the token as-is. If it also fails below, generate a FRESH token in");
+    console.log("  Graph API Explorer and run this ONCE (a token can only be exchanged one time).");
+  }
 } else {
   console.log("ℹ no --app given — continuing with your token as-is (short-lived tokens die in ~1-2h;");
   console.log("  rerun with --app APP_ID:APP_SECRET for a 60-day token → its page token never expires)");
