@@ -334,6 +334,28 @@ export function drawArrowhead(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.restore();
 }
 
+/** Point at fraction f (0-1) along a polyline, by cumulative segment length. */
+export function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: number; y: number } {
+  if (pts.length < 2) return pts[0] ?? { x: 0, y: 0 };
+  const segLens: number[] = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const len = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    segLens.push(len);
+    total += len;
+  }
+  let target = clamp01(f) * total;
+  for (let i = 1; i < pts.length; i++) {
+    const len = segLens[i - 1];
+    if (target <= len || i === pts.length - 1) {
+      const r = len === 0 ? 0 : target / len;
+      return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * r, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * r };
+    }
+    target -= len;
+  }
+  return pts[pts.length - 1];
+}
+
 /** Stroke a polyline partially (0-1), for draw-on arrow animation. */
 export function strokePolylineProgress(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], progress: number) {
   if (pts.length < 2 || progress <= 0) return { x: pts[0].x, y: pts[0].y, angle: 0, done: false };

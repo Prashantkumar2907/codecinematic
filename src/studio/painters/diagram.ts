@@ -12,6 +12,7 @@ import {
   drawArrowhead,
   drawSceneTitle,
   strokePolylineProgress,
+  pointAlongPolyline,
   beatWindow,
   beatT,
   activeBeatIndex,
@@ -174,6 +175,23 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const tip = strokePolylineProgress(ctx, pts, t);
     ctx.shadowBlur = 0;
     if (t > 0.15) drawArrowhead(ctx, tip.x, tip.y, tip.angle, unit * 0.55);
+
+    // Flowing pulse: once the arrow is fully drawn, a glowing dot travels along
+    // it on a 1.6s loop — visualises flow (data, blood, water, money, packets).
+    // Phase from elapsedMs keeps re-renders identical.
+    if (t >= 1) {
+      const f = ((env.elapsedMs % 1600) / 1600);
+      const dot = pointAlongPolyline(pts, f);
+      ctx.save();
+      ctx.globalAlpha = 0.9 * Math.sin(Math.PI * f); // fade in/out at the ends
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * 0.9;
+      ctx.fillStyle = "#eaf6ff";
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, unit * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     if (arrow.label && t >= 1) {
       const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[Math.floor(pts.length / 2) - 1];
