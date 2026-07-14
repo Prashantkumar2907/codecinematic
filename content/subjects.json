@@ -10,104 +10,254 @@
           "id": "frontend",
           "label": "Frontend",
           "submodules": [
-            { "id": "javascript", "label": "JavaScript" },
-            { "id": "typescript", "label": "TypeScript" },
-            { "id": "react", "label": "React" },
-            { "id": "nextjs", "label": "Next.js" },
-            { "id": "angular", "label": "Angular" },
-            { "id": "css-browser", "label": "CSS & Browser" }
+            {
+              "id": "javascript",
+              "label": "JavaScript"
+            },
+            {
+              "id": "typescript",
+              "label": "TypeScript"
+            },
+            {
+              "id": "react",
+              "label": "React"
+            },
+            {
+              "id": "nextjs",
+              "label": "Next.js"
+            },
+            {
+              "id": "angular",
+              "label": "Angular"
+            },
+            {
+              "id": "css-browser",
+              "label": "CSS & Browser"
+            }
           ]
         },
         {
           "id": "backend",
           "label": "Backend",
           "submodules": [
-            { "id": "python", "label": "Python" },
-            { "id": "fastapi", "label": "FastAPI" },
-            { "id": "nodejs", "label": "Node.js" },
-            { "id": "go", "label": "Go" },
-            { "id": "api-design", "label": "API Design" }
+            {
+              "id": "python",
+              "label": "Python"
+            },
+            {
+              "id": "fastapi",
+              "label": "FastAPI"
+            },
+            {
+              "id": "nodejs",
+              "label": "Node.js"
+            },
+            {
+              "id": "go",
+              "label": "Go"
+            },
+            {
+              "id": "api-design",
+              "label": "API Design"
+            }
           ]
         },
         {
           "id": "dsa",
           "label": "DSA & Interviews",
           "submodules": [
-            { "id": "arrays-strings", "label": "Arrays & Strings" },
-            { "id": "trees-graphs", "label": "Trees & Graphs" },
-            { "id": "dynamic-programming", "label": "Dynamic Programming" },
-            { "id": "sorting-searching", "label": "Sorting & Searching" },
-            { "id": "big-o", "label": "Big-O & Complexity" }
+            {
+              "id": "arrays-strings",
+              "label": "Arrays & Strings"
+            },
+            {
+              "id": "trees-graphs",
+              "label": "Trees & Graphs"
+            },
+            {
+              "id": "dynamic-programming",
+              "label": "Dynamic Programming"
+            },
+            {
+              "id": "sorting-searching",
+              "label": "Sorting & Searching"
+            },
+            {
+              "id": "big-o",
+              "label": "Big-O & Complexity"
+            }
           ]
         },
         {
           "id": "database",
           "label": "Database",
           "submodules": [
-            { "id": "sql", "label": "SQL" },
-            { "id": "postgresql", "label": "PostgreSQL" },
-            { "id": "indexing-performance", "label": "Indexing & Performance" },
-            { "id": "nosql", "label": "NoSQL" },
-            { "id": "mongodb", "label": "MongoDB" },
-            { "id": "cassandra", "label": "Cassandra" }
+            {
+              "id": "sql",
+              "label": "SQL"
+            },
+            {
+              "id": "postgresql",
+              "label": "PostgreSQL"
+            },
+            {
+              "id": "indexing-performance",
+              "label": "Indexing & Performance"
+            },
+            {
+              "id": "nosql",
+              "label": "NoSQL"
+            },
+            {
+              "id": "mongodb",
+              "label": "MongoDB"
+            },
+            {
+              "id": "cassandra",
+              "label": "Cassandra"
+            }
           ]
         },
         {
           "id": "devops",
           "label": "DevOps",
           "submodules": [
-            { "id": "docker", "label": "Docker" },
-            { "id": "kubernetes", "label": "Kubernetes" },
-            { "id": "linux-shell", "label": "Linux & Shell" },
-            { "id": "aws", "label": "AWS" },
-            { "id": "gcp", "label": "GCP" },
-            { "id": "terraform", "label": "Terraform & IaC" },
-            { "id": "cicd", "label": "CI/CD" }
+            {
+              "id": "docker",
+              "label": "Docker"
+            },
+            {
+              "id": "kubernetes",
+              "label": "Kubernetes"
+            },
+            {
+              "id": "linux-shell",
+              "label": "Linux & Shell"
+            },
+            {
+              "id": "aws",
+              "label": "AWS"
+            },
+            {
+              "id": "gcp",
+              "label": "GCP"
+            },
+            {
+              "id": "terraform",
+              "label": "Terraform & IaC"
+            },
+            {
+              "id": "cicd",
+              "label": "CI/CD"
+            }
           ]
         },
         {
           "id": "system-design",
           "label": "System Design",
           "submodules": [
-            { "id": "design-patterns", "label": "Design Patterns" },
-            { "id": "scaling-sharding", "label": "Scaling & Sharding" },
-            { "id": "caching-queues", "label": "Caching & Queues" },
-            { "id": "replication-consistency", "label": "Replication & Consistency" },
-            { "id": "distributed-systems", "label": "Distributed Systems" },
-            { "id": "real-architectures", "label": "Real-World Architectures" }
+            {
+              "id": "design-patterns",
+              "label": "Design Patterns"
+            },
+            {
+              "id": "scaling-sharding",
+              "label": "Scaling & Sharding"
+            },
+            {
+              "id": "caching-queues",
+              "label": "Caching & Queues"
+            },
+            {
+              "id": "replication-consistency",
+              "label": "Replication & Consistency"
+            },
+            {
+              "id": "distributed-systems",
+              "label": "Distributed Systems"
+            },
+            {
+              "id": "real-architectures",
+              "label": "Real-World Architectures"
+            }
           ]
         },
         {
           "id": "cs-fundamentals",
           "label": "CS Fundamentals",
           "submodules": [
-            { "id": "how-computers-work", "label": "How Computers Work" },
-            { "id": "operating-systems", "label": "Operating Systems" },
-            { "id": "networking", "label": "Networking & the Internet" },
-            { "id": "security-basics", "label": "Security & Cryptography Basics" }
+            {
+              "id": "how-computers-work",
+              "label": "How Computers Work"
+            },
+            {
+              "id": "operating-systems",
+              "label": "Operating Systems"
+            },
+            {
+              "id": "networking",
+              "label": "Networking & the Internet"
+            },
+            {
+              "id": "security-basics",
+              "label": "Security & Cryptography Basics"
+            }
           ]
         },
         {
           "id": "key-tech",
           "label": "Key Technologies",
           "submodules": [
-            { "id": "git", "label": "Git" },
-            { "id": "redis", "label": "Redis" },
-            { "id": "nginx", "label": "Nginx" },
-            { "id": "kafka", "label": "Kafka" },
-            { "id": "graphql", "label": "GraphQL" },
-            { "id": "websockets-grpc", "label": "WebSockets & gRPC" }
+            {
+              "id": "git",
+              "label": "Git"
+            },
+            {
+              "id": "redis",
+              "label": "Redis"
+            },
+            {
+              "id": "nginx",
+              "label": "Nginx"
+            },
+            {
+              "id": "kafka",
+              "label": "Kafka"
+            },
+            {
+              "id": "graphql",
+              "label": "GraphQL"
+            },
+            {
+              "id": "websockets-grpc",
+              "label": "WebSockets & gRPC"
+            }
           ]
         },
         {
           "id": "ai",
           "label": "AI & ML",
           "submodules": [
-            { "id": "llm-genai", "label": "LLMs & GenAI" },
-            { "id": "prompt-engineering", "label": "Prompt Engineering" },
-            { "id": "agents-rag", "label": "Agents & RAG" },
-            { "id": "ml-fundamentals", "label": "ML Fundamentals" },
-            { "id": "ai-apps", "label": "Building AI Apps" }
+            {
+              "id": "llm-genai",
+              "label": "LLMs & GenAI"
+            },
+            {
+              "id": "prompt-engineering",
+              "label": "Prompt Engineering"
+            },
+            {
+              "id": "agents-rag",
+              "label": "Agents & RAG"
+            },
+            {
+              "id": "ml-fundamentals",
+              "label": "ML Fundamentals"
+            },
+            {
+              "id": "ai-apps",
+              "label": "Building AI Apps"
+            }
           ]
         }
       ]
@@ -122,59 +272,128 @@
           "id": "ancient-india",
           "label": "Ancient India",
           "submodules": [
-            { "id": "indus-valley", "label": "Indus Valley Civilisation" },
-            { "id": "vedic-age", "label": "Vedic Age" },
-            { "id": "mauryan-empire", "label": "Mauryan Empire" },
-            { "id": "gupta-empire", "label": "Gupta Empire" }
+            {
+              "id": "indus-valley",
+              "label": "Indus Valley Civilisation"
+            },
+            {
+              "id": "vedic-age",
+              "label": "Vedic Age"
+            },
+            {
+              "id": "mauryan-empire",
+              "label": "Mauryan Empire"
+            },
+            {
+              "id": "gupta-empire",
+              "label": "Gupta Empire"
+            }
           ]
         },
         {
           "id": "medieval-india",
           "label": "Medieval India",
           "submodules": [
-            { "id": "delhi-sultanate", "label": "Delhi Sultanate" },
-            { "id": "mughal-empire", "label": "Mughal Empire" },
-            { "id": "marathas", "label": "Marathas" },
-            { "id": "vijayanagara", "label": "Vijayanagara Empire" }
+            {
+              "id": "delhi-sultanate",
+              "label": "Delhi Sultanate"
+            },
+            {
+              "id": "mughal-empire",
+              "label": "Mughal Empire"
+            },
+            {
+              "id": "marathas",
+              "label": "Marathas"
+            },
+            {
+              "id": "vijayanagara",
+              "label": "Vijayanagara Empire"
+            }
           ]
         },
         {
           "id": "modern-india",
           "label": "Modern India",
           "submodules": [
-            { "id": "british-raj", "label": "British Raj" },
-            { "id": "freedom-struggle", "label": "Freedom Struggle" },
-            { "id": "post-independence", "label": "Post-Independence India" }
+            {
+              "id": "british-raj",
+              "label": "British Raj"
+            },
+            {
+              "id": "freedom-struggle",
+              "label": "Freedom Struggle"
+            },
+            {
+              "id": "post-independence",
+              "label": "Post-Independence India"
+            }
           ]
         },
         {
           "id": "ancient-world",
           "label": "Ancient World",
           "submodules": [
-            { "id": "egypt", "label": "Ancient Egypt" },
-            { "id": "greece-rome", "label": "Greece & Rome" },
-            { "id": "mesopotamia-persia", "label": "Mesopotamia & Persia" },
-            { "id": "ancient-china", "label": "Ancient China" }
+            {
+              "id": "egypt",
+              "label": "Ancient Egypt"
+            },
+            {
+              "id": "greece-rome",
+              "label": "Greece & Rome"
+            },
+            {
+              "id": "mesopotamia-persia",
+              "label": "Mesopotamia & Persia"
+            },
+            {
+              "id": "ancient-china",
+              "label": "Ancient China"
+            }
           ]
         },
         {
           "id": "world-history",
           "label": "World History",
           "submodules": [
-            { "id": "world-wars", "label": "World Wars" },
-            { "id": "revolutions", "label": "Revolutions" },
-            { "id": "cold-war", "label": "Cold War" },
-            { "id": "empires-dynasties", "label": "Empires & Dynasties" }
+            {
+              "id": "world-wars",
+              "label": "World Wars"
+            },
+            {
+              "id": "revolutions",
+              "label": "Revolutions"
+            },
+            {
+              "id": "cold-war",
+              "label": "Cold War"
+            },
+            {
+              "id": "empires-dynasties",
+              "label": "Empires & Dynasties"
+            }
           ]
         },
         {
           "id": "history-of-things",
           "label": "History of Everyday Things",
           "submodules": [
-            { "id": "inventions-discoveries", "label": "Inventions & Discoveries" },
-            { "id": "food-drink", "label": "Food & Drink" },
-            { "id": "money-trade", "label": "Money & Trade" },
-            { "id": "medicine-disease", "label": "Medicine & Disease" }
+            {
+              "id": "inventions-discoveries",
+              "label": "Inventions & Discoveries"
+            },
+            {
+              "id": "food-drink",
+              "label": "Food & Drink"
+            },
+            {
+              "id": "money-trade",
+              "label": "Money & Trade"
+            },
+            {
+              "id": "medicine-disease",
+              "label": "Medicine & Disease"
+            }
           ]
         }
       ]
@@ -189,46 +408,94 @@
           "id": "india-physical",
           "label": "India — Physical",
           "submodules": [
-            { "id": "rivers", "label": "Rivers" },
-            { "id": "mountains-plateaus", "label": "Mountains & Plateaus" },
-            { "id": "monsoon-climate", "label": "Monsoon & Climate" }
+            {
+              "id": "rivers",
+              "label": "Rivers"
+            },
+            {
+              "id": "mountains-plateaus",
+              "label": "Mountains & Plateaus"
+            },
+            {
+              "id": "monsoon-climate",
+              "label": "Monsoon & Climate"
+            }
           ]
         },
         {
           "id": "india-economic",
           "label": "India — Economic",
           "submodules": [
-            { "id": "agriculture", "label": "Agriculture" },
-            { "id": "minerals-industry", "label": "Minerals & Industry" },
-            { "id": "transport-trade", "label": "Transport & Trade" }
+            {
+              "id": "agriculture",
+              "label": "Agriculture"
+            },
+            {
+              "id": "minerals-industry",
+              "label": "Minerals & Industry"
+            },
+            {
+              "id": "transport-trade",
+              "label": "Transport & Trade"
+            }
           ]
         },
         {
           "id": "world-geography",
           "label": "World Geography",
           "submodules": [
-            { "id": "continents-oceans", "label": "Continents & Oceans" },
-            { "id": "climate-zones", "label": "Climate Zones" },
-            { "id": "natural-wonders", "label": "Natural Wonders" }
+            {
+              "id": "continents-oceans",
+              "label": "Continents & Oceans"
+            },
+            {
+              "id": "climate-zones",
+              "label": "Climate Zones"
+            },
+            {
+              "id": "natural-wonders",
+              "label": "Natural Wonders"
+            }
           ]
         },
         {
           "id": "earth-processes",
           "label": "Earth in Action",
           "submodules": [
-            { "id": "plate-tectonics", "label": "Plate Tectonics" },
-            { "id": "volcanoes-earthquakes", "label": "Volcanoes & Earthquakes" },
-            { "id": "weather-storms", "label": "Weather & Storms" },
-            { "id": "glaciers-deserts", "label": "Glaciers & Deserts" }
+            {
+              "id": "plate-tectonics",
+              "label": "Plate Tectonics"
+            },
+            {
+              "id": "volcanoes-earthquakes",
+              "label": "Volcanoes & Earthquakes"
+            },
+            {
+              "id": "weather-storms",
+              "label": "Weather & Storms"
+            },
+            {
+              "id": "glaciers-deserts",
+              "label": "Glaciers & Deserts"
+            }
           ]
         },
         {
           "id": "human-geography",
           "label": "Human Geography",
           "submodules": [
-            { "id": "cities-megacities", "label": "Cities & Megacities" },
-            { "id": "population-migration", "label": "Population & Migration" },
-            { "id": "borders-maps", "label": "Borders & Strange Maps" }
+            {
+              "id": "cities-megacities",
+              "label": "Cities & Megacities"
+            },
+            {
+              "id": "population-migration",
+              "label": "Population & Migration"
+            },
+            {
+              "id": "borders-maps",
+              "label": "Borders & Strange Maps"
+            }
           ]
         }
       ]
@@ -243,56 +510,116 @@
           "id": "speed-math",
           "label": "Speed Math",
           "submodules": [
-            { "id": "vedic-tricks", "label": "Vedic Tricks" },
-            { "id": "mental-calculation", "label": "Mental Calculation" },
-            { "id": "squares-cubes", "label": "Squares & Cubes" }
+            {
+              "id": "vedic-tricks",
+              "label": "Vedic Tricks"
+            },
+            {
+              "id": "mental-calculation",
+              "label": "Mental Calculation"
+            },
+            {
+              "id": "squares-cubes",
+              "label": "Squares & Cubes"
+            }
           ]
         },
         {
           "id": "arithmetic",
           "label": "Arithmetic",
           "submodules": [
-            { "id": "percentages", "label": "Percentages" },
-            { "id": "ratio-proportion", "label": "Ratio & Proportion" },
-            { "id": "interest", "label": "Simple & Compound Interest" },
-            { "id": "time-work-speed", "label": "Time, Work & Speed" }
+            {
+              "id": "percentages",
+              "label": "Percentages"
+            },
+            {
+              "id": "ratio-proportion",
+              "label": "Ratio & Proportion"
+            },
+            {
+              "id": "interest",
+              "label": "Simple & Compound Interest"
+            },
+            {
+              "id": "time-work-speed",
+              "label": "Time, Work & Speed"
+            }
           ]
         },
         {
           "id": "reasoning",
           "label": "Reasoning & Aptitude",
           "submodules": [
-            { "id": "puzzles", "label": "Puzzles" },
-            { "id": "series-patterns", "label": "Series & Patterns" },
-            { "id": "logical-reasoning", "label": "Logical Reasoning" }
+            {
+              "id": "puzzles",
+              "label": "Puzzles"
+            },
+            {
+              "id": "series-patterns",
+              "label": "Series & Patterns"
+            },
+            {
+              "id": "logical-reasoning",
+              "label": "Logical Reasoning"
+            }
           ]
         },
         {
           "id": "probability-stats",
           "label": "Probability & Statistics",
           "submodules": [
-            { "id": "probability", "label": "Probability" },
-            { "id": "statistics-basics", "label": "Statistics Basics" },
-            { "id": "data-interpretation", "label": "Data Interpretation" }
+            {
+              "id": "probability",
+              "label": "Probability"
+            },
+            {
+              "id": "statistics-basics",
+              "label": "Statistics Basics"
+            },
+            {
+              "id": "data-interpretation",
+              "label": "Data Interpretation"
+            }
           ]
         },
         {
           "id": "beautiful-math",
           "label": "Beautiful Math",
           "submodules": [
-            { "id": "primes-infinity", "label": "Primes & Infinity" },
-            { "id": "paradoxes", "label": "Paradoxes" },
-            { "id": "golden-ratio-fibonacci", "label": "Golden Ratio & Fibonacci" },
-            { "id": "famous-problems", "label": "Famous Problems" }
+            {
+              "id": "primes-infinity",
+              "label": "Primes & Infinity"
+            },
+            {
+              "id": "paradoxes",
+              "label": "Paradoxes"
+            },
+            {
+              "id": "golden-ratio-fibonacci",
+              "label": "Golden Ratio & Fibonacci"
+            },
+            {
+              "id": "famous-problems",
+              "label": "Famous Problems"
+            }
           ]
         },
         {
           "id": "geometry-visual",
           "label": "Geometry & Visual Proofs",
           "submodules": [
-            { "id": "visual-proofs", "label": "Visual Proofs" },
-            { "id": "geometry-tricks", "label": "Geometry Tricks" },
-            { "id": "trigonometry-intuition", "label": "Trigonometry Intuition" }
+            {
+              "id": "visual-proofs",
+              "label": "Visual Proofs"
+            },
+            {
+              "id": "geometry-tricks",
+              "label": "Geometry Tricks"
+            },
+            {
+              "id": "trigonometry-intuition",
+              "label": "Trigonometry Intuition"
+            }
           ]
         }
       ]
@@ -307,46 +634,94 @@
           "id": "physics",
           "label": "Physics",
           "submodules": [
-            { "id": "mechanics", "label": "Mechanics" },
-            { "id": "electricity-magnetism", "label": "Electricity & Magnetism" },
-            { "id": "light-sound", "label": "Light & Sound" }
+            {
+              "id": "mechanics",
+              "label": "Mechanics"
+            },
+            {
+              "id": "electricity-magnetism",
+              "label": "Electricity & Magnetism"
+            },
+            {
+              "id": "light-sound",
+              "label": "Light & Sound"
+            }
           ]
         },
         {
           "id": "chemistry",
           "label": "Chemistry",
           "submodules": [
-            { "id": "everyday-chemistry", "label": "Everyday Chemistry" },
-            { "id": "periodic-table", "label": "Periodic Table" },
-            { "id": "reactions", "label": "Reactions" }
+            {
+              "id": "everyday-chemistry",
+              "label": "Everyday Chemistry"
+            },
+            {
+              "id": "periodic-table",
+              "label": "Periodic Table"
+            },
+            {
+              "id": "reactions",
+              "label": "Reactions"
+            }
           ]
         },
         {
           "id": "biology",
           "label": "Biology",
           "submodules": [
-            { "id": "human-body", "label": "Human Body" },
-            { "id": "genetics", "label": "Genetics" },
-            { "id": "plants-ecology", "label": "Plants & Ecology" }
+            {
+              "id": "human-body",
+              "label": "Human Body"
+            },
+            {
+              "id": "genetics",
+              "label": "Genetics"
+            },
+            {
+              "id": "plants-ecology",
+              "label": "Plants & Ecology"
+            }
           ]
         },
         {
           "id": "space",
           "label": "Space & Astronomy",
           "submodules": [
-            { "id": "solar-system", "label": "Solar System" },
-            { "id": "isro-missions", "label": "ISRO & Space Missions" },
-            { "id": "cosmos", "label": "Stars & Cosmos" }
+            {
+              "id": "solar-system",
+              "label": "Solar System"
+            },
+            {
+              "id": "isro-missions",
+              "label": "ISRO & Space Missions"
+            },
+            {
+              "id": "cosmos",
+              "label": "Stars & Cosmos"
+            }
           ]
         },
         {
           "id": "how-things-work",
           "label": "How Things Work",
           "submodules": [
-            { "id": "engines-machines", "label": "Engines & Machines" },
-            { "id": "gadgets-electronics", "label": "Gadgets & Electronics" },
-            { "id": "flight-vehicles", "label": "Flight & Vehicles" },
-            { "id": "home-tech", "label": "Everyday Home Tech" }
+            {
+              "id": "engines-machines",
+              "label": "Engines & Machines"
+            },
+            {
+              "id": "gadgets-electronics",
+              "label": "Gadgets & Electronics"
+            },
+            {
+              "id": "flight-vehicles",
+              "label": "Flight & Vehicles"
+            },
+            {
+              "id": "home-tech",
+              "label": "Everyday Home Tech"
+            }
           ]
         }
       ]
@@ -361,46 +736,94 @@
           "id": "personal-finance",
           "label": "Personal Finance",
           "submodules": [
-            { "id": "budgeting-saving", "label": "Budgeting & Saving" },
-            { "id": "emergency-insurance", "label": "Emergency Fund & Insurance" },
-            { "id": "credit-loans", "label": "Credit & Loans" }
+            {
+              "id": "budgeting-saving",
+              "label": "Budgeting & Saving"
+            },
+            {
+              "id": "emergency-insurance",
+              "label": "Emergency Fund & Insurance"
+            },
+            {
+              "id": "credit-loans",
+              "label": "Credit & Loans"
+            }
           ]
         },
         {
           "id": "investing",
           "label": "Investing",
           "submodules": [
-            { "id": "stock-market-basics", "label": "Stock Market Basics" },
-            { "id": "mutual-funds-sip", "label": "Mutual Funds & SIP" },
-            { "id": "compounding", "label": "Power of Compounding" }
+            {
+              "id": "stock-market-basics",
+              "label": "Stock Market Basics"
+            },
+            {
+              "id": "mutual-funds-sip",
+              "label": "Mutual Funds & SIP"
+            },
+            {
+              "id": "compounding",
+              "label": "Power of Compounding"
+            }
           ]
         },
         {
           "id": "india-money-system",
           "label": "India's Money System",
           "submodules": [
-            { "id": "banking-basics", "label": "Banking (FD, PPF, UPI)" },
-            { "id": "tax-basics", "label": "Income Tax Basics" },
-            { "id": "economy-concepts", "label": "Economy (Inflation, GDP, Repo)" }
+            {
+              "id": "banking-basics",
+              "label": "Banking (FD, PPF, UPI)"
+            },
+            {
+              "id": "tax-basics",
+              "label": "Income Tax Basics"
+            },
+            {
+              "id": "economy-concepts",
+              "label": "Economy (Inflation, GDP, Repo)"
+            }
           ]
         },
         {
           "id": "global-economics",
           "label": "Global Economics",
           "submodules": [
-            { "id": "inflation-recession", "label": "Inflation & Recessions" },
-            { "id": "currencies-trade", "label": "Currencies & Trade" },
-            { "id": "why-nations-rich", "label": "Why Nations Get Rich" },
-            { "id": "big-crashes", "label": "Famous Crashes & Bubbles" }
+            {
+              "id": "inflation-recession",
+              "label": "Inflation & Recessions"
+            },
+            {
+              "id": "currencies-trade",
+              "label": "Currencies & Trade"
+            },
+            {
+              "id": "why-nations-rich",
+              "label": "Why Nations Get Rich"
+            },
+            {
+              "id": "big-crashes",
+              "label": "Famous Crashes & Bubbles"
+            }
           ]
         },
         {
           "id": "money-psychology",
           "label": "Psychology of Money",
           "submodules": [
-            { "id": "spending-traps", "label": "Spending Traps" },
-            { "id": "scams-frauds", "label": "Scams & Frauds" },
-            { "id": "behavioral-biases", "label": "Behavioral Biases" }
+            {
+              "id": "spending-traps",
+              "label": "Spending Traps"
+            },
+            {
+              "id": "scams-frauds",
+              "label": "Scams & Frauds"
+            },
+            {
+              "id": "behavioral-biases",
+              "label": "Behavioral Biases"
+            }
           ]
         }
       ]
@@ -415,18 +838,36 @@
           "id": "grammar",
           "label": "Grammar",
           "submodules": [
-            { "id": "tenses", "label": "Tenses" },
-            { "id": "common-errors", "label": "Common Errors" },
-            { "id": "prepositions-articles", "label": "Prepositions & Articles" }
+            {
+              "id": "tenses",
+              "label": "Tenses"
+            },
+            {
+              "id": "common-errors",
+              "label": "Common Errors"
+            },
+            {
+              "id": "prepositions-articles",
+              "label": "Prepositions & Articles"
+            }
           ]
         },
         {
           "id": "vocabulary",
           "label": "Vocabulary",
           "submodules": [
-            { "id": "power-words", "label": "Power Words" },
-            { "id": "idioms-phrases", "label": "Idioms & Phrases" },
-            { "id": "confusing-pairs", "label": "Confusing Word Pairs" }
+            {
+              "id": "power-words",
+              "label": "Power Words"
+            },
+            {
+              "id": "idioms-phrases",
+              "label": "Idioms & Phrases"
+            },
+            {
+              "id": "confusing-pairs",
+              "label": "Confusing Word Pairs"
+            }
           ]
         },
         {
@@ -434,27 +875,57 @@
           "label": "Spoken English",
           "style": "functional real-life speaking, not grammar theory: teach copy-and-say phrases for actual situations, then a natural-sounding upgrade",
           "submodules": [
-            { "id": "daily-conversations", "label": "Daily Conversations", "style": "everyday situations — greetings and small talk, ordering food, shopping, phone calls, asking directions, agreeing or disagreeing politely; teach the exact phrases to say, never verb-tense rules" },
-            { "id": "interview-english", "label": "Interview English", "style": "answering real interview questions (tell me about yourself, strengths and weaknesses, why this role), professional phrasing and confident framing" },
-            { "id": "fluency-tips", "label": "Fluency Tips", "style": "sounding natural and fluent — connected speech, thinking-time phrases, avoiding fillers, sentence stress and rhythm; practical habits not grammar theory" }
+            {
+              "id": "daily-conversations",
+              "label": "Daily Conversations",
+              "style": "everyday situations — greetings and small talk, ordering food, shopping, phone calls, asking directions, agreeing or disagreeing politely; teach the exact phrases to say, never verb-tense rules"
+            },
+            {
+              "id": "interview-english",
+              "label": "Interview English",
+              "style": "answering real interview questions (tell me about yourself, strengths and weaknesses, why this role), professional phrasing and confident framing"
+            },
+            {
+              "id": "fluency-tips",
+              "label": "Fluency Tips",
+              "style": "sounding natural and fluent — connected speech, thinking-time phrases, avoiding fillers, sentence stress and rhythm; practical habits not grammar theory"
+            }
           ]
         },
         {
           "id": "writing",
           "label": "Writing Skills",
           "submodules": [
-            { "id": "emails-workplace", "label": "Emails & Workplace Writing" },
-            { "id": "essays-reports", "label": "Essays & Reports" },
-            { "id": "storytelling", "label": "Storytelling" }
+            {
+              "id": "emails-workplace",
+              "label": "Emails & Workplace Writing"
+            },
+            {
+              "id": "essays-reports",
+              "label": "Essays & Reports"
+            },
+            {
+              "id": "storytelling",
+              "label": "Storytelling"
+            }
           ]
         },
         {
           "id": "word-origins",
           "label": "Word Origins",
           "submodules": [
-            { "id": "etymology", "label": "Etymology Stories" },
-            { "id": "borrowed-words", "label": "Borrowed Words" },
-            { "id": "phrases-history", "label": "Where Phrases Come From" }
+            {
+              "id": "etymology",
+              "label": "Etymology Stories"
+            },
+            {
+              "id": "borrowed-words",
+              "label": "Borrowed Words"
+            },
+            {
+              "id": "phrases-history",
+              "label": "Where Phrases Come From"
+            }
           ]
         }
       ]
@@ -469,47 +940,98 @@
           "id": "india-gk",
           "label": "India GK",
           "submodules": [
-            { "id": "constitution-polity", "label": "Constitution & Polity" },
-            { "id": "states-culture", "label": "States & Culture" },
-            { "id": "indian-firsts", "label": "Indian Firsts & Records" }
+            {
+              "id": "constitution-polity",
+              "label": "Constitution & Polity"
+            },
+            {
+              "id": "states-culture",
+              "label": "States & Culture"
+            },
+            {
+              "id": "indian-firsts",
+              "label": "Indian Firsts & Records"
+            }
           ]
         },
         {
           "id": "world-gk",
           "label": "World GK",
           "submodules": [
-            { "id": "countries-flags", "label": "Countries & Flags" },
-            { "id": "organizations", "label": "Global Organizations" },
-            { "id": "world-records", "label": "World Records" }
+            {
+              "id": "countries-flags",
+              "label": "Countries & Flags"
+            },
+            {
+              "id": "organizations",
+              "label": "Global Organizations"
+            },
+            {
+              "id": "world-records",
+              "label": "World Records"
+            }
           ]
         },
         {
           "id": "amazing-facts",
           "label": "Amazing Facts",
           "submodules": [
-            { "id": "science-facts", "label": "Science Facts" },
-            { "id": "history-facts", "label": "History Facts" },
-            { "id": "tech-facts", "label": "Tech Facts" }
+            {
+              "id": "science-facts",
+              "label": "Science Facts"
+            },
+            {
+              "id": "history-facts",
+              "label": "History Facts"
+            },
+            {
+              "id": "tech-facts",
+              "label": "Tech Facts"
+            }
           ]
         },
         {
           "id": "how-world-works",
           "label": "How the World Runs",
           "submodules": [
-            { "id": "airports-aviation", "label": "Airports & Aviation" },
-            { "id": "shipping-trade", "label": "Shipping & Trade" },
-            { "id": "elections-governments", "label": "Elections & Governments" },
-            { "id": "money-systems", "label": "Currency & Central Banks" }
+            {
+              "id": "airports-aviation",
+              "label": "Airports & Aviation"
+            },
+            {
+              "id": "shipping-trade",
+              "label": "Shipping & Trade"
+            },
+            {
+              "id": "elections-governments",
+              "label": "Elections & Governments"
+            },
+            {
+              "id": "money-systems",
+              "label": "Currency & Central Banks"
+            }
           ]
         },
         {
           "id": "sports-games",
           "label": "Sports & Games",
           "submodules": [
-            { "id": "cricket", "label": "Cricket" },
-            { "id": "olympics", "label": "Olympics" },
-            { "id": "football", "label": "Football" },
-            { "id": "chess-esports", "label": "Chess & Esports" }
+            {
+              "id": "cricket",
+              "label": "Cricket"
+            },
+            {
+              "id": "olympics",
+              "label": "Olympics"
+            },
+            {
+              "id": "football",
+              "label": "Football"
+            },
+            {
+              "id": "chess-esports",
+              "label": "Chess & Esports"
+            }
           ]
         }
       ]
@@ -524,49 +1046,106 @@
           "id": "biases-decisions",
           "label": "Biases & Decisions",
           "submodules": [
-            { "id": "anchoring-framing", "label": "Anchoring & Framing" },
-            { "id": "confirmation-bias", "label": "Confirmation Bias" },
-            { "id": "loss-aversion", "label": "Loss Aversion & Sunk Cost" },
-            { "id": "probability-mistakes", "label": "How We Misjudge Risk" }
+            {
+              "id": "anchoring-framing",
+              "label": "Anchoring & Framing"
+            },
+            {
+              "id": "confirmation-bias",
+              "label": "Confirmation Bias"
+            },
+            {
+              "id": "loss-aversion",
+              "label": "Loss Aversion & Sunk Cost"
+            },
+            {
+              "id": "probability-mistakes",
+              "label": "How We Misjudge Risk"
+            }
           ]
         },
         {
           "id": "memory-learning",
           "label": "Memory & Learning",
           "submodules": [
-            { "id": "how-memory-works", "label": "How Memory Works" },
-            { "id": "forgetting-spaced-repetition", "label": "Forgetting & Spaced Repetition" },
-            { "id": "focus-attention", "label": "Focus & Attention" },
-            { "id": "learning-myths", "label": "Learning Myths" }
+            {
+              "id": "how-memory-works",
+              "label": "How Memory Works"
+            },
+            {
+              "id": "forgetting-spaced-repetition",
+              "label": "Forgetting & Spaced Repetition"
+            },
+            {
+              "id": "focus-attention",
+              "label": "Focus & Attention"
+            },
+            {
+              "id": "learning-myths",
+              "label": "Learning Myths"
+            }
           ]
         },
         {
           "id": "habits-motivation",
           "label": "Habits & Motivation",
           "submodules": [
-            { "id": "habit-loops", "label": "Habit Loops" },
-            { "id": "dopamine-rewards", "label": "Dopamine & Rewards" },
-            { "id": "procrastination", "label": "Procrastination" },
-            { "id": "willpower-environment", "label": "Willpower & Environment" }
+            {
+              "id": "habit-loops",
+              "label": "Habit Loops"
+            },
+            {
+              "id": "dopamine-rewards",
+              "label": "Dopamine & Rewards"
+            },
+            {
+              "id": "procrastination",
+              "label": "Procrastination"
+            },
+            {
+              "id": "willpower-environment",
+              "label": "Willpower & Environment"
+            }
           ]
         },
         {
           "id": "social-psych",
           "label": "Social Psychology",
           "submodules": [
-            { "id": "persuasion-influence", "label": "Persuasion & Influence" },
-            { "id": "conformity-obedience", "label": "Conformity & Obedience" },
-            { "id": "group-behavior", "label": "Group Behavior" },
-            { "id": "first-impressions", "label": "First Impressions" }
+            {
+              "id": "persuasion-influence",
+              "label": "Persuasion & Influence"
+            },
+            {
+              "id": "conformity-obedience",
+              "label": "Conformity & Obedience"
+            },
+            {
+              "id": "group-behavior",
+              "label": "Group Behavior"
+            },
+            {
+              "id": "first-impressions",
+              "label": "First Impressions"
+            }
           ]
         },
         {
           "id": "famous-experiments",
           "label": "Famous Experiments",
           "submodules": [
-            { "id": "landmark-experiments", "label": "Landmark Experiments" },
-            { "id": "flawed-famous-studies", "label": "What They Got Wrong" },
-            { "id": "everyday-experiments", "label": "Experiments You Can Try" }
+            {
+              "id": "landmark-experiments",
+              "label": "Landmark Experiments"
+            },
+            {
+              "id": "flawed-famous-studies",
+              "label": "What They Got Wrong"
+            },
+            {
+              "id": "everyday-experiments",
+              "label": "Experiments You Can Try"
+            }
           ]
         }
       ]
@@ -581,50 +1160,110 @@
           "id": "business-models",
           "label": "Business Models",
           "submodules": [
-            { "id": "how-x-makes-money", "label": "How X Makes Money" },
-            { "id": "platforms-marketplaces", "label": "Platforms & Marketplaces" },
-            { "id": "subscriptions-freemium", "label": "Subscriptions & Freemium" },
-            { "id": "unit-economics", "label": "Unit Economics" }
+            {
+              "id": "how-x-makes-money",
+              "label": "How X Makes Money"
+            },
+            {
+              "id": "platforms-marketplaces",
+              "label": "Platforms & Marketplaces"
+            },
+            {
+              "id": "subscriptions-freemium",
+              "label": "Subscriptions & Freemium"
+            },
+            {
+              "id": "unit-economics",
+              "label": "Unit Economics"
+            }
           ]
         },
         {
           "id": "startup-playbook",
           "label": "Startup Playbook",
           "submodules": [
-            { "id": "idea-to-mvp", "label": "Idea to MVP" },
-            { "id": "product-market-fit", "label": "Product-Market Fit" },
-            { "id": "funding-rounds", "label": "Funding & Valuations" },
-            { "id": "failure-postmortems", "label": "Failure Postmortems" }
+            {
+              "id": "idea-to-mvp",
+              "label": "Idea to MVP"
+            },
+            {
+              "id": "product-market-fit",
+              "label": "Product-Market Fit"
+            },
+            {
+              "id": "funding-rounds",
+              "label": "Funding & Valuations"
+            },
+            {
+              "id": "failure-postmortems",
+              "label": "Failure Postmortems"
+            }
           ]
         },
         {
           "id": "marketing-branding",
           "label": "Marketing & Branding",
           "submodules": [
-            { "id": "pricing-psychology", "label": "Pricing Psychology" },
-            { "id": "advertising", "label": "Advertising" },
-            { "id": "virality-word-of-mouth", "label": "Virality & Word of Mouth" },
-            { "id": "brand-stories", "label": "Brand Stories" }
+            {
+              "id": "pricing-psychology",
+              "label": "Pricing Psychology"
+            },
+            {
+              "id": "advertising",
+              "label": "Advertising"
+            },
+            {
+              "id": "virality-word-of-mouth",
+              "label": "Virality & Word of Mouth"
+            },
+            {
+              "id": "brand-stories",
+              "label": "Brand Stories"
+            }
           ]
         },
         {
           "id": "big-ideas",
           "label": "Big Ideas in Business",
           "submodules": [
-            { "id": "moats-network-effects", "label": "Moats & Network Effects" },
-            { "id": "disruption", "label": "Disruption" },
-            { "id": "economies-of-scale", "label": "Economies of Scale" },
-            { "id": "strategy-classics", "label": "Strategy Classics" }
+            {
+              "id": "moats-network-effects",
+              "label": "Moats & Network Effects"
+            },
+            {
+              "id": "disruption",
+              "label": "Disruption"
+            },
+            {
+              "id": "economies-of-scale",
+              "label": "Economies of Scale"
+            },
+            {
+              "id": "strategy-classics",
+              "label": "Strategy Classics"
+            }
           ]
         },
         {
           "id": "case-studies",
           "label": "Case Studies",
           "submodules": [
-            { "id": "rise-stories", "label": "Rise Stories" },
-            { "id": "fall-stories", "label": "Fall Stories" },
-            { "id": "turnarounds", "label": "Turnarounds" },
-            { "id": "india-stories", "label": "India Stories" }
+            {
+              "id": "rise-stories",
+              "label": "Rise Stories"
+            },
+            {
+              "id": "fall-stories",
+              "label": "Fall Stories"
+            },
+            {
+              "id": "turnarounds",
+              "label": "Turnarounds"
+            },
+            {
+              "id": "india-stories",
+              "label": "India Stories"
+            }
           ]
         }
       ]
@@ -639,41 +1278,92 @@
           "id": "body-systems",
           "label": "How Your Body Works",
           "submodules": [
-            { "id": "sleep", "label": "Sleep" },
-            { "id": "digestion-gut", "label": "Digestion & Gut" },
-            { "id": "immune-system", "label": "Immune System" },
-            { "id": "heart-blood", "label": "Heart & Blood" },
-            { "id": "brain-nerves", "label": "Brain & Nerves" }
+            {
+              "id": "sleep",
+              "label": "Sleep"
+            },
+            {
+              "id": "digestion-gut",
+              "label": "Digestion & Gut"
+            },
+            {
+              "id": "immune-system",
+              "label": "Immune System"
+            },
+            {
+              "id": "heart-blood",
+              "label": "Heart & Blood"
+            },
+            {
+              "id": "brain-nerves",
+              "label": "Brain & Nerves"
+            }
           ]
         },
         {
           "id": "nutrition",
           "label": "Nutrition",
           "submodules": [
-            { "id": "protein-carbs-fat", "label": "Protein, Carbs & Fat" },
-            { "id": "sugar-processed-food", "label": "Sugar & Processed Food" },
-            { "id": "fasting-diets", "label": "Fasting & Diets" },
-            { "id": "vitamins-supplements", "label": "Vitamins & Supplements" }
+            {
+              "id": "protein-carbs-fat",
+              "label": "Protein, Carbs & Fat"
+            },
+            {
+              "id": "sugar-processed-food",
+              "label": "Sugar & Processed Food"
+            },
+            {
+              "id": "fasting-diets",
+              "label": "Fasting & Diets"
+            },
+            {
+              "id": "vitamins-supplements",
+              "label": "Vitamins & Supplements"
+            }
           ]
         },
         {
           "id": "fitness",
           "label": "Fitness Science",
           "submodules": [
-            { "id": "muscle-strength", "label": "Muscle & Strength" },
-            { "id": "cardio-endurance", "label": "Cardio & Endurance" },
-            { "id": "fat-loss-science", "label": "Fat Loss Science" },
-            { "id": "mobility-posture", "label": "Mobility & Posture" }
+            {
+              "id": "muscle-strength",
+              "label": "Muscle & Strength"
+            },
+            {
+              "id": "cardio-endurance",
+              "label": "Cardio & Endurance"
+            },
+            {
+              "id": "fat-loss-science",
+              "label": "Fat Loss Science"
+            },
+            {
+              "id": "mobility-posture",
+              "label": "Mobility & Posture"
+            }
           ]
         },
         {
           "id": "everyday-health",
           "label": "Everyday Health",
           "submodules": [
-            { "id": "stress-cortisol", "label": "Stress & Cortisol" },
-            { "id": "screens-eyes-sleep", "label": "Screens, Eyes & Sleep" },
-            { "id": "hydration-heat", "label": "Hydration & Heat" },
-            { "id": "common-myths", "label": "Common Health Myths" }
+            {
+              "id": "stress-cortisol",
+              "label": "Stress & Cortisol"
+            },
+            {
+              "id": "screens-eyes-sleep",
+              "label": "Screens, Eyes & Sleep"
+            },
+            {
+              "id": "hydration-heat",
+              "label": "Hydration & Heat"
+            },
+            {
+              "id": "common-myths",
+              "label": "Common Health Myths"
+            }
           ]
         }
       ]
@@ -688,45 +1378,90 @@
           "id": "life-philosophies",
           "label": "Life Philosophies",
           "submodules": [
-            { "id": "stoicism", "label": "Stoicism" },
-            { "id": "existentialism", "label": "Existentialism" },
-            { "id": "happiness-meaning", "label": "Happiness & Meaning" }
+            {
+              "id": "stoicism",
+              "label": "Stoicism"
+            },
+            {
+              "id": "existentialism",
+              "label": "Existentialism"
+            },
+            {
+              "id": "happiness-meaning",
+              "label": "Happiness & Meaning"
+            }
           ]
         },
         {
           "id": "thought-experiments",
           "label": "Thought Experiments",
           "submodules": [
-            { "id": "trolley-ethics", "label": "Trolley Problems & Ethics" },
-            { "id": "identity-ship-theseus", "label": "Identity & the Ship of Theseus" },
-            { "id": "simulation-knowledge", "label": "Simulation & Knowledge" }
+            {
+              "id": "trolley-ethics",
+              "label": "Trolley Problems & Ethics"
+            },
+            {
+              "id": "identity-ship-theseus",
+              "label": "Identity & the Ship of Theseus"
+            },
+            {
+              "id": "simulation-knowledge",
+              "label": "Simulation & Knowledge"
+            }
           ]
         },
         {
           "id": "logic-thinking",
           "label": "Logic & Clear Thinking",
           "submodules": [
-            { "id": "fallacies", "label": "Logical Fallacies" },
-            { "id": "paradoxes", "label": "Paradoxes" },
-            { "id": "critical-thinking", "label": "Critical Thinking" }
+            {
+              "id": "fallacies",
+              "label": "Logical Fallacies"
+            },
+            {
+              "id": "paradoxes",
+              "label": "Paradoxes"
+            },
+            {
+              "id": "critical-thinking",
+              "label": "Critical Thinking"
+            }
           ]
         },
         {
           "id": "indian-wisdom",
           "label": "Indian Wisdom",
           "submodules": [
-            { "id": "gita-lessons", "label": "Lessons from the Gita" },
-            { "id": "chanakya-niti", "label": "Chanakya Niti" },
-            { "id": "buddhist-ideas", "label": "Buddhist Ideas" }
+            {
+              "id": "gita-lessons",
+              "label": "Lessons from the Gita"
+            },
+            {
+              "id": "chanakya-niti",
+              "label": "Chanakya Niti"
+            },
+            {
+              "id": "buddhist-ideas",
+              "label": "Buddhist Ideas"
+            }
           ]
         },
         {
           "id": "great-thinkers",
           "label": "Great Thinkers",
           "submodules": [
-            { "id": "ancient-greeks", "label": "Ancient Greeks" },
-            { "id": "enlightenment", "label": "Enlightenment Minds" },
-            { "id": "modern-minds", "label": "Modern Minds" }
+            {
+              "id": "ancient-greeks",
+              "label": "Ancient Greeks"
+            },
+            {
+              "id": "enlightenment",
+              "label": "Enlightenment Minds"
+            },
+            {
+              "id": "modern-minds",
+              "label": "Modern Minds"
+            }
           ]
         }
       ]
@@ -741,39 +1476,84 @@
           "id": "learning-how-to-learn",
           "label": "Learning How to Learn",
           "submodules": [
-            { "id": "memory-techniques", "label": "Memory Techniques" },
-            { "id": "note-taking", "label": "Note-Taking Systems" },
-            { "id": "deliberate-practice", "label": "Deliberate Practice" },
-            { "id": "exam-strategy", "label": "Exam Strategy" }
+            {
+              "id": "memory-techniques",
+              "label": "Memory Techniques"
+            },
+            {
+              "id": "note-taking",
+              "label": "Note-Taking Systems"
+            },
+            {
+              "id": "deliberate-practice",
+              "label": "Deliberate Practice"
+            },
+            {
+              "id": "exam-strategy",
+              "label": "Exam Strategy"
+            }
           ]
         },
         {
           "id": "time-focus",
           "label": "Time & Focus",
           "submodules": [
-            { "id": "deep-work", "label": "Deep Work" },
-            { "id": "procrastination-fix", "label": "Beating Procrastination" },
-            { "id": "planning-systems", "label": "Planning Systems" },
-            { "id": "digital-detox", "label": "Digital Detox" }
+            {
+              "id": "deep-work",
+              "label": "Deep Work"
+            },
+            {
+              "id": "procrastination-fix",
+              "label": "Beating Procrastination"
+            },
+            {
+              "id": "planning-systems",
+              "label": "Planning Systems"
+            },
+            {
+              "id": "digital-detox",
+              "label": "Digital Detox"
+            }
           ]
         },
         {
           "id": "career-skills",
           "label": "Career Skills",
           "submodules": [
-            { "id": "interviews", "label": "Interviews" },
-            { "id": "resume-linkedin", "label": "Resume & LinkedIn" },
-            { "id": "negotiation", "label": "Negotiation" },
-            { "id": "first-90-days", "label": "First 90 Days at Work" }
+            {
+              "id": "interviews",
+              "label": "Interviews"
+            },
+            {
+              "id": "resume-linkedin",
+              "label": "Resume & LinkedIn"
+            },
+            {
+              "id": "negotiation",
+              "label": "Negotiation"
+            },
+            {
+              "id": "first-90-days",
+              "label": "First 90 Days at Work"
+            }
           ]
         },
         {
           "id": "everyday-smart",
           "label": "Everyday Smart",
           "submodules": [
-            { "id": "online-safety-scams", "label": "Online Safety & Scams" },
-            { "id": "ai-tools-daily-life", "label": "AI Tools for Daily Life" },
-            { "id": "speaking-up", "label": "Speaking Up & Communication" }
+            {
+              "id": "online-safety-scams",
+              "label": "Online Safety & Scams"
+            },
+            {
+              "id": "ai-tools-daily-life",
+              "label": "AI Tools for Daily Life"
+            },
+            {
+              "id": "speaking-up",
+              "label": "Speaking Up & Communication"
+            }
           ]
         }
       ]
@@ -788,38 +1568,244 @@
           "id": "indian-epics",
           "label": "Indian Epics",
           "submodules": [
-            { "id": "ramayana-stories", "label": "Ramayana Stories" },
-            { "id": "mahabharata-stories", "label": "Mahabharata Stories" },
-            { "id": "epic-characters", "label": "Epic Characters" },
-            { "id": "lessons-dharma", "label": "Lessons & Dharma" }
+            {
+              "id": "ramayana-stories",
+              "label": "Ramayana Stories"
+            },
+            {
+              "id": "mahabharata-stories",
+              "label": "Mahabharata Stories"
+            },
+            {
+              "id": "epic-characters",
+              "label": "Epic Characters"
+            },
+            {
+              "id": "lessons-dharma",
+              "label": "Lessons & Dharma"
+            }
           ]
         },
         {
           "id": "hindu-mythology",
           "label": "Hindu Mythology",
           "submodules": [
-            { "id": "gods-avatars", "label": "Gods & Avatars" },
-            { "id": "festivals-stories", "label": "Stories Behind Festivals" },
-            { "id": "symbols-meanings", "label": "Symbols & Meanings" }
+            {
+              "id": "gods-avatars",
+              "label": "Gods & Avatars"
+            },
+            {
+              "id": "festivals-stories",
+              "label": "Stories Behind Festivals"
+            },
+            {
+              "id": "symbols-meanings",
+              "label": "Symbols & Meanings"
+            }
           ]
         },
         {
           "id": "world-mythology",
           "label": "World Mythology",
           "submodules": [
-            { "id": "greek", "label": "Greek" },
-            { "id": "norse", "label": "Norse" },
-            { "id": "egyptian", "label": "Egyptian" },
-            { "id": "mesopotamian", "label": "Mesopotamian" }
+            {
+              "id": "greek",
+              "label": "Greek"
+            },
+            {
+              "id": "norse",
+              "label": "Norse"
+            },
+            {
+              "id": "egyptian",
+              "label": "Egyptian"
+            },
+            {
+              "id": "mesopotamian",
+              "label": "Mesopotamian"
+            }
           ]
         },
         {
           "id": "myths-decoded",
           "label": "Myths Decoded",
           "submodules": [
-            { "id": "common-patterns", "label": "Patterns Across Cultures" },
-            { "id": "flood-myths-heroes", "label": "Flood Myths & Hero Journeys" },
-            { "id": "myth-vs-history", "label": "Myth vs History" }
+            {
+              "id": "common-patterns",
+              "label": "Patterns Across Cultures"
+            },
+            {
+              "id": "flood-myths-heroes",
+              "label": "Flood Myths & Hero Journeys"
+            },
+            {
+              "id": "myth-vs-history",
+              "label": "Myth vs History"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "polity",
+      "label": "Polity & Governance",
+      "audience": "UPSC, State PSC and government-exam aspirants plus curious citizens — India-first",
+      "style": "exam-precise: cite exact Articles, Amendments and landmark cases; always explain the WHY behind a provision, not just the fact",
+      "modules": [
+        {
+          "id": "constitution-basics",
+          "label": "Constitution Basics",
+          "submodules": [
+            {
+              "id": "making-of-constitution",
+              "label": "Making of the Constitution"
+            },
+            {
+              "id": "preamble-values",
+              "label": "Preamble & Core Values"
+            },
+            {
+              "id": "fundamental-rights",
+              "label": "Fundamental Rights"
+            },
+            {
+              "id": "dpsp-duties",
+              "label": "DPSP & Fundamental Duties"
+            }
+          ]
+        },
+        {
+          "id": "union-government",
+          "label": "Union Government",
+          "submodules": [
+            {
+              "id": "parliament",
+              "label": "Parliament"
+            },
+            {
+              "id": "president-pm",
+              "label": "President & PM"
+            },
+            {
+              "id": "judiciary",
+              "label": "Supreme Court & Judiciary"
+            }
+          ]
+        },
+        {
+          "id": "states-local",
+          "label": "States & Local Government",
+          "submodules": [
+            {
+              "id": "state-government",
+              "label": "State Government"
+            },
+            {
+              "id": "panchayati-raj",
+              "label": "Panchayati Raj"
+            },
+            {
+              "id": "centre-state-relations",
+              "label": "Centre-State Relations"
+            }
+          ]
+        },
+        {
+          "id": "elections-bodies",
+          "label": "Elections & Bodies",
+          "submodules": [
+            {
+              "id": "elections-eci",
+              "label": "Elections & ECI"
+            },
+            {
+              "id": "constitutional-bodies",
+              "label": "Constitutional Bodies"
+            },
+            {
+              "id": "emergency-provisions",
+              "label": "Emergency Provisions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mindset",
+      "label": "Mindset & Self-Growth",
+      "audience": "students and young professionals working on confidence, speaking and personal growth — India-first, useful worldwide",
+      "style": "transformation-first with zero platitudes: name the real psychological mechanism, then give a concrete drill the viewer can do today",
+      "modules": [
+        {
+          "id": "mindset-foundations",
+          "label": "Mindset Foundations",
+          "submodules": [
+            {
+              "id": "growth-vs-fixed",
+              "label": "Growth vs Fixed Mindset"
+            },
+            {
+              "id": "self-belief",
+              "label": "Self-Belief & Confidence"
+            },
+            {
+              "id": "comparison-trap",
+              "label": "The Comparison Trap"
+            }
+          ]
+        },
+        {
+          "id": "public-speaking",
+          "label": "Public Speaking",
+          "submodules": [
+            {
+              "id": "stage-fear",
+              "label": "Stage Fear"
+            },
+            {
+              "id": "storytelling-speech",
+              "label": "Storytelling in Speech"
+            },
+            {
+              "id": "voice-delivery",
+              "label": "Voice & Delivery"
+            }
+          ]
+        },
+        {
+          "id": "emotional-strength",
+          "label": "Emotional Strength",
+          "submodules": [
+            {
+              "id": "resilience",
+              "label": "Resilience & Setbacks"
+            },
+            {
+              "id": "handling-criticism",
+              "label": "Handling Criticism"
+            },
+            {
+              "id": "emotional-intelligence",
+              "label": "Emotional Intelligence"
+            }
+          ]
+        },
+        {
+          "id": "success-principles",
+          "label": "Success Principles",
+          "submodules": [
+            {
+              "id": "goal-setting",
+              "label": "Goal Setting That Works"
+            },
+            {
+              "id": "consistency",
+              "label": "Consistency & Showing Up"
+            },
+            {
+              "id": "failure-lessons",
+              "label": "Learning From Failure"
+            }
           ]
         }
       ]

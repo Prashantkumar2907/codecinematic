@@ -20,7 +20,8 @@ export const DEMO_SCRIPT: SceneScript = {
       id: "chain",
       title: "The lookup walk",
       nodes: [
-        { id: "obj", label: "p1", x: 4, y: 0, w: 4, h: 2, accent: true },
+        { id: "obj", label: "p1", x: 4, y: 0, w: 4, h: 2, accent: true, icon: "📦" },
+        { id: "lookup", label: "lookup", x: 0, y: 0, w: 2, h: 2, accent: false, icon: "🔍" },
         { id: "proto", label: "Person.prototype", x: 3, y: 4, w: 6, h: 2, accent: false },
         { id: "objproto", label: "Object.prototype", x: 3, y: 8, w: 6, h: 2, accent: false },
       ],
@@ -29,15 +30,22 @@ export const DEMO_SCRIPT: SceneScript = {
         { from: "proto", to: "objproto", label: "still not found?" },
       ],
       steps: [
-        { reveal: ["obj"], highlight: ["obj"], say: "JavaScript checks the object itself first." },
+        {
+          reveal: ["obj", "lookup"],
+          highlight: ["obj"],
+          move: [],
+          say: "JavaScript checks the object itself first.",
+        },
         {
           reveal: ["proto"],
           highlight: ["proto"],
+          move: [{ node: "lookup", x: 0, y: 4 }],
           say: "Not there? It walks up to the prototype and looks again.",
         },
         {
           reveal: ["objproto"],
           highlight: ["objproto"],
+          move: [{ node: "lookup", x: 0, y: 8 }],
           say: "Still nothing? It keeps climbing until Object dot prototype, then gives up with undefined.",
         },
       ],

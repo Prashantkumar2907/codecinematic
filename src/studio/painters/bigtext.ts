@@ -34,6 +34,13 @@ export function paintBigtext(ctx: CanvasRenderingContext2D, scene: BigtextScene,
     const textX = contentX + unit * 1.1;
     const barIn = easeOutCubic(sub(env.p, 0, 0.18));
     ctx.save();
+    if (scene.icon) {
+      const iconIn = easeOutBack(sub(env.p, 0, 0.22));
+      ctx.globalAlpha = clamp01(iconIn);
+      ctx.font = `${unit * 2.2}px ${FONT_SANS}`;
+      ctx.fillText(scene.icon, textX, blockTop - px * 1.15);
+      ctx.globalAlpha = 1;
+    }
     ctx.fillStyle = accent;
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.5;
@@ -66,6 +73,17 @@ export function paintBigtext(ctx: CanvasRenderingContext2D, scene: BigtextScene,
   ctx.textAlign = "center";
   ctx.translate(w / 2, h * 0.44);
   const startY = (-(lines.length - 1) * lineH) / 2;
+
+  if (scene.icon) {
+    // Big emoji pops in above the headline.
+    const iconIn = easeOutBack(sub(env.p, 0, 0.25));
+    ctx.save();
+    ctx.globalAlpha = clamp01(sub(env.p, 0, 0.18));
+    ctx.scale(Math.max(0.01, iconIn), Math.max(0.01, iconIn));
+    ctx.font = `${unit * 2.6}px ${FONT_SANS}`;
+    ctx.fillText(scene.icon, 0, startY - px * 1.05);
+    ctx.restore();
+  }
 
   if (variant === 1) {
     // Word-by-word rise across the first third of the scene.

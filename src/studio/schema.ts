@@ -17,12 +17,16 @@ const say = z.string().min(6).max(MAX_BEAT_CHARS);
 const narration = z.string().min(6).max(MAX_NARRATION_CHARS);
 const id = z.string().min(1).max(40);
 
+/** One emoji (possibly multi-codepoint) used as a visual icon. */
+const icon = z.string().min(1).max(16).optional();
+
 const bigtextScene = z.object({
   kind: z.literal("bigtext"),
   id,
   narration,
   text: z.string().min(2).max(80),
   sub: z.string().max(110).optional(),
+  icon,
 });
 
 const bulletsScene = z.object({
@@ -74,6 +78,7 @@ const diagramNode = z.object({
   w: z.number().int().min(2).max(GRID).default(3),
   h: z.number().int().min(1).max(4).default(1),
   accent: z.boolean().default(false),
+  icon,
 });
 
 const diagramScene = z.object({
@@ -97,6 +102,10 @@ const diagramScene = z.object({
       z.object({
         reveal: z.array(id).default([]),
         highlight: z.array(id).default([]),
+        move: z
+          .array(z.object({ node: id, x: z.number().int().min(0).max(GRID - 1), y: z.number().int().min(0).max(GRID - 1) }))
+          .max(4)
+          .default([]),
         say,
       })
     )
@@ -109,8 +118,8 @@ const compareScene = z.object({
   id,
   sayIntro: say.optional(),
   title: z.string().min(2).max(60),
-  left: z.object({ title: z.string().min(1).max(30), items: z.array(z.string().max(70)).min(1).max(4), say }),
-  right: z.object({ title: z.string().min(1).max(30), items: z.array(z.string().max(70)).min(1).max(4), say }),
+  left: z.object({ title: z.string().min(1).max(30), items: z.array(z.string().max(70)).min(1).max(4), say, icon }),
+  right: z.object({ title: z.string().min(1).max(30), items: z.array(z.string().max(70)).min(1).max(4), say, icon }),
   verdict: z.string().max(110).optional(),
   sayVerdict: say.optional(),
 });
@@ -440,7 +449,7 @@ export const sceneScriptSchema = z
             });
           }
         }
-        const stepIds = s.steps.flatMap((st) => [...st.reveal, ...st.highlight]);
+        const stepIds = s.steps.flatMap((st) => [...st.reveal, ...st.highlight, ...st.move.map((m) => m.node)]);
         for (const sid of stepIds) {
           if (!nodeIds.has(sid)) {
             ctx.addIssue({

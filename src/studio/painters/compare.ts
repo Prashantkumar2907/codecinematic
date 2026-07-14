@@ -1,10 +1,10 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, clamp01, wrapText, roundRect, drawSceneTitle, beatWindow, beatT, activeBeatIndex } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, clamp01, wrapText, roundRect, drawSceneTitle, beatWindow, beatT, activeBeatIndex, rgba } from "./common";
 import type { PaintEnv } from "./index";
 
 type CompareScene = Extract<Scene, { kind: "compare" }>;
 
-const DIM_ALPHA = 0.65;
+const DIM_ALPHA = 0.85;
 
 export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene, env: PaintEnv) {
   const { layout } = env;
@@ -99,16 +99,26 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
     ctx.fill();
     ctx.shadowBlur = 0;
     roundRect(ctx, x, y, pw, ph, unit * 0.7);
-    ctx.strokeStyle = isCurrent ? color : THEME.panelBorder;
-    ctx.lineWidth = isCurrent ? 2.5 : 1;
+    // A non-active panel keeps a clearly visible tinted border — with the old
+    // 1px dark border, a finished panel collapsed visually into just its accent
+    // top strip (a bare horizontal line) with floating bullet text.
+    ctx.strokeStyle = isCurrent ? color : rgba(color, 0.45);
+    ctx.lineWidth = isCurrent ? 2.5 : unit * 0.05;
     ctx.stroke();
     ctx.fillStyle = color;
     roundRect(ctx, x, y, pw, unit * 0.24, unit * 0.12);
     ctx.fill();
 
+    let titleX = x + unit;
+    if (side.icon) {
+      // Emoji icon leading the panel title.
+      ctx.font = `${unit * 1.2}px ${FONT_SANS}`;
+      ctx.fillText(side.icon, titleX, y + unit * 1.55);
+      titleX += ctx.measureText(side.icon).width + unit * 0.45;
+    }
     ctx.font = `800 ${unit * 1.05}px ${FONT_SANS}`;
     ctx.fillStyle = color;
-    ctx.fillText(side.title, x + unit, y + unit * 1.5);
+    ctx.fillText(side.title, titleX, y + unit * 1.5);
 
     ctx.font = `500 ${unit * 0.85}px ${FONT_SANS}`;
     let iy = y + unit * 2.8;

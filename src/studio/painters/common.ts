@@ -69,6 +69,8 @@ const SUBJECT_PALETTES: Record<string, Palette> = {
   "Philosophy & Big Ideas": makePalette("#60a5fa", "#c084fc"),
   "Life Skills & Productivity": makePalette("#a3e635", "#22d3ee"),
   "Mythology & Epics": makePalette("#f43f5e", "#fbbf24"),
+  "Polity & Governance": makePalette("#f97316", "#38bdf8"),
+  "Mindset & Self-Growth": makePalette("#e879f9", "#34d399"),
 };
 
 export function paletteForSubject(subjectLabel: string): Palette {

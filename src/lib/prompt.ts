@@ -5,12 +5,12 @@ Scene kinds (every scene has "kind" and a unique kebab-case "id"). Narration is 
 each beat is one spoken chunk ("say"/"narration", 1-2 sentences, <=320 chars) that plays EXACTLY while
 its visual element appears. Write every beat about the element it accompanies and nothing else.
 
-- {"kind":"bigtext","narration":"...","text":"<=80 chars","sub":"<=110 optional"} — hook or section card
+- {"kind":"bigtext","narration":"...","text":"<=80 chars","sub":"<=110 optional","icon":"optional ONE emoji shown large above the text (🚀, 🧠, ⚖️) — use when it sharpens the card"} — hook or section card
 - {"kind":"bullets","sayIntro":"optional lead-in","title":"<=60","items":[{"text":"<=110","say":"spoken while THIS item appears"}, 2-5 items]}
 - {"kind":"code","sayIntro":"optional setup line spoken over an empty editor","lang":"js|ts|python|sql|bash|yaml|text","title":"filename or panel title","code":"<=22 lines, EVERY line <=46 chars","segments":[{"fromLine":1,"toLine":4,"say":"spoken while lines 1-4 type"}, ...contiguous, covering every line exactly once],"focusLines":[optional emphasis],"expectedOutput":"exact stdout if executable code prints"} — typing panel; with lang "text" it is a typed worked-example/derivation panel
 - {"kind":"terminal","narration":"...","lines":["$ command","output", 1-10 lines, each <=60 chars]}
-- {"kind":"diagram","sayIntro":"optional","title":"<=60","nodes":[{"id","label":"<=28","x":0-11,"y":0-11,"w":2-12,"h":1-4,"accent":bool}],"arrows":[{"from","to","label":"<=24 optional"}],"steps":[{"reveal":[node ids],"highlight":[node ids],"say":"spoken while THIS step reveals/highlights"}, 1-8 steps]} — 12x12 grid, nodes must not overlap; tell the story step by step (also perfect for timelines, maps-as-boxes, flows, hierarchies)
-- {"kind":"compare","sayIntro":"optional","title":"<=60","left":{"title":"<=30","items":["<=70",1-4],"say":"spoken while the LEFT panel shows"},"right":{same with its own "say"},"verdict":"<=110 optional","sayVerdict":"spoken while the verdict appears"}
+- {"kind":"diagram","sayIntro":"optional","title":"<=60","nodes":[{"id","label":"<=28","x":0-11,"y":0-11,"w":2-12,"h":1-4,"accent":bool,"icon":"optional ONE emoji drawn above the label"}],"arrows":[{"from","to","label":"<=24 optional"}],"steps":[{"reveal":[node ids],"highlight":[node ids],"move":[{"node":"id","x":0-11,"y":0-11}, optional 0-4 — the node GLIDES to the new grid spot during this step's beat],"say":"spoken while THIS step reveals/highlights/moves"}, 1-8 steps]} — 12x12 grid, nodes must not overlap; tell the story step by step. "move" is perfect for sliding-window/two-pointer walks, queue shifts, swaps and anything that physically travels — narrate the movement while it happens
+- {"kind":"compare","sayIntro":"optional","title":"<=60","left":{"title":"<=30","icon":"optional ONE emoji","items":["<=70",1-4],"say":"spoken while the LEFT panel shows"},"right":{same with its own "say" and optional "icon"},"verdict":"<=110 optional","sayVerdict":"spoken while the verdict appears"}
 - {"kind":"question","narration":"...","text":"<=180","hint":"<=110 optional"} — ending challenge for comments
 - {"kind":"timeline","sayIntro":"optional","title":"<=60","events":[{"when":"<=18 date/era/marker","label":"<=52","say":"spoken as THIS event appears"}, 2-6 chronological events]} — dated vertical spine; ideal for history, the evolution of an idea, a sequence of events
 - {"kind":"stat","narration":"...","value":"<=14 (e.g. \\"₹1.2 Cr\\", \\"40%\\", \\"8 min\\", \\"1 in 9\\")","label":"<=60 what the number measures","context":"<=100 optional framing"} — ONE huge number made visceral; use for a stunning figure or the payoff of a calculation. The value MUST be an actual number/quantity you are confident is TRUE — never a word like "Higher" or "Faster", and never a figure invented for impact (a wrong "wow" number is a factual error that destroys trust). If you are not certain of a real figure, use a different scene kind instead of guessing.
@@ -110,7 +110,10 @@ const SUBJECT_PLAYBOOKS: Record<string, string> = {
   coding: `Coding playbook: teach the MECHANISM. Use a "code" scene as minimal runnable proof and a
 "terminal" scene for the real output. Use "diagram" for architecture/data-flow, "compare" for
 approach-vs-approach (e.g. array vs linked list), "steps" for an algorithm walk-through, "chart" for
-benchmark/complexity numbers, "mythfact" for a widespread wrong belief. Prove it, do not just assert it.`,
+benchmark/complexity numbers, "mythfact" for a widespread wrong belief. Prove it, do not just assert it.
+For algorithms where something MOVES (sliding window, two pointers, queue head, swap), use diagram
+"move" so the pointer/window nodes physically glide across the array — move EVERY node that travels
+in that step (both the window box AND its pointers together, never leaving one behind).`,
   history: `History playbook: make it a thriller. Use a "timeline" for the sequence of events, a
 "diagram" for cause->effect chains or who-fought-whom, a "stat" for the number that stuns (army
 sizes, death tolls, distances), a "chart" to compare empires/armies/economies, and a real "quote"
@@ -184,6 +187,24 @@ emotions"). ALWAYS end with a "question" people will argue about.`,
 first (bigtext or mythfact), then the fix as a "steps" scene the viewer can copy today. Use "stat"
 for the cost of doing it wrong, "chart" to compare methods, "quiz" to check understanding, and end
 with a 24-hour challenge in the "question" scene. Practical over motivational — no platitudes.`,
+  polity: `Polity & Governance playbook (UPSC-grade): precision IS the product — cite the exact
+Article, Amendment and landmark case (Article 21, Kesavananda Bharati 1973, 73rd Amendment); one
+wrong number destroys aspirant trust, so if unsure of a figure, say "around" or restructure. Use
+"diagram" for structures and processes (how a bill becomes law, judicial hierarchy, election
+machinery), "compare" for classic exam confusions (FR vs DPSP, Lok Sabha vs Rajya Sabha, censure vs
+no-confidence), "timeline" for constitutional history, "stat" for the memorable number (545 seats,
+6 freedoms, 22 languages), "mythfact" for misconceptions (the President is NOT the head of
+government). ALWAYS include a "quiz" — aspirants crave self-testing — and end with a mains-style
+"question" that demands an opinion with reasoning. Explain the WHY behind every provision (why
+bicameral, why a collegium, why Article 356 exists), never just the fact.`,
+  mindset: `Mindset & Self-Growth playbook: transformation-first, zero platitudes. Open with the
+painful, hyper-specific moment (your mind going blank on stage, the 2 AM scroll-envy spiral), then
+name the real psychological mechanism behind it — never say "just be confident". Use "mythfact" to
+kill one piece of toxic advice per video, "steps" for a drill the viewer can literally do TODAY
+with rep counts ("record yourself for 60 seconds, three takes"), "compare" for the fixed vs growth
+response to the SAME event, "stat" for research numbers with "about" hedging, and a "quote" only if
+real and correctly attributed. Show the rep count, not the pep talk. End with a 24-hour challenge
+"question" the viewer can report back on in the comments.`,
   mythology: `Mythology & Epics playbook: storytelling-first, like a gripping narrator. Use "timeline"
 for the arc of an episode, "diagram" for family trees and who-cursed-whom chains, a "quote" for a
 famous verse or line (translated, attributed), "compare" for parallel myths across cultures,

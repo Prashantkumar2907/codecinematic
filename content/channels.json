@@ -18,7 +18,14 @@
       "label": "Bharat Briefs (English)",
       "lang": "en",
       "voice": "en-IN-NeerjaNeural",
-      "defaultCategories": ["Indian Politics", "International", "Sports", "Economy", "Entertainment", "Technology"],
+      "defaultCategories": [
+        "Indian Politics",
+        "International",
+        "Sports",
+        "Economy",
+        "Entertainment",
+        "Technology"
+      ],
       "creds": {
         "clientId": "EN_YT_CLIENT_ID",
         "clientSecret": "EN_YT_CLIENT_SECRET",
@@ -31,7 +38,14 @@
       "label": "Bharat Briefs हिंदी",
       "lang": "hi",
       "voice": "hi-IN-SwaraNeural",
-      "defaultCategories": ["Indian Politics", "International", "Sports", "Economy", "Entertainment", "Technology"],
+      "defaultCategories": [
+        "Indian Politics",
+        "International",
+        "Sports",
+        "Economy",
+        "Entertainment",
+        "Technology"
+      ],
       "creds": {
         "clientId": "HI_YT_CLIENT_ID",
         "clientSecret": "HI_YT_CLIENT_SECRET",
@@ -45,7 +59,9 @@
       "lang": "en",
       "voice": "en-US-AndrewMultilingualNeural",
       "defaultCategories": [],
-      "subjects": ["Coding"],
+      "subjects": [
+        "Coding"
+      ],
       "creds": {
         "clientId": "YT_CLIENT_ID",
         "clientSecret": "YT_CLIENT_SECRET",
@@ -65,7 +81,8 @@
         "Science",
         "GK & Amazing Facts",
         "Mythology & Epics",
-        "Philosophy & Big Ideas"
+        "Philosophy & Big Ideas",
+        "Polity & Governance"
       ],
       "creds": {
         "clientId": "LORE_YT_CLIENT_ID",
@@ -87,7 +104,8 @@
         "Health & Body",
         "Life Skills & Productivity",
         "English & Communication",
-        "Math & Aptitude"
+        "Math & Aptitude",
+        "Mindset & Self-Growth"
       ],
       "creds": {
         "clientId": "GROW_YT_CLIENT_ID",

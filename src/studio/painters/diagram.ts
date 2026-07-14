@@ -4,6 +4,7 @@ import {
   FONT_SANS,
   easeOutBack,
   easeOutCubic,
+  easeInOutCubic,
   sub,
   clamp01,
   wrapText,
@@ -12,6 +13,7 @@ import {
   drawSceneTitle,
   strokePolylineProgress,
   beatWindow,
+  beatT,
   activeBeatIndex,
   type Layout,
 } from "./common";
@@ -63,6 +65,34 @@ function nodeRect(node: Node, map: GridMap): Rect {
   return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
 }
 
+/**
+ * Grid position of every node at scene progress p, applying step "move"
+ * animations in order: past beats land on their targets, the active beat
+ * glides (eased) toward its target, future beats leave positions untouched.
+ * Powers sliding-window pointers, queue shifts and swaps.
+ */
+function positionsAt(
+  scene: DiagramScene,
+  env: PaintEnv,
+  offset: number,
+  totalBeats: number
+): Map<string, { x: number; y: number }> {
+  const pos = new Map(scene.nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+  scene.steps.forEach((step, k) => {
+    if (!step.move.length) return;
+    const t = beatT(env.beats, offset + k, totalBeats, env.p);
+    if (t <= 0) return;
+    // Glide within the first ~70% of the beat, then rest at the target.
+    const e = easeInOutCubic(clamp01(t * 1.45));
+    for (const mv of step.move) {
+      const from = pos.get(mv.node);
+      if (!from) continue;
+      pos.set(mv.node, { x: from.x + (mv.x - from.x) * e, y: from.y + (mv.y - from.y) * e });
+    }
+  });
+  return pos;
+}
+
 /** Scene-progress fraction at which each node first appears (start of its reveal step's beat). */
 function revealTimes(scene: DiagramScene, env: PaintEnv, offset: number, totalBeats: number): Map<string, number> {
   const times = new Map<string, number>();
@@ -103,9 +133,24 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
-  const map = gridMap(scene.nodes, layout, titleBand);
+  // Bounds cover initial positions AND every move target so the grid never
+  // re-centers mid-glide.
+  const extents: Node[] = [
+    ...scene.nodes,
+    ...scene.steps.flatMap((st) =>
+      st.move.flatMap((mv) => {
+        const n = scene.nodes.find((x) => x.id === mv.node);
+        return n ? [{ ...n, x: mv.x, y: mv.y }] : [];
+      })
+    ),
+  ];
+  const map = gridMap(extents, layout, titleBand);
+  const livePos = positionsAt(scene, env, offset, totalBeats);
   const rects = new Map<string, Rect>();
-  for (const node of scene.nodes) rects.set(node.id, nodeRect(node, map));
+  for (const node of scene.nodes) {
+    const p = livePos.get(node.id) ?? node;
+    rects.set(node.id, nodeRect({ ...node, x: p.x, y: p.y }, map));
+  }
   const reveals = revealTimes(scene, env, offset, totalBeats);
   const highlights = activeStep >= 0 && !inTail ? new Set(scene.steps[Math.min(activeStep, scene.steps.length - 1)]?.highlight ?? []) : new Set<string>();
 
@@ -234,7 +279,17 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     }
     ctx.textAlign = "center";
     const lineH = fontPx * 1.25;
-    const startY = rect.cy - ((lines.length - 1) * lineH) / 2 + fontPx * 0.35;
+    let startY = rect.cy - ((lines.length - 1) * lineH) / 2 + fontPx * 0.35;
+    if (node.icon) {
+      // Emoji icon above the label, both centered as one block.
+      const iconPx = Math.min(rect.h * 0.4, unit * 1.25);
+      const blockH = iconPx * 1.25 + lines.length * lineH;
+      const top = rect.cy - blockH / 2;
+      ctx.font = `${iconPx}px ${FONT_SANS}`;
+      ctx.fillText(node.icon, rect.cx, top + iconPx * 0.95);
+      ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
+      startY = top + iconPx * 1.25 + fontPx * 0.8;
+    }
     lines.forEach((line, i) => ctx.fillText(line, rect.cx, startY + i * lineH));
     ctx.restore();
   }
