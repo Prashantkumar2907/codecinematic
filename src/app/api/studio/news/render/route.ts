@@ -88,6 +88,8 @@ export async function POST(req: Request) {
       title: meta.title,
       description: meta.description,
       tags: meta.tags,
+      instagramCaption: meta.instagramCaption,
+      facebookCaption: meta.facebookCaption,
       categoryId: ytCategoryFor(category),
       metaSource: meta.source,
       stories,

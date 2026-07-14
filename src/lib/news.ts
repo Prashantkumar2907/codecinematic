@@ -48,6 +48,9 @@ export type NewsInfo = {
   title: string;
   description: string;
   tags: string[];
+  /** Platform-tuned captions for Instagram/Facebook Reels (YouTube uses title+description+tags). */
+  instagramCaption?: string;
+  facebookCaption?: string;
   /** YouTube categoryId for the upload (mapped from the news category). */
   categoryId?: string;
   /** Whether title/description/tags were AI-optimized or fell back to the template. */
