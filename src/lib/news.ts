@@ -124,6 +124,19 @@ export async function teachingChannelMap(): Promise<Record<string, string>> {
   return map;
 }
 
+/** subject label → channel voice, so the studio can render with the correct TTS voice. */
+export async function teachingVoiceMap(): Promise<Record<string, string>> {
+  const { channels } = await readChannelsFile();
+  const map: Record<string, string> = {};
+  for (const c of channels) {
+    if (c.type !== "teaching") continue;
+    if (c.voice) {
+      for (const s of c.subjects ?? []) map[s] = c.voice;
+    }
+  }
+  return map;
+}
+
 export function newsDir(slug: string): string {
   return path.join(NEWS_DIR, slug);
 }

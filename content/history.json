@@ -527,6 +527,21 @@
           }
         ]
       }
+    },
+    "Economy": {
+      "Economic Basics": {
+        "GDP & Growth": [
+          {
+            "date": "2026-07-15",
+            "topic": "GDP vs GNP: What Is Net Factor Income From Abroad?",
+            "title": "GDP vs GNP: Why Geography and Citizenship Matter #Shorts",
+            "format": "short",
+            "slug": "2026-07-15-16-40-short-gdp-vs-gnp-what-is-net-factor-income-from-abroad",
+            "status": "uploaded",
+            "videoId": "w6mMO0LK43o"
+          }
+        ]
+      }
     }
   }
 }

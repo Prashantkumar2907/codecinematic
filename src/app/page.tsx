@@ -130,6 +130,7 @@ export default function Studio() {
   const [genWarning, setGenWarning] = useState<string | null>(null);
   const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
   const [uploadChannels, setUploadChannels] = useState<Record<string, string>>({});
+  const [channelVoices, setChannelVoices] = useState<Record<string, string>>({});
   const [genStartedAt, setGenStartedAt] = useState<number | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyingSceneId, setVerifyingSceneId] = useState<string | null>(null);
@@ -188,6 +189,7 @@ export default function Studio() {
         setSubjects(data.subjects);
         if (data.quota) setQuota(data.quota as Quota);
         if (data.uploadChannels) setUploadChannels(data.uploadChannels as Record<string, string>);
+        if (data.channelVoices) setChannelVoices(data.channelVoices as Record<string, string>);
       }
     } catch {
       /* retry on next mount; create flow shows empty pickers meanwhile */
@@ -449,7 +451,7 @@ export default function Studio() {
     setVoiceProgress(null);
     try {
       const narration =
-        audio ?? (await fetchNarration(script, undefined, (done, total) => setVoiceProgress({ done, total })));
+        audio ?? (await fetchNarration(script, channelVoices[script.subject], (done, total) => setVoiceProgress({ done, total })));
       setAudio(narration);
       const sceneTimings = computeTimings(script, narration);
       setTimings(sceneTimings);
