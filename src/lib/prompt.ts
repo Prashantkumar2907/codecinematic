@@ -19,7 +19,8 @@ its visual element appears. Write every beat about the element it accompanies an
 - {"kind":"vocab","sayIntro":"optional","word":"<=28","pron":"<=32 optional e.g. /ˈɛləkwənt/","pos":"<=16 optional noun/verb/adj","meaning":"<=90","examples":[{"text":"<=90 a real sentence that LITERALLY CONTAINS the word/phrase, used naturally","say":"spoken as THIS example appears"}, 1-3],"synonym":"<=48 optional"} — English-vocabulary flashcard; the word is auto-highlighted inside each example, so each example text MUST include the exact word/phrase (a sentence that only describes the meaning without using the word is wrong and teaches nothing)
 - {"kind":"chart","sayIntro":"optional","title":"<=60","items":[{"label":"<=24","value":number (plain number, no commas),"unit":"<=8 optional e.g. %, Cr, km","say":"spoken as THIS bar grows"}, 2-6 items]} — animated horizontal bar comparison with counting values; perfect for rankings, sizes, before/after numbers
 - {"kind":"quote","narration":"...","text":"<=200 the exact quotation","author":"<=40 optional"} — styled quotation card; ONLY real, correctly attributed quotes (or mark as proverb/saying)
-- {"kind":"mythfact","myth":"<=140 the common false belief","fact":"<=160 the correction","sayMyth":"spoken while the myth card shows","sayFact":"spoken while the myth is struck out and the fact appears"} — myth-buster reveal; high-engagement way to correct a misconception`;
+- {"kind":"mythfact","myth":"<=140 the common false belief","fact":"<=160 the correction","sayMyth":"spoken while the myth card shows","sayFact":"spoken while the myth is struck out and the fact appears"} — myth-buster reveal; high-engagement way to correct a misconception
+- {"kind":"table","sayIntro":"optional","title":"<=60","columns":["<=18 header", 2-5],"rows":[{"cells":["<=24 value", one per column],"say":"spoken as THIS row slides in","highlight":bool optional},2-6 rows],"highlightCol":optional 0-based column to tint (the key/join column),"caption":"<=90 optional"} — animated data grid; header appears, then rows reveal one per beat. PERFECT for SQL result sets / JOIN outputs / WHERE-filtered rows (set highlight:true on rows that match), a schema's columns, a pricing/plan comparison, or any real rows-and-columns data. Keep cells short; narrate what each row shows.`;
 
 const NARRATION_RULES = `
 Narration rules (neural TTS voice; each beat is voiced separately):
@@ -113,7 +114,11 @@ approach-vs-approach (e.g. array vs linked list), "steps" for an algorithm walk-
 benchmark/complexity numbers, "mythfact" for a widespread wrong belief. Prove it, do not just assert it.
 For algorithms where something MOVES (sliding window, two pointers, queue head, swap), use diagram
 "move" so the pointer/window nodes physically glide across the array — move EVERY node that travels
-in that step (both the window box AND its pointers together, never leaving one behind).`,
+in that step (both the window box AND its pointers together, never leaving one behind).
+For SQL / databases, use a "table" scene to SHOW real rows: a sample table, a JOIN's output, or a
+query result — set highlight:true on the rows a WHERE clause keeps, and highlightCol on the join/key
+column, so the query's effect is visible, not just described. Pair a "code" SQL query with the
+"table" result right after it.`,
   history: `History playbook: make it a thriller. Use a "timeline" for the sequence of events, a
 "diagram" for cause->effect chains or who-fought-whom, a "stat" for the number that stuns (army
 sizes, death tolls, distances), a "chart" to compare empires/armies/economies, and a real "quote"

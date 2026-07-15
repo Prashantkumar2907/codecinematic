@@ -15,6 +15,7 @@ import { paintVocab } from "./vocab";
 import { paintChart } from "./chart";
 import { paintQuote } from "./quote";
 import { paintMythfact } from "./mythfact";
+import { paintTable } from "./table";
 
 /** A narration beat's window within the scene, as fractions of scene duration. */
 export type BeatWindow = { start: number; end: number };
@@ -51,6 +52,7 @@ const painters: Record<SceneKind, Painter> = {
   chart: paintChart as Painter,
   quote: paintQuote as Painter,
   mythfact: paintMythfact as Painter,
+  table: paintTable as Painter,
 };
 
 export function paintScene(ctx: CanvasRenderingContext2D, scene: Scene, env: PaintEnv) {

@@ -11,6 +11,15 @@
             "format": "long",
             "slug": "2026-07-10-10-57-long-the-strategy-pattern-replacing-complex-if-else-chains",
             "status": "draft"
+          },
+          {
+            "date": "2026-07-15",
+            "topic": "The Singleton Pattern: Why global state is a trap",
+            "title": "The Singleton Pattern: Why Global State is a Dangerous Trap",
+            "format": "long",
+            "slug": "2026-07-15-07-04-long-the-singleton-pattern-why-global-state-is-a-trap",
+            "status": "uploaded",
+            "videoId": "V9rZ7s2MZrI"
           }
         ],
         "Scaling & Sharding": [
@@ -134,6 +143,14 @@
             "title": "Your object doesn't own its methods — JS prototypes #Shorts",
             "format": "short",
             "slug": "2026-07-14-13-47-short-the-prototype-chain-how-objects-find-their-methods",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-15",
+            "topic": "The prototype chain: how objects find their methods",
+            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "format": "short",
+            "slug": "2026-07-15-08-02-short-the-prototype-chain-how-objects-find-their-methods",
             "status": "draft"
           }
         ]
@@ -312,6 +329,14 @@
             "format": "short",
             "slug": "2026-07-13-15-37-short-the-elephant-in-the-room-how-to-use-it-correctly",
             "status": "draft"
+          },
+          {
+            "date": "2026-07-15",
+            "topic": "Stop saying 'doing full enjoy': Correcting common Indian-English idioms",
+            "title": "Stop Saying Doing Full Enjoy: Correct Indian English Idioms #Shorts",
+            "format": "short",
+            "slug": "2026-07-15-03-48-short-stop-saying-doing-full-enjoy-correcting-common-indian-englis",
+            "status": "draft"
           }
         ]
       },
@@ -343,6 +368,15 @@
             "slug": "2026-07-14-18-10-short-stop-saying-what-3-polite-ways-to-ask-for-repetition",
             "status": "uploaded",
             "videoId": "a5aJZRPxb3E"
+          },
+          {
+            "date": "2026-07-15",
+            "topic": "Agreeing politely: stop saying 'Yes' to everything",
+            "title": "Agreeing Politely: Stop Saying Yes to Everything #Shorts",
+            "format": "short",
+            "slug": "2026-07-15-03-42-short-agreeing-politely-stop-saying-yes-to-everything",
+            "status": "uploaded",
+            "videoId": "aWfF2YciPjI"
           }
         ]
       }

@@ -219,6 +219,27 @@ const mythfactScene = z.object({
   sayFact: say,
 });
 
+const tableScene = z.object({
+  kind: z.literal("table"),
+  id,
+  sayIntro: say.optional(),
+  title: z.string().min(2).max(60),
+  columns: z.array(z.string().min(1).max(18)).min(2).max(5),
+  rows: z
+    .array(
+      z.object({
+        cells: z.array(z.string().max(24)).min(1).max(5),
+        say,
+        highlight: z.boolean().default(false),
+      })
+    )
+    .min(1)
+    .max(6),
+  /** Optional 0-based column to tint throughout (e.g. the key/join column). */
+  highlightCol: z.number().int().min(0).max(4).optional(),
+  caption: z.string().max(90).optional(),
+});
+
 export const sceneSchema = z.discriminatedUnion("kind", [
   bigtextScene,
   bulletsScene,
@@ -235,6 +256,7 @@ export const sceneSchema = z.discriminatedUnion("kind", [
   chartScene,
   quoteScene,
   mythfactScene,
+  tableScene,
 ]);
 export type Scene = z.infer<typeof sceneSchema>;
 export type SceneKind = Scene["kind"];
@@ -295,6 +317,10 @@ export function sceneBeats(scene: Scene): { beatId: string; text: string }[] {
       return [beat(0, scene.narration)];
     case "mythfact":
       return [beat(0, scene.sayMyth), beat(1, scene.sayFact)];
+    case "table": {
+      const texts = [...(scene.sayIntro ? [scene.sayIntro] : []), ...scene.rows.map((r) => r.say)];
+      return texts.map((t, k) => beat(k, t));
+    }
   }
 }
 
@@ -309,6 +335,7 @@ export function introBeatCount(scene: Scene): number {
     case "steps":
     case "vocab":
     case "chart":
+    case "table":
       return scene.sayIntro ? 1 : 0;
     default:
       return 0;

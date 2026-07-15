@@ -112,7 +112,7 @@ function sanitizeScene(raw: unknown): unknown {
   for (const key of ["sayIntro", "sayMyth", "sayFact", "sayQuestion", "sayReveal", "sayVerdict"]) {
     if (typeof scene[key] === "string") scene[key] = clampSpeech(scene[key], MAX_BEAT);
   }
-  for (const key of ["items", "steps", "events", "examples", "segments"]) {
+  for (const key of ["items", "steps", "events", "examples", "segments", "rows"]) {
     if (Array.isArray(scene[key])) scene[key] = (scene[key] as unknown[]).map(clampItemSay);
   }
   for (const side of ["left", "right"]) {
@@ -253,6 +253,23 @@ function sanitizeScene(raw: unknown): unknown {
       scene.myth = clamp(scene.myth, 140);
       scene.fact = clamp(scene.fact, 160);
       break;
+    case "table": {
+      scene.title = clamp(scene.title, 60);
+      scene.caption = clamp(scene.caption, 90);
+      const cols = Array.isArray(scene.columns) ? scene.columns.slice(0, 5).map((c) => clamp(c, 18)) : [];
+      scene.columns = cols;
+      if (Array.isArray(scene.rows)) {
+        scene.rows = scene.rows.slice(0, 6).map((r) => {
+          if (typeof r !== "object" || r === null) return r;
+          const row = r as Record<string, unknown>;
+          const cells = Array.isArray(row.cells) ? row.cells.map((c) => clamp(c, 24)) : [];
+          // Pad/truncate each row to match the column count so the grid is rectangular.
+          while (cells.length < cols.length) cells.push("");
+          return { ...row, cells: cells.slice(0, cols.length) };
+        });
+      }
+      break;
+    }
   }
   return scene;
 }

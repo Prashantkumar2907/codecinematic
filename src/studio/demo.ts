@@ -80,22 +80,25 @@ export const DEMO_SCRIPT: SceneScript = {
       lines: ["$ node prototype.js", "Hello, Aman", "false"],
     },
     {
+      kind: "table",
+      id: "props",
+      sayIntro: "Here is what actually lives where, side by side.",
+      title: "Own vs inherited",
+      columns: ["Property", "On p1?", "Found via"],
+      highlightCol: 2,
+      rows: [
+        { cells: ["name", "yes", "the object"], highlight: false, say: "name is set in the constructor, so it lives on p1 itself." },
+        { cells: ["greet", "no", "the prototype"], highlight: true, say: "But greet is not on p1 — it is found one hop up, on the prototype." },
+        { cells: ["toString", "no", "Object.prototype"], highlight: false, say: "And toString comes from two hops up, on Object dot prototype." },
+      ],
+    },
+    {
       kind: "mythfact",
       id: "myth",
       myth: "Every object carries its own copy of every method.",
       fact: "Methods live once on the prototype — a thousand objects share one function.",
       sayMyth: "Most beginners assume every object carries its own copy of every method.",
       sayFact: "Wrong. Methods live once on the prototype, and a thousand objects share that single function.",
-    },
-    {
-      kind: "chart",
-      id: "memory",
-      sayIntro: "Here is why that sharing matters for memory.",
-      title: "Memory for 10,000 objects",
-      items: [
-        { label: "Copied methods", value: 4200, unit: " KB", say: "Copy the method onto each object and ten thousand objects cost over four megabytes." },
-        { label: "Prototype shared", value: 640, unit: " KB", say: "Share it on the prototype and the same objects need a fraction of that." },
-      ],
     },
     {
       kind: "quiz",

@@ -75,6 +75,7 @@ function describeScene(scene: Scene): string {
     case "timeline":
     case "steps":
     case "chart":
+    case "table":
       return scene.title;
     case "code":
       return `${scene.title} (${scene.lang})`;
