@@ -140,18 +140,18 @@
     "terminal": {
       "wave": 1,
       "group": "Text/general",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 3,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "2/3/3/2/2 -> 4/4/4/4/4. Top-down camera keystoned the slab while the title bar / traffic lights / body text are axis-aligned pixel rects taken from the bounding box of two projected corners, so the bar overhung the slab's top-right corner into black. Window is now upright before an axis-aligned camera, sized from the frustum, chrome on the projected front face. Also dropped the slab scale+bob that slid under fixed-pixel chrome, sized the window to its content so it clears the Shorts UI band (was running to y=1745), raised the mono cap for phone legibility, removed 2 rgba()-into-THREE.Color calls + 9 hardcoded literals. console.log clean, 0% edge bleed.",
+      "commit": "88af755",
+      "date": "2026-07-27"
     },
     "storyboard": {
       "wave": 1,
