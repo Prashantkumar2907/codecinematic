@@ -220,18 +220,18 @@
     "trace": {
       "wave": 1,
       "group": "Code",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 2,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "1/3/4/2/2 -> 4/4/4/4/4. Same defect as code: 3D viewport was the whole frame with a hardcoded 7-wide block against a ~3.49 frustum half-width, chrome fitted to it by the MEAN of two axis scales -> 1.5% left edge bleed at 9:16. Viewport is now the panel rect, block sized from that frustum, chrome in plain pixels. Also dropped group offset/scale/bob/rotation, clamped the array-cell band to the Shorts UI edge (it centred in a band running past it, leaving ~200px dead space under the code panel), 2 hardcoded hex. edge-check 1.5% -> 0.0%.",
+      "commit": "708b223",
+      "date": "2026-07-27"
     },
     "memgrid": {
       "wave": 1,
