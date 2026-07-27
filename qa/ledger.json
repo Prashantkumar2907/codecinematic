@@ -124,18 +124,18 @@
     "dialogue": {
       "wave": 1,
       "group": "Text/general",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 3,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "1/1/2/1/1 -> 4/4/4/4/4. The scene rendered ZERO message text on every frame after the first: projectedPoints was a per-paint array filled inside build()'s update() closure, which captures frame 0's array, so the live one stayed empty and every bubble was dropped. Realigned the 3D layer to the 2D layout with an axis-aligned camera (projectToRect is affine on a z=const plane, so pixel<->world round-trips exactly); removed the two-axis group wobble. Also: accentSoft/rgba() into THREE.Color dropped alpha and rendered a solid sky-blue slab; edge wireframes now fade with their face; short threads centre instead of pinning to the bottom of an empty panel; 5 hardcoded hex. console.log clean, 0% edge bleed.",
+      "commit": "edb851b",
+      "date": "2026-07-27"
     },
     "terminal": {
       "wave": 1,
@@ -1821,6 +1821,15 @@
       "id": "2d-layout-round-tripped-through-camera",
       "status": "open",
       "detail": "Painters that map 2D pixel positions linearly into world space and then project back through a TILTED perspective camera do not recover the source pixel - the ground plane maps non-linearly. Confirmed in showdown; suspected in race and any painter with a worldPos(px,py) helper plus an off-axis camera. Symptom: elements near the design edges land outside the frame, worst at 9:16 where the frustum is narrowest."
+    },
+    {
+      "id": "frozen-painter-local-output-array",
+      "status": "found-2026-07-27",
+      "detail": "Same root cause as frozen-3d-layer but the frozen value is a painter-local array the update() closure writes INTO, not env. The central liveEnv fix cannot reach it. In dialogue this suppressed 100% of the message text. Grep for a const array declared in the painter body and mutated inside build()'s update(). Confirmed in quiz.ts:99/205/221 by the same grep.",
+      "affected": [
+        "dialogue",
+        "quiz"
+      ]
     }
   ],
   "tools": [
