@@ -236,18 +236,18 @@
     "memgrid": {
       "wave": 1,
       "group": "Code",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 2,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "1/2/2/1/1 -> 4/4/4/4/4. A uniform memory grid rendered as six different shapes with the outer columns off both frame edges: cell positions were world literals on a ground plane under a camera at (0,12,10), so every cell sat at a different depth while the 2D chrome used one fixed pixel width. Pixel grid is now authoritative, each slab mapped onto its cell via an axis-aligned camera. SEPARATELY the 3D cell colours were frozen at frame 0 (update() read the painter-local writes/frees/cur captured by the build closure) so allocation/write/free were invisible in 3D \u2014 that state now travels through render3D's context arg. Also accentSoft (an rgba string) into THREE.Color.setStyle rendered as full accent, grid now clears the Shorts UI band, ptr pin moved inside its own cell (was landing on the next row's address), 5 hardcoded literals. edge-check 0.5% -> 0.0%.",
+      "commit": "0913570",
+      "date": "2026-07-27"
     },
     "callstack": {
       "wave": 1,
@@ -1774,7 +1774,7 @@
     {
       "id": "frozen-3d-layer",
       "status": "fixed-centrally-2026-07-27",
-      "detail": "render3D caches the ThreeBundle per key; painters wrote update() as a closure over env, capturing frame 0. Every scene starts at p=0, so the whole 3D layer was frozen/invisible in production. Fixed in three3d.ts via a liveEnv arg + Object.assign onto the captured env; all 29 call sites updated. VISUALLY VERIFIED ONLY FOR bigtext AND bullets - the other 27 now animate for the first time and must be re-reviewed as the wave reaches them.",
+      "detail": "render3D caches the ThreeBundle per key; painters wrote update() as a closure over env, capturing frame 0. Every scene starts at p=0, so the whole 3D layer was frozen/invisible in production. Fixed in three3d.ts via a liveEnv arg + Object.assign onto the captured env; all 29 call sites updated. VISUALLY VERIFIED ONLY FOR bigtext AND bullets - the other 27 now animate for the first time and must be re-reviewed as the wave reaches them. ALSO: liveEnv only refreshes `env`. Painters whose update() reads OTHER painter-local values (Sets, derived state, output arrays) are still frozen at frame 0 \u2014 confirmed and fixed in memgrid (write/free colours) and dialogue/quiz (projectedPoints). Pass such state through render3D's `context` argument instead.",
       "affected": [
         "bigtext",
         "bracket",
