@@ -204,18 +204,18 @@
     "code": {
       "wave": 1,
       "group": "Code",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 2,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "1/3/3/2/1 -> 4/4/4/4/4. The editor window overflowed BOTH side edges at 9:16 (traffic lights half off at x=0, JS badge and UTF-8 clipped, code cut mid-string; edge-check 1.7% left): the 3D viewport was the whole frame with a hardcoded 7.5-wide block against a ~3.49 frustum half-width, and the pixel chrome was scaled onto the block by the MEAN of its two axis scales. Viewport is now the window itself, block sized from that frustum, chrome drawn in plain pixels with no transform. edge-check 1.7% -> 0.0%. Also dropped bob + two-axis rotation + easeOutBack overshoot, clamped above the Shorts UI band, removed 11 hardcoded literals including 3 that hardcoded the default sky accent and ignored the subject palette.",
+      "commit": "c35d7a9",
+      "date": "2026-07-27"
     },
     "trace": {
       "wave": 1,
