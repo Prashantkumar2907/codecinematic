@@ -108,18 +108,18 @@
     "mythfact": {
       "wave": 1,
       "group": "Text/general",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 2,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "1/2/3/1/2 -> 4/4/4/4/4. Card chrome (chip/text/badge/strike) was a pixel rect sized from contentW then re-centred on the projected block, so on 16:9 the chip and first line floated in black off the slab and the badge sat 120px past its edge. Front-on coplanar blocks sized from frustumHalfExtent; chrome rect derived from the projected front face. Also: bust colour ramps over 320ms instead of flipping in one frame, strike spans the measured text not the card width, emphasis variant now reaches the geometry, faces darkened for text contrast, 5 hardcoded hex. 0% edge bleed both aspects.",
+      "commit": "c4ac573",
+      "date": "2026-07-27"
     },
     "dialogue": {
       "wave": 1,
