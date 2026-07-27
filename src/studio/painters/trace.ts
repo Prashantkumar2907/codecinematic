@@ -1,0 +1,338 @@
+import * as THREE from "three";
+import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
+import { introBeatCount, type Scene } from "../schema";
+import {
+  THEME,
+  FONT_MONO,
+  easeOutCubic,
+  easeInOutCubic,
+  easeOutBack,
+  shade,
+  enterT,
+  idle,
+  clamp01,
+  roundRect,
+  fitFontSize,
+  drawSceneTitle,
+  beatT,
+  activeBeatIndex,
+  rgba,
+} from "./common";
+import type { PaintEnv } from "./index";
+
+const BLOCK_DEPTH = 0.3;
+/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
+const EDGE_ALPHA = 0.6;
+const PANEL_FACE_LIFT = 0.16;
+/** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16). */
+const SAFE_BOTTOM_SHORT = 0.75;
+const SAFE_BOTTOM_LONG = 0.94;
+
+type TraceScene = Extract<Scene, { kind: "trace" }>;
+type MarkKind = "focus" | "done" | "visit";
+
+/** Replay steps 0..k: value order after all settled swaps + latest mark per index. */
+function stateAt(scene: TraceScene, k: number): { values: string[]; marks: Map<number, MarkKind> } {
+  const values = [...scene.cells];
+  const marks = new Map<number, MarkKind>();
+  const last = Math.min(k, scene.steps.length - 1);
+  for (let i = 0; i <= last; i++) {
+    const step = scene.steps[i];
+    if (step.swap && step.swap.a < values.length && step.swap.b < values.length) {
+      const { a, b } = step.swap;
+      [values[a], values[b]] = [values[b], values[a]];
+    }
+    for (const m of step.mark) if (m.index < values.length) marks.set(m.index, m.state);
+  }
+  return { values, marks };
+}
+
+/** Latest index per pointer label after steps 0..k, in first-seen order. */
+function pointersAt(scene: TraceScene, k: number): Map<string, number> {
+  const pos = new Map<string, number>();
+  const last = Math.min(k, scene.steps.length - 1);
+  for (let i = 0; i <= last; i++) for (const pt of scene.steps[i].pointers) pos.set(pt.label, pt.index);
+  return pos;
+}
+
+export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env: PaintEnv) {
+  const { layout } = env;
+  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { accent, accentSoft, accentGlow, secondary } = env.palette;
+  const offset = introBeatCount(scene);
+  const totalBeats = offset + scene.steps.length;
+  const active = activeBeatIndex(env.beats, totalBeats, env.p);
+  const activeStep = Math.min(active - offset, scene.steps.length - 1);
+  const t = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
+  const frameIn = easeOutCubic(enterT(env, 380));
+  if (frameIn <= 0) return;
+  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
+
+  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.35;
+  const areaY = contentY + band;
+  const areaH = contentH - band;
+
+  const panelX = contentX;
+  const panelY = areaY;
+  const panelW = vertical ? contentW : contentW * 0.48;
+  const panelH = vertical ? areaH * 0.42 : areaH;
+  const cellsX = vertical ? contentX : contentX + contentW * 0.52;
+  const cellsW = vertical ? contentW : contentW * 0.48;
+  const cellsAreaY = vertical ? panelY + panelH + unit * 0.6 : areaY;
+  // The cell row is centred in this band, so the band must stop at the Shorts UI
+  // edge — measuring it to contentH pushed the row ~200px lower than the visible
+  // area and opened a dead gap between the code panel and the cells.
+  const cellsAreaBottom = Math.min(areaY + areaH, (vertical ? SAFE_BOTTOM_SHORT : SAFE_BOTTOM_LONG) * layout.h);
+  const cellsAreaH = vertical ? cellsAreaBottom - cellsAreaY : areaH;
+
+  const rawLines = scene.code;
+  const clampLine = (l: number) => Math.min(Math.max(l, 1), rawLines.length);
+  const toLine = clampLine(scene.steps[Math.max(activeStep, 0)].line);
+  const fromLine = clampLine(scene.steps[Math.max(activeStep - 1, 0)].line);
+  
+  const key = scene.id + "-trace3d";
+  
+  // The 3D viewport is the code panel plus a hairline for its edge glow. It used to be
+  // the WHOLE FRAME with a hardcoded 7-wide block: at 9:16 the frustum half-width is
+  // only ~3.49, so the block hung off both edges and dragged the pixel chrome with it.
+  const rectPad = unit * 0.3;
+  const rect = {
+    x: panelX - rectPad,
+    y: panelY - rectPad,
+    w: panelW + rectPad * 2,
+    h: panelH + rectPad * 2,
+  };
+
+  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
+  };
+
+  const build = (): ThreeBundle => {
+    const s = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, vertical ? 15 : 12);
+    camera.lookAt(0, 0, 0);
+    studioLights(s, accent, secondary);
+
+    const m = mappingAt(camera, BLOCK_DEPTH / 2);
+    const block = makeBlock(panelW / m.sx, panelH / m.sy, BLOCK_DEPTH, THEME.panel, accent);
+    s.add(block);
+
+    const update = () => {
+      // No offset, scale, bob or rotation: the chrome below is drawn in pixels on this
+      // block's own rect, so any transform here slides the two layers apart.
+      const gIn = easeOutCubic(enterT(env, 600));
+      block.traverse((o) => {
+        const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (!mat) return;
+        mat.transparent = true;
+        mat.opacity = gIn * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 0.95);
+      });
+    };
+
+    return { scene: s, camera, update };
+  };
+
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
+  if (!cam) return;
+
+  ctx.save();
+  ctx.globalAlpha = frameIn;
+
+  // draw the code panel borders over 3D block
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  roundRect(ctx, panelX, panelY, panelW, panelH, unit * 0.5);
+  ctx.strokeStyle = THEME.panelBorder;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const padX = unit * 0.65;
+  const gutterW = unit * 1.3;
+  const longest = rawLines.reduce((a, b) => (b.length > a.length ? b : a), "");
+  const px = fitFontSize(ctx, longest, {
+    maxW: panelW - padX * 2 - gutterW,
+    startPx: vertical ? unit * 1.05 : unit * 0.92,
+    minPx: unit * 0.42,
+    weight: 500,
+    family: FONT_MONO,
+  });
+  let lineH = px * 1.5;
+  if (rawLines.length * lineH > panelH - unit * 0.9) lineH = (panelH - unit * 0.9) / rawLines.length;
+  const codeTop = panelY + (panelH - rawLines.length * lineH) / 2;
+
+  const glideRaw = clamp01(t / 0.3);
+  const glide = activeStep > 0 ? easeInOutCubic(glideRaw) : 1;
+  const lineF = fromLine + (toLine - fromLine) * glide;
+  const breathe = 0.7 + 0.3 * idle(env, 3800);
+  const barY = codeTop + (lineF - 1) * lineH;
+  ctx.save();
+  ctx.globalAlpha = frameIn * (activeStep >= 0 ? breathe : 0.25 * breathe);
+  ctx.fillStyle = accentSoft;
+  ctx.fillRect(panelX + unit * 0.16, barY, panelW - unit * 0.32, lineH);
+  ctx.fillStyle = accent;
+  ctx.fillRect(panelX + unit * 0.16, barY, unit * 0.14, lineH);
+  ctx.restore();
+
+  const boldLine = activeStep < 0 ? -1 : activeStep > 0 && glideRaw < 0.5 ? fromLine : toLine;
+  for (let i = 0; i < rawLines.length; i++) {
+    const y = codeTop + i * lineH + lineH * 0.5 + px * 0.35;
+    const isBold = i + 1 === boldLine;
+    ctx.font = `500 ${px * 0.78}px ${FONT_MONO}`;
+    ctx.fillStyle = THEME.textFaint;
+    ctx.textAlign = "right";
+    ctx.fillText(String(i + 1), panelX + padX + gutterW - unit * 0.45, y);
+    ctx.textAlign = "start";
+    ctx.font = `${isBold ? 700 : 500} ${px}px ${FONT_MONO}`;
+    ctx.fillStyle = isBold ? THEME.text : THEME.textDim;
+    ctx.fillText(rawLines[i], panelX + padX + gutterW, y);
+  }
+  ctx.restore(); // restore from panel scaling!
+
+  // Now draw the array cells!
+  ctx.save();
+  ctx.globalAlpha = frameIn;
+  ctx.translate(0, (1 - frameIn) * unit * 0.5);
+
+  const n = scene.cells.length;
+  const gap = unit * 0.24;
+  const side = Math.min((cellsW - gap * (n - 1)) / n, unit * 2.2);
+  const rowW = n * side + (n - 1) * gap;
+  const x0 = cellsX + (cellsW - rowW) / 2;
+  const blockH2 = side + unit * 2.7;
+  let tileY = cellsAreaY + Math.max((cellsAreaH - blockH2) / 2, 0);
+  if (vertical) tileY = Math.max(Math.min(tileY, layout.h * 0.86 - blockH2), cellsAreaY);
+  const tileCx = (i: number) => x0 + i * (side + gap) + side / 2;
+
+  const swap = activeStep >= 0 ? scene.steps[activeStep].swap : undefined;
+  const swapping = !!swap && swap.a < n && swap.b < n;
+  const valueState = stateAt(scene, swapping ? activeStep - 1 : activeStep);
+  const marks = stateAt(scene, activeStep).marks;
+  const activeMarked = new Set(activeStep >= 0 ? scene.steps[activeStep].mark.map((m) => m.index) : []);
+
+  const longestVal = scene.cells.reduce((a, b) => (b.length > a.length ? b : a), "0");
+  const vpx = fitFontSize(ctx, longestVal, {
+    maxW: side * 0.74,
+    startPx: Math.max(side * 0.5, unit * 0.75),
+    minPx: Math.min(unit * 0.75, side * 0.6),
+    weight: 700,
+    family: FONT_MONO,
+  });
+
+  const paintTileFrame = (x: number, y: number, mark: MarkKind | undefined, emphasized: boolean) => {
+    if (emphasized) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * 0.7;
+    }
+    roundRect(ctx, x, y, side, side, unit * 0.3);
+    ctx.fillStyle =
+      mark === "focus" ? accentSoft : mark === "done" ? rgba(THEME.good, 0.12) : mark === "visit" ? rgba(secondary, 0.14) : THEME.panel;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    roundRect(ctx, x, y, side, side, unit * 0.3);
+    ctx.strokeStyle = mark === "focus" ? accent : mark === "done" ? THEME.good : THEME.panelBorder;
+    ctx.lineWidth = mark === "focus" || mark === "done" ? unit * 0.08 : unit * 0.05;
+    ctx.stroke();
+  };
+
+  ctx.textAlign = "center";
+  for (let i = 0; i < n; i++) {
+    const appear = easeOutCubic(enterT(env, 320, 140 + i * 45));
+    if (appear <= 0) continue;
+    const x = x0 + i * (side + gap);
+    const y = tileY + (1 - appear) * unit * 0.5;
+    const mark = marks.get(i);
+    ctx.save();
+    ctx.globalAlpha = appear;
+    paintTileFrame(x, y, mark, activeMarked.has(i));
+    const hidden = swapping && (i === swap.a || i === swap.b);
+    if (!hidden) {
+      ctx.font = `700 ${vpx}px ${FONT_MONO}`;
+      ctx.fillStyle = THEME.text;
+      ctx.fillText(valueState.values[i], x + side / 2, y + side / 2 + vpx * 0.35);
+    }
+    ctx.font = `500 ${unit * 0.5}px ${FONT_MONO}`;
+    ctx.fillStyle = THEME.textFaint;
+    ctx.fillText(String(i), x + side / 2, y + side + unit * 0.6);
+    ctx.restore();
+  }
+
+  if (swapping) {
+    const f = clamp01(t * 1.3);
+    const e = easeInOutCubic(f);
+    const arc = Math.sin(Math.PI * f) * unit * 1.5;
+    const cy = tileY + side / 2;
+    const faces = [
+      { val: valueState.values[swap.a], x: tileCx(swap.a) + (tileCx(swap.b) - tileCx(swap.a)) * e, y: cy - arc },
+      { val: valueState.values[swap.b], x: tileCx(swap.b) + (tileCx(swap.a) - tileCx(swap.b)) * e, y: cy + arc },
+    ];
+    for (const face of faces) {
+      ctx.save();
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * 0.9;
+      roundRect(ctx, face.x - side / 2, face.y - side / 2, side, side, unit * 0.3);
+      ctx.fillStyle = shade(THEME.panel, PANEL_FACE_LIFT);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      roundRect(ctx, face.x - side / 2, face.y - side / 2, side, side, unit * 0.3);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = unit * 0.09;
+      ctx.stroke();
+      ctx.font = `700 ${vpx}px ${FONT_MONO}`;
+      ctx.fillStyle = THEME.text;
+      ctx.fillText(face.val, face.x, face.y + vpx * 0.35);
+      ctx.restore();
+    }
+  }
+
+  const curPtrs = pointersAt(scene, activeStep);
+  const prevPtrs = pointersAt(scene, activeStep - 1);
+  const activeLabels = new Set(activeStep >= 0 ? scene.steps[activeStep].pointers.map((p) => p.label) : []);
+  const glideP = easeInOutCubic(clamp01(t / 0.4));
+  const placed: number[] = [];
+  const notchTop = tileY + side + unit * 0.82;
+  for (const [label, idx] of curPtrs) {
+    const target = Math.min(idx, n - 1);
+    const from = prevPtrs.has(label) ? Math.min(prevPtrs.get(label)!, n - 1) : target;
+    const posF = from + (target - from) * glideP;
+    const level = placed.filter((p) => Math.abs(p - posF) < 0.6).length;
+    placed.push(posF);
+    const isFresh = !prevPtrs.has(label) && activeLabels.has(label);
+    const pop = isFresh ? easeOutBack(clamp01(t * 2.5)) : 1;
+    const alpha = isFresh ? clamp01(t * 3) : 1;
+    const bob = activeLabels.has(label) ? (idle(env, 3100) - 0.5) * unit * 0.12 : 0;
+    const cx = x0 + posF * (side + gap) + side / 2;
+    const ny = notchTop + level * unit * 1.2 + bob;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cx, ny);
+    ctx.scale(pop, pop);
+    ctx.translate(-cx, -ny);
+    if (activeLabels.has(label)) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * 0.5;
+    }
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(cx, ny - unit * 0.26);
+    ctx.lineTo(cx - unit * 0.26, ny);
+    ctx.lineTo(cx + unit * 0.26, ny);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = `700 ${unit * 0.58}px ${FONT_MONO}`;
+    const tw = ctx.measureText(label).width;
+    roundRect(ctx, cx - tw / 2 - unit * 0.35, ny - unit * 0.04, tw + unit * 0.7, unit * 0.92, unit * 0.26);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = THEME.bgBottom;
+    ctx.fillText(label, cx, ny + unit * 0.58);
+    ctx.restore();
+  }
+  ctx.restore(); // restore the translate that was wrapped around array cells
+  ctx.textAlign = "start";
+}
