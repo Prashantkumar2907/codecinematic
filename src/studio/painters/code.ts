@@ -1,6 +1,8 @@
+import * as THREE from "three";
+import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import { tokenizeLine } from "../tokenize";
-import { THEME, FONT_MONO, FONT_SANS, easeOutCubic, sub, clamp01, roundRect, beatWindow, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_MONO, FONT_SANS, easeOutCubic, clamp01, enterT, idle, roundRect, beatWindow, activeBeatIndex, rgba, shade } from "./common";
 import type { PaintEnv } from "./index";
 
 type CodeScene = Extract<Scene, { kind: "code" }>;
@@ -8,6 +10,14 @@ type CodeScene = Extract<Scene, { kind: "code" }>;
 /** Fraction of a segment's beat spent typing; the rest holds for listening. */
 const TYPE_WITHIN_BEAT = 0.88;
 const BASE_COLS = 46;
+const BLOCK_DEPTH = 0.3;
+/** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16). */
+const SAFE_BOTTOM_SHORT = 0.75;
+const SAFE_BOTTOM_LONG = 0.94;
+/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
+const EDGE_ALPHA = 0.6;
+/** Traffic lights are a macOS reference, not palette colours — deliberately literal. */
+const TRAFFIC_LIGHTS = ["#ff5f57", "#febc2e", "#28c840"] as const;
 
 type TypingState = {
   lines: { content: string; number: number; typedChars: number }[];
@@ -58,13 +68,17 @@ function typingState(scene: CodeScene, env: PaintEnv, offset: number, totalBeats
 export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
-  const { accent, accentSoft } = env.palette;
+  const { accent, accentSoft, secondary } = env.palette;
   const focus = new Set(scene.focusLines);
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.segments.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const frameIn = easeOutCubic(sub(env.p, 0, 0.1));
+  const frameIn = easeOutCubic(enterT(env, 340));
+  if (frameIn <= 0) return;
+
+  const key = scene.id + "-code3d";
+
   const fx = contentX;
   const fw = contentW;
   const barH = unit * 1.7;
@@ -77,48 +91,86 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   const lineCount = scene.code.split("\n").length;
   // Panel hugs the code instead of always filling the frame — a 8-line snippet
   // in 9:16 otherwise leaves the bottom two thirds of the editor empty.
-  const maxFh = contentH * (vertical ? 0.92 : 0.96);
+  // Clamp to the Shorts UI band, not to contentH: a full-height snippet at 9:16 put
+  // the status bar and the last code lines at y>1440, under the YouTube UI.
+  const bandBottom = Math.min(contentY + contentH, (vertical ? SAFE_BOTTOM_SHORT : SAFE_BOTTOM_LONG) * layout.h);
+  const bandH = bandBottom - contentY;
+  const maxFh = bandH * (vertical ? 0.98 : 0.96);
   const fh = Math.min(maxFh, barH + lineH * (lineCount + 1.2) + sbH);
-  const fy = contentY + (contentH - fh) / 2;
+  const fy = contentY + (bandH - fh) / 2;
+  
+  // The 3D viewport is the editor window plus a hairline of room for its edge glow.
+  // It used to be the WHOLE FRAME with a hardcoded 7.5-wide block: at 9:16 the frustum
+  // half-width is only ~3.49, so the block (half-width 3.75) hung off both edges and
+  // dragged the pixel chrome with it through the scale transform below.
+  const rectPad = unit * 0.3;
+  const rect = { x: fx - rectPad, y: fy - rectPad, w: fw + rectPad * 2, h: fh + rectPad * 2 };
+
+  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
+  };
+
+  const build = (): ThreeBundle => {
+    const s = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, vertical ? 15 : 12);
+    camera.lookAt(0, 0, 0);
+    studioLights(s, accent, secondary);
+
+    const m = mappingAt(camera, BLOCK_DEPTH / 2);
+    const block = makeBlock(fw / m.sx, fh / m.sy, BLOCK_DEPTH, THEME.panel, accent);
+    s.add(block);
+
+    const update = () => {
+      // No scale, bob or rotation: the chrome below is drawn in pixels on the block's
+      // own rect, so any transform here slides the two layers against each other.
+      const gIn = easeOutCubic(enterT(env, 600));
+      block.traverse((o) => {
+        const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (!mat) return;
+        mat.transparent = true;
+        mat.opacity = gIn * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 0.95);
+      });
+    };
+
+    return { scene: s, camera, update };
+  };
+
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
+  if (!cam) return;
 
   ctx.save();
   ctx.globalAlpha = frameIn;
 
-  ctx.shadowColor = "rgba(56,189,248,0.05)";
-  ctx.shadowBlur = 60;
-  roundRect(ctx, fx - 2, fy - 2, fw + 4, fh + 4, unit * 0.75);
-  ctx.strokeStyle = "rgba(56,189,248,0.06)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.shadowColor = "rgba(0,0,0,0.65)";
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetY = 12;
-  roundRect(ctx, fx, fy, fw, fh, unit * 0.7);
-  ctx.fillStyle = THEME.panel;
-  ctx.fill();
+  // Background is already drawn by 3D block, we only draw the UI elements and borders.
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   roundRect(ctx, fx, fy, fw, fh, unit * 0.7);
   ctx.strokeStyle = THEME.panelBorder;
+  ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.save();
   roundRect(ctx, fx, fy, fw, barH, unit * 0.7);
   ctx.clip();
   const tb = ctx.createLinearGradient(fx, fy, fx, fy + barH);
-  tb.addColorStop(0, "#161b22");
-  tb.addColorStop(1, "#12161d");
+  tb.addColorStop(0, rgba(shade(THEME.panel, 0.1), 0.8));
+  tb.addColorStop(1, rgba(shade(THEME.panel, 0.05), 0.8));
   ctx.fillStyle = tb;
   ctx.fillRect(fx, fy, fw, barH);
   ctx.restore();
-  ctx.strokeStyle = "rgba(48,54,64,0.45)";
+  ctx.strokeStyle = THEME.panelBorder;
   ctx.beginPath();
   ctx.moveTo(fx, fy + barH);
   ctx.lineTo(fx + fw, fy + barH);
   ctx.stroke();
 
-  ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
+  TRAFFIC_LIGHTS.forEach((c, i) => {
     ctx.fillStyle = c;
     ctx.beginPath();
     ctx.arc(fx + unit * (0.9 + i * 0.8), fy + barH / 2, unit * 0.21, 0, Math.PI * 2);
@@ -128,7 +180,7 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   ctx.font = `500 ${unit * 0.72}px ${FONT_SANS}`;
   const tabX = fx + unit * 3.4;
   const tabW = Math.min(ctx.measureText(scene.title).width + unit * 1.6, fw * 0.5);
-  ctx.fillStyle = THEME.panel;
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.7);
   roundRect(ctx, tabX, fy + barH * 0.16, tabW, barH * 0.84, unit * 0.4);
   ctx.fill();
   ctx.fillStyle = rgba(accent, 0.6);
@@ -149,7 +201,7 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   const codeAreaH = fh - barH - unit * 1.4;
   const maxVisible = Math.floor(codeAreaH / lineH);
 
-  ctx.fillStyle = "rgba(13,17,23,0.35)";
+  ctx.fillStyle = rgba(THEME.panel, 0.35);
   ctx.fillRect(fx, fy + barH, gutterW, fh - barH);
 
   const state = typingState(scene, env, offset, totalBeats);
@@ -172,19 +224,19 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
 
     if (isActive || isFocus || inActiveSegment) {
       ctx.fillStyle = isActive
-        ? "rgba(56,189,248,0.07)"
+        ? rgba(accent, 0.07)
         : inActiveSegment
-          ? "rgba(56,189,248,0.035)"
-          : "rgba(255,255,255,0.025)";
+          ? rgba(accent, 0.035)
+          : rgba(THEME.text, 0.025);
       ctx.fillRect(fx, y - lineH + fontPx * 0.35, fw, lineH);
       if (isFocus) {
-        ctx.fillStyle = rgba(accent, 0.5);
+        ctx.fillStyle = rgba(accent, 0.4 + 0.28 * idle(env, 2200));
         ctx.fillRect(fx + gutterW, y - lineH + fontPx * 0.35, 3, lineH);
       }
     }
 
     ctx.font = `${fontPx * 0.8}px ${FONT_MONO}`;
-    ctx.fillStyle = isActive ? rgba(accent, 0.6) : "rgba(100,116,139,0.4)";
+    ctx.fillStyle = isActive ? rgba(accent, 0.6) : rgba(THEME.textDim, 0.4);
     ctx.textAlign = "right";
     ctx.fillText(String(line.number), fx + gutterW - unit * 0.35, y);
     ctx.textAlign = "start";
@@ -218,7 +270,7 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   }
   ctx.restore();
 
-  ctx.fillStyle = "#161b22";
+  ctx.fillStyle = rgba(shade(THEME.panel, 0.1), 0.7);
   roundRect(ctx, fx, fy + fh - sbH, fw, sbH, unit * 0.35);
   ctx.fill();
   ctx.fillStyle = THEME.textFaint;
