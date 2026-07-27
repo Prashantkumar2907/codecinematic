@@ -34,7 +34,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | terminal | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
 | storyboard | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
 | question | 1 | Text/general | passed | 1 | 4 | 4 | 4 | 4 | 4 | 1/4/4/3/3 -> 4/4/4/4/4. The whole 2D layer was translated by the unclamped projection error of an off-axis camera, slicing the heading at x=0 and the CTA at the bottom edge; now clamped. CTA also moved above the Shorts UI band. Measured 0% edge bleed after. | (uncommitted) | 2026-07-27 |
-| quiz | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
+| quiz | 1 | Text/general | passed | 2 | 4 | 4 | 4 | 4 | 4 | 2/2/3/1/1 -> 4/4/4/4/4. Same frozen-local-array bug as dialogue: projectedPoints filled inside build()'s update() closure, so every option's badge/label/tick was dropped from frame 1 on. 3D layer realigned to the 2D layout via an axis-aligned camera; group wobble removed; option text shrinks to fit instead of wrapText()[0] silently truncating 52-char options; edge wireframes fade with their face; 7 hardcoded hex/rgba gone including an rgba() string passed to THREE.Color. console.log clean, 0% edge bleed. NOTE: the think-time countdown HUD is unreachable in the probe (needs a gap between beat windows) and was not exercised. | bd37e1b | 2026-07-27 |
 | code | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
 | trace | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
 | memgrid | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |

@@ -188,18 +188,18 @@
     "quiz": {
       "wave": 1,
       "group": "Text/general",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 2,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "2/2/3/1/1 -> 4/4/4/4/4. Same frozen-local-array bug as dialogue: projectedPoints filled inside build()'s update() closure, so every option's badge/label/tick was dropped from frame 1 on. 3D layer realigned to the 2D layout via an axis-aligned camera; group wobble removed; option text shrinks to fit instead of wrapText()[0] silently truncating 52-char options; edge wireframes fade with their face; 7 hardcoded hex/rgba gone including an rgba() string passed to THREE.Color. console.log clean, 0% edge bleed. NOTE: the think-time countdown HUD is unreachable in the probe (needs a gap between beat windows) and was not exercised.",
+      "commit": "bd37e1b",
+      "date": "2026-07-27"
     },
     "code": {
       "wave": 1,
