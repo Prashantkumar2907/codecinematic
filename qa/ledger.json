@@ -156,18 +156,18 @@
     "storyboard": {
       "wave": 1,
       "group": "Text/general",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 3,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
       },
-      "summary": "",
-      "commit": "",
-      "date": ""
+      "summary": "2/3/3/2/1 -> 4/4/4/4/4. Top-down camera + a 2D card rect taken from the bounding box of two projected corners: every slab keystoned while its card stayed axis-aligned, so margins differed per row, panels were unequal sizes, and the lit top faces read as silver bars. Pixel grid is now authoritative, each slab mapped onto its exact cell via an axis-aligned camera. Also clamped the grid above the Shorts UI band (bottom caption was at y=1690), removed the easeOutBack reveal scale that shrank 1.0->0.9 before growing back and the active-panel y-bob, one absolute card inset on all sides, 2 rgba()-into-THREE.Color calls + 8 hardcoded literals gone. console.log clean, 0% edge bleed.",
+      "commit": "6963d39",
+      "date": "2026-07-27"
     },
     "question": {
       "wave": 1,
