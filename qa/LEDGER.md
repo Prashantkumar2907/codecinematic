@@ -1,0 +1,135 @@
+# Animation QA ledger
+
+Source of truth for polish progress across all 110 registered painters — **not** the
+conversation, which gets summarised and lost. Update a row in the same commit that polishes its kind.
+
+- Rubric and ship gate: `ANIMATION-QA-PROMPT.md` Part C. **Ship gate: every section >= 4.**
+- Score columns are 1-5: cont = containment & safe area, typo = typography, motion = motion quality,
+  clean = cleanliness, palette = palette & consistency.
+- `status`: todo | in-progress | passed | blocked. `blocked` must carry the specific reason in summary.
+- Typecheck baseline: **99** pre-existing errors (`qa/ledger.json` → `typecheckBaseline`).
+  A polish commit may never raise it, and the file it touched must have zero errors.
+- Variant-seeded painters (`variantOf(scene.id, n)`) only show one style per scene id. Reach the
+  others with `npm run filmstrip -- --scene=<sceneId>` (output goes to `qa/<kind>/<sceneId>/`).
+- Motion scoring needs `--entrance` (samples the first 500ms at ~33ms/cell, one real frame at 30fps).
+  A plain `p=0..1` strip has 533ms-2.7s between cells and cannot show a 380ms `enterT()` entrance.
+- Capture: `npm run filmstrip -- --kind=<kind>` writes `qa/<kind>/{short,long}-strip.png`,
+  `-p50.png`, `-p90.png` and `console.log`. Those artifacts are gitignored; the ledger is not.
+
+> **Systemic, see `qa/ledger.json` -> `systemic`:** the 3D layer of 29 painters was frozen at frame 0
+> (`render3D` cached a closure over the first frame`s env). Fixed centrally on 2026-07-27, but only
+> bigtext and bullets have been looked at since. The other 27 animate for the first time and MUST be
+> re-reviewed when the wave reaches them.
+
+| kind | wave | group | status | rounds | cont | typo | motion | clean | palette | summary | commit | date |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| bigtext | 1 | Text/general | passed | 5 | 4 | 4 | 4 | 4 | 4 | All 5 variants scored 4/5. Fixed: entrance clipping (1.8x stamp overflowed canvas), Shorts safe-area overrun, 350ms hard colour pop, hardcoded glitch hex, Math.random nondeterminism, icon flying through headline, v0 accent bar at full opacity at t=0, v2 letters cascading through the icon, 3D grid hardcoded hex. Harness gained --scene= and --entrance to get here. | (uncommitted) | 2026-07-27 |
+| bullets | 1 | Text/general | passed | 3 | 4 | 4 | 4 | 4 | 4 | 1/2/3/1/4 -> 4/4/4/4/4. Found the systemic frozen-3D-layer bug here (29 painters). Also fixed: half the bullets under the Shorts UI band, 16:9 slicing its outer panels (spreadY exceeded the frustum), labels overflowing their panels, sheared off-axis camera, dead rowGap. | (uncommitted) | 2026-07-27 |
+| quote | 1 | Text/general | passed | 1 | 4 | 4 | 4 | 4 | 4 | 2/4/4/4/3 -> 4/4/4/4/4. Glass card overhung both side edges at 9:16 (blockW half 3.0 vs frustum halfW 2.87); now clamped via the new frustumHalfExtent helper. Measured 0% edge bleed after. Hardcoded grid hex removed. | (uncommitted) | 2026-07-27 |
+| stat | 1 | Text/general | passed | 2 | 4 | 4 | 4 | 4 | 4 | 1/2/2/3/2 -> 4/4/4/4/4. Fixed: isoCamera frustum overflow at 9:16 (blockW hardcoded 5.8 vs halfW 1.81), context text overlapping a 2-line label, label fading in over still-spinning odometer reels, 2 hardcoded hex. | (uncommitted) | 2026-07-27 |
+| steps | 1 | Text/general | passed | 1 | 4 | 4 | 4 | 4 | 4 | 3/4/4/4/3 -> 4/4/4/4/4. List was centred in the full content box, pushing it low with a dead third under the title; now centred in the visible band above the Shorts UI. 2 hardcoded hex removed. NOTE: ~174 lines of uncommitted 3D-staircase work in this file were destroyed by an unguarded git checkout on 2026-07-27; this is the committed 2D version. | (uncommitted) | 2026-07-27 |
+| vocab | 1 | Text/general | passed | 3 | 4 | 4 | 4 | 4 | 4 | 2/3/4/1/2 -> 4/4/4/4/4. The 3D slabs and the example text were unrelated layers: an off-axis camera plus a per-row Z stagger meant a slab projected as a diagonal parallelogram while the text was centred on the projected world origin, so they overlapped. Front-on camera, coplanar rows, card size from frustumHalfExtent, text box derived from the projected front face. Also killed a 26%-of-frame dead void, aligned the empty sockets with the cards that fill them, replaced an off-frame entrance slide with a scale, 4 hardcoded hex. Measured 0% edge bleed both aspects. | 5d7c82d | 2026-07-27 |
+| mythfact | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
+| dialogue | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
+| terminal | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
+| storyboard | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
+| question | 1 | Text/general | passed | 1 | 4 | 4 | 4 | 4 | 4 | 1/4/4/3/3 -> 4/4/4/4/4. The whole 2D layer was translated by the unclamped projection error of an off-axis camera, slicing the heading at x=0 and the CTA at the bottom edge; now clamped. CTA also moved above the Shorts UI band. Measured 0% edge bleed after. | (uncommitted) | 2026-07-27 |
+| quiz | 1 | Text/general | todo | 0 | – | – | – | – | – |  |  |  |
+| code | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| trace | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| memgrid | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| callstack | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| bits | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| browserframe | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| threads | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| cipher | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| circuit | 1 | Code | todo | 0 | – | – | – | – | – | CAPTURE CRASHES: hex.slice is not a function (painters/circuit.ts:197 passes 4 args to a 2-arg helper) — every frame errors |  |  |
+| trafficflow | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| eventbus | 1 | Code | todo | 0 | – | – | – | – | – |  |  |  |
+| chart | 1 | Charts | in-progress | 1 | 4 | 4 | 3 | 4 | 4 | Containment/typography already good (own CAPTION_SAFE_Y, 0% measured bleed). Fixed 5 hardcoded hex. HELD AT 3 ON MOTION: nothing but the title is solid for the whole first 500ms - grid/labels sit at ~15% opacity and no column appears. Partly a probe artifact (probe opens beat 0 at p=0.05 = 2.4s; engine opens it at t=0), so needs that ruled out before fixing. Suggested fix: absolute-time enterT entrance for the grid + ghost column sockets, the steps.ts idiom. | (uncommitted) | 2026-07-27 |
+| table | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| timeline | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| ledger | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| sankey | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| gauge | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| pictogram | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| race | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| radar | 1 | Charts | todo | 0 | – | – | – | – | – | CAPTURE CRASHES: cy is not defined — every frame errors |  |  |
+| buckets | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| basket | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| probability | 1 | Charts | todo | 0 | – | – | – | – | – |  |  |  |
+| diagram | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| tree | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| mindmap | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| statemachine | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| cycle | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| chain | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| lifeline | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| geomap | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| layers | 1 | Diagrams | todo | 0 | – | – | – | – | – |  |  |  |
+| orbit | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| schematic | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| terrain | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| zoomladder | 1 | STEM | in-progress | 1 | – | – | – | – | – | Edge bleed is INTENTIONAL (final rung is Earth filling the frame) - do not clamp. Real defect: the scale caption renders at y~1700, inside the Shorts UI band (>1440), so the label naming the rung is hidden on 9:16. Also a hard black box seam where the 3D rect starts. See qa/zoomladder/FINDINGS.md. |  | 2026-07-27 |
+| bodymap | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| constellation | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| dayclock | 1 | STEM | todo | 0 | – | – | – | – | – | CAPTURE CRASHES: reading translate of undefined (painters/dayclock.ts:135,140 read .geometry off a THREE.Group) — every frame errors |  |  |
+| geometry | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| numberline | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| molecule | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| formula | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| curves | 1 | STEM | todo | 0 | – | – | – | – | – |  |  |  |
+| compare | 1 | Compare | todo | 0 | – | – | – | – | – |  |  |  |
+| bracket | 1 | Compare | todo | 0 | – | – | – | – | – |  |  |  |
+| showdown | 1 | Compare | in-progress | 1 | – | – | – | – | – | Side labels/scores/crown clipped off both edges at 9:16. Root cause identified: 2D pixel layout mapped linearly to world (spreadX 5.5) then projected back through a camera at (0,10,7) - does not round-trip, and 9:16 frustum halfW is only ~2.23. Needs a layout rework (derive spread from the camera), NOT a clamp. See qa/showdown/FINDINGS.md. |  | 2026-07-27 |
+| skyline | 1 | Compare | todo | 0 | – | – | – | – | – |  |  |  |
+| iso3d | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| decision | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| pipeline | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| graphwalk | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| matrix | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| queueflow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| calendar | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| globe3d | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| dp_table_fill | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| sysarch | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| slidingwindow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| trendgraph | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| topology | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| scroll | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| tactical_map | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| architecture_blueprint | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| packet_delivery | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| codediff | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| parliament_arc | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| server_rack | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| jigsaw_puzzle | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| domino_cascade | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| sheet_music | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| canvas_reveal | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| scalecompare | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| fluidflow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| ecosystem_web | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| turing_tape | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| grid_flood | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| hash_ring | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| recursion_tree | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| token_exchange | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| coin_stack | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| btree_index | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| lsm_compaction | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| vdom_diff | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| flamegraph | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| event_loop | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| dom_event_flow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| commit_dag | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| partitioned_log | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| container_sandbox | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| control_loop | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| telemetry_trace | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| spatial_index | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| object_heap | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| vector_space | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| neural_network | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| matrix_convolution | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| consensus_quorum | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |

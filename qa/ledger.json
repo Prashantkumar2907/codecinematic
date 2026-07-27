@@ -1,0 +1,1836 @@
+{
+  "typecheckBaseline": 99,
+  "rubric": [
+    "containment",
+    "typography",
+    "motion",
+    "cleanliness",
+    "palette"
+  ],
+  "shipGate": "every rubric section >= 4",
+  "kinds": {
+    "bigtext": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 5,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "All 5 variants scored 4/5. Fixed: entrance clipping (1.8x stamp overflowed canvas), Shorts safe-area overrun, 350ms hard colour pop, hardcoded glitch hex, Math.random nondeterminism, icon flying through headline, v0 accent bar at full opacity at t=0, v2 letters cascading through the icon, 3D grid hardcoded hex. Harness gained --scene= and --entrance to get here.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "bullets": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 3,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "1/2/3/1/4 -> 4/4/4/4/4. Found the systemic frozen-3D-layer bug here (29 painters). Also fixed: half the bullets under the Shorts UI band, 16:9 slicing its outer panels (spreadY exceeded the frustum), labels overflowing their panels, sheared off-axis camera, dead rowGap.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "quote": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 1,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "2/4/4/4/3 -> 4/4/4/4/4. Glass card overhung both side edges at 9:16 (blockW half 3.0 vs frustum halfW 2.87); now clamped via the new frustumHalfExtent helper. Measured 0% edge bleed after. Hardcoded grid hex removed.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "stat": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 2,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "1/2/2/3/2 -> 4/4/4/4/4. Fixed: isoCamera frustum overflow at 9:16 (blockW hardcoded 5.8 vs halfW 1.81), context text overlapping a 2-line label, label fading in over still-spinning odometer reels, 2 hardcoded hex.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "steps": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 1,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "3/4/4/4/3 -> 4/4/4/4/4. List was centred in the full content box, pushing it low with a dead third under the title; now centred in the visible band above the Shorts UI. 2 hardcoded hex removed. NOTE: ~174 lines of uncommitted 3D-staircase work in this file were destroyed by an unguarded git checkout on 2026-07-27; this is the committed 2D version.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "vocab": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 3,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "2/3/4/1/2 -> 4/4/4/4/4. 3D slabs and example text were unrelated layers (off-axis camera + per-row Z stagger vs text centred on the projected origin). Front-on camera, coplanar rows, card size from frustumHalfExtent, text box from the projected front face. Killed a 26%-of-frame dead void, aligned empty sockets to their cards, replaced an off-frame entrance slide with a scale, 4 hardcoded hex. 0% edge bleed both aspects.",
+      "commit": "5d7c82d",
+      "date": "2026-07-27"
+    },
+    "mythfact": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "dialogue": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "terminal": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "storyboard": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "question": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "passed",
+      "rounds": 1,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "1/4/4/3/3 -> 4/4/4/4/4. The whole 2D layer was translated by the unclamped projection error of an off-axis camera, slicing the heading at x=0 and the CTA at the bottom edge; now clamped. CTA also moved above the Shorts UI band. Measured 0% edge bleed after.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "quiz": {
+      "wave": 1,
+      "group": "Text/general",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "code": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "trace": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "memgrid": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "callstack": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "bits": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "browserframe": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "threads": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "cipher": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "circuit": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "CAPTURE CRASHES: hex.slice is not a function (painters/circuit.ts:197 passes 4 args to a 2-arg helper) \u2014 every frame errors",
+      "commit": "",
+      "date": ""
+    },
+    "trafficflow": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "eventbus": {
+      "wave": 1,
+      "group": "Code",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "chart": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "in-progress",
+      "rounds": 1,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 3,
+        "cleanliness": 4,
+        "palette": 4
+      },
+      "summary": "Containment/typography already good (own CAPTION_SAFE_Y, 0% measured bleed). Fixed 5 hardcoded hex. HELD AT 3 ON MOTION: nothing but the title is solid for the whole first 500ms - grid/labels sit at ~15% opacity and no column appears. Partly a probe artifact (probe opens beat 0 at p=0.05 = 2.4s; engine opens it at t=0), so needs that ruled out before fixing. Suggested fix: absolute-time enterT entrance for the grid + ghost column sockets, the steps.ts idiom.",
+      "commit": "(uncommitted)",
+      "date": "2026-07-27"
+    },
+    "table": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "timeline": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "ledger": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "sankey": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "gauge": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "pictogram": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "race": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "radar": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "CAPTURE CRASHES: cy is not defined \u2014 every frame errors",
+      "commit": "",
+      "date": ""
+    },
+    "buckets": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "basket": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "probability": {
+      "wave": 1,
+      "group": "Charts",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "diagram": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "tree": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "mindmap": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "statemachine": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "cycle": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "chain": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "lifeline": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "geomap": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "layers": {
+      "wave": 1,
+      "group": "Diagrams",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "orbit": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "schematic": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "terrain": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "zoomladder": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "in-progress",
+      "rounds": 1,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "Edge bleed is INTENTIONAL (final rung is Earth filling the frame) - do not clamp. Real defect: the scale caption renders at y~1700, inside the Shorts UI band (>1440), so the label naming the rung is hidden on 9:16. Also a hard black box seam where the 3D rect starts. See qa/zoomladder/FINDINGS.md.",
+      "commit": "",
+      "date": "2026-07-27"
+    },
+    "bodymap": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "constellation": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "dayclock": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "CAPTURE CRASHES: reading translate of undefined (painters/dayclock.ts:135,140 read .geometry off a THREE.Group) \u2014 every frame errors",
+      "commit": "",
+      "date": ""
+    },
+    "geometry": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "numberline": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "molecule": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "formula": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "curves": {
+      "wave": 1,
+      "group": "STEM",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "compare": {
+      "wave": 1,
+      "group": "Compare",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "bracket": {
+      "wave": 1,
+      "group": "Compare",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "showdown": {
+      "wave": 1,
+      "group": "Compare",
+      "status": "in-progress",
+      "rounds": 1,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "Side labels/scores/crown clipped off both edges at 9:16. Root cause identified: 2D pixel layout mapped linearly to world (spreadX 5.5) then projected back through a camera at (0,10,7) - does not round-trip, and 9:16 frustum halfW is only ~2.23. Needs a layout rework (derive spread from the camera), NOT a clamp. See qa/showdown/FINDINGS.md.",
+      "commit": "",
+      "date": "2026-07-27"
+    },
+    "skyline": {
+      "wave": 1,
+      "group": "Compare",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "iso3d": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "decision": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "pipeline": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "graphwalk": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "matrix": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "queueflow": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "calendar": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "globe3d": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "dp_table_fill": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "sysarch": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "slidingwindow": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "trendgraph": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "topology": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "scroll": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "tactical_map": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "architecture_blueprint": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "packet_delivery": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "codediff": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "parliament_arc": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "server_rack": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "jigsaw_puzzle": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "domino_cascade": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "sheet_music": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "canvas_reveal": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "scalecompare": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "fluidflow": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "ecosystem_web": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "turing_tape": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "grid_flood": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "hash_ring": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "recursion_tree": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "token_exchange": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "coin_stack": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "btree_index": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "lsm_compaction": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "vdom_diff": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "flamegraph": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "event_loop": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "dom_event_flow": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "commit_dag": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "partitioned_log": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "container_sandbox": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "control_loop": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "telemetry_trace": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "spatial_index": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "object_heap": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "vector_space": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "neural_network": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "matrix_convolution": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    },
+    "consensus_quorum": {
+      "wave": 2,
+      "group": "Wave 2",
+      "status": "todo",
+      "rounds": 0,
+      "scores": {
+        "containment": null,
+        "typography": null,
+        "motion": null,
+        "cleanliness": null,
+        "palette": null
+      },
+      "summary": "",
+      "commit": "",
+      "date": ""
+    }
+  },
+  "systemic": [
+    {
+      "id": "frozen-3d-layer",
+      "status": "fixed-centrally-2026-07-27",
+      "detail": "render3D caches the ThreeBundle per key; painters wrote update() as a closure over env, capturing frame 0. Every scene starts at p=0, so the whole 3D layer was frozen/invisible in production. Fixed in three3d.ts via a liveEnv arg + Object.assign onto the captured env; all 29 call sites updated. VISUALLY VERIFIED ONLY FOR bigtext AND bullets - the other 27 now animate for the first time and must be re-reviewed as the wave reaches them.",
+      "affected": [
+        "bigtext",
+        "bracket",
+        "browserframe",
+        "bullets",
+        "callstack",
+        "chain",
+        "chart",
+        "code",
+        "compare",
+        "cycle",
+        "diagram",
+        "formula",
+        "geomap",
+        "layers",
+        "ledger",
+        "lifeline",
+        "matrix",
+        "memgrid",
+        "quote",
+        "schematic",
+        "showdown",
+        "skyline",
+        "stat",
+        "statemachine",
+        "storyboard",
+        "table",
+        "terminal",
+        "timeline",
+        "trace"
+      ]
+    },
+    {
+      "id": "three3d-cache-ignores-aspect",
+      "status": "fixed-in-harness-2026-07-27",
+      "detail": "Geometry is built once per key from the first rect it sees, so rendering short then long in one page reused the wrong build. Harmless in production (one aspect per video) but it corrupted QA. probe now calls resetThree3D() before every strip."
+    },
+    {
+      "id": "hardcoded-world-size-vs-frustum",
+      "status": "helper-added-2026-07-27",
+      "detail": "Painters size three.js geometry with literals that only fit 16:9; the frustum half-width is halfH*aspect, so 9:16 is ~2.5x narrower and the geometry hangs off both edges. Hit bullets, stat and quote. three3d.ts now exports frustumHalfExtent(camera, rect) - use it instead of literals. npm run edge-audit measures which kinds still bleed."
+    },
+    {
+      "id": "2d-layout-round-tripped-through-camera",
+      "status": "open",
+      "detail": "Painters that map 2D pixel positions linearly into world space and then project back through a TILTED perspective camera do not recover the source pixel - the ground plane maps non-linearly. Confirmed in showdown; suspected in race and any painter with a worldPos(px,py) helper plus an off-axis camera. Symptom: elements near the design edges land outside the frame, worst at 9:16 where the frustum is narrowest."
+    }
+  ],
+  "tools": [
+    {
+      "name": "edge-audit",
+      "cmd": "npm run edge-audit",
+      "detail": "Renders every kind at both aspects, diffs a 3px border ring against the bare background, flags hard-contrast content at the frame edge. Writes qa/AUDIT.md. Measures rubric section 1 across all 110 kinds in ~4 min instead of reading 220 contact sheets."
+    }
+  ],
+  "acceptedEdgeBleed": [
+    "zoomladder"
+  ]
+}
