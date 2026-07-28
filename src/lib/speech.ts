@@ -1,0 +1,110 @@
+/**
+ * Speech-only text normalization applied right before edge-TTS synthesis
+ * (src/app/api/studio/tts/route.ts). It is the code safety-net for TTS issues
+ * #15/#16/#21: an English voice mis-reads "₹10Cr" as "rupee ten C R", "99.9%" as
+ * "ninety nine point nine", "API" as "appy", and raw code punctuation letter by
+ * letter. This expands symbols and unit abbreviations to spoken words while KEEPING
+ * the digits (edge-tts reads "40" correctly — only the symbols mislead it).
+ *
+ * It runs ONLY on the voiced copy. Captions are built separately from the original
+ * beat text (src/studio/captions.ts), so the screen keeps "₹10Cr" / "API" while the
+ * voice hears "ten crore rupees" / "A P I". Phonetic spelling of arbitrary proper
+ * nouns and homograph/emphasis intent stay the model's job (TTS_RULES in prompt.ts);
+ * this handles only what is deterministic and reversible.
+ */
+
+/** Acronyms edge-tts should SPELL letter by letter (spaces force it). */
+const SPELL_ACRONYMS = [
+  "API", "AWS", "GCP", "SDK", "CLI", "CPU", "GPU", "RAM", "ROM", "SSD", "HDD",
+  "HTTP", "HTTPS", "URL", "URI", "XML", "HTML", "CSS", "TCP", "UDP", "IP", "DNS",
+  "SSH", "SSL", "TLS", "CDN", "VPN", "ORM", "JWT", "OS", "UI", "UX", "IDE", "OTP",
+  "RBI", "GDP", "GST", "UPI", "IPO", "CEO", "CFO", "CTO", "FDI", "NPA", "IPC", "FIR",
+  "PDF", "USB", "GPS", "LED", "ATM", "AI", "ML", "DB",
+];
+
+/** Acronyms said AS a word — written phonetically so edge-tts doesn't spell them. */
+const WORD_ACRONYMS: Record<string, string> = {
+  SQL: "Sequel", NoSQL: "No Sequel", NASA: "Nassa", ISRO: "Iss-ro", UNESCO: "You-ness-co",
+  NATO: "Nay-toh", GIF: "Gif", JSON: "Jason", JPEG: "Jay-peg", PNG: "P N G", SaaS: "Sass",
+};
+
+/** Number-attached units → spoken word (longest alternatives first so GHz beats Hz). */
+const UNIT_WORDS: Array<[RegExp, string]> = [
+  [/\b(\d[\d.,]*)\s?GHz\b/g, "$1 gigahertz"],
+  [/\b(\d[\d.,]*)\s?MHz\b/g, "$1 megahertz"],
+  [/\b(\d[\d.,]*)\s?Hz\b/g, "$1 hertz"],
+  [/\b(\d[\d.,]*)\s?Gbps\b/g, "$1 gigabits per second"],
+  [/\b(\d[\d.,]*)\s?Mbps\b/g, "$1 megabits per second"],
+  [/\b(\d[\d.,]*)\s?Kbps\b/g, "$1 kilobits per second"],
+  [/\b(\d[\d.,]*)\s?GB\b/g, "$1 gigabytes"],
+  [/\b(\d[\d.,]*)\s?MB\b/g, "$1 megabytes"],
+  [/\b(\d[\d.,]*)\s?KB\b/g, "$1 kilobytes"],
+  [/\b(\d[\d.,]*)\s?TB\b/g, "$1 terabytes"],
+  [/\b(\d[\d.,]*)\s?ms\b/g, "$1 milliseconds"],
+  [/\b(\d[\d.,]*)\s?km\b/g, "$1 kilometres"],
+  [/\b(\d[\d.,]*)\s?kg\b/g, "$1 kilograms"],
+];
+
+/** Indian/regional terms an English voice mangles — spelled phonetically for the ear. */
+const INDIAN_TERMS: Array<[RegExp, string]> = [
+  [/\bLok Sabha\b/gi, "Loke Sub-haa"],
+  [/\bRajya Sabha\b/gi, "Raajya Sub-haa"],
+  [/\bKailasa\b/gi, "Kye-laa-saa"],
+  [/\bKesavananda\b/gi, "Kay-sha-vaa-nanda"],
+  [/\bPanchayat\b/gi, "Pun-chaa-yat"],
+  [/\bLokpal\b/gi, "Loke-paal"],
+];
+
+/** Bare currency/percent for the Hindi voice (minimal — the model writes the rest). */
+const HI_SYMBOLS: Array<[RegExp, string]> = [
+  [/(\d[\d.,]*)\s?%/g, "$1 प्रतिशत"],
+  [/₹\s?(\d[\d.,]*)/g, "$1 रुपये"],
+];
+
+function expandCurrency(text: string): string {
+  // ₹1.2Cr / ₹10 Cr / ₹500 / Rs. 500  (digits kept; magnitude + "rupees" spoken)
+  const mag: Record<string, string> = { cr: "crore", crore: "crore", lakh: "lakh", l: "lakh", k: "thousand" };
+  return text
+    // Case-sensitive with a boundary before "Rs" so it never matches the "rs" inside a
+    // word like "cars 5". ₹ is a symbol, so no boundary needed there.
+    .replace(/(?:₹\s?|\bRs\.?\s?)(\d[\d,]*\.?\d*)(?:\s?(Cr|crore|Lakh|lakh|L|K))?\b/g, (_m, num, unit) => {
+      const suffix = unit ? ` ${mag[unit.toLowerCase()] ?? unit}` : "";
+      return `${num}${suffix} rupees`;
+    })
+    .replace(/₹/g, " rupees ");
+}
+
+/**
+ * Normalize a spoken beat for the given content language. English gets the full
+ * treatment; Hindi (Devanagari, numbers already written as words by the model) gets
+ * only a minimal symbol pass so we never inject English words into a Hindi voice.
+ */
+export function normalizeSpeech(text: string, lang: "en" | "hi" = "en"): string {
+  let s = text;
+
+  // Code punctuation that occasionally leaks into narration (issue #21 backstop).
+  s = s.replace(/=>/g, " to ").replace(/`/g, "");
+
+  if (lang === "hi") {
+    for (const [re, w] of HI_SYMBOLS) s = s.replace(re, w);
+    return s.replace(/\s{2,}/g, " ").trim();
+  }
+
+  for (const [re, w] of INDIAN_TERMS) s = s.replace(re, w);
+
+  s = expandCurrency(s);
+  s = s.replace(/\$\s?(\d[\d,]*\.?\d*)/g, "$1 dollars");
+  s = s.replace(/(\d[\d.,]*)\s?%/g, "$1 percent").replace(/%/g, " percent");
+  for (const [re, w] of UNIT_WORDS) s = s.replace(re, w);
+
+  for (const [acr, say] of Object.entries(WORD_ACRONYMS)) {
+    s = s.replace(new RegExp(`\\b${acr}\\b`, "g"), say);
+  }
+  for (const acr of SPELL_ACRONYMS) {
+    s = s.replace(new RegExp(`\\b${acr}\\b`, "g"), acr.split("").join(" "));
+  }
+
+  s = s.replace(/\s=\s/g, " equals ").replace(/&/g, " and ").replace(/(\w)\+(\w)/g, "$1 plus $2");
+
+  return s.replace(/\s{2,}/g, " ").trim();
+}

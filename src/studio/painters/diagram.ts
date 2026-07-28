@@ -1,3 +1,5 @@
+import * as THREE from "three";
+import { render3D, projectToRect, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -7,6 +9,8 @@ import {
   easeInOutCubic,
   sub,
   clamp01,
+  enterT,
+  idle,
   wrapText,
   roundRect,
   drawArrowhead,
@@ -16,34 +20,123 @@ import {
   beatWindow,
   beatT,
   activeBeatIndex,
+  variantOf,
   type Layout,
 } from "./common";
+import { drawIcon, isVectorIcon } from "./icons";
 import type { PaintEnv } from "./index";
 
 type DiagramScene = Extract<Scene, { kind: "diagram" }>;
 type Node = DiagramScene["nodes"][number];
 type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number };
+type Pt = { x: number; y: number };
+type NodeShape = "rounded" | "pill" | "hex";
 
 const GRID = 12;
 
-type GridMap = { ox: number; oy: number; cw: number; ch: number };
+const NODE_SHAPES: NodeShape[] = ["rounded", "pill", "hex"];
+
+/** Build a node outline path (no fill/stroke) — family is picked once per scene. */
+function nodePath(ctx: CanvasRenderingContext2D, rect: Rect, shape: NodeShape, unit: number) {
+  const { x, y, w, h } = rect;
+  if (shape === "pill") {
+    roundRect(ctx, x, y, w, h, h / 2);
+    return;
+  }
+  if (shape === "hex") {
+    const indent = Math.min(h * 0.5, w * 0.28);
+    ctx.beginPath();
+    ctx.moveTo(x + indent, y);
+    ctx.lineTo(x + w - indent, y);
+    ctx.lineTo(x + w, y + h / 2);
+    ctx.lineTo(x + w - indent, y + h);
+    ctx.lineTo(x + indent, y + h);
+    ctx.lineTo(x, y + h / 2);
+    ctx.closePath();
+    return;
+  }
+  roundRect(ctx, x, y, w, h, unit * 0.45);
+}
+
+/** Quadratic bow between two anchors, SAMPLED to a polyline so the draw-on and
+ *  flowing-dot animations (which walk polylines) work unchanged on curves. */
+function curvedPath(a: Pt, b: Pt): Pt[] {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const off = len * 0.2; // perpendicular control-point offset at the midpoint
+  const cx = mx - (dy / len) * off;
+  const cy = my + (dx / len) * off;
+  const N = 20;
+  const pts: Pt[] = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const u = 1 - t;
+    pts.push({ x: u * u * a.x + 2 * u * t * cx + t * t * b.x, y: u * u * a.y + 2 * u * t * cy + t * t * b.y });
+  }
+  return pts;
+}
+
+/** Shift a polyline sideways by d, for the two rails of a "double" arrow. */
+function offsetPolyline(pts: Pt[], d: number): Pt[] {
+  return pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(pts.length - 1, i + 1)];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: p.x + (-dy / len) * d, y: p.y + (dx / len) * d };
+  });
+}
+
+type GridMap = { ox: number; oy: number; cw: number; ch: number; rot: boolean; maxYo: number };
+
+/**
+ * Rotate a node's grid box 90° so a graph authored wide reads tall (and vice
+ * versa). A left→right chain becomes top→bottom: original column x maps to the
+ * display row, original row y maps to the display column. Positions rotate;
+ * glyphs stay upright (they are drawn from the resulting pixel rect).
+ */
+function toDisp(x: number, y: number, w: number, h: number, rot: boolean, maxYo: number) {
+  if (!rot) return { x, y, w, h };
+  return { x: maxYo - (y + h), y: x, w: h, h: w };
+}
+
+/** Whether the graph's long axis is opposed to the frame's — the case where a
+ *  straight fit leaves big empty margins (wide graph in a 9:16 short). */
+function shouldRotate(nodes: Node[], vertical: boolean): boolean {
+  const minX = Math.min(...nodes.map((n) => n.x));
+  const maxX = Math.max(...nodes.map((n) => n.x + n.w));
+  const minY = Math.min(...nodes.map((n) => n.y));
+  const maxY = Math.max(...nodes.map((n) => n.y + n.h));
+  const aspect = Math.max(maxX - minX, 1) / Math.max(maxY - minY, 1);
+  return vertical ? aspect >= 1.5 : aspect <= 0.66;
+}
 
 /**
  * Models rarely use the full 12x12 grid — un-remapped, a diagram drawn in rows
  * 0-6 bunches at the top of a 9:16 frame. Center the used extent and scale it
  * up modestly (never distorting node aspect more than the grid itself does).
+ * When `rot`, node coordinates are rotated first so a wide graph fills a tall
+ * frame instead of sitting as a small band in the middle.
  */
-function gridMap(nodes: Node[], layout: Layout, titleBand: number): GridMap {
+function gridMap(nodes: Node[], layout: Layout, titleBand: number, rot: boolean): GridMap {
   const areaX = layout.contentX;
   const areaY = layout.contentY + titleBand;
   const areaW = layout.contentW;
-  const areaH = layout.contentH - titleBand;
+  // Vertical: keep the lowest grid row above the caption band (bottom ~14%).
+  let areaH = layout.contentH - titleBand;
+  if (layout.vertical) areaH = Math.min(areaH, layout.h * 0.86 - areaY);
   const cellW = areaW / GRID;
   const cellH = areaH / GRID;
-  const minX = Math.min(...nodes.map((n) => n.x));
-  const maxX = Math.max(...nodes.map((n) => n.x + n.w));
-  const minY = Math.min(...nodes.map((n) => n.y));
-  const maxY = Math.max(...nodes.map((n) => n.y + n.h));
+  const maxYo = Math.max(...nodes.map((n) => n.y + n.h));
+  const disp = nodes.map((n) => toDisp(n.x, n.y, n.w, n.h, rot, maxYo));
+  const minX = Math.min(...disp.map((d) => d.x));
+  const maxX = Math.max(...disp.map((d) => d.x + d.w));
+  const minY = Math.min(...disp.map((d) => d.y));
+  const maxY = Math.max(...disp.map((d) => d.y + d.h));
   const usedW = Math.max(maxX - minX, 1);
   const usedH = Math.max(maxY - minY, 1);
   const f = Math.min(GRID / usedW, GRID / usedH, 1.3);
@@ -52,17 +145,20 @@ function gridMap(nodes: Node[], layout: Layout, titleBand: number): GridMap {
   return {
     cw,
     ch,
+    rot,
+    maxYo,
     ox: areaX + (areaW - usedW * cw) / 2 - minX * cw,
     oy: areaY + (areaH - usedH * ch) / 2 - minY * ch,
   };
 }
 
 function nodeRect(node: Node, map: GridMap): Rect {
+  const d = toDisp(node.x, node.y, node.w, node.h, map.rot, map.maxYo);
   const pad = Math.min(map.cw, map.ch) * 0.12;
-  const x = map.ox + node.x * map.cw + pad;
-  const y = map.oy + node.y * map.ch + pad;
-  const w = node.w * map.cw - pad * 2;
-  const h = node.h * map.ch - pad * 2;
+  const x = map.ox + d.x * map.cw + pad;
+  const y = map.oy + d.y * map.ch + pad;
+  const w = d.w * map.cw - pad * 2;
+  const h = d.h * map.ch - pad * 2;
   return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
 }
 
@@ -125,17 +221,17 @@ function arrowPath(from: Rect, to: Rect): { x: number; y: number }[] {
 
 export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentW, contentY } = layout;
+  const { unit, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
+  // Node-shape family is a deterministic, purely-visual per-scene flourish.
+  const nodeShape = NODE_SHAPES[variantOf(scene.id, NODE_SHAPES.length)];
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
-  // Bounds cover initial positions AND every move target so the grid never
-  // re-centers mid-glide.
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent) + unit * 0.4;
   const extents: Node[] = [
     ...scene.nodes,
     ...scene.steps.flatMap((st) =>
@@ -145,15 +241,119 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
       })
     ),
   ];
-  const map = gridMap(extents, layout, titleBand);
+  const rot = shouldRotate(extents, layout.vertical);
+  
+  const minX = Math.min(...extents.map((n) => n.x));
+  const maxX = Math.max(...extents.map((n) => n.x + n.w));
+  const minY = Math.min(...extents.map((n) => n.y));
+  const maxY = Math.max(...extents.map((n) => Math.max(n.y + n.h, n.y + 2)));
+  const rangeX = Math.max(maxX - minX, 1);
+  const rangeY = Math.max(maxY - minY, 1);
+  
+  const areaX = layout.contentX;
+  const areaY = layout.contentY + titleBand;
+  const areaW = layout.contentW;
+  let areaH = layout.contentH - titleBand;
+  if (layout.vertical) areaH = Math.min(areaH, layout.h * 0.86 - areaY);
+  const rect = { x: areaX, y: areaY, w: areaW, h: areaH };
+  
+  const spreadX = vertical ? 3.5 : 5.5;
+  const spreadZ = vertical ? 5.5 : 3.5;
+  
+  const worldPos = (gx: number, gy: number) => {
+    const cx = (gx - minX) / rangeX - 0.5;
+    const cy = (gy - minY) / rangeY - 0.5;
+    return rot ? new THREE.Vector3(cy * spreadX * 2, 0, cx * spreadZ * 2) 
+               : new THREE.Vector3(cx * spreadX * 2, 0, cy * spreadZ * 2);
+  };
+
+  const key = scene.id + "-diag3d";
+  const reveals = revealTimes(scene, env, offset, totalBeats);
   const livePos = positionsAt(scene, env, offset, totalBeats);
+  const highlights = activeStep >= 0 && !inTail ? new Set(scene.steps[Math.min(activeStep, scene.steps.length - 1)]?.highlight ?? []) : new Set<string>();
+  const ghostIn = easeOutCubic(enterT(env, 420));
+
+  const build = (): ThreeBundle => {
+    const s = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, 1, 0.1, 100);
+    camera.position.set(0, vertical ? 13 : 10, vertical ? 9 : 7);
+    camera.lookAt(0, 0, 0);
+    studioLights(s, accent, "rgba(148,163,184,0.5)");
+    
+    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    (grid.material as THREE.Material).transparent = true;
+    (grid.material as THREE.Material).opacity = 0.2;
+    grid.position.y = -0.5;
+    s.add(grid);
+    
+    const shadowPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
+      new THREE.ShadowMaterial({ opacity: 0.4 })
+    );
+    shadowPlane.rotation.x = -Math.PI / 2;
+    shadowPlane.position.y = -0.5;
+    shadowPlane.receiveShadow = true;
+    s.add(shadowPlane);
+
+    const models = scene.nodes.map((n) => {
+      // Different shapes map to cylinders vs blocks
+      const isPill = nodeShape === "pill";
+      const isCyl = nodeShape === "hex" || isPill; // hex placeholder as cylinder
+      const blockColor = n.accent ? accent : "#1e293b";
+      const g = isCyl ? makeCylinder(1.2, 0.5, blockColor, accent) 
+                      : makeBlock(2.2 * (n.w/2), 0.5, 2.2 * (n.h/2), blockColor, n.accent ? accentGlow : accent);
+      s.add(g);
+      return { id: n.id, mesh: g, node: n };
+    });
+
+    const update = (elapsedMs: number) => {
+      models.forEach(({ id, mesh, node }) => {
+        const revealAt = reveals.get(id) ?? 0;
+        const t = sub(env.p, revealAt, 0.1);
+        const pop = easeOutBack(clamp01(t));
+        const highlighted = highlights.has(id);
+        const pulse = highlighted ? 1 + 0.018 * idle(env, 1600) : 1;
+        
+        mesh.scale.setScalar(Math.max(0.001, pop * pulse));
+        mesh.visible = ghostIn > 0 || t > 0.01;
+        if (t <= 0) {
+            mesh.scale.setScalar(Math.max(0.001, 0.9 * ghostIn));
+        }
+        
+        const p = livePos.get(id) ?? node;
+        const wp = worldPos(p.x + node.w/2, p.y + node.h/2);
+        mesh.position.copy(wp);
+        mesh.position.y = (t <= 0 ? -0.4 : 0) + (highlighted ? 0.2 : 0) + Math.sin(elapsedMs / 1500 + p.x) * 0.05;
+        
+        mesh.children.forEach(child => {
+            if (child instanceof THREE.Mesh) {
+                const mat = child.material as THREE.Material;
+                mat.transparent = true;
+                mat.opacity = t <= 0 ? 0.2 * ghostIn : 1.0;
+            }
+        });
+      });
+    };
+    return { scene: s, camera, update };
+  };
+
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
+  if (!cam) return;
+
   const rects = new Map<string, Rect>();
   for (const node of scene.nodes) {
     const p = livePos.get(node.id) ?? node;
-    rects.set(node.id, nodeRect({ ...node, x: p.x, y: p.y }, map));
+    const centerWorld = worldPos(p.x + node.w/2, p.y + node.h/2);
+    // Rough 2D extent matching the 3D block
+    const p0 = projectToRect(cam, centerWorld.clone().add(new THREE.Vector3(-1.1 * (node.w/2), 0, -1.1 * (node.h/2))), rect);
+    const p1 = projectToRect(cam, centerWorld.clone().add(new THREE.Vector3(1.1 * (node.w/2), 0, 1.1 * (node.h/2))), rect);
+    
+    const rw = Math.abs(p1.x - p0.x);
+    const rh = Math.abs(p1.y - p0.y);
+    const cx = (p0.x + p1.x) / 2;
+    const cy = (p0.y + p1.y) / 2;
+    rects.set(node.id, { x: cx - rw/2, y: cy - rh/2, w: rw, h: rh, cx, cy });
   }
-  const reveals = revealTimes(scene, env, offset, totalBeats);
-  const highlights = activeStep >= 0 && !inTail ? new Set(scene.steps[Math.min(activeStep, scene.steps.length - 1)]?.highlight ?? []) : new Set<string>();
 
   for (const arrow of scene.arrows) {
     const from = rects.get(arrow.from);
@@ -163,16 +363,30 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const t = easeOutCubic(sub(env.p, startAt, 0.09));
     if (t <= 0) continue;
 
-    const pts = arrowPath(from, to);
+    const straight = arrowPath(from, to);
+    const pts = arrow.curve ? curvedPath(straight[0], straight[straight.length - 1]) : straight;
     ctx.save();
     ctx.strokeStyle = accent;
     ctx.fillStyle = accent;
-    ctx.lineWidth = unit * 0.14;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.3;
-    const tip = strokePolylineProgress(ctx, pts, t);
+    let tip: { x: number; y: number; angle: number };
+    if (arrow.style === "double") {
+      // Two thin parallel rails; the arrowhead lands on the centre line.
+      ctx.lineWidth = unit * 0.06;
+      strokePolylineProgress(ctx, offsetPolyline(pts, unit * 0.09), t);
+      strokePolylineProgress(ctx, offsetPolyline(pts, -unit * 0.09), t);
+      const p0 = pointAlongPolyline(pts, t);
+      const p1 = pointAlongPolyline(pts, Math.min(1, t + 0.03));
+      tip = { x: p0.x, y: p0.y, angle: Math.atan2(p1.y - p0.y, p1.x - p0.x) };
+    } else {
+      ctx.lineWidth = unit * 0.14;
+      if (arrow.style === "dashed") ctx.setLineDash([unit * 0.42, unit * 0.3]);
+      tip = strokePolylineProgress(ctx, pts, t);
+      ctx.setLineDash([]);
+    }
     ctx.shadowBlur = 0;
     if (t > 0.15) drawArrowhead(ctx, tip.x, tip.y, tip.angle, unit * 0.55);
 
@@ -203,17 +417,16 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     if (t <= 0) {
       // Blueprint ghost: before its reveal the node is faintly present, so an
       // intro beat never plays over an empty frame and reveals still pop.
-      const ghostIn = easeOutCubic(sub(env.p, 0, 0.1));
       if (ghostIn <= 0) continue;
       ctx.save();
       ctx.globalAlpha = 0.14 * ghostIn;
-      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * 0.45);
+      nodePath(ctx, rect, nodeShape, unit);
       ctx.fillStyle = THEME.panel;
       ctx.fill();
       ctx.strokeStyle = "rgba(148,163,184,0.7)";
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.35, unit * 0.3]);
-      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * 0.45);
+      nodePath(ctx, rect, nodeShape, unit);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 0.22 * ghostIn;
@@ -232,7 +445,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const pop = easeOutBack(clamp01(t));
     const highlighted = highlights.has(node.id);
     const dimmed = !highlighted && highlights.size > 0;
-    const pulse = highlighted ? 1 + 0.015 * Math.sin(env.elapsedMs / 180) : 1;
+    const pulse = highlighted ? 1 + 0.018 * idle(env, 1600) : 1;
 
     ctx.save();
     // Entrance fade only — a revealed node is always fully opaque so arrows
@@ -245,20 +458,20 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
 
     if (highlighted) {
       ctx.shadowColor = accentGlow;
-      ctx.shadowBlur = unit * 1.1;
+      ctx.shadowBlur = unit * (0.95 + 0.3 * idle(env, 1600));
     } else {
       ctx.shadowColor = "rgba(0,0,0,0.55)";
       ctx.shadowBlur = unit * 0.5;
       ctx.shadowOffsetY = 4;
     }
-    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * 0.45);
+    nodePath(ctx, rect, nodeShape, unit);
     ctx.fillStyle = highlighted || node.accent ? "#0e2433" : dimmed ? "#0b0f15" : THEME.panel;
     ctx.fill();
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
     // Border is always drawn with real, visible contrast — even when dimmed.
-    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * 0.45);
+    nodePath(ctx, rect, nodeShape, unit);
     ctx.strokeStyle = highlighted
       ? accent
       : node.accent
@@ -270,11 +483,11 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     ctx.stroke();
 
     ctx.fillStyle = dimmed ? THEME.textDim : THEME.text;
-    let fontPx = unit * 0.78;
+    let fontPx = unit * (vertical ? 0.82 : 0.78);
     ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
     let lines = wrapText(ctx, node.label, rect.w - unit * 0.8);
     if (lines.length > 2) {
-      fontPx = unit * 0.62;
+      fontPx = unit * (vertical ? 0.66 : 0.62);
       ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
       lines = wrapText(ctx, node.label, rect.w - unit * 0.7).slice(0, 2);
     }
@@ -282,14 +495,19 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const lineH = fontPx * 1.25;
     let startY = rect.cy - ((lines.length - 1) * lineH) / 2 + fontPx * 0.35;
     if (node.icon) {
-      // Emoji icon above the label, both centered as one block.
-      const iconPx = Math.min(rect.h * 0.4, unit * 1.25);
-      const blockH = iconPx * 1.25 + lines.length * lineH;
+      // Vector concept icon (server/database/…) when recognised, else emoji —
+      // both sit above the label as one centred block.
+      const iconPx = Math.min(rect.h * 0.46, unit * 1.5);
+      const blockH = iconPx * 1.15 + lines.length * lineH;
       const top = rect.cy - blockH / 2;
-      ctx.font = `${iconPx}px ${FONT_SANS}`;
-      ctx.fillText(node.icon, rect.cx, top + iconPx * 0.95);
+      if (isVectorIcon(node.icon)) {
+        drawIcon(ctx, node.icon, rect.cx, top + iconPx * 0.5, iconPx, env, node.accent ? env.palette.accent : env.palette.secondary);
+      } else {
+        ctx.font = `${iconPx}px ${FONT_SANS}`;
+        ctx.fillText(node.icon, rect.cx, top + iconPx * 0.95);
+      }
       ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
-      startY = top + iconPx * 1.25 + fontPx * 0.8;
+      startY = top + iconPx * 1.2 + fontPx * 0.8;
     }
     lines.forEach((line, i) => ctx.fillText(line, rect.cx, startY + i * lineH));
     ctx.restore();
@@ -304,7 +522,8 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     if (!from || !to) continue;
     const startAt = Math.max(reveals.get(arrow.from) ?? 0, reveals.get(arrow.to) ?? 0) + 0.02;
     if (sub(env.p, startAt, 0.09) < 1) continue;
-    const pts = arrowPath(from, to);
+    const straight = arrowPath(from, to);
+    const pts = arrow.curve ? curvedPath(straight[0], straight[straight.length - 1]) : straight;
     const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[Math.floor(pts.length / 2) - 1];
     const labelIn = sub(env.p, startAt + 0.09, 0.08);
     ctx.save();

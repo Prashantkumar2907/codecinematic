@@ -1,0 +1,11 @@
+import { chromium } from "playwright";
+const [url, out] = process.argv.slice(2);
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+page.on("console", (m) => { if (m.type() === "error") console.log("[err]", m.text().slice(0, 300)); });
+page.on("pageerror", (e) => console.log("[pageerror]", String(e).slice(0, 300)));
+await page.goto(url, { waitUntil: "domcontentloaded" });
+await page.waitForFunction(() => window.__PROBE_DONE === true, { timeout: 30000 });
+await page.locator("canvas").screenshot({ path: out });
+console.log("shot", out);
+await browser.close();

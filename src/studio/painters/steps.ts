@@ -1,13 +1,16 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba, shade } from "./common";
 import type { PaintEnv } from "./index";
+
+/** On 9:16 the bottom quarter is covered by the YouTube Shorts UI (CLAUDE_PROMPT.md:207). */
+const SHORTS_SAFE_BOTTOM = 0.75;
 
 type StepsScene = Extract<Scene, { kind: "steps" }>;
 
 /** Numbered process: circled numbers on a spine, each step revealed in order. */
 export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { h, unit, contentX, contentY, contentW, contentH, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
@@ -15,7 +18,13 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
 
   const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3;
   const n = scene.steps.length;
-  const availH = contentH - band;
+  // Centre within the VISIBLE band on 9:16. Centring in the full content box put
+  // the list low, with a dead third under the title and the slack below it hidden
+  // by the caption strip anyway.
+  const listLimit = vertical
+    ? Math.min(contentY + contentH, h * SHORTS_SAFE_BOTTOM)
+    : contentY + contentH;
+  const availH = listLimit - (contentY + band);
   const rowGap = Math.min(availH / n, unit * (vertical ? 4.2 : 3.2));
   const listTop = contentY + band + Math.max(0, (availH - n * rowGap) / 2);
   const numX = contentX + unit * 1.4;
@@ -76,13 +85,13 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
     }
     ctx.beginPath();
     ctx.arc(numX, cyc, numR, 0, Math.PI * 2);
-    ctx.fillStyle = isCurrent ? accent : "#0e2433";
+    ctx.fillStyle = isCurrent ? accent : shade(accent, -0.82);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.lineWidth = unit * 0.07;
     ctx.strokeStyle = accent;
     ctx.stroke();
-    ctx.fillStyle = isCurrent ? "#06121a" : accent;
+    ctx.fillStyle = isCurrent ? shade(accent, -0.9) : accent;
     ctx.font = `800 ${unit}px ${FONT_SANS}`;
     ctx.textAlign = "center";
     ctx.fillText(String(i + 1), numX, cyc + unit * 0.36);

@@ -18,6 +18,26 @@ const VOICE_BY_LANG: Record<string, string> = {
   hi: "hi-IN-MadhurNeural",
 };
 
+/** Curated, verified edge-tts voices for the Output voice picker (from
+ *  `edge-tts --list-voices`). Only these are offered, so every pick works. */
+export const VOICE_OPTIONS: { id: string; label: string }[] = [
+  { id: "en-US-AndrewMultilingualNeural", label: "Andrew · US (M) — default" },
+  { id: "en-US-AvaMultilingualNeural", label: "Ava · US (F)" },
+  { id: "en-US-BrianMultilingualNeural", label: "Brian · US (M)" },
+  { id: "en-US-EmmaMultilingualNeural", label: "Emma · US (F)" },
+  { id: "en-US-GuyNeural", label: "Guy · US (M)" },
+  { id: "en-US-JennyNeural", label: "Jenny · US (F)" },
+  { id: "en-US-AriaNeural", label: "Aria · US (F)" },
+  { id: "en-IN-PrabhatNeural", label: "Prabhat · Indian English (M)" },
+  { id: "en-IN-NeerjaNeural", label: "Neerja · Indian English (F)" },
+  { id: "en-IN-NeerjaExpressiveNeural", label: "Neerja Expressive · Indian English (F)" },
+  { id: "en-GB-RyanNeural", label: "Ryan · British (M)" },
+  { id: "en-GB-SoniaNeural", label: "Sonia · British (F)" },
+  { id: "en-AU-NatashaNeural", label: "Natasha · Australian (F)" },
+  { id: "hi-IN-MadhurNeural", label: "Madhur · Hindi (M)" },
+  { id: "hi-IN-SwaraNeural", label: "Swara · Hindi (F)" },
+];
+
 export async function fetchNarration(
   script: SceneScript,
   voice?: string,

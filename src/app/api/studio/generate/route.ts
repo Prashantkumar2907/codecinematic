@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, bigtextAfterLastQuestion, firstBeatFormulaic, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
+import { sceneScriptSchema, narrationWordCount, firstAdjacentBigtext, vocabExampleMissingWord, bigtextAfterLastQuestion, firstBeatFormulaic, shortSceneOverdense, unknownSceneKeys, NARRATION_BUDGET, type SceneScript } from "@/studio/schema";
 import { generateJson, geminiQuotaSnapshot, GeminiError } from "@/lib/gemini";
-import { buildScriptPrompt, buildRepairPrompt } from "@/lib/prompt";
+import { buildScriptPrompt, buildRepairPrompt, buildBlueprintPrompt, buildScriptFromBlueprintPrompt, buildCritiquePrompt, buildRefinePrompt, ENHANCED_SUBJECTS, type ScriptCritique } from "@/lib/prompt";
 import { sanitizeScript } from "@/lib/sanitize";
 import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
@@ -15,6 +15,11 @@ const requestSchema = z.object({
   topic: z.string().min(3).max(120),
   angle: z.string().max(160).optional(),
   lang: z.enum(["en", "hi"]).default("en"),
+  model: z.string().max(60).optional(),
+  keyId: z.string().max(40).optional(),
+  freeOnly: z.boolean().optional(),
+  directives: z.array(z.string().max(400)).max(12).optional(),
+  exemplarScript: z.string().max(60000).optional(),
 });
 
 /* Soft gates (word budget, bare section cards) often need more than two tries —
@@ -31,7 +36,14 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
   }
-  const { format, topic, angle, lang } = parsed.data;
+  const { format, topic, angle, lang, model, keyId, freeOnly, directives, exemplarScript } = parsed.data;
+  const gen =
+    model || keyId || freeOnly
+      ? { ...(model ? { model } : {}), ...(keyId ? { keyId } : {}), ...(freeOnly ? { freeOnly } : {}) }
+      : undefined;
+  // The blueprint/critique stages don't take a model/key pin, but they must still
+  // honor freeOnly so an automated run never bills via a planning/review sub-call.
+  const fastOpts = freeOnly ? { freeOnly } : undefined;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -46,7 +58,7 @@ export async function POST(req: Request) {
         );
         const recentTopics = (await coveredTopics(subject.label, module_.label, submodule.label)).slice(-15);
 
-        const prompt = buildScriptPrompt({
+        const promptOpts = {
           subject,
           moduleLabel: module_.label,
           submoduleLabel: submodule.label,
@@ -57,9 +69,57 @@ export async function POST(req: Request) {
           angle,
           recentTopics,
           lang,
-        });
-        emit({ stage: "writing" });
-        let raw = sanitizeScript(await generateJson(prompt));
+          directives,
+          exemplarScript,
+        };
+
+        let raw: unknown;
+        if (ENHANCED_SUBJECTS.has(subject.id)) {
+          /* Creator pipeline: blueprint → script → critique → refine. The blueprint
+           * and critique stages are best-effort — if either fails, generation falls
+           * through to the plain path / ships the draft rather than dying. */
+          let blueprint: unknown = null;
+          emit({ stage: "planning" });
+          try {
+            blueprint = await generateJson(
+              buildBlueprintPrompt({ ...promptOpts, exemplar: module_.exemplars?.[format] }),
+              "fast",
+              fastOpts
+            );
+          } catch {
+            blueprint = null;
+          }
+          emit({ stage: "writing" });
+          raw = sanitizeScript(
+            await generateJson(
+              blueprint ? buildScriptFromBlueprintPrompt(JSON.stringify(blueprint), promptOpts) : buildScriptPrompt(promptOpts),
+              "quality",
+              gen
+            )
+          );
+          try {
+            emit({ stage: "reviewing" });
+            const critique = (await generateJson(
+              buildCritiquePrompt(JSON.stringify(raw), { subject, format, topic, lang }),
+              "fast",
+              fastOpts
+            )) as Partial<ScriptCritique> | null;
+            const issues = Array.isArray(critique?.issues)
+              ? critique.issues.filter((i) => i && typeof i.problem === "string" && typeof i.fix === "string")
+              : [];
+            if (critique?.verdict === "revise" && issues.length > 0) {
+              emit({ stage: "refining" });
+              raw = sanitizeScript(
+                await generateJson(buildRefinePrompt(JSON.stringify(raw), JSON.stringify(issues), { subject, format, topic }), "quality", gen)
+              );
+            }
+          } catch {
+            /* keep the un-refined draft; validation below still gates it */
+          }
+        } else {
+          emit({ stage: "writing" });
+          raw = sanitizeScript(await generateJson(buildScriptPrompt(promptOpts), "quality", gen));
+        }
         const budget = NARRATION_BUDGET[format];
         const warnings: string[] = [];
         let accepted: SceneScript | null = null;
@@ -106,6 +166,12 @@ export async function POST(req: Request) {
                 `the opening beat "${hook}…" uses a tired formulaic hook — rewrite the first beat with a fresh opener (a shocking number, a concrete mini-scene, or a blunt myth-strike), NOT "Have you ever…/Did you know…/Think you…/You think…"`
               );
             }
+            const dense = shortSceneOverdense(validated.data);
+            if (dense) {
+              issues.push(
+                `scene "${dense.id}" is too dense for a 9:16 short — ${dense.detail}. The YouTube UI covers the bottom quarter and right edge, so split it into two scenes or drop the least important items`
+              );
+            }
             if (issues.length === 0) {
               accepted = validated.data;
               break;
@@ -132,6 +198,10 @@ export async function POST(req: Request) {
               if (firstBeatFormulaic(validated.data)) {
                 warnings.push("the opening hook uses a formulaic opener");
               }
+              const dense = shortSceneOverdense(validated.data);
+              if (dense) {
+                warnings.push(`scene "${dense.id}" may crowd behind the YouTube UI (${dense.detail})`);
+              }
               accepted = validated.data;
               break;
             }
@@ -144,10 +214,18 @@ export async function POST(req: Request) {
             return;
           }
           emit({ stage: "repairing", round: round + 1 });
-          raw = sanitizeScript(await generateJson(buildRepairPrompt(JSON.stringify(raw), issues.join("\n"))));
+          raw = sanitizeScript(await generateJson(buildRepairPrompt(JSON.stringify(raw), issues.join("\n")), "quality", gen));
         }
 
         if (!accepted) throw new Error("validation loop exited without a script");
+        // Surface invented properties zod silently stripped (#13/#26) — the scene still
+        // renders (the key is gone), so this warns for prompt-tuning rather than repairs.
+        const invented = unknownSceneKeys((raw as { scenes?: unknown }).scenes, accepted);
+        if (invented.length) {
+          const preview = invented.slice(0, 4).map((s) => `${s.id}: ${s.keys.join(", ")}`).join("; ");
+          console.warn(`[generate] dropped unknown scene keys — ${preview}`);
+          warnings.push(`ignored unsupported field(s) the model invented (${preview})`);
+        }
         const script = {
           ...accepted,
           lang,

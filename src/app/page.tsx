@@ -2,27 +2,36 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type SceneScript, type Scene, type SceneTiming, type VerifyResult, ASPECTS, sceneScriptSchema } from "@/studio/schema";
-import { computeTimings, runPlan, type RenderHandle, type BeatAudio } from "@/studio/engine";
-import { fetchNarration, verifyScript } from "@/studio/pipeline";
+import { computeTimings, runPlan, introOutroMs, type RenderHandle, type BeatAudio, type CaptionStyle, type CaptionPos, CAPTION_STYLES, CAPTION_POSITIONS } from "@/studio/engine";
+import { buildSrt } from "@/studio/captions";
+import { fetchNarration, verifyScript, VOICE_OPTIONS } from "@/studio/pipeline";
 import { renderThumbnail } from "@/studio/thumbnail";
-import { DEMO_SCRIPT } from "@/studio/demo";
+import { DEMO_SCRIPT, DEMO_KINDS_LONG, DEMO_KINDS_SHORT, DEMO_KINDS2_LONG, DEMO_KINDS2_SHORT, DEMO_WAVE1, DEMO_WAVE2 } from "@/studio/demo";
 import NewsView from "@/components/NewsView";
 
 type Format = "short" | "long";
 type View = "create" | "library" | "news";
 type Stage = "idle" | "topics" | "generating" | "scripted" | "voicing" | "rendering" | "rendered" | "saving" | "uploading" | "uploaded";
-type GenStage = "writing" | "validating" | "repairing" | "optimizing";
+type GenStage = "planning" | "writing" | "reviewing" | "refining" | "validating" | "repairing" | "optimizing";
 
 type Submodule = { id: string; label: string };
 type Module = { id: string; label: string; submodules: Submodule[] };
 type Subject = { id: string; label: string; audience: string; style: string; modules: Module[] };
 type TopicSuggestion = { title: string; angle?: string };
 type GenerateFailure = { message: string; details?: string[]; raw?: string };
-type Quota = { used: number; limit: number; perModel: { model: string; used: number; limit: number }[] };
+type Quota = { used: number; limit: number; perModel: { model: string; used: number; limit: number }[]; byKey?: Record<string, number> };
+type KeyProbe = {
+  id: string;
+  label: string;
+  billed: boolean;
+  exhausted: boolean;
+  models: { model: string; status: "ok" | "exhausted" | "unavailable" }[];
+};
 type DraftInfo = {
   slug: string;
   hasVideo: boolean;
   hasThumbnail: boolean;
+  hasCaptions: boolean;
   videoBytes: number;
   savedAt: string;
   format: string;
@@ -44,10 +53,11 @@ const TOAST_MS = 4000;
 
 function descriptionWithChapters(script: SceneScript, timings: SceneTiming[]): string {
   const base = script.meta.description.split("\n\nChapters:")[0].trimEnd();
+  const { introMs } = introOutroMs(script.format);
   const marks: { atS: number; label: string }[] = [];
   script.scenes.forEach((scene, i) => {
     if (scene.kind === "bigtext" && timings[i]) {
-      marks.push({ atS: Math.floor(timings[i].startMs / 1000), label: scene.text.slice(0, 50) });
+      marks.push({ atS: Math.floor((introMs + timings[i].startMs) / 1000), label: scene.text.slice(0, 50) });
     }
   });
   const chapters: { atS: number; label: string }[] = [];
@@ -71,6 +81,10 @@ function describeScene(scene: Scene): string {
       return scene.text;
     case "bullets":
     case "diagram":
+    case "tree":
+    case "mindmap":
+    case "iso3d":
+    case "orbit":
     case "compare":
     case "timeline":
     case "steps":
@@ -92,7 +106,59 @@ function describeScene(scene: Scene): string {
       return scene.word;
     case "mythfact":
       return scene.myth;
+    case "trace":
+    case "memgrid":
+    case "callstack":
+    case "lifeline":
+    case "bits":
+    case "cycle":
+    case "statemachine":
+    case "decision":
+    case "chain":
+    case "pipeline":
+    case "ledger":
+    case "sankey":
+    case "gauge":
+    case "pictogram":
+    case "race":
+    case "schematic":
+    case "terrain":
+    case "graphwalk":
+    case "matrix":
+    case "threads":
+    case "queueflow":
+    case "cipher":
+    case "circuit":
+    case "formula":
+    case "curves":
+    case "buckets":
+    case "probability":
+    case "basket":
+    case "radar":
+    case "bodymap":
+    case "constellation":
+    case "dayclock":
+    case "storyboard":
+    case "bracket":
+    case "showdown":
+    case "skyline":
+    case "calendar":
+    case "geomap":
+    case "numberline":
+    case "geometry":
+    case "molecule":
+    case "layers":
+    case "trafficflow":
+    case "eventbus":
+      return scene.title;
+    case "browserframe":
+      return scene.url;
+    case "zoomladder":
+      return scene.title ?? scene.rungs[0]?.label ?? "zoom";
+    case "dialogue":
+      return scene.title ?? `${scene.left.name} ↔ ${scene.right.name}`;
   }
+  return (scene as { title?: string }).title ?? "scene";
 }
 
 function fileUrl(slug: string, name: string) {
@@ -119,6 +185,13 @@ export default function Studio() {
   const [customTopic, setCustomTopic] = useState("");
   const [topicsExpanded, setTopicsExpanded] = useState(true);
   const [quota, setQuota] = useState<Quota | null>(null);
+  const [models, setModels] = useState<string[]>([]);
+  const [genModel, setGenModel] = useState("");
+  const [keyProbes, setKeyProbes] = useState<KeyProbe[]>([]);
+  const [selKey, setSelKey] = useState("");
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle | "auto">("off");
+  const [captionPos, setCaptionPos] = useState<CaptionPos>("bottom");
+  const [genVoice, setGenVoice] = useState("");
 
   const [stage, setStage] = useState<Stage>("idle");
   const [topicsError, setTopicsError] = useState<string | null>(null);
@@ -126,11 +199,11 @@ export default function Studio() {
   const [generateError, setGenerateError] = useState<GenerateFailure | null>(null);
   const [stageError, setStageError] = useState<string | null>(null);
   const [genStage, setGenStage] = useState<GenStage | null>(null);
+  const [genEnhanced, setGenEnhanced] = useState(false);
   const [genRound, setGenRound] = useState(0);
   const [genWarning, setGenWarning] = useState<string | null>(null);
   const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
   const [uploadChannels, setUploadChannels] = useState<Record<string, string>>({});
-  const [channelVoices, setChannelVoices] = useState<Record<string, string>>({});
   const [genStartedAt, setGenStartedAt] = useState<number | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyingSceneId, setVerifyingSceneId] = useState<string | null>(null);
@@ -189,10 +262,32 @@ export default function Studio() {
         setSubjects(data.subjects);
         if (data.quota) setQuota(data.quota as Quota);
         if (data.uploadChannels) setUploadChannels(data.uploadChannels as Record<string, string>);
-        if (data.channelVoices) setChannelVoices(data.channelVoices as Record<string, string>);
+        if (Array.isArray(data.models)) {
+          setModels(data.models as string[]);
+          setGenModel((prev) => prev || (data.models as string[])[0] || "");
+        }
       }
     } catch {
-      /* retry on next mount; create flow shows empty pickers meanwhile */
+      /* keep last-known subjects */
+    }
+  }, []);
+
+  const refreshKeys = useCallback(async (force = false) => {
+    // The probe is 40+ tiny calls and can transiently 500/time out; a slow or failed
+    // probe used to leave the key picker empty. Retry a few times so it populates —
+    // the picker itself now always renders (Auto) even before this resolves.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`/api/studio/keys${force ? "?force=1" : ""}`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.keys)) {
+          setKeyProbes(data.keys as KeyProbe[]);
+          return;
+        }
+      } catch {
+        /* transient — fall through to retry */
+      }
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
     }
   }, []);
 
@@ -209,7 +304,8 @@ export default function Studio() {
   useEffect(() => {
     void refreshSubjects();
     void refreshDrafts();
-  }, [refreshSubjects, refreshDrafts]);
+    void refreshKeys();
+  }, [refreshSubjects, refreshDrafts, refreshKeys]);
 
   useEffect(() => {
     if (!toast) return;
@@ -290,6 +386,9 @@ export default function Studio() {
 
   const adoptScript = useCallback(async (raw: SceneScript) => {
     setScript(raw);
+    // The canvas element's display box follows the format picker; an adopted
+    // script (demo, JSON edit) may carry the other aspect — keep them in sync.
+    setFormat(raw.format);
     setVerifyResults([]);
     setVerifying(true);
     try {
@@ -331,7 +430,7 @@ export default function Studio() {
   };
 
   const runGenerate = useCallback(
-    async (body: { subject: string; module: string; submodule: string; format: Format; topic: string; angle?: string; lang?: "en" | "hi" }) => {
+    async (body: { subject: string; module: string; submodule: string; format: Format; topic: string; angle?: string; lang?: "en" | "hi"; model?: string }) => {
       setTopicsError(null);
       setGenerateError(null);
       setStageError(null);
@@ -340,6 +439,7 @@ export default function Studio() {
       setVerifyResults([]);
       setShowJson(false);
       setGenStage(null);
+      setGenEnhanced(false);
       setGenRound(0);
       setGenWarning(null);
       setGenStartedAt(Date.now());
@@ -348,7 +448,7 @@ export default function Studio() {
         const res = await fetch("/api/studio/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ ...body, model: body.model ?? (genModel || undefined), keyId: selKey || undefined }),
         });
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => ({ error: `generate failed (${res.status})` }));
@@ -361,11 +461,15 @@ export default function Studio() {
         const handleEvent = async (event: Record<string, unknown>) => {
           if (event.quota && typeof event.quota === "object") setQuota(event.quota as Quota);
           if (
+            event.stage === "planning" ||
             event.stage === "writing" ||
+            event.stage === "reviewing" ||
+            event.stage === "refining" ||
             event.stage === "validating" ||
             event.stage === "repairing" ||
             event.stage === "optimizing"
           ) {
+            if (event.stage === "planning") setGenEnhanced(true);
             setGenStage(event.stage);
             if (event.stage === "repairing" && typeof event.round === "number") setGenRound(event.round);
             return;
@@ -408,7 +512,7 @@ export default function Studio() {
         setGenStartedAt(null);
       }
     },
-    [adoptScript]
+    [adoptScript, genModel, selKey]
   );
 
   const generate = async () => {
@@ -423,14 +527,14 @@ export default function Studio() {
     });
   };
 
-  const loadDemo = async () => {
+  const loadDemo = async (demoScript?: SceneScript) => {
     setTopicsError(null);
     setGenerateError(null);
     setStageError(null);
     resetOutputs();
     setStage("generating");
     try {
-      await adoptScript(structuredClone(DEMO_SCRIPT));
+      await adoptScript(structuredClone(demoScript ?? DEMO_SCRIPT));
     } catch (err) {
       setStageError(err instanceof Error ? err.message : String(err));
       setStage("idle");
@@ -451,7 +555,7 @@ export default function Studio() {
     setVoiceProgress(null);
     try {
       const narration =
-        audio ?? (await fetchNarration(script, channelVoices[script.subject], (done, total) => setVoiceProgress({ done, total })));
+        audio ?? (await fetchNarration(script, genVoice || undefined, (done, total) => setVoiceProgress({ done, total })));
       setAudio(narration);
       const sceneTimings = computeTimings(script, narration);
       setTimings(sceneTimings);
@@ -467,6 +571,8 @@ export default function Studio() {
         {
           record: true,
           audioCtx,
+          captionStyle: captionStyle === "auto" ? undefined : captionStyle,
+          captionPos,
           onProgress: (p, label) => {
             // Called every painted frame; committing state 30–60×/s re-renders the
             // whole page and steals frames from the recording. Update at 0.5% steps.
@@ -499,7 +605,7 @@ export default function Studio() {
       if (!ctxHandedOff) void audioCtx.close().catch(() => {});
       setVoiceProgress(null);
     }
-  }, [script, audio]);
+  }, [script, audio, captionStyle, captionPos, genVoice]);
 
   const save = useCallback(async (): Promise<string | null> => {
     if (!script || !videoBlob) return null;
@@ -512,6 +618,10 @@ export default function Studio() {
       const form = new FormData();
       form.append("video", new File([videoBlob], "video.webm", { type: "video/webm" }));
       form.append("script", JSON.stringify(withChapters));
+      if (timings) {
+        const srt = buildSrt(script, timings, introOutroMs(script.format).introMs);
+        if (srt.trim()) form.append("captions", new File([srt], "captions.srt", { type: "application/x-subrip" }));
+      }
       try {
         const thumb = await renderThumbnail(script, BRAND);
         form.append("thumbnail", new File([thumb], "thumbnail.png", { type: "image/png" }));
@@ -598,8 +708,11 @@ export default function Studio() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("demo") === "1" && stage === "idle" && !script) {
-      void loadDemo();
+    const demo = params.get("demo");
+    if (demo && stage === "idle" && !script) {
+      void loadDemo(
+        demo === "2" ? DEMO_KINDS_LONG : demo === "3" ? DEMO_KINDS_SHORT : demo === "4" ? DEMO_KINDS2_LONG : demo === "5" ? DEMO_KINDS2_SHORT : demo === "6" ? DEMO_WAVE1 : demo === "7" ? DEMO_WAVE2 : DEMO_SCRIPT
+      );
       return;
     }
     if (params.get("gen") === "1" && stage === "idle" && !script && subjects.length) {
@@ -710,19 +823,27 @@ export default function Studio() {
   })();
 
   const genChecklist: { key: GenStage; label: string; state: "done" | "current" | "pending" }[] = (() => {
-    const order: GenStage[] = ["writing", "validating", "repairing", "optimizing"];
+    const order: GenStage[] = genEnhanced
+      ? ["planning", "writing", "reviewing", "refining", "validating", "repairing", "optimizing"]
+      : ["writing", "validating", "repairing", "optimizing"];
     const currentIdx = genStage ? order.indexOf(genStage) : -1;
     return order.map((key, i) => {
       const label =
-        key === "writing"
-          ? `writing scenes (${format === "short" ? "4–8" : "14–32"} planned)`
-          : key === "validating"
-            ? "validating structure"
-            : key === "optimizing"
-              ? "optimizing title, description & tags"
-              : genRound > 0
-                ? `repairing — round ${genRound}/2`
-                : "repairing (only if needed)";
+        key === "planning"
+          ? "researching & planning the episode"
+          : key === "reviewing"
+            ? "editor review"
+            : key === "refining"
+              ? "applying editor fixes (only if needed)"
+              : key === "writing"
+                ? `writing scenes (${format === "short" ? "4–8" : "14–32"} planned)`
+                : key === "validating"
+                  ? "validating structure"
+                  : key === "optimizing"
+                    ? "optimizing title, description & tags"
+                    : genRound > 0
+                      ? `repairing — round ${genRound}/2`
+                      : "repairing (only if needed)";
       const state: "done" | "current" | "pending" =
         i === currentIdx ? "current" : i < currentIdx || (key === "repairing" && genRound > 0 && genStage !== "repairing") ? "done" : "pending";
       return { key, label, state };
@@ -754,6 +875,9 @@ export default function Studio() {
     </>
   );
 
+  const selKeyProbe = keyProbes.find((k) => k.id === selKey);
+  const modelOptions = selKeyProbe ? selKeyProbe.models.filter((m) => m.status === "ok").map((m) => m.model) : [];
+
   return (
     <main className="studio">
       <header className="masthead">
@@ -763,17 +887,27 @@ export default function Studio() {
         {quota ? (
           <span
             className="quota"
-            title={`Gemini free-tier requests today (resets midnight PT)\n${quota.perModel
-              .map((m) => `${m.model}: ${m.used}/${m.limit}`)
-              .join("\n")}`}
+            title={`Gemini calls today (resets midnight PT)\nBy key:\n${
+              Object.keys(quota.byKey ?? {}).length
+                ? Object.entries(quota.byKey ?? {})
+                    .map(([k, n]) => `  ${k}: ${n}`)
+                    .join("\n")
+                : "  (none yet)"
+            }\nBy model:\n${quota.perModel.map((m) => `  ${m.model}: ${m.used}/${m.limit}`).join("\n")}`}
           >
-            <span className="quota-label">Gemini today</span>
-            <span className="quota-bar" aria-hidden>
-              <span style={{ width: `${Math.min(100, (quota.used / Math.max(1, quota.limit)) * 100)}%` }} />
-            </span>
-            <span className="quota-count">
-              {quota.used}/{quota.limit}
-            </span>
+            <span className="quota-label">{selKey ? `Calls · ${selKey}` : "Gemini today"}</span>
+            {selKey ? (
+              <span className="quota-count">{quota.byKey?.[selKey] ?? 0} calls</span>
+            ) : (
+              <>
+                <span className="quota-bar" aria-hidden>
+                  <span style={{ width: `${Math.min(100, (quota.used / Math.max(1, quota.limit)) * 100)}%` }} />
+                </span>
+                <span className="quota-count">
+                  {quota.used}/{quota.limit}
+                </span>
+              </>
+            )}
           </span>
         ) : null}
         <div className="view-tabs" role="tablist" aria-label="View">
@@ -858,7 +992,69 @@ export default function Studio() {
 
             <section className="step">
               <div className="step-head">
-                <span className={`snum${stepDone.topic ? " done" : ""}`}>3</span>
+                <span className="snum">3</span>
+                <span className="slab">Output</span>
+                <span className="smut push">model · key · captions</span>
+              </div>
+              <div className="row">
+                <select className="sel" value={selKey} disabled={busy} aria-label="API key"
+                  title="API key. Exhausted keys are disabled; Auto rotates free-first then billed."
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelKey(id);
+                    const kp = keyProbes.find((k) => k.id === id);
+                    const ok = kp?.models.filter((m) => m.status === "ok").map((m) => m.model) ?? [];
+                    if (id && !ok.includes(genModel)) setGenModel(ok[0] ?? "");
+                  }}>
+                  <option value="">{keyProbes.length ? "Key: Auto" : "Key: Auto (loading…)"}</option>
+                  {keyProbes.map((k) => (
+                    <option key={k.id} value={k.id} disabled={k.exhausted}>
+                      {k.label}{k.exhausted ? " — exhausted" : ""}
+                    </option>
+                  ))}
+                </select>
+                {selKey && modelOptions.length ? (
+                  <select className="sel" value={genModel} disabled={busy} aria-label="Model"
+                    title="Gemini model for content generation (falls back down the chain unless a key is pinned)"
+                    onChange={(e) => setGenModel(e.target.value)}>
+                    {modelOptions.map((m) => (
+                      <option key={m} value={m}>{m.replace("gemini-", "")}</option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+              <div className="row">
+                <select className="sel" value={captionStyle} disabled={busy} aria-label="Caption style"
+                  title="Burned-in caption style (auto = karaoke on shorts, pop on long)"
+                  onChange={(e) => setCaptionStyle(e.target.value as CaptionStyle | "auto")}>
+                  <option value="auto">Captions: auto</option>
+                  {CAPTION_STYLES.map((c) => (
+                    <option key={c} value={c}>Captions: {c}</option>
+                  ))}
+                </select>
+                <select className="sel" value={captionPos} disabled={busy} aria-label="Caption placement"
+                  title="Where captions sit in the frame"
+                  onChange={(e) => setCaptionPos(e.target.value as CaptionPos)}>
+                  {CAPTION_POSITIONS.map((p) => (
+                    <option key={p} value={p}>Place: {p}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="row">
+                <select className="sel" value={genVoice} disabled={busy} aria-label="Narration voice"
+                  title="Narration voice for this video. Change it and re-render to re-voice with the new voice. (auto = language default)"
+                  onChange={(e) => { setGenVoice(e.target.value); setAudio(null); }}>
+                  <option value="">Voice: auto (language default)</option>
+                  {VOICE_OPTIONS.map((v) => (
+                    <option key={v.id} value={v.id}>Voice: {v.label}</option>
+                  ))}
+                </select>
+              </div>
+            </section>
+
+            <section className="step">
+              <div className="step-head">
+                <span className={`snum${stepDone.topic ? " done" : ""}`}>4</span>
                 <span className="slab">Topic</span>
                 {script && !topicsExpanded ? (
                   <button className="link push" onClick={() => setTopicsExpanded(true)} disabled={busy}>
@@ -879,7 +1075,7 @@ export default function Studio() {
                       {stage === "topics" ? <span className="spinner" aria-hidden /> : null}
                       {stage === "topics" ? "Asking Gemini…" : topics ? "⟳ Suggest 10 topics" : "Suggest 10 topics"}
                     </button>
-                    <button className="btn" onClick={loadDemo} disabled={busy}>
+                    <button className="btn" onClick={() => loadDemo()} disabled={busy}>
                       Load demo
                     </button>
                   </div>
@@ -1011,7 +1207,7 @@ export default function Studio() {
             {script ? (
               <section className="step step-grow">
                 <div className="step-head">
-                  <span className={`snum${stepDone.script ? " done" : ""}`}>4</span>
+                  <span className={`snum${stepDone.script ? " done" : ""}`}>5</span>
                   <span className="slab">Script — {script.scenes.length} scenes</span>
                   {verifying ? (
                     <span className="smut push">
@@ -1075,7 +1271,7 @@ export default function Studio() {
             {script ? (
               <section className="step">
                 <div className="step-head">
-                  <span className={`snum${stepDone.meta ? " done" : ""}`}>5</span>
+                  <span className={`snum${stepDone.meta ? " done" : ""}`}>6</span>
                   <span className="slab">Metadata</span>
                   <span className="smut push">{script.meta.title.length}/100</span>
                 </div>
@@ -1317,6 +1513,11 @@ export default function Studio() {
                       {selectedDraft.hasThumbnail ? (
                         <a className="btn btn-sm" href={fileUrl(selectedDraft.slug, "thumbnail.png")} download={`${selectedDraft.slug}.png`}>
                           ⬇ Download thumbnail (.png)
+                        </a>
+                      ) : null}
+                      {selectedDraft.hasCaptions ? (
+                        <a className="btn btn-sm" href={fileUrl(selectedDraft.slug, "captions.srt")} download={`${selectedDraft.slug}.srt`}>
+                          ⬇ Download captions (.srt)
                         </a>
                       ) : null}
                       {privacySelect}

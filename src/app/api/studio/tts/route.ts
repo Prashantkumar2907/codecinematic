@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { normalizeSpeech } from "@/lib/speech";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,6 +46,9 @@ export async function POST(req: Request) {
   }
   const voice = parsed.data.voice || process.env.VOICE || DEFAULT_VOICE;
   const rate = parsed.data.rate;
+  // The voice prefix encodes the language (hi-IN-… / en-US-…); the speech normalizer
+  // needs it to avoid injecting English words into a Hindi voice.
+  const lang: "en" | "hi" = voice.toLowerCase().startsWith("hi") ? "hi" : "en";
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "devstudio-tts-"));
 
   try {
@@ -56,7 +60,7 @@ export async function POST(req: Request) {
         const index = cursor++;
         const segment = segments[index];
         const outPath = path.join(tmpDir, `${index}.mp3`);
-        await synthesize(segment.text, voice, outPath, rate);
+        await synthesize(normalizeSpeech(segment.text, lang), voice, outPath, rate);
         const mp3 = await fs.readFile(outPath);
         results[index] = { id: segment.id, mp3Base64: mp3.toString("base64") };
       }

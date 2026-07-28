@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { geminiQuotaSnapshot } from "@/lib/gemini";
+import { geminiQuotaSnapshot, SELECTABLE_MODELS } from "@/lib/gemini";
 import { readHistory, readSubjects } from "@/lib/state";
 import { teachingChannelMap, teachingVoiceMap } from "@/lib/news";
 
@@ -11,5 +11,12 @@ export async function GET() {
     teachingChannelMap().catch(() => ({})),
     teachingVoiceMap().catch(() => ({})),
   ]);
-  return NextResponse.json({ subjects, history: history.slice(-40).reverse(), quota, uploadChannels, channelVoices });
+  return NextResponse.json({
+    subjects,
+    history: history.slice(-40).reverse(),
+    quota,
+    uploadChannels,
+    channelVoices,
+    models: SELECTABLE_MODELS,
+  });
 }

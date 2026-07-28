@@ -4,261 +4,411 @@
       "id": "coding",
       "label": "Coding",
       "audience": "software engineers from junior to staff, global English-speaking",
-      "style": "mechanism-first engineering teaching; prove concepts with small runnable code wherever possible",
+      "style": "mechanism-first engineering teaching; use runnable code only where code itself is the lesson (syntax, an algorithm, an API, a bug) — for conceptual/theory topics show the mechanism visually instead of a code listing",
       "modules": [
         {
           "id": "frontend",
           "label": "Frontend",
+          "style": "the browser is the machine: teach what actually happens at runtime (parse, render, paint, bundle, hydrate) with real DevTools evidence and numbers; trace every framework abstraction down to the DOM/network reality beneath it",
           "submodules": [
             {
               "id": "javascript",
-              "label": "JavaScript"
-            },
-            {
-              "id": "typescript",
-              "label": "TypeScript"
-            },
-            {
-              "id": "react",
-              "label": "React"
-            },
-            {
-              "id": "nextjs",
-              "label": "Next.js"
-            },
-            {
-              "id": "angular",
-              "label": "Angular"
+              "label": "JavaScript",
+              "style": "The language runtime itself — event loop, closures, prototypes, coercion, async — never React or types. Great episodes trace code through the call stack and task queues. Credibility comes from console-provable snippets, V8 behaviors, and spec terms like TDZ and microtask."
             },
             {
               "id": "css-browser",
-              "label": "CSS & Browser"
+              "label": "CSS & Browser",
+              "style": "How the browser turns CSS into pixels: cascade, specificity, flexbox/grid, layout-paint-composite, Core Web Vitals. JS appears only to prove rendering claims. Great episodes lean on DevTools evidence. Credibility: the 16.7ms frame budget, which properties trigger layout, real LCP and CLS numbers."
+            },
+            {
+              "id": "typescript",
+              "label": "TypeScript",
+              "style": "The type system, never runtime behavior: narrowing, generics, structural typing, tsconfig strictness. Great episodes show the compiler catching a bug JavaScript would ship. Credibility: exact error codes (TS2345), what each strict flag changes, utility types like Partial and Pick, version-specific features."
+            },
+            {
+              "id": "react",
+              "label": "React",
+              "style": "React's client rendering model — re-renders, reconciliation, hooks rules, state, memo. Server components and routing belong to Next.js. Great episodes prove WHY a component re-rendered. Credibility: React DevTools profiler evidence, useEffect dependency traps, StrictMode double-invoke, exact hook signatures."
+            },
+            {
+              "id": "nextjs",
+              "label": "Next.js",
+              "style": "The framework layer above React: App Router, server components, SSR/SSG/ISR, caching, hydration. Great episodes pin down where code runs — server or client — and prove it. Credibility: file conventions (page.tsx, 'use client'), fetch cache options, build output, App-vs-Pages Router gotchas."
+            },
+            {
+              "id": "web-performance",
+              "label": "Web Performance",
+              "style": "making pages feel instant — Core Web Vitals, the critical rendering path, lazy loading, code splitting, image strategy, caching. Great episodes show a Lighthouse score moving and attribute every millisecond."
+            },
+            {
+              "id": "web-security-a11y",
+              "label": "Web Security & Accessibility",
+              "style": "the frontend's duty of care — XSS, CSRF, CORS, CSP, clickjacking, plus semantic HTML, ARIA, keyboard and screen-reader accessibility. Great episodes demo one real exploit (safely) or one real assistive-tech flow."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Promises always beat setTimeout: the microtask queue\nHOOK: setTimeout(fn, 0) does not run in zero milliseconds — and a one-line Promise will jump the queue ahead of it every single time.\nARC: 1) Run setTimeout(() => log('timeout'), 0) then Promise.resolve().then(() => log('promise')) — the promise logs first, every time, in every browser. 2) After each task the event loop drains the ENTIRE microtask queue before touching the next macrotask; setTimeout callbacks are macrotasks, and per the HTML spec deeply nested timeouts clamp to a 4ms minimum anyway. 3) That is also why an endless chain of promises can starve rendering — microtasks never yield to paint.\nPAYOFF: setTimeout's delay is a minimum wait, not a schedule — which queue you are in matters more than the number you pass.\nQUESTION: Is there ever a legitimate reason to use setTimeout(0) instead of queueMicrotask? Defend one.",
+            "long": "TITLE: 16 milliseconds: the browser's frame deadline\nHOOK: Your screen repaints 60 times a second, which gives your JavaScript about 16.7 milliseconds per frame — miss the deadline and users call your app janky.\nARC: 1) HTML becomes the DOM, CSS becomes the CSSOM, and they merge into the render tree — watch it as Parse HTML and Recalculate Style in the DevTools Performance panel. 2) Layout computes geometry; reading offsetHeight right after writing styles forces a synchronous reflow, and doing it in a loop is classic layout thrashing. 3) Paint rasterizes layers and the compositor stitches them on the GPU — transform and opacity skip layout AND paint, which is why they animate smoothly. 4) Chrome flags any task over 50ms as a Long Task; batch your DOM reads and writes, or move work into requestAnimationFrame. 5) Re-profile: the flame chart shows the purple layout blocks gone.\nPAYOFF: The fastest CSS property is the one that never triggers layout — animate transform and opacity and the compositor does the work off the main thread.\nQUESTION: Is will-change a legitimate optimization or a footgun that leaks GPU memory in your codebase?"
+          }
         },
         {
           "id": "backend",
           "label": "Backend",
+          "style": "follow one real request end to end — routing, middleware, serialization, the process model; real framework code, typical latency numbers, and the production failure mode that bites",
           "submodules": [
             {
               "id": "python",
-              "label": "Python"
-            },
-            {
-              "id": "fastapi",
-              "label": "FastAPI"
-            },
-            {
-              "id": "nodejs",
-              "label": "Node.js"
-            },
-            {
-              "id": "go",
-              "label": "Go"
+              "label": "Python",
+              "style": "Python the language and CPython the runtime: object model, GIL, asyncio, decorators, typing — no web frameworks here. Great episodes reveal what the interpreter actually does. Credibility: dis and sys demos, GIL behavior under threads, version facts (3.12 speedups, 3.13's experimental free-threaded build)."
             },
             {
               "id": "api-design",
-              "label": "API Design"
+              "label": "API Design",
+              "style": "Language-agnostic contract design: REST semantics, status codes, versioning, pagination, idempotency, auth patterns, webhooks. Framework internals live in the framework lanes. Great episodes autopsy real public APIs. Credibility: Stripe and GitHub examples, correct 409-vs-422 calls, Idempotency-Key headers, cursor-vs-offset trade-offs."
+            },
+            {
+              "id": "fastapi",
+              "label": "FastAPI",
+              "style": "FastAPI and its stack — Pydantic, Starlette, uvicorn, dependency injection, async endpoints. Language internals go to Python; HTTP semantics to API Design. Great episodes follow one request through the framework. Credibility: def-vs-async-def threadpool behavior, Pydantic v2's Rust core, uvicorn worker flags."
+            },
+            {
+              "id": "backend-production",
+              "label": "Backend Production",
+              "style": "shipping Python services for real — Docker images, health checks, graceful shutdown, logging/metrics/tracing, CI/CD, pooling, queues, load testing. Great episodes trace one deploy from git push to serving traffic and name the failure it prevents."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: One million goroutines: Go's 2KB trick\nHOOK: Spawning a million OS threads will take down a Linux box — Go programs spawn a million goroutines and barely notice. The difference is one number: 2 kilobytes.\nARC: 1) A pthread on Linux defaults to an 8MB stack — ulimit -s prints 8192 — so a million threads means terabytes of virtual memory plus a brutal kernel context-switch tax. 2) A goroutine starts at 2KB and grows its stack on demand, while the runtime multiplexes goroutines onto a small pool of OS threads sized by GOMAXPROCS, which defaults to your CPU count. 3) Goroutines blocked on channels or network I/O get parked off-thread by the netpoller, so 10,000 idle connections cost megabytes, not gigabytes.\nPAYOFF: Cheap concurrency is really a memory-layout decision — tiny growable stacks are what make go func() an unremarkable thing to type.\nQUESTION: Do you still bother with worker pools in Go, or just spawn a goroutine per job?",
+            "long": "TITLE: One request through FastAPI: the whole journey\nHOOK: Changing def to async def on a FastAPI endpoint changes which thread your code runs on — and under load, that one keyword decides whether requests pile up or flow.\nARC: 1) The kernel accepts the TCP connection and uvicorn — an ASGI server built on uvloop and httptools — parses HTTP and hands FastAPI a scope dict, not a request object. 2) Starlette matches the route, middleware wraps the call like an onion, and your Depends() graph resolves before the handler runs. 3) Pydantic v2 validates the body in compiled Rust (pydantic-core) — several times faster than the pure-Python v1. 4) async def handlers run on the event loop; plain def handlers are shipped to a threadpool that AnyIO caps at 40 threads by default — and one time.sleep() inside async def stalls every request in the process. 5) Your returned dict is serialized to a JSONResponse and written back through the same ASGI send channel.\nPAYOFF: FastAPI is fast because the slow parts — parsing, validation — were pushed down to C and Rust; the only thing that ruins it is you blocking the loop.\nQUESTION: def or async def for a handler calling a sync database driver — what do you ship, and why?"
+          }
         },
         {
           "id": "dsa",
           "label": "DSA & Interviews",
+          "style": "interview-first: open on the problem class that filters candidates, show the naive way dying (count the operations), then the insight, then the reusable pattern; complexity always stated AND shown",
           "submodules": [
             {
+              "id": "big-o",
+              "label": "Big-O & Complexity",
+              "style": "Complexity analysis itself: reading growth rates off code, amortized costs, space-time trades — no single algorithm owns this lane. Great episodes count real operations, then time real runs to match the math. Credibility: measured timings at n = 10³ versus 10⁶, amortized append analysis, log₂ arithmetic."
+            },
+            {
               "id": "arrays-strings",
-              "label": "Arrays & Strings"
+              "label": "Arrays & Strings",
+              "style": "Linear-structure interview patterns: two pointers, sliding window, prefix sums, hashing over arrays and strings. Trees and graphs live next door. Great episodes show the naive O(n²) dying before the pattern rescues it. Credibility: named LeetCode problems, operation counts at n = 10⁵, runnable code."
             },
             {
-              "id": "trees-graphs",
-              "label": "Trees & Graphs"
+              "id": "hashing",
+              "label": "Hashing & Hash Maps",
+              "style": "hash maps as the interview workhorse — hash functions, collisions, load factor, and the classic patterns (frequency count, two-sum, seen-sets). Great episodes show WHY O(1) lookup isn't magic and when it degrades."
             },
             {
-              "id": "dynamic-programming",
-              "label": "Dynamic Programming"
+              "id": "linked-lists",
+              "label": "Linked Lists",
+              "style": "pointers you can draw — traversal, reversal, fast/slow runners, cycle detection, dummy heads. Great episodes animate the pointer surgery step by step and name the off-by-one traps."
+            },
+            {
+              "id": "stacks-queues",
+              "label": "Stacks & Queues",
+              "style": "LIFO/FIFO as thinking tools — parentheses matching, monotonic stacks, queue-via-stacks, deques and sliding windows. Great episodes show the moment a problem 'becomes' a stack problem."
             },
             {
               "id": "sorting-searching",
-              "label": "Sorting & Searching"
+              "label": "Sorting & Searching",
+              "style": "Ordering and lookup: binary search and its variants, quicksort/mergesort/heapsort mechanics, when the built-in sort is the right answer. Great episodes expose off-by-one traps and pivot disasters. Credibility: Timsort inside Python and Java, the O(n log n) comparison-sort lower bound, mid-computation overflow lore."
             },
             {
-              "id": "big-o",
-              "label": "Big-O & Complexity"
+              "id": "heaps-priority-queues",
+              "label": "Heaps & Priority Queues",
+              "style": "the structure behind 'top-K' — heap property, sift up/down, heapify in O(n), K-way merge, two-heap median. Great episodes contrast heap vs sorting and show real heapq/PriorityQueue code."
+            },
+            {
+              "id": "trees-graphs",
+              "label": "Trees & Graphs",
+              "style": "Hierarchies and networks: BFS/DFS, binary search trees, topological sort, union-find. Great episodes pick the traversal from what the problem is really asking. Credibility: recursion versus explicit stack, adjacency list versus matrix costs, canonical problems like Number of Islands and Course Schedule."
+            },
+            {
+              "id": "recursion-backtracking",
+              "label": "Recursion & Backtracking",
+              "style": "trust the recursion — base cases, call trees, then backtracking's choose/explore/un-choose loop for permutations, subsets, N-queens, Sudoku. Great episodes draw the decision tree and prune it on screen."
+            },
+            {
+              "id": "greedy",
+              "label": "Greedy Algorithms",
+              "style": "when local best is global best — exchange arguments, interval scheduling, jump game, Huffman. Great episodes also show a greedy FAILURE (coin change 1/3/4) so viewers learn when greedy is wrong."
+            },
+            {
+              "id": "bit-manipulation-math",
+              "label": "Bit Manipulation & Math",
+              "style": "bits and number theory interviewers love — XOR tricks, masks, power-of-two checks, GCD, modular arithmetic, fast exponentiation. Great episodes make one bit trick feel like a magic reveal, then demystify it."
+            },
+            {
+              "id": "dynamic-programming",
+              "label": "Dynamic Programming",
+              "style": "Overlapping-subproblem optimization: memoization, tabulation, state design, space compression. No repeated subproblem means it is not this lane. Great episodes derive the recurrence live rather than announcing it. Credibility: call-count math (naive fib(50) is about 40 billion calls), named problems — edit distance, knapsack, LIS."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Two Sum in one pass: the hash map insight\nHOOK: Two Sum is LeetCode problem number one, and the answer that feels obvious is exactly the one that gets you rejected.\nARC: 1) Nested loops check every pair — n(n-1)/2 comparisons, so at n = 100,000 that is around five billion operations and a guaranteed time-limit-exceeded. 2) One pass with a hash map flips the question: for each x, have I already seen target minus x? Lookup is O(1) average, the whole scan O(n) time and O(n) space. 3) The reusable pattern is trading memory for a question — 'have I seen this before?' is the cheapest question in computing.\nPAYOFF: Interviews rarely test the data structure — they test whether you notice the inner loop is asking a question a hash map answers in constant time.\nQUESTION: If the array came pre-sorted, do you write the hash map or two pointers — and which does your interviewer secretly want?",
+            "long": "TITLE: 40 billion calls: fixing recursive Fibonacci\nHOOK: fib(50) written the textbook way makes over 40 billion function calls to compute one number your phone's calculator returns instantly. Every dynamic programming problem is this bug in disguise.\nARC: 1) Trace the call tree: fib(48) is computed twice, fib(47) three times — total calls come to 2·fib(51)−1, roughly 40.7 billion, growing at O(φⁿ). 2) Memoization caches answers by argument, collapsing the tree to 51 unique calls — in Python, @functools.lru_cache does it in one line. 3) Tabulation flips it bottom-up into an array filled left to right — no recursion, so CPython's default 1000-frame recursion limit stops mattering. 4) Only two previous values are ever read, so the O(n) array shrinks to two variables: O(1) space. 5) The same recipe — define the state, find the transition, cache overlapping subproblems — cracks coin change, edit distance, and house robber.\nPAYOFF: DP is not a topic, it is an observation: when the call tree repeats itself, cache it — everything after that is bookkeeping.\nQUESTION: Memoization or tabulation as your interview default — and which one has actually bitten you?"
+          }
         },
         {
           "id": "database",
           "label": "Database",
+          "style": "real tables on screen, not prose about tables: show the rows, the query, the plan; teach what the engine does — indexes, locks, joins — through one worked dataset per video",
           "submodules": [
             {
               "id": "sql",
-              "label": "SQL"
+              "label": "SQL",
+              "style": "The query language, engine-agnostic: joins, GROUP BY, subqueries, window functions, NULL semantics, CTEs. Engine internals belong to PostgreSQL; speed tuning to Indexing. Great episodes run every query against a visible dataset. Credibility: logical clause order (FROM before SELECT), three-valued-logic traps, exact syntax."
             },
             {
               "id": "postgresql",
-              "label": "PostgreSQL"
+              "label": "PostgreSQL",
+              "style": "Postgres the engine: MVCC, VACUUM, WAL, transactions and isolation levels, psql tooling, extensions. Portable SQL stays in the SQL lane. Great episodes prove engine behavior with system catalogs. Credibility: pg_stat views, EXPLAIN output, defaults like port 5432, version facts (MERGE landed in 15)."
             },
             {
               "id": "indexing-performance",
-              "label": "Indexing & Performance"
+              "label": "Indexing & Performance",
+              "style": "Making queries fast on any engine: B-trees, query plans, composite and covering indexes, N+1 queries, lock contention. Great episodes measure before and after, reading the plan aloud. Credibility: EXPLAIN ANALYZE timings, 8KB page math, the leading-column rule, the write tax every index adds."
+            },
+            {
+              "id": "transactions-concurrency",
+              "label": "Transactions & Concurrency",
+              "style": "the ACID heart of databases — isolation levels and their anomalies (dirty/non-repeatable/phantom, write skew), MVCC vs locking, deadlocks, idempotency, sagas/2PC. Great episodes reproduce an anomaly with two terminal sessions."
             },
             {
               "id": "nosql",
-              "label": "NoSQL"
+              "label": "NoSQL",
+              "style": "The category and its trade-offs: key-value, document, wide-column, and graph models, CAP, denormalization, and when relational still wins. Specific engines get their own lanes. Great episodes match data model to access pattern. Credibility: named systems (DynamoDB, Redis), real consistency menus, honest 'don't use NoSQL here' calls."
             },
             {
               "id": "mongodb",
-              "label": "MongoDB"
+              "label": "MongoDB",
+              "style": "MongoDB specifics: documents and BSON, aggregation pipelines, indexes, replica sets, schema design without joins. Category-level NoSQL arguments go next door. Great episodes design the schema around the query pattern. Credibility: real aggregation stages ($match, $group, $lookup), the 16MB document limit, writeConcern semantics."
             },
             {
               "id": "cassandra",
-              "label": "Cassandra"
+              "label": "Cassandra",
+              "style": "Cassandra's wide-column world: partition keys, LSM-tree storage, tunable consistency, query-first data modeling. Great episodes explain why writes are cheap and ad-hoc queries are forbidden. Credibility: CQL-versus-SQL differences, quorum math at RF=3, the memtable-SSTable-compaction flow, tombstone gotchas."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The rows SQL silently hides: NULL logic\nHOOK: WHERE status != 'cancelled' looks airtight — and it quietly throws away every row where status is NULL. No error, no warning, just missing data.\nARC: 1) SQL comparisons return TRUE, FALSE, or UNKNOWN, and WHERE keeps only TRUE — run SELECT NULL = NULL and the answer is NULL, not true. 2) NOT IN is crueler: one NULL inside the list makes the whole query return zero rows. 3) The fixes are explicit: IS DISTINCT FROM in Postgres, COALESCE before comparing, and knowing COUNT(col) skips NULLs while COUNT(*) doesn't — the classic dashboard mismatch.\nPAYOFF: NULL isn't a value, it's a claim of ignorance — and SQL refuses to say TRUE about anything it doesn't know.\nQUESTION: Should new schemas ban NULLs with NOT NULL everywhere — or where do you deliberately allow them?",
+            "long": "TITLE: Reading the query plan: one index, ten million rows\nHOOK: EXPLAIN ANALYZE on a ten-million-row table prints 'Seq Scan' — Postgres just admitted it read every single row to find your one user.\nARC: 1) Build the table with generate_series; WHERE email = ... without an index sequentially scans every 8KB heap page — hundreds of milliseconds even when cached. 2) CREATE INDEX ON users(email) builds a B-tree; each 8KB page holds hundreds of keys, so the tree stays 3-4 levels tall at tens of millions of rows — a handful of page reads instead of millions. 3) Rerun EXPLAIN ANALYZE: Index Scan, under a millisecond — but LIKE '%gmail.com' still seq-scans, because B-trees only match left-anchored prefixes. 4) A composite index on (a, b) is useless for filters on b alone — the leading-column rule makes column order a design decision. 5) The bill: every INSERT and UPDATE now writes index pages too, and pg_stat_user_indexes.idx_scan exposes the indexes nobody reads.\nPAYOFF: An index is a bet — you pay on every write to win on specific reads, and the query plan tells you whether the bet is paying off.\nQUESTION: How many indexes on one hot table before you call it a smell — five, ten, more?"
+          }
         },
         {
           "id": "devops",
           "label": "DevOps",
+          "style": "from laptop to production: teach the actual files and commands (Dockerfile, YAML, IAM policy) line by line and what each buys; one real deploy/ops war story where it fits",
           "submodules": [
             {
-              "id": "docker",
-              "label": "Docker"
-            },
-            {
-              "id": "kubernetes",
-              "label": "Kubernetes"
-            },
-            {
               "id": "linux-shell",
-              "label": "Linux & Shell"
+              "label": "Linux & Shell",
+              "style": "The OS surface engineers actually touch: filesystem and permissions, processes and signals, pipes, systemd, bash scripting, debugging tools. Great episodes make one command's real behavior click. Credibility: exact flags (chmod 755, kill -15 versus -9), /proc spelunking, strace output, exit codes."
             },
             {
-              "id": "aws",
-              "label": "AWS"
-            },
-            {
-              "id": "gcp",
-              "label": "GCP"
-            },
-            {
-              "id": "terraform",
-              "label": "Terraform & IaC"
+              "id": "docker",
+              "label": "Docker",
+              "style": "Containers and images on one machine: Dockerfile mechanics, layers and caching, namespaces and cgroups underneath, Compose, registries. Multi-machine orchestration is Kubernetes' lane. Great episodes shrink an image or bust a caching myth live. Credibility: exact instructions, image-size numbers, multi-stage builds, docker inspect evidence."
             },
             {
               "id": "cicd",
-              "label": "CI/CD"
+              "label": "CI/CD",
+              "style": "Pipelines from push to production: GitHub Actions and GitLab CI syntax, build-test-deploy stages, artifacts, secrets, blue-green and canary deploys, rollbacks. Great episodes debug a real failing pipeline or ship a safe deploy. Credibility: actual YAML, cache-hit savings, deployment gates, honest pipeline-duration numbers."
+            },
+            {
+              "id": "aws",
+              "label": "AWS",
+              "style": "AWS services and their sharp edges: IAM, EC2, S3, Lambda, VPC, and the cost traps between them. GCP-first content lives next door. Great episodes build one small real thing and show the bill. Credibility: hard limits (Lambda's 15-minute timeout), IAM policy JSON, S3 storage classes, egress pricing."
+            },
+            {
+              "id": "gcp",
+              "label": "GCP",
+              "style": "Google Cloud's take: Cloud Run, GKE, BigQuery, IAM differences, the project and billing model. AWS comparisons welcome; AWS-first content belongs next door. Great episodes highlight where GCP's model genuinely differs. Credibility: gcloud commands, BigQuery's per-TB-scanned pricing, Cloud Run scale-to-zero and cold starts."
+            },
+            {
+              "id": "kubernetes",
+              "label": "Kubernetes",
+              "style": "Orchestration: pods, Deployments, Services, the control loop, scheduling, probes, autoscaling. Single-machine container mechanics stay with Docker. Great episodes trace desired state to running container through named components. Credibility: kubectl commands, YAML fields (livenessProbe, resources.limits), kubelet/etcd/kube-scheduler roles, CrashLoopBackOff behavior."
+            },
+            {
+              "id": "terraform",
+              "label": "Terraform & IaC",
+              "style": "Infrastructure as code: HCL, providers, the plan/apply lifecycle, state files, modules, drift. Console click-ops belongs in the cloud lanes. Great episodes read the plan diff and show what state actually stores. Credibility: terraform plan output, state locking with S3 plus DynamoDB, count-versus-for_each gotchas."
+            },
+            {
+              "id": "observability",
+              "label": "Observability & SRE",
+              "style": "seeing production — structured logs, metrics, traces, Prometheus/Grafana, SLI/SLO/error budgets, alerting that doesn't page at 3am for nothing, incident response. Great episodes debug one simulated outage end to end."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Swap two Dockerfile lines: instant rebuilds\nHOOK: Every code change forcing a full npm install isn't Docker being slow — it's your COPY line sitting one instruction too early.\nARC: 1) Each Dockerfile instruction becomes a cached layer, and a change invalidates that layer plus everything after it — so COPY . . before RUN npm install reinstalls node_modules on every edit. 2) Copy package.json and package-lock.json first, install, THEN copy the source: the dependency layer stays cached until the lockfile changes, and rebuilds drop from minutes to seconds. 3) The same trick is universal — requirements.txt before app code in Python, go.mod before source in Go.\nPAYOFF: Docker's cache is deliberately dumb — it checksums per instruction — so you order instructions from least- to most-frequently changed.\nQUESTION: Multi-stage builds or --mount=type=cache — which one has saved you more real minutes?",
+            "long": "TITLE: kubectl apply to running pod: the control loop\nHOOK: kubectl apply returns in half a second, but nothing you typed starts a container — five separate programs negotiate that behind your back.\nARC: 1) kubectl POSTs your YAML to the API server on port 6443; after authentication and admission webhooks, the Deployment is just a record persisted to etcd, a Raft-replicated key-value store — no container exists yet. 2) The deployment controller sees desired ≠ actual and creates a ReplicaSet, which creates Pod objects — still only etcd entries with no node assigned. 3) kube-scheduler watches for unscheduled pods, filters nodes on resources, taints, and affinity, scores the survivors, and writes one node name onto the pod. 4) That node's kubelet notices the binding and drives containerd through CRI to pull the image and start containers; repeated crashes back off exponentially — CrashLoopBackOff caps at five minutes. 5) The loop never stops: delete the pod and the ReplicaSet controller recreates it within seconds.\nPAYOFF: Kubernetes isn't a deployment tool, it's a reconciliation engine — you edit a database record and controllers fight reality until it matches.\nQUESTION: Below what scale is Kubernetes overkill — five services, twenty, fifty?"
+          }
         },
         {
           "id": "system-design",
           "label": "System Design",
+          "style": "numbers drive decisions: QPS, latency budgets, storage math; every pattern anchored in a named company's real architecture and the trade-off they accepted",
           "submodules": [
             {
-              "id": "design-patterns",
-              "label": "Design Patterns"
+              "id": "interview-toolkit",
+              "label": "The Interview Toolkit",
+              "style": "the system design interview as a skill — requirements, back-of-envelope estimation, API and data-model choices, deep dives, trade-off talk, 45-minute pacing. Great episodes run a real mock segment and grade it out loud."
             },
             {
-              "id": "scaling-sharding",
-              "label": "Scaling & Sharding"
+              "id": "design-patterns",
+              "label": "Design Patterns",
+              "style": "The building blocks on the request path: client-server, load balancers (L4 versus L7), API gateways, monolith versus microservices, stateless design. Capacity math belongs to Scaling. Great episodes place each block on a traced request. Credibility: nginx/HAProxy/Envoy specifics, health-check configs, real request-path diagrams."
             },
             {
               "id": "caching-queues",
-              "label": "Caching & Queues"
+              "label": "Caching & Queues",
+              "style": "The two great decouplers: cache placement and invalidation, TTLs, stampedes, plus queues, backpressure, and delivery guarantees. Engine internals belong to Key Technologies. Great episodes pick the strategy from the failure mode. Credibility: cache-aside versus write-through trade-offs, at-least-once honesty, hit-rate math."
+            },
+            {
+              "id": "scaling-sharding",
+              "label": "Scaling & Sharding",
+              "style": "Growing past one machine: vertical versus horizontal, partitioning strategies, consistent hashing, hot keys, capacity math. Cache tactics live in Caching & Queues. Great episodes do the arithmetic on screen — QPS, storage, growth. Credibility: hash-ring mechanics, Instagram's sharded-Postgres ID scheme, back-of-envelope numbers that check out."
             },
             {
               "id": "replication-consistency",
-              "label": "Replication & Consistency"
+              "label": "Replication & Consistency",
+              "style": "Keeping copies agreeing: leader-follower setups, quorums, replication lag, CAP in practice, isolation levels. Consensus algorithms and clocks go to Distributed Systems. Great episodes show a stale read happening, then fix it. Credibility: R+W>N arithmetic, read-your-writes techniques, Postgres streaming replication versus DynamoDB's consistency menu."
             },
             {
               "id": "distributed-systems",
-              "label": "Distributed Systems"
+              "label": "Distributed Systems",
+              "style": "The hard theory made usable: consensus (Raft, Paxos), clocks and ordering, failure detection, idempotency, the exactly-once myth. Replication topologies sit next door. Great episodes prove why the naive distributed version breaks. Credibility: Raft terms and elections, Lamport clocks, Two Generals, Jepsen findings."
             },
             {
               "id": "real-architectures",
-              "label": "Real-World Architectures"
+              "label": "Real-World Architectures",
+              "style": "Whole named systems end to end: how Netflix, Uber, WhatsApp, or Discord actually built it, every component chosen for a stated reason. Isolated patterns belong in the other lanes. Great episodes cite engineering blogs and talks. Credibility: published numbers only — Discord's Cassandra-to-ScyllaDB migration, WhatsApp's famously tiny team."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: One key expires, database dies: cache stampede\nHOOK: Your cache hit rate is 99% and your database still went down — because the 1% arrived all at once, the moment one hot key expired.\nARC: 1) A hot key like the homepage feed expires; ten thousand in-flight requests miss simultaneously and all run the same expensive query — the herd kills the database, not the miss rate. 2) Three production fixes: request coalescing (Go's singleflight collapses duplicate calls), TTL jitter so keys never expire together, and serving stale data while one worker refreshes. 3) Facebook's 'Scaling Memcache' paper (NSDI 2013) formalized the same idea as leases — one client rebuilds, everyone else waits.\nPAYOFF: Averages lie — systems fail on correlated behavior, and expiry timestamps are the easiest way to accidentally synchronize ten thousand clients.\nQUESTION: Jittered TTLs or never-expire with background refresh — what does your team actually ship?",
+            "long": "TITLE: The celebrity problem: timeline fanout at scale\nHOOK: When a celebrity with 80 million followers tweets, a naive design performs 80 million writes for one 280-character message. Timeline architecture is deciding when that work is worth it.\nARC: 1) Fanout-on-read stores each tweet once and assembles timelines by querying every followee at read time — but Twitter reported timeline reads around 300,000 QPS against only thousands of new tweets per second, so reads melt first. 2) Fanout-on-write flips it: each tweet's ID is pushed into every follower's precomputed timeline, which Twitter kept in Redis — a read becomes one list fetch in milliseconds. 3) Then the celebrity problem: 80 million inserts for one tweet is a write storm that can lag by minutes. 4) The shipped answer is hybrid — fan out normal users on write, merge celebrity tweets in at read time, bounding work on both paths.\nPAYOFF: There is no correct architecture, only a read/write ratio — precompute for the many, compute on demand for the heavy, and the cutoff is a dial, not a truth.\nQUESTION: At what follower count would you flip a user from push to pull? Defend your number."
+          }
         },
         {
           "id": "cs-fundamentals",
           "label": "CS Fundamentals",
+          "style": "the magic-removal channel: what REALLY happens beneath the software — bits, syscalls, packets, caches — so the viewer can re-explain it to a friend; one 'your computer is lying to you' reveal per video",
           "submodules": [
             {
               "id": "how-computers-work",
-              "label": "How Computers Work"
+              "label": "How Computers Work",
+              "style": "Silicon up to software: transistors, gates, binary, CPU cycles, the memory hierarchy — how code becomes electricity. OS abstractions start next door. Great episodes build one layer from the layer below it. Credibility: the latency ladder (L1 about 1ns, RAM about 100ns, SSD about 100µs), fetch-decode-execute, real instructions."
             },
             {
               "id": "operating-systems",
-              "label": "Operating Systems"
+              "label": "Operating Systems",
+              "style": "The kernel's contract: processes versus threads, syscalls, scheduling, virtual memory, file descriptors. Hardware belongs to How Computers Work; packets to Networking. Great episodes catch the OS lying helpfully — virtual addresses, buffered writes. Credibility: strace output, fork and exec, page-fault mechanics, context-switch costs."
             },
             {
               "id": "networking",
-              "label": "Networking & the Internet"
+              "label": "Networking & the Internet",
+              "style": "Data in flight: IP, TCP and UDP, DNS, HTTP's evolution, TLS, routing — the full journey of a packet between machines. Inside-the-box concerns stay with Operating Systems. Great episodes trace one real request hop by hop. Credibility: handshake sequences, port numbers, dig/curl/traceroute output, RTT math."
             },
             {
               "id": "security-basics",
-              "label": "Security & Cryptography Basics"
+              "label": "Security & Cryptography Basics",
+              "style": "How trust works: hashing versus encryption, symmetric and asymmetric keys, certificates, password storage, and the canonical attacks — SQL injection, XSS, MITM. Great episodes demo the attack, then the defense mechanism. Credibility: bcrypt-not-SHA-256 for passwords, TLS certificate chains, real breach post-mortems, OWASP names."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: 0.1 plus 0.2 isn't 0.3: floating point\nHOOK: Open any browser console and type 0.1 + 0.2. The answer — 0.30000000000000004 — is not a bug, and it ships in every language you have ever used.\nARC: 1) Doubles are IEEE 754 binary64 — 1 sign bit, 11 exponent bits, 52 fraction bits — so every number must be built from powers of two. 2) 0.1 in binary is 0.000110011... repeating forever, so the nearest 64-bit double is slightly off — add two rounding errors and they surface at the 17th digit. 3) That is why money code uses integer cents or decimal types: Python's decimal, Java's BigDecimal, Postgres NUMERIC.\nPAYOFF: Floats aren't broken — they're honest about a hard truth: you cannot store infinite digits in 64 bits, so every float is the nearest representable lie.\nQUESTION: Have you ever shipped a float-for-money bug — and how far into production did it get?",
+            "long": "TITLE: Enter to pixels: what one URL triggers\nHOOK: Pressing Enter on google.com fires four protocols across dozens of machines you will never see — and the whole negotiation usually finishes in a few hundred milliseconds.\nARC: 1) DNS first: browser and OS caches, then a recursive resolver walks root, .com TLD, and authoritative servers — classically over UDP port 53 — to return an IP. 2) TCP next: the three-way handshake — SYN, SYN-ACK, ACK — burns one full round-trip before a single byte of data moves. 3) TLS 1.3 needs just one more round-trip to agree on keys, down from two in TLS 1.2, after verifying the certificate chain up to a trusted root CA. 4) The HTTP request finally hits port 443, likely multiplexed over HTTP/2, and the HTML response starts parsing before it finishes downloading. 5) Since cross-continent round-trips run around 150-250ms, CDNs win by terminating your connection at an edge server a few milliseconds away.\nPAYOFF: The internet gets faster not with faster light but with fewer round-trips — TLS 1.3, HTTP/2, and QUIC are all wars on RTT.\nQUESTION: A site is slow: which layer do you blame first — DNS, TCP, TLS, or the app?"
+          }
         },
         {
           "id": "key-tech",
           "label": "Key Technologies",
+          "style": "one tool, deeply: why it exists, the mental model in one sentence, the handful of commands/APIs that cover 90% of real use, and the classic production mistake made with it",
           "submodules": [
             {
               "id": "git",
-              "label": "Git"
-            },
-            {
-              "id": "redis",
-              "label": "Redis"
+              "label": "Git",
+              "style": "Git's real model — objects, refs, the index — and the workflows above it: rebase versus merge, reflog rescue, bisect. Great episodes replace command memorization with the pointer picture. Credibility: .git internals via cat-file, exact recovery sequences, merge-conflict anatomy."
             },
             {
               "id": "nginx",
-              "label": "Nginx"
+              "label": "Nginx",
+              "style": "Nginx as the front door: reverse proxying, server and location blocks, the worker event model, load balancing, TLS termination, caching directives. Great episodes read a real nginx.conf line by line. Credibility: proxy_pass semantics, location matching-order rules, worker_connections math, 502-versus-504 diagnosis."
             },
             {
-              "id": "kafka",
-              "label": "Kafka"
+              "id": "redis",
+              "label": "Redis",
+              "style": "Redis itself: data structures per use case, the single-threaded event loop, RDB versus AOF persistence, eviction policies, TTLs. Where caching sits in an architecture is System Design's lane. Great episodes match a structure to a job. Credibility: exact commands (ZADD, SETNX), maxmemory-policy options, O(1)-versus-O(n) command costs, port 6379."
             },
             {
               "id": "graphql",
-              "label": "GraphQL"
+              "label": "GraphQL",
+              "style": "GraphQL the contract: schemas, resolvers, queries versus mutations, the N+1 resolver trap, caching pain, and an honest comparison with REST. Great episodes weigh real costs, not advocacy. Credibility: actual SDL and resolver code, DataLoader batching, persisted queries, GitHub's public GraphQL API as the worked example."
             },
             {
               "id": "websockets-grpc",
-              "label": "WebSockets & gRPC"
+              "label": "WebSockets & gRPC",
+              "style": "Beyond request-response: the WebSocket upgrade handshake and frames, gRPC over HTTP/2 with protobuf, streaming modes, and when plain HTTP still wins. Great episodes derive the protocol choice from the requirement. Credibility: the 101 Switching Protocols exchange, .proto definitions, gRPC's four streaming modes, the browser gRPC-Web caveat."
+            },
+            {
+              "id": "kafka",
+              "label": "Kafka",
+              "style": "Kafka's log-centric model: topics, partitions, offsets, consumer groups, retention, ordering guarantees. Generic queueing theory sits in System Design. Great episodes show why the log beats the queue for replay. Credibility: partition-count decisions, acks=all semantics, consumer-group rebalances, the 7-day default retention."
+            },
+            {
+              "id": "auth-oauth",
+              "label": "Auth & OAuth",
+              "style": "who are you, prove it — sessions vs JWT, password hashing, OAuth2 flows with PKCE, OIDC, SSO/SAML, RBAC. Great episodes walk one real login flow arrow by arrow and flag the vulnerability each step prevents."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: git reset --hard isn't fatal: reflog rescue\nHOOK: You just ran git reset --hard on the wrong branch and watched a day of work vanish. It's still there — Git almost never deletes a commit.\nARC: 1) Every time HEAD moves, Git appends a line to .git/logs/HEAD — run git reflog and your 'lost' commit is sitting right there as HEAD@{1}. 2) git reset --hard HEAD@{1}, or cherry-pick the raw hash, restores it — even unreachable commits survive until garbage collection, 30 days by default. 3) The same move rescues botched rebases and deleted branches — anything that was ever committed can come back.\nPAYOFF: Git is an append-only object database with pointers on top — 'destructive' commands only move pointers, and the reflog remembers where they pointed.\nQUESTION: Worst Git state you've ever recovered from — did you reflog your way out or quietly re-clone?",
+            "long": "TITLE: Kafka's speed secret: it barely does anything\nHOOK: Kafka pushes millions of messages a second on ordinary disks — not by avoiding the disk, but by using it the one way disks are actually fast.\nARC: 1) A topic splits into partitions, each an append-only log file; producers write sequentially, and sequential disk I/O runs orders of magnitude faster than random seeks. 2) The broker barely buffers in process — it leans on the OS page cache and ships bytes to consumers via sendfile() zero-copy, skipping user space entirely. 3) Consumers pull from offsets they control; a consumer group splits partitions among members — 12 partitions across 4 consumers is 3 each, and a 13th consumer sits idle. 4) Ordering holds per partition only: same key, same partition via hash — global order means one partition, which means no parallelism. 5) Retention is time- or size-based — 7 days by default, port 9092 — not consumption-based, so replaying last week is free.\nPAYOFF: Kafka is fast because it's a dumb pipe on purpose — no per-message state, no delivery tracking; every consumer keeps its own bookmark.\nQUESTION: How many partitions do you give a new topic — and what's your story when that number turns out wrong?"
+          }
         },
         {
           "id": "ai",
           "label": "AI & ML",
+          "style": "practitioner AI, zero hype: how it actually works (tokens, embeddings, attention in plain words), real API code with real costs, and the failure modes; never 'AI changes everything' filler",
           "submodules": [
             {
+              "id": "ml-fundamentals",
+              "label": "ML Fundamentals",
+              "style": "Classical ML from scratch: regression, gradient descent, loss functions, overfitting, train/test discipline, evaluation metrics. LLM-specific topics stay in their lanes. Great episodes build tiny working models in NumPy or scikit-learn. Credibility: runnable code, the precision-recall trade-off, learning curves, why accuracy lies on imbalanced data."
+            },
+            {
               "id": "llm-genai",
-              "label": "LLMs & GenAI"
+              "label": "LLMs & GenAI",
+              "style": "What LLMs are: tokens, embeddings, attention in plain words, sampling, context windows, the model landscape. Prompting technique and app-building have their own lanes. Great episodes make the mechanism click without math worship. Credibility: real tokenizer output, temperature and top-p effects, context sizes and prices of named models."
             },
             {
               "id": "prompt-engineering",
-              "label": "Prompt Engineering"
+              "label": "Prompt Engineering",
+              "style": "Getting reliably better outputs: few-shot examples, chain-of-thought, structured outputs, system prompts, prompt evaluation. Retrieval and tools belong to Agents & RAG. Great episodes show before-and-after outputs on the same task. Credibility: exact prompts on screen, JSON-mode and schema features, measured accuracy deltas, model-specific quirks."
             },
             {
               "id": "agents-rag",
-              "label": "Agents & RAG"
-            },
-            {
-              "id": "ml-fundamentals",
-              "label": "ML Fundamentals"
+              "label": "Agents & RAG",
+              "style": "Making models use knowledge and tools: embeddings, chunking, vector search, reranking, tool-calling loops, agent failure modes. Great episodes debug why retrieval returned the wrong paragraphs. Credibility: embedding model names with prices, recall@k evals, function-calling JSON, honest agent-reliability numbers."
             },
             {
               "id": "ai-apps",
-              "label": "Building AI Apps"
+              "label": "Building AI Apps",
+              "style": "Shipping AI features: API integration, streaming, cost and latency budgets, caching, evals, guardrails, fallbacks. How models work internally is upstream. Great episodes treat the model as an unreliable dependency and engineer around it. Credibility: real SDK code, per-token price math, p95 latencies, rate-limit strategies."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Why LLMs can't count letters: tokens\nHOOK: Frontier models have famously failed to count the r's in 'strawberry' — while writing working compilers. The letters were never there to count.\nARC: 1) Models don't read characters: a BPE tokenizer chops text into subword chunks first — GPT-4o's vocabulary is around 200,000 tokens — and 'strawberry' can arrive as pieces like 'str' + 'awberry', already as integer IDs. 2) Each ID becomes an embedding vector; nothing in that vector preserves spelling, so asking about letters asks for information the encoding destroyed. 3) Same root cause behind weak digit arithmetic and rhyming — and why 'spell it out letter by letter first' often fixes it.\nPAYOFF: An LLM's dumbest failures usually trace to its input encoding — before blaming the model, ask what the tokenizer did to the text.\nQUESTION: What's the most trivial thing you've watched a frontier model fail at — and can you pin it on tokenization?",
+            "long": "TITLE: RAG that actually works: the retrieval pipeline\nHOOK: Most 'chat with your docs' demos die in production for the same reason — the model never hallucinated; your retrieval handed it the wrong paragraphs.\nARC: 1) Ingest: split documents into chunks of a few hundred tokens with overlap — chunking strategy moves answer quality more than model choice does. 2) Embed each chunk — OpenAI's text-embedding-3-small costs $0.02 per million tokens — and store the vectors in pgvector or a dedicated vector database. 3) At query time, embed the question and take cosine-similarity top-k — but similar is not relevant: 'how do I cancel?' happily matches both the refund policy and the retention script. 4) The fixes that move the needle: hybrid search combining BM25 with vectors, a reranker model over the top 50 candidates, and metadata filters applied before similarity. 5) Ground the generation — pass chunks with citations, instruct 'answer only from context' — then evaluate retrieval hit-rate separately from answer quality.\nPAYOFF: RAG quality is a search problem wearing an AI costume — measure recall@k on your retriever before touching prompts or swapping models.\nQUESTION: Hybrid search plus a reranker, or a bigger context window stuffed with more chunks — where does your money go?"
+          }
         }
       ]
     },
@@ -271,130 +421,243 @@
         {
           "id": "ancient-india",
           "label": "Ancient India",
+          "style": "evidence-first storytelling: lead with what was actually found (seals, edicts, coins, ruins) and what it proves; explicitly separate archaeology from legend, and date everything",
           "submodules": [
             {
               "id": "indus-valley",
-              "label": "Indus Valley Civilisation"
+              "label": "Indus Valley Civilisation",
+              "style": "Cities before empires: planned streets, standardised bricks and seals, the undeciphered script, the still-open decline debate. Lead with excavated evidence from named sites (Mohenjo-daro, Harappa, Dholavira) and always separate what digs prove from what we infer."
             },
             {
               "id": "vedic-age",
-              "label": "Vedic Age"
+              "label": "Vedic Age",
+              "style": "The world the Vedas describe: pastoral clans becoming kingdoms, sabha and samiti, varna's beginnings, iron and the eastward push. Evidence is mostly textual — say so on screen — and keep date ranges hedged (around 1500-600 BCE)."
+            },
+            {
+              "id": "mahajanapadas-buddhism-jainism",
+              "label": "Mahajanapadas, Buddhism & Jainism",
+              "style": "second urbanisation to shramana revolution — Buddha and Mahavira as historical figures; councils, sects, texts and sites with exam-grade precision"
             },
             {
               "id": "mauryan-empire",
-              "label": "Mauryan Empire"
+              "label": "Mauryan Empire",
+              "style": "India's first empire, Chandragupta to Ashoka: Arthashastra statecraft, Megasthenes' account, rock and pillar edicts as primary sources. Anchor every claim in an edict, a Greek report or archaeology, with Kalinga as the hinge of the story."
+            },
+            {
+              "id": "post-mauryan-dynasties",
+              "label": "Post-Mauryan India",
+              "style": "the connector centuries — Kushanas, Satavahanas, Indo-Greeks; coins, art schools and Indo-Roman trade as historical evidence"
+            },
+            {
+              "id": "sangam-south-kingdoms",
+              "label": "Sangam Age & Early South India",
+              "style": "Tamilakam's three crowns and Sangam literature — anthologies, Tirukkural, Muziris trade; the South enters Indian history"
             },
             {
               "id": "gupta-empire",
-              "label": "Gupta Empire"
+              "label": "Gupta Empire",
+              "style": "The 'classical age' and its fine print: Samudragupta's Prayag Prashasti, gold coinage, Aryabhata, Kalidasa, Nalanda. Cite the inscription or text behind each claim, and weigh the golden-age label against who it left out."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The Great Bath: A 4,500-Year-Old Pool That Held Water\nHOOK: Around 2500 BCE, workers in Mohenjo-daro waterproofed a public pool with natural tar. When archaeologists dug it up in the 1920s, the brickwork was still tight.\nARC: 1) The tank: around 12 by 7 metres, sunk into the citadel, with steps at both ends. 2) The engineering: baked bricks on edge in gypsum mortar with a bitumen layer — no cement, no pumps. 3) The meaning: no palace or grand temple found nearby; the city's biggest structure was civic.\nPAYOFF: Harappans monumentalised the public bath, not the king — you can read a civilization's values in what it builds biggest.\nQUESTION: What does India's biggest public structure today say about us?",
+            "long": "TITLE: Ashoka's Regret: The Emperor Who Apologised in Stone\nHOOK: Around 261 BCE, an emperor won a war so completely that he spent the rest of his life apologising for it — and carved the apology across the subcontinent.\nARC: 1) Kalinga: Rock Edict XIII, in Ashoka's own words, records around 100,000 killed and 150,000 deported. 2) The turn: dhamma — tolerance, hospitals, tree-lined roads — as state policy. 3) The machinery: edicts in Prakrit, written in Brahmi, placed on trade routes; dhamma-mahamattas as a new cadre of officials. 4) The export: his son Mahinda's mission takes Buddhism to Sri Lanka. 5) The rediscovery: Brahmi was forgotten until James Prinsep deciphered it in 1837 — India's greatest emperor was nearly erased.\nPAYOFF: Almost everything we know of Ashoka comes from his own inscriptions — a ruler who published his remorse.\nQUESTION: Is an apology carved in stone real accountability, or the world's oldest PR campaign?"
+          }
         },
         {
           "id": "medieval-india",
           "label": "Medieval India",
+          "style": "power, money and armies: tell each reign through decisions and their costs — revenue systems, battles with real numbers, succession gambles; courts and cultures, not just kings",
           "submodules": [
             {
+              "id": "harsha-rajputs",
+              "label": "Harsha & Early Medieval North India",
+              "style": "post-Gupta north India — Harsha, the tripartite Kannauj struggle, Rajput origins, the Palas; lean on sources like Hiuen Tsang and prashastis"
+            },
+            {
+              "id": "cholas-pallavas",
+              "label": "Cholas, Pallavas & the Deccan Dynasties",
+              "style": "the imperial South — temple-building states, Rajendra's naval expeditions, Uttaramerur village democracy; inscriptions as evidence"
+            },
+            {
               "id": "delhi-sultanate",
-              "label": "Delhi Sultanate"
+              "label": "Delhi Sultanate",
+              "style": "Five dynasties in 320 years: how Turkic cavalry states ruled from Delhi — iqta revenue, Alauddin's market control, Tughlaq's experiments, Timur's 1398 sack. Focus on power mechanics and administration over battle lists; reign dates exact."
             },
             {
-              "id": "mughal-empire",
-              "label": "Mughal Empire"
+              "id": "bhakti-sufi",
+              "label": "Bhakti & Sufi Movements",
+              "style": "saints who reshaped India — saguna/nirguna, Alvars to Kabir to Nanak, Chishti orders; composite culture with dates and places"
             },
             {
-              "id": "marathas",
-              "label": "Marathas"
+              "id": "regional-kingdoms",
+              "label": "Regional Kingdoms of Medieval India",
+              "style": "India between Sultanate and Mughals — Bahmani, Bengal, Mewar, the Ahoms; the 1500 map nobody teaches"
             },
             {
               "id": "vijayanagara",
-              "label": "Vijayanagara Empire"
+              "label": "Vijayanagara Empire",
+              "style": "The empire travellers raved about: Hampi's bazaars and temples, Krishnadevaraya's court, Talikota 1565. Pair every splendour claim with its eyewitness — Abdur Razzaq, Domingo Paes, Nicolo Conti — and read the ruins as evidence."
+            },
+            {
+              "id": "mughal-empire",
+              "label": "Mughal Empire",
+              "style": "Empire as a system: mansabdari ranks, jagir transfers, Akbar's sulh-i-kul, Todar Mal's revenue settlement, Aurangzeb's long Deccan drain. Explain how the machine worked and why it seized up, with reign dates and named institutions."
+            },
+            {
+              "id": "marathas",
+              "label": "Marathas",
+              "style": "From Shivaji's forts to a confederacy taxing half of India: guerrilla war, the Ashtapradhan, the Peshwa shift, chauth and sardeshmukhi, Panipat 1761. Explain the revenue-and-cavalry model that scaled a mountain kingdom into a subcontinental power."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Token Money, 1329: Delhi's Boldest Economic Disaster\nHOOK: In 1329, Delhi's Sultan declared that cheap brass tokens were worth as much as silver coins. His subjects heard: print your own money at home.\nARC: 1) The idea: Muhammad bin Tughlaq faced a silver shortage and copied China's paper-money logic with token currency. 2) The flaw: no defence against forgery — the chronicler Barani wrote that every house became a mint. 3) The retreat: the Sultan redeemed the fakes with real silver, draining his own treasury.\nPAYOFF: Money is a trust technology — Tughlaq had the fiat idea 600 years early, without the state capacity to enforce it.\nQUESTION: Was Tughlaq a fool or just early? Your UPI balance runs on the same trust.",
+            "long": "TITLE: Panipat 1526: How 12,000 Beat 100,000\nHOOK: On 21 April 1526, a Kabul prince with around 12,000 men faced the Delhi Sultan's army of around 100,000 with war elephants. By afternoon the Sultan was dead.\nARC: 1) The stakes: Babur, descendant of Timur, on his fifth push into Hindustan; Ibrahim Lodi's nobles already defecting. 2) The tech: matchlock muskets and field cannon behind a chained line of around 700 carts — the araba. 3) The trap: tulughma flanking — horse archers wheel around both wings and shoot into the packed centre. 4) The collapse: Lodi's mass is pressed onto the gun line; Ibrahim dies on the field, the only Delhi Sultan to fall in battle. 5) The aftermath: Delhi and Agra taken; Babur records it all in the Baburnama.\nPAYOFF: Numbers lose to combined arms — and the victor who writes a memoir wins twice.\nQUESTION: Without the cannons, does Babur still win — or did Lodi's fractured nobility matter more?"
+          }
         },
         {
           "id": "modern-india",
           "label": "Modern India",
+          "style": "the freedom struggle and after with exact dates, acts and people; every episode connects the event to something visible in today's India (a law, a border, an institution)",
           "submodules": [
             {
+              "id": "eighteenth-century-states",
+              "label": "Eighteenth-Century India",
+              "style": "Mughal collapse to Company rise — successor states, Mysore, the Sikhs; end on the 'dark age or decentralisation' debate"
+            },
+            {
               "id": "british-raj",
-              "label": "British Raj"
+              "label": "British Raj",
+              "style": "How a trading company became a state and then a Crown colony: Plassey to 1947 through revenue systems, railways, famines and the drain theory. Name the Acts and the numbers; show both what was built and who paid for it."
             },
             {
               "id": "freedom-struggle",
-              "label": "Freedom Struggle"
+              "label": "Freedom Struggle",
+              "style": "The campaigns that ended an empire: 1857, Swadeshi, Non-Cooperation, Civil Disobedience, Quit India, the INA. Dates, places and people exact; show strategy, internal debates and costs — not just heroism."
             },
             {
               "id": "post-independence",
-              "label": "Post-Independence India"
+              "label": "Post-Independence India",
+              "style": "The republic under construction: princely integration, the 1950 Constitution, linguistic states, wars, the Green Revolution, Emergency, 1991 reforms. Every episode ties one decision to a consequence Indians live with today."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The Radcliffe Line: Drawn in Five Weeks\nHOOK: The border that defines South Asia was drawn by a British lawyer who had never been to India before — in around five weeks.\nARC: 1) July 1947: Cyril Radcliffe chairs two boundary commissions armed with outdated maps and census tables. 2) The line splits Punjab and Bengal through villages, canals and families — and is kept secret until 17 August, two days AFTER independence. 3) Around 14 million people cross it; estimates of the dead run from several hundred thousand to around 2 million.\nPAYOFF: Radcliffe refused his fee and never returned to India.\nQUESTION: Announcing the line before independence — fewer deaths, or more? Argue it.",
+            "long": "TITLE: 562 Kingdoms Gone: How India's Map Was Made\nHOOK: On 15 August 1947, India as one country did not exist — over 560 princely states covering around a third of the land could legally have stayed out.\nARC: 1) The problem: British paramountcy lapsed, and each ruler chose India, Pakistan, or going it alone. 2) The team: Sardar Patel and V.P. Menon with the Instrument of Accession — just defence, foreign affairs and communications. 3) The persuasion: privy purses and guarantees; nearly all sign before independence day. 4) The holdouts: Junagadh's plebiscite, Hyderabad's Operation Polo in September 1948, Kashmir's October accession amid invasion. 5) The finish: mergers, then the 1956 linguistic reorganisation dissolves the princely map entirely.\nPAYOFF: Modern India was assembled mostly by paperwork and pressure — force was the exception, not the method.\nQUESTION: Patel is called India's Bismarck. Fair, or does negotiation beat blood-and-iron?"
+          }
         },
         {
           "id": "ancient-world",
           "label": "Ancient World",
+          "style": "make dead civilizations feel present: daily life, engineering feats and stunning scale numbers; always one comparison to something Indian or modern so scale lands",
           "submodules": [
             {
               "id": "egypt",
-              "label": "Ancient Egypt"
+              "label": "Ancient Egypt",
+              "style": "The Nile's civilization through its evidence: how pyramids were actually built (paid workers' villages), mummification's logic, Karnak, the Rosetta decipherment. Kill the slave-labour and alien myths with excavation reports and named finds."
             },
             {
               "id": "greece-rome",
-              "label": "Greece & Rome"
+              "label": "Greece & Rome",
+              "style": "Institutions and engineering with dates: Athens' assembly, Sparta's system, Alexander's decade of conquest, Rome's republic-to-empire slide, concrete, roads and aqueducts. Named figures and primary sources over vague 'glory of the ancients'."
             },
             {
               "id": "mesopotamia-persia",
-              "label": "Mesopotamia & Persia"
+              "label": "Mesopotamia & Persia",
+              "style": "Firsts of civilization and the tablets that prove them: cuneiform receipts, Hammurabi's 282 laws, ziggurats, then Persia's Royal Road and satrap system under Cyrus and Darius. Lead with the invention or institution, not the king list."
             },
             {
               "id": "ancient-china",
-              "label": "Ancient China"
+              "label": "Ancient China",
+              "style": "Dynasties as systems: Qin standardisation and the terracotta army, Han bureaucracy and the exam idea, Silk Road exchange, the paper-to-gunpowder inventions. Connect each dynasty to the institution or invention it left behind."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Pyramid Builders: Paid Workers, Not Slaves\nHOOK: The people who built the Great Pyramid ate beef, drank beer rations, and got medical care. We found their town.\nARC: 1) The evidence: the workers' village at Giza, excavated since the 1990s — bakeries, breweries, cattle bones by the thousand. 2) The organisation: rotating labour gangs who scrawled names like 'Friends of Khufu' inside the pyramid's relieving chambers. 3) The scale: around 2.3 million blocks in roughly 20 years — a block placed every few minutes of daylight.\nPAYOFF: The pyramid was a state logistics project — the real wonder is the payroll.\nQUESTION: Which is harder to believe: aliens, or a 4,500-year-old supply chain that worked?",
+            "long": "TITLE: Feeding Rome: A Million Mouths, Zero Tractors\nHOOK: Ancient Rome grew to around a million people — a size London only reached in the 1800s. Every day, all of them had to be fed by sail and muscle.\nARC: 1) The dole: the annona gave free or subsidised grain to around 200,000 registered citizens. 2) The sources: Egypt and North Africa as grain provinces — a delayed fleet meant riots in the capital. 3) The ports: Ostia and the artificial harbour at Portus; barges hauled up the Tiber by oxen. 4) The politics: 'bread and circuses' is Juvenal's sneer — emperors rose and fell on the grain supply. 5) The end: when the provinces fractured in the 5th century, the city starved and shrank to tens of thousands.\nPAYOFF: Rome didn't fall in a single battle; its supply chain did.\nQUESTION: Which single supply line could break a megacity today?"
+          }
         },
         {
           "id": "world-history",
           "label": "World History",
+          "style": "turning points told through people under pressure: the decision, the stakes, the aftermath; real casualty and economic figures, and more than one side's perspective",
           "submodules": [
             {
-              "id": "world-wars",
-              "label": "World Wars"
+              "id": "empires-dynasties",
+              "label": "Empires & Dynasties",
+              "style": "Rise-and-fall mechanics beyond Europe: the Mongol relay post and composite bow, Ottoman devshirme, Mali's gold and Mansa Musa's hajj, Habsburg marriages. Name the system that scaled each empire and the flaw that broke it."
+            },
+            {
+              "id": "renaissance-enlightenment",
+              "label": "Renaissance & Enlightenment",
+              "style": "Europe rewires its mind — Florence to Luther to Voltaire; the ideas that armed the revolutions"
             },
             {
               "id": "revolutions",
-              "label": "Revolutions"
+              "label": "Revolutions",
+              "style": "Why regimes snap: French, American, Russian, Chinese — the fiscal crisis, the spark, the radical turn, the aftermath that betrays the slogans. Compare across cases with exact dates and named actors."
+            },
+            {
+              "id": "industrial-revolution",
+              "label": "The Industrial Revolution",
+              "style": "coal, cotton, railways — why Britain first, how it spread, what it did to workers; numbers over adjectives"
+            },
+            {
+              "id": "ideologies-isms",
+              "label": "The Age of Isms",
+              "style": "the age of isms — capitalism to communism to fascism; the unifications of Italy and Germany as ideology in action"
+            },
+            {
+              "id": "colonization-decolonization",
+              "label": "Colonization & Decolonization",
+              "style": "empire built and dismantled — 1492 to 1994; Berlin Conference, Sykes-Picot, Bandung; maps redrawn, with dates"
+            },
+            {
+              "id": "world-wars",
+              "label": "World Wars",
+              "style": "Two wars as decisions under pressure: the July 1914 spiral, trench mechanics, Versailles' backlash, appeasement, D-Day, the bomb. Real orders and hedged casualty figures, always with more than one nation's perspective."
             },
             {
               "id": "cold-war",
-              "label": "Cold War"
-            },
-            {
-              "id": "empires-dynasties",
-              "label": "Empires & Dynasties"
+              "label": "Cold War",
+              "style": "A 45-year standoff through its flashpoints: Berlin airlift, Cuba 1962, proxy wars, the space race, 1989. Decisions and near-misses with declassified detail (Arkhipov, Able Archer 83) over ideology lectures."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The Wrong Turn That Started World War One\nHOOK: On 28 June 1914, a driver in Sarajevo took a wrong turn and stalled the car — directly in front of a 19-year-old assassin who had already given up.\nARC: 1) That morning a grenade had missed Archduke Franz Ferdinand; the route was changed, but nobody told the drivers. 2) The stall: the car stops beside Gavrilo Princip outside a delicatessen; two shots. 3) The spiral: Austria's ultimatum, Russia mobilises, Germany's war plan demands speed — five weeks later, Europe is at war.\nPAYOFF: The system was primed to explode; mobilisation timetables made de-escalation nearly impossible. The wrong turn just struck the match.\nQUESTION: No wrong turn — no World War One, or just a different spark within months?",
+            "long": "TITLE: One Vote From Nuclear War: October 1962\nHOOK: On 27 October 1962, three Soviet officers in a suffocating submarine voted on whether to fire a nuclear torpedo. The vote was two to one.\nARC: 1) Day twelve of the Cuban Missile Crisis: a US blockade, and a U-2 shot down that very day. 2) Submarine B-59: days out of radio contact, batteries dying, air near 45°C, US ships dropping practice depth charges to force it up. 3) The rule: launch needed all three senior officers — the captain and political officer said yes; Vasili Arkhipov said no. 4) The exit: the sub surfaces; within days Kennedy and Khrushchev cut the secret Jupiter-missiles-for-Cuba deal. 5) The silence: the story stayed buried until around 2002.\nPAYOFF: Deterrence theory didn't save the world that day — one calm officer did.\nQUESTION: Should any single person hold veto power over nuclear use? Design your answer."
+          }
         },
         {
           "id": "history-of-things",
           "label": "History of Everyday Things",
+          "style": "the secret biography of everyday objects: the accident, the inventor, the trade route; every episode ends at the viewer's own table — 'that's why yours looks like this'",
           "submodules": [
             {
               "id": "inventions-discoveries",
-              "label": "Inventions & Discoveries"
+              "label": "Inventions & Discoveries",
+              "style": "The accident-and-iteration truth behind things we use: penicillin's contaminated dish, the microwave's melted chocolate bar, GPS born from tracking Sputnik. Real inventor names and dates — and the decades between discovery and product."
             },
             {
               "id": "food-drink",
-              "label": "Food & Drink"
+              "label": "Food & Drink",
+              "style": "How dishes and drinks moved history: spice routes, the Columbian exchange (chilli reached India with the Portuguese), tea and opium, coffee houses. Trace one item's journey with dates and trade numbers; flag food-origin myths honestly."
             },
             {
               "id": "money-trade",
-              "label": "Money & Trade"
+              "label": "Money & Trade",
+              "style": "From cowrie shells to UPI: Lydian coins around 600 BCE, Song paper money, bills of exchange, the gold standard's 1971 end, why trade routes shifted. Every episode shows who trusted whom, and what enforced that trust."
             },
             {
               "id": "medicine-disease",
-              "label": "Medicine & Disease"
+              "label": "Medicine & Disease",
+              "style": "Plagues and cures that reshaped societies: the Black Death's labour shock, Jenner and vaccination in 1796, cholera and the Broad Street pump, antibiotics and resistance. Body counts hedged; the mechanism-and-response story exact."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Coca-Cola's Secret: It Really Had Cocaine\nHOOK: For its first two decades, Coca-Cola's name was literal — coca leaf extract in every glass.\nARC: 1) 1886: Atlanta pharmacist John Pemberton sells it as a nerve tonic — 'coca' for the leaf, 'kola' for the caffeine nut. 2) Around 1903, drug panic pushes the company to switch to 'spent', decocainised leaves — flavour stays, drug goes. 3) The company still imports coca leaves today under a special licence, processed by one authorised firm.\nPAYOFF: Brands outlive their products — the name is a fossil of a Victorian pharmacy counter.\nQUESTION: Which everyday product today will look shocking in a hundred years?",
+            "long": "TITLE: From Shells to UPI: Money's 3,000-Year Trust Trick\nHOOK: A cowrie shell, a lump of electrum, a paper note, a QR code — none of them are worth anything by themselves. That is exactly the point.\nARC: 1) Commodity money: cowries circulate across Africa and Asia — scarce, portable, uncounterfeitable. 2) Around 600 BCE, Lydia mints the first standardised coins; the king's stamp replaces weighing at every sale. 3) Song China issues jiaozi, the first widespread paper money, around 1000 CE — and promptly discovers inflation by over-printing. 4) Goldsmiths' receipts become banknotes; in 1971 Nixon ends dollar-gold convertibility — money becomes pure fiat. 5) UPI processes over 15 billion transactions a month — trust has moved from metal to state to protocol.\nPAYOFF: Every era's money is a claim on trust; the technology changes, the trick never does.\nQUESTION: Is crypto the next link in this chain — or a repeat of Tughlaq's token money?"
+          }
         }
       ]
     },
@@ -407,96 +670,162 @@
         {
           "id": "india-physical",
           "label": "India — Physical",
+          "style": "India's landscape as a story of forces: why the mountain, river or monsoon is exactly where it is — real heights, lengths and rainfall figures; UPSC-grade names told creator-grade",
           "submodules": [
             {
-              "id": "rivers",
-              "label": "Rivers"
+              "id": "mountains-plateaus",
+              "label": "Mountains & Plateaus",
+              "style": "Why the relief exists: the Himalayan collision, the Deccan Trap's stacked lava flows, the Aravallis' age. Real heights and ages, and what each landform does to the climate, rivers and people around it."
             },
             {
-              "id": "mountains-plateaus",
-              "label": "Mountains & Plateaus"
+              "id": "indian-physiography",
+              "label": "Indian Physiography",
+              "style": "India's divisions beyond the mountains — plains, coasts, islands, lakes; bhabar/terai/khadar/bangar-level precision"
+            },
+            {
+              "id": "rivers",
+              "label": "Rivers",
+              "style": "One river system at a time: source, tributaries, gradient, and what each stretch enables — dams, disputes, deltas. Exact lengths and basin figures hedged where sources differ, and always the why behind the river's behaviour."
             },
             {
               "id": "monsoon-climate",
-              "label": "Monsoon & Climate"
+              "label": "Monsoon & Climate",
+              "style": "The monsoon as a machine: differential heating, the ITCZ shift, Arabian Sea vs Bay of Bengal branches, El Niño's interference, bursts and breaks. Real rainfall figures and named places; mechanism before memorisation."
+            },
+            {
+              "id": "soils-vegetation",
+              "label": "Soils & Vegetation",
+              "style": "ICAR's eight soils and India's forest types — the classic prelims area taught as soil-crop-region triads"
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Mawsynram: 11,000 mm of Rain a Year\nHOOK: One village in Meghalaya gets around 11,000 millimetres of rain a year — Mumbai's annual downpour, five times over.\nARC: 1) The funnel: Bay of Bengal monsoon winds get squeezed into converging Khasi hill valleys. 2) The wall: air forced up around 1,400 metres cools and dumps — orographic rain, nearly all of it between June and September. 3) The twist: villagers still face water shortage in winter — the deluge runs straight off the slopes.\nPAYOFF: 'Wettest place on Earth' and 'water-scarce' can be the same village — rainfall is not water security.\nQUESTION: Name another place where abundance and scarcity coexist like this.",
+            "long": "TITLE: The Himalayas Are Still Growing\nHOOK: The mountain range on your map is a live collision — India is still ramming into Asia at about the speed your fingernails grow.\nARC: 1) The journey: the Indian plate broke off Gondwana and raced north, colliding around 50 million years ago. 2) The proof: marine fossils sit in the limestone near Everest's summit — that rock was once sea floor. 3) The rate: convergence of around 4-5 cm a year; Everest rises around 4 mm a year even as erosion files it down. 4) The receipts: the 2015 Nepal earthquake — strain releasing in jolts along the Main Himalayan Thrust. 5) The elders: the Indus and Sutlej are older than the range — antecedent rivers that kept cutting as the mountains rose around them.\nPAYOFF: The Himalaya is a process, not a place — and its earthquakes are the instalment payments.\nQUESTION: Should Himalayan towns build to Japanese seismic codes? Who pays for that?"
+          }
         },
         {
           "id": "india-economic",
           "label": "India — Economic",
+          "style": "geography that pays: why crops, industries and ports sit where they sit — resource logic, transport logic, one named company, crop belt or port as the running example",
           "submodules": [
             {
               "id": "agriculture",
-              "label": "Agriculture"
+              "label": "Agriculture",
+              "style": "Why crops grow where they do: soil types, rainfall lines, irrigation, and the pull of MSP and mandis. One crop belt per episode with hedged yield and state-share figures, and the economics that lock farmers in."
             },
             {
               "id": "minerals-industry",
-              "label": "Minerals & Industry"
+              "label": "Minerals & Industry",
+              "style": "The resource map's logic: why coal sits in the Damodar valley, iron ore in Odisha, and industry clusters at ports and coalfields. Named mines, plants and corridors, with production shares hedged."
             },
             {
               "id": "transport-trade",
-              "label": "Transport & Trade"
+              "label": "Transport & Trade",
+              "style": "How goods and people actually move: highways, rail freight corridors, ports, inland waterways. Real route names, tonnage and travel-time numbers, and why each corridor was placed where it is."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Why Assam Grows Half of India's Tea\nHOOK: Around half the tea India drinks comes from one river valley. That is not tradition — it is rainfall arithmetic.\nARC: 1) The recipe: tea wants heavy rain spread through the year, acidic loamy soil, and slopes that drain — the Brahmaputra valley delivers all three. 2) The history: the British found indigenous tea plants in Assam in the 1820s and built estates to break China's monopoly. 3) The scale: Assam produces around 700 million kg a year — more than most tea-growing countries manage.\nPAYOFF: Crops don't follow culture or borders; they follow soil chemistry and rainfall lines.\nQUESTION: If climate change shifts the rainfall belt, where does India's tea move next?",
+            "long": "TITLE: The Golden Quadrilateral: 5,846 km That Rewired India\nHOOK: In 2001, India began linking Delhi, Mumbai, Chennai and Kolkata with one highway loop. It quietly rearranged where Indians build, work and sell.\nARC: 1) The build: around 5,846 km under the National Highways Development Project — India's biggest transport build since the railways. 2) The physics: freight travel times on upgraded corridors fall by roughly a quarter, and reliability matters as much as speed. 3) The relocation: studies find manufacturing drifting out of big cities into towns close to the corridor. 4) The gap: districts far from the loop grew slower — a highway re-prices land unevenly. 5) The sequel: dedicated freight corridors and expressways now chase the same logic at higher speed.\nPAYOFF: A road doesn't just carry traffic — it re-prices land and labour along its whole length.\nQUESTION: Does connecting four metros help the towns between them, or drain them?"
+          }
         },
         {
           "id": "world-geography",
           "label": "World Geography",
+          "style": "the planet's greatest hits with the WHY behind each: real scale numbers, always compared back to India so the size actually registers",
           "submodules": [
             {
               "id": "continents-oceans",
-              "label": "Continents & Oceans"
+              "label": "Continents & Oceans",
+              "style": "The planet's biggest features and their why: drift's evidence, ocean currents as conveyor belts, why coastlines match across the Atlantic. Scale numbers always compared to something Indian so size actually registers."
             },
             {
               "id": "climate-zones",
-              "label": "Climate Zones"
+              "label": "Climate Zones",
+              "style": "Why climate wraps the Earth in bands: Hadley cells, deserts near 30 degrees, equatorial rainforest, Mediterranean winters. Teach each zone through one named place living with its consequences."
             },
             {
               "id": "natural-wonders",
-              "label": "Natural Wonders"
+              "label": "Natural Wonders",
+              "style": "One wonder per episode with the process that built it: the Grand Canyon's incision, the Great Barrier Reef's polyps, Victoria Falls' basalt cracks. Real dimensions and hedged ages, formation mechanism front and centre."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The Pacific Ocean Is Shrinking\nHOOK: The biggest thing on Earth is disappearing a few centimetres a year — and the Atlantic is eating its lunch.\nARC: 1) The mechanism: the Atlantic widens at the Mid-Atlantic Ridge by around 2-4 cm a year, while Pacific floor dives into subduction trenches. 2) The evidence: GPS stations measure the drift directly; the Ring of Fire is the Pacific's shrinking seam. 3) The forecast: over a couple of hundred million years, the Americas and Asia converge — the supercontinent cycle turns again.\nPAYOFF: Oceans are temporary — the world map is one frame of a very slow film.\nQUESTION: Which of today's countries end up neighbours on the next supercontinent?",
+            "long": "TITLE: The Green Sahara: When the Desert Had Lakes\nHOOK: Under the world's largest hot desert lie fish bones, hippo skeletons, and cave paintings of people swimming.\nARC: 1) The evidence: rock art at Tassili n'Ajjer shows swimmers and cattle herds; sediments record Lake Mega-Chad at around the size of a sea. 2) The mechanism: Earth's orbital wobble — precession on a roughly 23,000-year cycle — pulled the monsoon north during the African Humid Period, until around 5,000 years ago. 3) The flip: vegetation feedbacks made the drying fast once it started. 4) The exodus: herders retreated to the Nile valley — concentration that fed the rise of Egypt. 5) The kicker: the cycle continues; the Sahara is due to green again in the far future.\nPAYOFF: Climate rebuilt and emptied whole worlds before humans burned anything — what's new today is the speed.\nQUESTION: Did the drying Sahara create ancient Egypt? Argue both sides."
+          }
         },
         {
           "id": "earth-processes",
           "label": "Earth in Action",
+          "style": "forces in action: the mechanism step by step (plates, storms, ice, sand), then a named real event with its date and magnitude as proof",
           "submodules": [
             {
               "id": "plate-tectonics",
-              "label": "Plate Tectonics"
+              "label": "Plate Tectonics",
+              "style": "The engine under the map: ridges, subduction, hotspots, and what happens at each boundary type. Real plate speeds in cm per year and named boundaries, with India's northward journey as the recurring case study."
+            },
+            {
+              "id": "geomorphic-processes",
+              "label": "Geomorphic Processes",
+              "style": "the earth's sculptors — weathering to karst to coasts; every day a landform → process → real example ladder"
             },
             {
               "id": "volcanoes-earthquakes",
-              "label": "Volcanoes & Earthquakes"
+              "label": "Volcanoes & Earthquakes",
+              "style": "Named events as evidence: why quakes cluster where they do, magnitude scales that multiply rather than add, volcano types by magma chemistry. Anchor each episode on one real event with date, magnitude and consequence."
+            },
+            {
+              "id": "atmosphere-winds",
+              "label": "Atmosphere & Winds",
+              "style": "the air machine — heat budget, pressure belts, jet streams, local winds; every named wind located on the map"
             },
             {
               "id": "weather-storms",
-              "label": "Weather & Storms"
+              "label": "Weather & Storms",
+              "style": "Storms from their ingredients: cyclones need around 26.5°C seas, tornado alley is an air-mass collision zone, lightning is charge separation. One named storm per episode with real wind speeds and pressure drops."
+            },
+            {
+              "id": "oceanography",
+              "label": "Oceanography",
+              "style": "the ocean as a system — currents, tides, IOD, UNCLOS; fishing grounds and deep-sea resources argued with map logic"
             },
             {
               "id": "glaciers-deserts",
-              "label": "Glaciers & Deserts"
+              "label": "Glaciers & Deserts",
+              "style": "Ice and sand as sculptors: U-valleys and moraines, dune types and their movement, why deserts sit where they sit. Hedged retreat rates and dune speeds, with named glaciers and deserts, never generic 'climate is changing' lines."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Parícutin: The Volcano Born in a Cornfield\nHOOK: In February 1943, a Mexican farmer watched a crack in his cornfield hiss, smoke, and start throwing rocks. Within a year it was a mountain over 300 metres tall.\nARC: 1) The birth: villagers watched the cinder cone grow house-high within days — the only volcano scientists observed from birth to extinction, 1943 to 1952. 2) The mechanism: gas-charged basaltic magma found a fresh vent; cinder cones grow fast and die young. 3) The trace: lava buried two villages — the San Juan church tower still pokes out of the flow.\nPAYOFF: Mountains aren't scenery — some of them are events.\nQUESTION: Would you rebuild beside a 'dead' volcano? How dead is dead?",
+            "long": "TITLE: The 2004 Tsunami: One Quake, Fourteen Countries\nHOOK: On 26 December 2004, the Indian Ocean floor slipped — and hours later the same wave was killing people on two continents.\nARC: 1) The source: a magnitude-around-9.1 megathrust off Sumatra; the fault unzipped for around 1,300 km. 2) The physics: in deep water a tsunami races at around 800 km/h with barely a ripple on the surface; near shore it slows and stacks into walls. 3) The toll: around 228,000 dead across 14 countries, from Indonesia to India to Somalia. 4) The failure: the Indian Ocean had no warning network — the Pacific had one for decades. 5) The fix: the Indian Ocean Tsunami Warning System went live within about two years; buoys, sirens and drills now stand between the fault and the coast.\nPAYOFF: The earthquake was unpreventable; most of the deaths were an information failure.\nQUESTION: The warning tech now exists — so why do disaster deaths still track poverty lines?"
+          }
         },
         {
           "id": "human-geography",
           "label": "Human Geography",
+          "style": "people patterns: why cities boom, borders bend and millions migrate; real population numbers and one map oddity or paradox per episode",
           "submodules": [
             {
               "id": "cities-megacities",
-              "label": "Cities & Megacities"
+              "label": "Cities & Megacities",
+              "style": "Why cities sit where they sit and grow how they grow: site vs situation, primacy, informal settlements' internal logic. Hedged UN population figures and one named city's mechanics per episode, never a generic 'cities are growing' take."
             },
             {
               "id": "population-migration",
-              "label": "Population & Migration"
+              "label": "Population & Migration",
+              "style": "People flows with numbers: demographic transition stages, remittance corridors (India receives over $100 billion a year, hedged), Partition and other great migrations. Push-pull mechanics through one named flow per episode."
             },
             {
               "id": "borders-maps",
-              "label": "Borders & Strange Maps"
+              "label": "Borders & Strange Maps",
+              "style": "The strangest lines on Earth and their paper trails: the India-Bangladesh enclave swap of 2015, the Durand and Radcliffe lines, why Mercator distorts. Every oddity explained by the treaty, survey or projection that created it."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Tokyo: A City Bigger Than Australia\nHOOK: More people live in and around Tokyo than in all of Australia — around 37 million against around 26 million.\nARC: 1) The shape: not one city but a merged galaxy of cities around Tokyo Bay — the world's largest urban area. 2) The enabler: the planet's densest rail network moves tens of millions of trips a day; density only works when people can move. 3) The paradox: Tokyo keeps growing while Japan's population shrinks — the capital is absorbing its own country.\nPAYOFF: Megacities aren't crowded versions of cities — they're transport networks wearing buildings.\nQUESTION: Is one giant capital a strength or a national risk? Think Tokyo, Seoul, Delhi.",
+            "long": "TITLE: Megacity Century: From 10 to 34 in 30 Years\nHOOK: In 1990 the planet had around ten cities of over ten million people. Today it has around 34 — and nearly all the new ones are in Asia and Africa.\nARC: 1) The list: Tokyo, Delhi, Shanghai, Dhaka, Lagos — a megacity is around ten million plus, and Delhi is projected among the largest of all. 2) The engine: rural push and urban pull — Dhaka adds several hundred thousand people a year. 3) The speed: Shenzhen went from a town of tens of thousands to over 12 million in around four decades — growth London needed 150 years for. 4) The form: much of it is informal — around a billion people worldwide live in slums (UN-Habitat figures). 5) The stakes: transport, water and sewage decide whether density becomes a superpower or a trap.\nPAYOFF: Urbanisation on this scale happens roughly once per civilization — and Asia and Africa are mid-leap right now.\nQUESTION: Should governments fight megacity growth or build for it? Pick a side with one example."
+          }
         }
       ]
     },
@@ -837,38 +1166,54 @@
         {
           "id": "grammar",
           "label": "Grammar",
+          "style": "rules people actually break: state the rule ONCE in plain words, then spend the video on edge cases and the specific mistakes Indian speakers make — warmly, never like a textbook",
           "submodules": [
             {
               "id": "tenses",
-              "label": "Tenses"
+              "label": "Tenses",
+              "style": "Owns time and aspect only — present perfect vs past, stative verbs, the since/for traps — not word-choice slips or article rules. Great episodes fix ONE contrast with verbatim pairs: 'I have been working here since 2019', never 'I am working here since 2019'."
             },
             {
               "id": "common-errors",
-              "label": "Common Errors"
+              "label": "Common Errors",
+              "style": "The Indian-English slip clinic: 'discuss about', 'revert back', 'myself Anita', 'prepone', subject-verb misses — anything that isn't a tense or preposition rule. Explain WHY each slip feels right, give the verbatim fix, and say honestly when the 'error' is fine in India."
             },
             {
               "id": "prepositions-articles",
-              "label": "Prepositions & Articles"
+              "label": "Prepositions & Articles",
+              "style": "Only in/on/at, to/with/for, and a/an/the — including the missing article ('I went to office'). One rule of thumb per episode plus verbatim pairs: 'married to, not married with'; 'good at maths, not good in maths'. Tense clashes belong to Tenses."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The 'since three years' trap: India's favourite tense error, fixed\nHOOK: 'I am working here since three years.' That one sentence quietly weakens a thousand Indian interviews every day.\nARC: 1) 'Since' marks a starting point and 'for' marks a duration — so it's 'since 2022' but 'for three years', never 'since three years'. 2) An action still running needs the present perfect: 'I have been working here for three years', not 'I am working'. 3) The test: answering 'starting when?' takes since; 'how long?' takes for.\nPAYOFF: The natural version carries both: 'I've been working here for three years, since 2022.'\nQUESTION: Fix this and post it: 'She is living in Pune since five years.'",
+            "long": "TITLE: Past simple vs present perfect: the line 'yesterday' draws\nHOOK: 'I have submitted the report yesterday.' Your manager won't correct you — but that sentence has two time zones crashing inside it.\nARC: 1) A finished time like 'yesterday' forces past simple — 'I submitted it yesterday'; the perfect links past to now. 2) Unfinished periods keep the perfect: 'I have called him twice today' works because today isn't over. 3) 'The team has won' announces; 'they won by five wickets' narrates. 4) 'Just', 'already' and 'yet' travel with the perfect: 'Have you eaten yet?' 5) And drop the extra 'had': 'I had gone there last week' needs no 'had' unless something happened before something else.\nPAYOFF: If you can point at it on a calendar, use past simple; if the point is now, use the perfect.\nQUESTION: Fix this in one comment: 'I have visited my hometown last Diwali and had met all my cousins.'"
+          }
         },
         {
           "id": "vocabulary",
           "label": "Vocabulary",
+          "style": "words that upgrade how you sound: every word and idiom heard in real spoken sentences, plus one memory hook (root, mnemonic or vivid image) that makes it stick for years",
           "submodules": [
             {
               "id": "power-words",
-              "label": "Power Words"
+              "label": "Power Words",
+              "style": "Single words that raise register — 'meticulous', 'candid', 'leverage' — one per episode, heard in 2-3 verbatim spoken sentences plus a memory hook: a Latin root ('meticulous, from metus, fear') or vivid image. Idioms and near-twin pairs belong to the sibling lanes."
             },
             {
               "id": "idioms-phrases",
-              "label": "Idioms & Phrases"
+              "label": "Idioms & Phrases",
+              "style": "Multi-word expressions only — 'bite the bullet', 'on the same page'. Deliver the literal image and the origin the hook promises ('the story goes' when disputed), then the idiom verbatim in office, family and WhatsApp sentences, closing on the common misuse."
             },
             {
               "id": "confusing-pairs",
-              "label": "Confusing Word Pairs"
+              "label": "Confusing Word Pairs",
+              "style": "Two near-twins, ONE crisp discriminator: fewer/less (countability), bring/take (direction), affect/effect. Every episode leaves a sticky lifetime test — 'if you can count it, use fewer' — proven on Indian-context sentences. Single-word upgrades stay with Power Words; origin stories with Word Origins."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Meticulous: the power word born from fear\nHOOK: 'She's very careful with details.' Fine. 'She's meticulous.' Same fact — only one gets remembered in the appraisal meeting.\nARC: 1) Meticulous means so exact that nothing slips: 'Priya keeps a meticulous record of every rupee the team spends.' 2) Memory hook: it comes from Latin metus, fear — a meticulous person works as if afraid of missing one detail. 3) Pair it with work, not emotions: a meticulous audit, a meticulous planner — never 'meticulous love'.\nPAYOFF: Swap 'very careful' for 'meticulous' once tomorrow — in a review, a LinkedIn post, or praise for a colleague.\nQUESTION: Use 'meticulous' in one true sentence about someone you work with — post it below.",
+            "long": "TITLE: Bite the bullet: the surgery story inside the idiom\nHOOK: 'We'll have to bite the bullet and migrate the database this weekend.' Nobody is biting anything — so where did the bullet come from?\nARC: 1) It means finally doing the painful thing you've been postponing. 2) The story goes it began with battlefield surgery before anaesthesia — patients bit a soft lead bullet against the pain; Kipling put the phrase in print in 1891. 3) Office: 'We bit the bullet and told the client the launch slips two weeks.' 4) Family: 'Papa finally bit the bullet and booked his knee operation.' 5) The misuse: no dread, no bullet — buying a phone you already wanted doesn't count.\nPAYOFF: Use it when you accept short-term pain for the right long-term call — that's the whole idiom.\nQUESTION: What did you finally bite the bullet on this year? One sentence, idiom included."
+          }
         },
         {
           "id": "spoken",
@@ -890,43 +1235,63 @@
               "label": "Fluency Tips",
               "style": "sounding natural and fluent — connected speech, thinking-time phrases, avoiding fillers, sentence stress and rhythm; practical habits not grammar theory"
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Disagreeing without 'you are wrong': three phrases that win rooms\nHOOK: 'No no, you are wrong.' The meeting goes quiet. The same idea, phrased differently, would have won the room.\nARC: 1) Soften the opener: 'I see it a bit differently' does the work of 'you're wrong' without the bruise. 2) Attack the point, not the person: 'That works for metros, but will it hold in tier-2 cities?' 3) The confident close: 'Can I push back on one thing?' signals seniority, not conflict.\nPAYOFF: The natural pattern is acknowledge-then-pivot: 'That's fair — my worry is the timeline.'\nQUESTION: Your boss proposes a Sunday deadline you can't make. Write your polite pushback below.",
+            "long": "TITLE: Tell me about yourself: the 60-second answer that isn't a biodata\nHOOK: 'Myself Rohan, I have done B.Tech in 2021...' — the interviewer's eyes drop to the resume, and the interview is over before it began.\nARC: 1) Kill the opener: not 'Myself Rohan' but 'I'm Rohan, a backend developer with three years at a fintech startup.' 2) Shape: present, past, future — what you do now, one proof from before, why this role next. 3) One number beats ten adjectives: 'I cut checkout errors by about 30%' outworks 'I am hardworking and dedicated.' 4) The future line: 'That's why this role interests me — same problem, bigger scale.' 5) Freshers swap job proof for a project: 'I built an expense-tracker app 200 students in my college use.'\nPAYOFF: A 60-second arc — now, proof, next — beats five minutes of biodata every time.\nQUESTION: Post your opening line — 'I'm ___, a ___ who ___' — and let's tighten it."
+          }
         },
         {
           "id": "writing",
           "label": "Writing Skills",
+          "style": "writing that gets results: real before/after rewrites of emails, essays and messages; one structural move per video the viewer can apply the same day",
           "submodules": [
             {
               "id": "emails-workplace",
-              "label": "Emails & Workplace Writing"
+              "label": "Emails & Workplace Writing",
+              "style": "Workplace prose: emails, Slack messages, escalations, leave requests. One structural move per episode — ask-first openings, real subject lines, softening bad news — made credible by a full before/after rewrite: 'Kindly do the needful' against 'Please approve invoice #217 by Friday'. Essays sit next door."
             },
             {
               "id": "essays-reports",
-              "label": "Essays & Reports"
+              "label": "Essays & Reports",
+              "style": "Formal structured writing — exam essays, reports, SOPs — never office mail. Teach one architecture move per episode (thesis-first openings, one-idea paragraphs, 'however' vs 'moreover' signposting) demonstrated on a real UPSC- or IELTS-style prompt with a before/after paragraph rewrite."
             },
             {
               "id": "storytelling",
-              "label": "Storytelling"
+              "label": "Storytelling",
+              "style": "Narrative craft for interviews, speeches and posts: open in the moment, cut throat-clearing, land a STAR answer that doesn't sound robotic. Each episode rewrites one flat real-life anecdote live — 'I did an internship' becoming a scene with stakes. Persuasion emails stay with Emails."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: 'Do the needful': retire it, send this instead\nHOOK: 'Kindly do the needful at the earliest.' Your reader now has to guess what 'the needful' even is — so nothing gets done.\nARC: 1) The sin is vagueness, not politeness — name the action: 'Please approve the ₹40,000 vendor invoice.' 2) Put ask + deadline + reason in one line: 'Could you approve it by Friday? Payments close on the 5th.' 3) Drop 'kindly'; 'please' plus a real deadline does more work.\nPAYOFF: The rewrite: 'Please approve invoice #217 (₹40,000) by Friday — vendor payments close Monday.' One line, zero guessing.\nQUESTION: Rewrite this below: 'Kindly do the needful regarding the pending leave request.'",
+            "long": "TITLE: Bottom line first: one real office email, rewritten live\nHOOK: 'Hope you are doing well. As per our discussion held on Tuesday regarding the above-mentioned subject...' — your reader stopped reading, and your request is hiding in paragraph three.\nARC: 1) The move is BLUF — bottom line up front: the ask is sentence one, context after. 2) Before: three lines of throat-clearing ending in 'it would be highly appreciated if the report could be shared'; after: 'Can you share the Q2 report by Thursday? Context below.' 3) The subject line carries the ask too: 'Q2 report — need by Thursday' beats 'Regarding report'. 4) Bad news still leads, softened: 'We'll miss Friday's deadline; here's the recovery plan.' 5) For seniors, one courtesy line maximum — deference is brevity, not padding.\nPAYOFF: If your reader reads only sentence one, they should still know exactly what to do.\nQUESTION: Post the first sentence of the last email you sent — would BLUF change it?"
+          }
         },
         {
           "id": "word-origins",
           "label": "Word Origins",
+          "style": "the language detective channel: the surprising true story behind a word or phrase, evidence-based; when the origin is disputed, say 'the story goes' — never invent etymology",
           "submodules": [
             {
               "id": "etymology",
-              "label": "Etymology Stories"
+              "label": "Etymology Stories",
+              "style": "The biography of one English word: 'salary' from Latin salarium (salt money), 'quarantine' from Venetian quaranta giorni (forty days). Find the pivot moment the meaning shifted; hedge disputed tales with 'the story goes'. Words English imported belong to Borrowed Words."
             },
             {
               "id": "borrowed-words",
-              "label": "Borrowed Words"
+              "label": "Borrowed Words",
+              "style": "Words English took from elsewhere — 'shampoo' from Hindi chāmpo, 'loot' from lūṭ, 'bungalow' from bangla. Name the trade route or colonial moment of entry and how the meaning drifted. Home-grown word biographies stay with Etymology Stories."
             },
             {
               "id": "phrases-history",
-              "label": "Where Phrases Come From"
+              "label": "Where Phrases Come From",
+              "style": "Whole expressions, not single words: 'bury the hatchet' from a real Native American peace ritual, 'turn a blind eye' — the story goes — from Nelson at Copenhagen, 1801. Verify or debunk the popular tale, then use the phrase verbatim in a modern sentence."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Salary: the salt hiding in your payslip\nHOOK: 'Salary credited.' The SMS every Indian waits for carries a two-thousand-year-old Roman ration inside it.\nARC: 1) Salary descends from Latin salarium, the allowance tied to sal — salt — in the Roman army. 2) The story goes soldiers were partly paid in salt, which is also why we still say someone is 'worth their salt'. 3) Before refrigeration, salt preserved food — so salt genuinely was wealth, and the payment made sense.\nPAYOFF: Next payday you'll hear the Latin: salarium, salt money, sitting quietly inside 'salary'.\nQUESTION: Use 'worth their salt' in one sentence about a teammate — post it below.",
+            "long": "TITLE: Loot, shampoo, bungalow: the Hindi inside English\nHOOK: When a Londoner books a bungalow, shampoos their hair and worries about looters, they're speaking Hindi three times without knowing it.\nARC: 1) Loot came from Hindi lūṭ — plunder — carried into English by East India Company soldiers in the late 1700s. 2) Shampoo is chāmpo, 'to press or massage'; Sake Dean Mahomed opened his 'shampooing' vapour baths in Brighton around 1814. 3) Bungalow is bangla — 'in the Bengal style' — the single-storey house colonial officers copied everywhere. 4) Juggernaut rolled out of Puri's Jagannath Rath Yatra, its giant chariots becoming English for an unstoppable force. 5) Traffic ran both ways: English took 'pyjama' and 'chutney'; Hindi took 'station' and 'botal'.\nPAYOFF: The coloniser's dictionary is full of the colonised — etymology quietly flips the story.\nQUESTION: 'Verandah', 'cot', 'thug' — guess which Indian words these came from before you Google."
+          }
         }
       ]
     },
@@ -1655,78 +2020,131 @@
         {
           "id": "constitution-basics",
           "label": "Constitution Basics",
+          "style": "the Constitution as design decisions: why the framers chose each provision — Constituent Assembly debates, exact Articles, and the landmark case where it was tested",
           "submodules": [
             {
               "id": "making-of-constitution",
-              "label": "Making of the Constitution"
+              "label": "Making of the Constitution",
+              "style": "The paper trail to 26 January 1950: colonial statutes up to the Government of India Act 1935, the Cabinet Mission Plan 1946 that formed the Constituent Assembly, and its committees and debates. This is HOW the document was built, not its contents. Anchor to borrowed features and the Drafting Committee."
             },
             {
               "id": "preamble-values",
-              "label": "Preamble & Core Values"
+              "label": "Preamble & Core Values",
+              "style": "The Preamble's exact words and why each was chosen, Sovereign Socialist Secular Democratic Republic, plus Justice-Liberty-Equality-Fraternity. Owns the 42nd Amendment 1976 additions and the Berubari 1960 versus Kesavananda Bharati 1973 fight over whether the Preamble is part of the Constitution."
+            },
+            {
+              "id": "citizenship",
+              "label": "Citizenship",
+              "style": "Articles 5-11 and the living debates — PIO/OCI/NRI distinctions, CAA; always concept + case + current relevance"
             },
             {
               "id": "fundamental-rights",
-              "label": "Fundamental Rights"
+              "label": "Fundamental Rights",
+              "style": "Part III, Articles 12-35: the six rights, who counts as 'State' under Article 12, reasonable restrictions, and enforcement via writs under Article 32. Great episodes turn on cases, Maneka Gandhi 1978, Puttaswamy 2017 privacy, not lists. Distinguish from DPSP's non-justiciable directives."
             },
             {
               "id": "dpsp-duties",
-              "label": "DPSP & Fundamental Duties"
+              "label": "DPSP & Fundamental Duties",
+              "style": "Part IV Directive Principles (Articles 36-51) and Part IVA Fundamental Duties (Article 51A). The lane is the non-justiciable half of the Constitution, moral goals not enforceable rights. Cite the Swaran Singh Committee, the 42nd Amendment 1976, and the Minerva Mills 1980 balance with Part III."
+            },
+            {
+              "id": "amendments-basic-structure",
+              "label": "Amendments & Basic Structure",
+              "style": "Article 368 and the judicial counterstrike — Golaknath to Kesavananda to NJAC; the Constitution's immune system"
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Two words missing in 1950: the Preamble's edit\nHOOK: Read India's Preamble as adopted in 1950 and two words are absent, \"Socialist\" and \"Secular.\" Both were slipped in during the Emergency.\nARC: 1) The original 1950 Preamble described India only as a \"Sovereign Democratic Republic.\" 2) The 42nd Amendment Act, 1976, passed during the Emergency, inserted \"Socialist\" and \"Secular\" and changed \"unity of the Nation\" to \"unity and integrity.\" 3) In S.R. Bommai (1994) the Supreme Court held secularism to be part of the basic structure, so the added word now anchors a doctrine.\nPAYOFF: The words formalized rather than invented, the Court had already read secularism into the text, so 1976 codified a value the Constitution always carried.\nQUESTION: Did the 42nd Amendment add new values to the Preamble or merely make explicit what was always implicit? Argue with reference to basic structure.",
+            "long": "TITLE: How India wrote its rulebook: 1,082 days of debate\nHOOK: On 16 May 1946 the Cabinet Mission handed India a plan to write its own constitution, and a grouping clause that nearly split the country before a single word was drafted.\nARC: 1) The Constituent Assembly, formed under the Cabinet Mission Plan of 1946, was indirectly elected by provincial legislatures, not by universal suffrage. 2) The Objectives Resolution, moved by Jawaharlal Nehru on 13 December 1946, set the guiding aims that became the Preamble. 3) Thirteen major committees did the work; the Drafting Committee under B.R. Ambedkar, formed 29 August 1947, shaped the text. 4) The framers borrowed deliberately, parliamentary government from Britain, Fundamental Rights from the US, Directive Principles from Ireland, emergency provisions from the Government of India Act 1935. 5) The Assembly adopted the Constitution on 26 November 1949 and brought it into force on 26 January 1950, echoing Purna Swaraj Day of 1930.\nPAYOFF: The document reads as \"borrowed\" because the framers picked a proven solution for each part, the achievement was fitting them into one working machine, as Ambedkar argued.\nQUESTION: The Indian Constitution is often called a \"bag of borrowings.\" Do you agree? Justify with specific borrowed features and what India adapted."
+          }
         },
         {
           "id": "union-government",
           "label": "Union Government",
+          "style": "how Delhi actually works: the real procedure (a bill's journey, an appointment, a no-confidence motion) step by step, with Article numbers and the precedent-setting moments",
           "submodules": [
             {
               "id": "parliament",
-              "label": "Parliament"
+              "label": "Parliament",
+              "style": "How Parliament legislates: a bill's journey through the Lok Sabha and Rajya Sabha, Money Bills under Article 110, joint sittings under Article 108, and devices like the no-confidence motion. Lane is procedure and the two Houses' powers, not elections (that belongs to Elections & Bodies)."
             },
             {
               "id": "president-pm",
-              "label": "President & PM"
+              "label": "President & PM",
+              "style": "The executive's mechanics: the President's powers under Articles 52-78, ordinance-making under Article 123, and the Council of Ministers headed by the PM under Articles 74-75. Focus on discretion versus aid-and-advice and appointment precedents, not Parliament's law-making."
             },
             {
               "id": "judiciary",
-              "label": "Supreme Court & Judiciary"
+              "label": "Supreme Court & Judiciary",
+              "style": "The Supreme Court and higher judiciary: jurisdiction under Articles 124-147, judicial review, PILs, the collegium system, and appointment battles (NJAC struck down 2015). Lane is the courts' structure and power, anchored by landmark cases, distinct from Fundamental Rights' rights-content."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The bill Rajya Sabha can't stop: Money Bills\nHOOK: The Rajya Sabha can debate a Money Bill and suggest changes, and the Lok Sabha can throw every suggestion in the bin. It legally must return the bill within 14 days.\nARC: 1) Under Article 110 a Money Bill deals only with taxes, borrowing, or the Consolidated Fund of India, and the Speaker's decision on what qualifies is final. 2) It can be introduced only in the Lok Sabha and only on the President's recommendation; the Rajya Sabha gets 14 days and can only recommend, not amend. 3) This is why the Aadhaar Act 2016 was passed as a Money Bill, bypassing the Rajya Sabha, a route the Supreme Court later scrutinized.\nPAYOFF: The design gives the directly elected House sole control over the nation's purse, but leaves the Speaker's certification as a single point that can be stretched.\nQUESTION: Should the Speaker's certification of a Money Bill be open to judicial review? Argue your position.",
+            "long": "TITLE: How a bill becomes law: three readings and a signature\nHOOK: A single bill can clear the Lok Sabha, stall in the Rajya Sabha, and force the President to call both Houses into one room, something that has happened only three times.\nARC: 1) A bill starts with the First Reading (introduction), moves to the Second Reading (clause-by-clause debate and voting), then the Third Reading (final vote) in the originating House. 2) It repeats the process in the second House, which can pass, reject, amend, or sit on it. 3) A deadlock on an ordinary bill can trigger a joint sitting under Article 108, presided over by the Speaker, used for the Dowry Prohibition Act 1961, the Banking Service Commission Repeal Bill 1978, and POTA 2002. 4) Once both Houses agree, the bill goes to the President under Article 111, who can assent, withhold, or return it once (a suspensive veto). 5) With assent it becomes an Act; the President cannot return a Money Bill.\nPAYOFF: The three-reading maze exists to force deliberation, but the joint-sitting escape hatch quietly favors the larger House, since the Lok Sabha usually outnumbers the Rajya Sabha.\nQUESTION: Does the joint-sitting provision strengthen or weaken bicameralism in India? Justify."
+          }
         },
         {
           "id": "states-local",
           "label": "States & Local Government",
+          "style": "federalism on the ground: Centre-state friction told through real episodes (Article 356 uses, GST bargaining), and how power actually reaches a panchayat or municipality",
           "submodules": [
             {
               "id": "state-government",
-              "label": "State Government"
+              "label": "State Government",
+              "style": "The state tier's machinery: the Governor under Articles 153-161, the Chief Minister and state legislature, and the Governor's discretionary powers that spark friction. Lane is how a state governs itself and the Governor's contested role, not Centre-state disputes (that is its sibling)."
+            },
+            {
+              "id": "states-uts-special-provisions",
+              "label": "States, UTs & Special Provisions",
+              "style": "the asymmetric union — UTs, J&K and Article 370, North-East special provisions, statehood demands"
             },
             {
               "id": "panchayati-raj",
-              "label": "Panchayati Raj"
+              "label": "Panchayati Raj",
+              "style": "Grassroots democracy after the 73rd Amendment 1992: the three-tier panchayat system, the Gram Sabha, the Eleventh Schedule's 29 subjects, State Finance Commissions and reservations for women and SC/ST. Lane is how power reaches the village, with the 74th Amendment's municipalities and Twelfth Schedule alongside."
             },
             {
               "id": "centre-state-relations",
-              "label": "Centre-State Relations"
+              "label": "Centre-State Relations",
+              "style": "The federal bargain in tension: legislative (Seventh Schedule lists), administrative and financial relations, Article 356 President's Rule, and the Finance Commission's tax-share awards. Lane is Centre-versus-state power, GST Council bargaining, Sarkaria and Punchhi recommendations, not a state's internal government."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The Article that dismisses a government: 356\nHOOK: On a single report from the Governor, the Centre can dissolve an elected state government overnight. It has been used more than 100 times, and was once grossly abused.\nARC: 1) Article 356 lets the President impose President's Rule if a state's government cannot run \"in accordance with the Constitution,\" usually on the Governor's report. 2) It was invoked more than 100 times, often to topple opposition governments, sometimes in bulk after a change of power at the Centre. 3) S.R. Bommai v Union of India (1994) made the proclamation subject to judicial review and ruled that the floor of the Assembly, not the Governor's opinion, tests majority.\nPAYOFF: A provision meant as a last-resort safety valve became a partisan weapon, until the Court moved the majority test from the Raj Bhavan to the Assembly floor.\nQUESTION: Has judicial review under Bommai ended the misuse of Article 356, or merely slowed it? Argue.",
+            "long": "TITLE: One nation, one tax, one bargain: the GST Council\nHOOK: In 2017 India's states surrendered their single biggest power, the right to tax sales, into one shared council. The catch: the Centre alone holds a third of every vote.\nARC: 1) The 101st Constitutional Amendment Act, 2016, created GST and inserted Article 279A establishing the GST Council. 2) The Council, chaired by the Union Finance Minister, sets rates and rules; the Centre holds one-third of the votes and all states together two-thirds, with decisions needing a three-fourths majority. 3) GST subsumed a tangle of taxes, excise, service tax, VAT, octroi, into one destination-based tax with CGST, SGST and IGST components. 4) States were promised compensation for revenue loss for five years, till June 2022, a guarantee that itself became a Centre-state flashpoint during the pandemic. 5) In 2022 the Supreme Court (Mohit Minerals) held that the Council's recommendations are not binding on Parliament or states, reasserting fiscal federalism.\nPAYOFF: GST traded state autonomy for a common market, but the voting math means neither the Centre nor any single bloc of states can dictate alone, cooperation is structurally forced.\nQUESTION: Is the GST Council a model of cooperative federalism or a tool of central dominance? Justify with its voting structure."
+          }
         },
         {
           "id": "elections-bodies",
           "label": "Elections & Bodies",
+          "style": "the machinery of democracy: how elections and constitutional bodies really run — the process step by step, with real controversies and cases as the story",
           "submodules": [
             {
               "id": "elections-eci",
-              "label": "Elections & ECI"
+              "label": "Elections & ECI",
+              "style": "How India runs an election: the Election Commission under Article 324, the electoral roll, the Model Code of Conduct, EVMs and VVPATs, and the anti-defection Tenth Schedule where relevant. Lane is the process and the ECI's powers, told through real controversies, not the party system generally."
             },
             {
               "id": "constitutional-bodies",
-              "label": "Constitutional Bodies"
+              "label": "Constitutional Bodies",
+              "style": "The watchdogs the Constitution itself creates: the CAG (Article 148), UPSC (Article 315), Finance Commission (Article 280), and Attorney General (Article 76). Lane is bodies born of the Constitution, sharply distinct from statutory bodies like the CIC or NHRC. Focus on independence safeguards and real audit or appointment episodes."
+            },
+            {
+              "id": "governance-accountability",
+              "label": "Governance & Accountability",
+              "style": "the accountability toolkit — RTI, Lokpal, CVC, citizen charters; each institution with a landmark case and a limitation"
             },
             {
               "id": "emergency-provisions",
-              "label": "Emergency Provisions"
+              "label": "Emergency Provisions",
+              "style": "The Constitution's break-glass powers: National Emergency (Article 352), President's Rule (Article 356), Financial Emergency (Article 360), and how the 44th Amendment 1978 fenced them after 1975. Lane is emergency machinery and its abuse, with the 1975-77 Emergency as the case study."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The two words the Emergency rewrote: Article 352\nHOOK: In 1975 the government declared a National Emergency citing \"internal disturbance,\" and jailed the opposition. The 44th Amendment made sure those exact words could never be used again.\nARC: 1) Article 352 lets the President declare a National Emergency on grounds of war, external aggression, or, originally, \"internal disturbance.\" 2) The 1975 Emergency was proclaimed on the vague ground of internal disturbance, suspending rights and elections for 21 months. 3) The 44th Amendment Act, 1978, replaced \"internal disturbance\" with \"armed rebellion\" and required the Cabinet's written advice, raising the bar for any future declaration.\nPAYOFF: A single loose phrase enabled the gravest abuse of the Constitution, so the fix was surgical, tightening the trigger words rather than removing the power.\nQUESTION: Did the 44th Amendment make a repeat of 1975 impossible, or only harder? Justify.",
+            "long": "TITLE: The world's largest election: how the ECI runs it\nHOOK: One unelected commission can postpone a poll, bar a leader from campaigning, and freeze a party's symbol, powers the Constitution grants in a single Article.\nARC: 1) The Election Commission of India, created by Article 324, is a constitutional body responsible for elections to Parliament, state legislatures, and the offices of President and Vice-President. 2) It became a three-member body in 1993; the Chief Election Commissioner can be removed only like a Supreme Court judge, while the two other Commissioners have weaker protection. 3) The moment polls are announced, the Model Code of Conduct, not a law but enforced by the ECI, freezes new schemes and governs campaign conduct. 4) Voting runs on EVMs paired with VVPAT paper trails after a phased rollout, with the ECI matching a sample of slips to detect mismatches. 5) In 2023 a Constitution Bench (Anoop Baranwal) ordered CEC and EC appointments by a committee including the CJI until Parliament legislates; Parliament then replaced the CJI with a Union Cabinet Minister.\nPAYOFF: The ECI's power rests less on statute than on institutional credibility, its strongest tool, the Model Code, has no legal teeth yet reshapes every campaign.\nQUESTION: Should the ECI's Model Code of Conduct be given statutory backing? Argue the trade-offs."
+          }
         }
       ]
     },
@@ -1819,74 +2237,121 @@
         {
           "id": "basics",
           "label": "Economic Basics",
+          "style": "one term per video, anchored in the viewer's own money first, then the real Indian data (with source body — NSO, RBI) and the exam-grade distinction hiding inside it",
           "submodules": [
             {
               "id": "gdp-growth",
-              "label": "GDP & Growth"
+              "label": "GDP & Growth",
+              "style": "What GDP measures and how India computes it: nominal versus real, GDP versus GVA, the three methods (expenditure, income, production), the 2011-12 base year, and the NSO (formerly CSO). Lane is the size-and-growth number itself, hedged with 'around', not prices (inflation) or the Budget."
             },
             {
               "id": "inflation-types",
-              "label": "Inflation & Its Types"
+              "label": "Inflation & Its Types",
+              "style": "How prices rise and how India measures it: CPI (base 2012) versus WPI (base 2011-12), headline versus core, demand-pull versus cost-push, and the RBI's 4% plus or minus 2% target under the 2016 framework. Lane is the price-level story, not the RBI tools that fight it (that is Money & Banking)."
             },
             {
               "id": "fiscal-monetary",
-              "label": "Fiscal vs Monetary Policy"
+              "label": "Fiscal vs Monetary Policy",
+              "style": "The two levers of macro policy: fiscal (taxes and spending, run by the Finance Ministry under the FRBM Act 2003) versus monetary (interest rates, run by the RBI). Lane is the contrast and coordination, with the fiscal deficit targeted at around 4.5% of GDP for FY26. Deeper RBI mechanics live in Money & Banking."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Growth that isn't real: nominal vs real GDP\nHOOK: Your country's GDP can jump 10% in a year while the economy makes exactly the same number of goods. The extra is just higher prices, and economists strip it out.\nARC: 1) Nominal GDP measures output at current prices, so it rises when prices rise even if nothing more is produced. 2) Real GDP values output at a fixed base year's prices, India currently uses 2011-12, isolating the actual change in quantity. 3) The gap between them is captured by the GDP deflator (nominal / real x 100), the broadest measure of inflation in the economy.\nPAYOFF: \"Growth\" headlines only mean something in real terms, a high nominal number in a high-inflation year can hide a shrinking real economy.\nQUESTION: Why might the GDP deflator tell a different inflation story than CPI in a given year? Reason it out.",
+            "long": "TITLE: Three ways to count one economy: measuring GDP\nHOOK: Every rupee you spend is also someone's income and also something produced, so India can count its economy, now around 300 lakh crore rupees, three separate ways and land on the same number.\nARC: 1) The expenditure method adds consumption, investment, government spending and net exports (C + I + G + X-M); private consumption alone is around 60% of India's GDP. 2) The income method sums wages, rent, interest and profits, every rupee earned in producing output. 3) The production, or value-added, method adds the value created at each stage, avoiding double-counting, and gives Gross Value Added (GVA). 4) GDP at market prices equals GVA at basic prices plus product taxes minus subsidies, the reason the two numbers differ. 5) The NSO, renamed from CSO in 2019, compiles these using the 2011-12 base year and releases Advance Estimates before the year even ends.\nPAYOFF: The three methods must reconcile because spending, earning and producing are the same flow seen from three sides, a large gap between them signals data problems, not real disagreement.\nQUESTION: India shifted its headline measure toward GVA at basic prices with the 2011-12 base revision. Why does the choice of measure matter for policy debate?"
+          }
         },
         {
           "id": "money-banking",
           "label": "Money & Banking",
+          "style": "follow the money: RBI's tools and the banking system as cause-and-effect chains with actual rates and dates; one real policy move or crisis as the case study",
           "submodules": [
             {
               "id": "rbi-role",
-              "label": "RBI & Its Tools"
+              "label": "RBI & Its Tools",
+              "style": "The RBI as monetary authority: the repo rate, the SDF, CRR, SLR and open market operations, the MPC that sets rates against the 4% plus or minus 2% target, and the transmission chain to your EMI. Lane is central-bank tools and how a rate move ripples, with one policy move as the case study."
             },
             {
               "id": "banking-system",
-              "label": "Banking System"
+              "label": "Banking System",
+              "style": "How banks work: the structure (scheduled commercial, cooperative, RRBs, small finance and payments banks), money creation via the deposit multiplier, NPAs and the IBC 2016, and rescues like Yes Bank 2020 or PMC. Lane is the banking plumbing and its crises, not the RBI's policy tools."
             },
             {
               "id": "financial-markets",
-              "label": "Financial Markets & SEBI"
+              "label": "Financial Markets & SEBI",
+              "style": "Where capital is raised and traded: primary versus secondary markets, equity versus debt, the roles of the NSE and BSE, and SEBI (statutory since 1992) as regulator. Lane is markets and their watchdog, with IPOs, indices and a real scam (Harshad Mehta 1992) as the story. Banks and the RBI sit apart."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The rate that moves your EMI: repo\nHOOK: When the RBI changes one number by a quarter of a percent, your home-loan EMI shifts months later, even though you never borrowed a rupee from the RBI.\nARC: 1) The repo rate is the rate at which the RBI lends short-term to commercial banks against government securities. 2) When the RBI's Monetary Policy Committee raises the repo rate, banks' cost of funds rises and they pass it to borrowers, cooling demand and inflation. 3) The MPC, a six-member body created under the 2016 framework, targets CPI inflation at 4% within a 2-6% band; transmission to loans is faster now via external benchmark-linked lending rates.\nPAYOFF: The RBI never touches your loan directly, it changes the price of money for banks, and competition drags your EMI along, which is why transmission is always imperfect and lagged.\nQUESTION: Why does a repo rate cut reach borrowers faster than it once did? Reason through the transmission chain.",
+            "long": "TITLE: How the RBI controls the money supply: the toolkit\nHOOK: The RBI can make your loan cheaper or your savings worth less without printing or burning a single note, it just changes how much money banks are allowed to lend.\nARC: 1) The repo rate is the RBI's main signal, the rate it lends to banks against securities; the reverse leg is now the Standing Deposit Facility (SDF), introduced in 2022, which absorbs cash without collateral. 2) The Cash Reserve Ratio (CRR) forces banks to park a share of deposits with the RBI earning no interest, directly shrinking lendable funds. 3) The Statutory Liquidity Ratio (SLR) requires banks to hold a minimum share in government securities and other approved assets. 4) Through Open Market Operations the RBI buys or sells government bonds to inject or absorb durable liquidity. 5) All of it is steered by the six-member Monetary Policy Committee toward CPI inflation of 4% (plus or minus 2%), a mandate legislated in 2016.\nPAYOFF: Rates are the RBI's fine-tuning; CRR and SLR are its blunt structural controls, the art is using price tools without freezing credit, which is why it rarely moves everything at once.\nQUESTION: When inflation is driven by supply shocks like crude oil, how effective are the RBI's demand-side tools? Argue."
+          }
         },
         {
           "id": "india-economy",
           "label": "Indian Economy",
+          "style": "the Indian growth story by where the rupee actually goes: real Budget heads, tax flows and scheme outlays, with the ministry or body that runs each",
           "submodules": [
             {
               "id": "budget-taxation",
-              "label": "Budget & Taxation"
+              "label": "Budget & Taxation",
+              "style": "Where the rupee comes from and goes: the Union Budget's receipts and expenditure, direct versus indirect taxes, GST, the fiscal deficit, and Articles 112 (Annual Financial Statement) and 110 (Money Bill). Lane is the government's income-and-spending ledger, with the schemes it funds as the sibling submodule."
+            },
+            {
+              "id": "reforms-liberalisation",
+              "label": "1991 Reforms & Liberalisation",
+              "style": "1991 as the hinge of Indian economy — crisis, LPG reforms, what changed and what didn't; before/after numbers"
             },
             {
               "id": "planning-schemes",
-              "label": "Planning & Flagship Schemes"
+              "label": "Planning & Flagship Schemes",
+              "style": "From the Planning Commission to NITI Aayog (2015) and the flagship schemes the rupee funds, MGNREGA 2005, PM-KISAN, PMAY, Jan Dhan. Lane is development delivery: outlays, target beneficiaries, and the ministry running each. The Budget that funds them and agriculture policy sit adjacent."
+            },
+            {
+              "id": "poverty-employment",
+              "label": "Poverty, Employment & Human Development",
+              "style": "measuring the unmeasurable — poverty lines, PLFS, MPI, HDI; committee names and methodology gotchas"
             },
             {
               "id": "agriculture-economy",
-              "label": "Agriculture & Economy"
+              "label": "Agriculture & Economy",
+              "style": "The farm economy's structure and policy: MSP and procurement, the FCI and buffer stocks, credit and subsidies, and agriculture's roughly 18% share of GVA against around 42% of employment. Lane is the agricultural sector as an economic system, its schemes overlap with the sibling but the focus is the farm gate."
+            },
+            {
+              "id": "industry-infrastructure",
+              "label": "Industry, Infrastructure & Services",
+              "style": "industrial policy to Gati Shakti — PLI, MSME, PPP models; every scheme with a number and a bottleneck"
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The price the government promises farmers: MSP\nHOOK: Before a single grain is sown, the government announces the minimum price it will pay for 23 crops, but for most of them, almost no one actually buys at that price.\nARC: 1) The Minimum Support Price is announced for 23 crops on the recommendation of the Commission for Agricultural Costs and Prices (CACP). 2) It becomes real only where government agencies actually procure, mainly wheat and rice bought by the Food Corporation of India for the public distribution system. 3) MSP has no statutory guarantee, which is why the 2020-21 farmer protests demanded a law making it legally enforceable.\nPAYOFF: MSP is a signal, not a promise, its power depends entirely on procurement, so a crop with a high MSP but no buyer leaves the farmer exactly where the market left them.\nQUESTION: Should MSP be given legal guarantee across all crops? Weigh the fiscal and market consequences.",
+            "long": "TITLE: Where your tax rupee goes: reading the Union Budget\nHOOK: Of every rupee the Union government spends, around 20 paise never buys anything new, it only pays interest on money already borrowed.\nARC: 1) The Budget, presented under Article 112 as the Annual Financial Statement, splits into receipts (what the government earns and borrows) and expenditure (what it spends). 2) Receipts divide into revenue receipts, like taxes, which create no liability, and capital receipts, mainly borrowing, which do. 3) The fiscal deficit, total expenditure minus receipts excluding borrowings, is the headline gap, targeted at around 4.5% of GDP for FY26. 4) On the spending side, borrowing costs bite: interest payments are the largest single expenditure head, around a fifth of the total. 5) The FRBM Act, 2003, is the legal leash on this borrowing, reviewed by the N.K. Singh Committee in 2017.\nPAYOFF: A government can grow its Budget every year yet have less to spend on people, because past borrowing compounds into interest, the biggest bill it cannot cut.\nQUESTION: Is a fiscal deficit always bad? Distinguish between borrowing for capital investment and for revenue spending."
+          }
         },
         {
           "id": "external",
           "label": "External Sector",
+          "style": "India and the world's money: trade, the rupee and global institutions told through real events (1991 crisis, 2013 taper tantrum) and real BoP figures, hedged when approximate",
           "submodules": [
             {
               "id": "bop-trade",
-              "label": "Balance of Payments & Trade"
+              "label": "Balance of Payments & Trade",
+              "style": "India's account with the world: the Balance of Payments split into a current account (goods, services, remittances) and a capital account, the trade deficit, and the current account deficit as a share of GDP. Lane is the BoP ledger and trade balance, the rupee's price is the sibling."
             },
             {
               "id": "forex-rupee",
-              "label": "Forex & the Rupee"
+              "label": "Forex & the Rupee",
+              "style": "What sets the rupee's value: a managed float, forex reserves (over 600 billion dollars), RBI intervention, and shocks like the 2013 taper tantrum. Lane is the exchange rate and reserves, how a falling rupee raises the petrol bill. The BoP that drives it and the global bodies sit apart."
             },
             {
               "id": "global-bodies",
-              "label": "IMF, World Bank & WTO"
+              "label": "IMF, World Bank & WTO",
+              "style": "The institutions India works through: the IMF (quotas, SDRs, the 1991 bailout), the World Bank group, and the WTO (1995, its agreements and India's disputes). Lane is the multilateral economic architecture, with real episodes like 1991 as the story, distinct from bilateral trade balances."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Why a weak rupee costs you: imported inflation\nHOOK: When the rupee slips from 80 to 84 against the dollar, the crude India buys gets costlier in rupees even if its global price never moved, and that reaches your fuel tank.\nARC: 1) India imports around 85% of its crude oil, all priced in US dollars. 2) When the rupee depreciates, each barrel costs more rupees, raising fuel, transport and input costs across the economy, this is imported inflation. 3) The RBI can cushion the fall by selling dollars from its forex reserves, which are over 600 billion dollars, but it cannot hold the rupee up indefinitely against real trade pressures.\nPAYOFF: A cheaper rupee helps exporters but taxes every importer and consumer, for an oil-dependent economy, currency weakness is felt first at the pump.\nQUESTION: Should the RBI defend the rupee at a particular level, or let it float? Argue the trade-offs for inflation and exports.",
+            "long": "TITLE: The three weeks India nearly defaulted: 1991\nHOOK: In 1991 India had enough foreign currency to pay for barely two to three weeks of imports, and had to physically fly its gold to London to borrow against it.\nARC: 1) A widening current account deficit, the 1990-91 Gulf War oil spike, and falling remittances drained India's forex reserves to critically low levels. 2) With reserves covering only weeks of imports, India pledged tonnes of gold to the Bank of England and the Bank of Japan to raise emergency dollars. 3) India secured an IMF bailout, which came tied to conditions pushing liberalization. 4) The response was the 1991 reforms, devaluation of the rupee, dismantling of the industrial licensing \"Licence Raj,\" and opening to foreign investment. 5) The crisis reset India's model from import-substitution to a more open, market-oriented economy.\nPAYOFF: The near-default did what decades of debate could not, an external shock forced reforms a comfortable economy would never have accepted, which is why crises often drive the biggest policy shifts.\nQUESTION: Were the 1991 reforms a product of conviction or compulsion? Argue with reference to the balance-of-payments crisis."
+          }
         }
       ]
     },
@@ -1899,74 +2364,111 @@
         {
           "id": "ecology",
           "label": "Ecology Basics",
+          "style": "systems made visible: chains, cycles and webs with named species in named Indian ecosystems; the exam term always anchored to a real place the viewer can picture",
           "submodules": [
             {
               "id": "ecosystems",
-              "label": "Ecosystems & Food Chains"
+              "label": "Ecosystems & Food Chains",
+              "style": "How energy and matter move through a living system: producers-consumers-decomposers, food chains versus webs, the 10% energy law, ecological pyramids, and succession, anchored to named Indian biomes (Sundarbans, Thar, Shola). Lane is the flow mechanism, always in a real place. Species-count conservation is a later module."
             },
             {
               "id": "biodiversity",
-              "label": "Biodiversity & Hotspots"
+              "label": "Biodiversity & Hotspots",
+              "style": "The variety of life and how it is measured: genetic, species and ecosystem diversity, endemism, India's four biodiversity hotspots (Western Ghats, Eastern Himalaya, Indo-Burma, Sundaland), and the IUCN Red List categories. Lane is diversity and its metrics, anchored by the Biological Diversity Act 2002. Protected areas are the conservation module."
             },
             {
               "id": "nutrient-cycles",
-              "label": "Nutrient Cycles"
+              "label": "Nutrient Cycles",
+              "style": "The biogeochemical loops that recycle matter: carbon, nitrogen (fixation-nitrification-denitrification), phosphorus (the only major cycle with no gas phase), and water. Lane is the cycles themselves and how humans break them (Haber-Bosch, eutrophication), the carbon cycle's climate link is developed in the Climate module."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Why top predators are rare: the 10% law\nHOOK: India's grasslands feed millions of deer but support only a few thousand tigers, the 2022 census counted around 3,682. That gap is not chance, it is physics.\nARC: 1) At each step up a food chain, grass to deer to tiger, only about 10% of the energy is passed on; the rest is lost as heat and life processes (Lindeman's rule). 2) So it takes a vast base of producers to support a small biomass of top carnivores. 3) That is why the 2022 estimate found only around 3,682 tigers across India despite abundant prey and vegetation.\nPAYOFF: Apex predators are rare by thermodynamic necessity, not by scarcity of food, which is why losing one signals that a huge energy base beneath it is being squeezed.\nQUESTION: Trace the food chain that ends at the largest predator near your city or state, how much plant life must it rest on?",
+            "long": "TITLE: The gas that's everywhere but nowhere: the nitrogen cycle\nHOOK: About 78% of the air you breathe is nitrogen, yet plants are starving for it, and a single early-1900s invention now adds more usable nitrogen to land than all of nature once did.\nARC: 1) Atmospheric nitrogen (N2) is around 78% of air but inert, plants cannot use it until it is \"fixed\" into ammonia or nitrates. 2) Nitrogen-fixing bacteria like Rhizobium in legume root nodules, plus lightning, convert N2 into usable forms, the natural entry point of the cycle. 3) Nitrifying bacteria turn ammonia into nitrites and nitrates that plants absorb, while denitrifying bacteria return nitrogen to the air, closing the loop. 4) The Haber-Bosch process, industrialized in the early 1900s, fixes nitrogen artificially for fertilizer, now feeding much of humanity but roughly doubling the reactive nitrogen entering ecosystems. 5) Excess fertilizer runoff triggers eutrophication, algal blooms that strip water bodies of oxygen and create dead zones.\nPAYOFF: The reaction that ended famines also broke a cycle billions of years old, we now add nitrogen faster than nature can return it, which is why the fix for hunger became a pollution problem.\nQUESTION: Is a lake or river near you showing algal blooms? Trace the nitrogen path from a nearby farm's fertilizer to that water."
+          }
         },
         {
           "id": "climate",
           "label": "Climate & Pollution",
+          "style": "evidence over doom: real measurements, real mechanisms, what is actually warming or polluting and by how much — India-first data, hedged with 'around' when estimated",
           "submodules": [
             {
               "id": "climate-change",
-              "label": "Climate Change"
+              "label": "Climate Change",
+              "style": "The measured warming and its drivers: greenhouse gases, the roughly 1.1 to 1.2 degrees Celsius rise since pre-industrial times, India's monsoon and glacier impacts, and the IPCC's evidence. Lane is the climate system and observed data, the policy conventions (Paris 2015) are referenced but the mechanism leads. Carbon's cycle is the sibling."
             },
             {
               "id": "pollution-types",
-              "label": "Pollution & Control"
+              "label": "Pollution & Control",
+              "style": "Air, water, soil and noise pollution: what pollutes, how it is measured (AQI, PM2.5 and PM10), and controls like the CPCB, NGT and the National Clean Air Programme. Lane is pollution as a measurable phenomenon with Indian data (Delhi's winter smog), distinct from climate warming and from the conservation module's laws."
             },
             {
               "id": "carbon-cycle",
-              "label": "Carbon Cycle & Warming"
+              "label": "Carbon Cycle & Warming",
+              "style": "How carbon moves between air, oceans, life and rock, and why burning fossil fuels overloads it: the greenhouse-effect mechanism, carbon sinks (forests, oceans), and CO2 concentration passing around 420 ppm. Lane is the carbon flow that drives warming, the broader climate impacts sit in the sibling submodule."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The number that keeps breaking records: 420 ppm\nHOOK: For all of human history CO2 in the air stayed under 300 parts per million. In 2024 it crossed around 420 ppm, a level the planet had not seen in millions of years.\nARC: 1) Carbon dioxide lets sunlight in but traps outgoing heat, the greenhouse effect that keeps Earth livable. 2) Burning fossil fuels releases carbon locked underground for millions of years, adding it faster than oceans and forests can absorb it. 3) Atmospheric CO2 has climbed from around 280 ppm before industrialization to around 420 ppm today, tracked continuously since 1958 at Mauna Loa.\nPAYOFF: The greenhouse effect is not the problem, it is necessary, the problem is speed, we are releasing ancient carbon in centuries that took millions of years to bury.\nQUESTION: What is the single largest source of CO2 in your city, transport, power or industry, and how would you cut it?",
+            "long": "TITLE: How ancient sunlight warms the planet: the carbon cycle\nHOOK: Every litre of petrol you burn releases carbon that a plant pulled from the air tens of millions of years ago, and we now burn it faster than the Earth can bury it again.\nARC: 1) Carbon constantly cycles: plants pull CO2 from the air by photosynthesis, animals and decay return it by respiration, a fast loop roughly in balance. 2) Over millions of years some carbon gets locked in rock and buried plant matter, coal, oil and gas, the slow carbon cycle. 3) Oceans and forests act as sinks, absorbing a large share of emissions; the ocean absorbing CO2 also makes seawater more acidic. 4) Burning fossil fuels short-circuits the slow cycle, dumping buried carbon into the air in decades and pushing CO2 to around 420 ppm. 5) The excess traps more heat, and warming itself can weaken sinks, warmer oceans absorb less CO2, a feedback that accelerates the problem.\nPAYOFF: The danger is not the carbon but the timescale mismatch, we are running the slow cycle in fast-forward, and the sinks that once saved us weaken as the planet warms.\nQUESTION: Name one carbon sink near you, a forest, wetland or urban green belt, and trace what would happen to local CO2 if it were paved over."
+          }
         },
         {
           "id": "conservation",
           "label": "Conservation",
+          "style": "species and places with stakes: real counts (tigers, forest cover %), the exact protection status and law, and one recovery or failure story per episode",
           "submodules": [
             {
               "id": "protected-areas",
-              "label": "Protected Areas & Reserves"
+              "label": "Protected Areas & Reserves",
+              "style": "India's spatial protection tiers: national parks, wildlife sanctuaries, conservation and community reserves under the Wildlife (Protection) Act 1972, plus tiger reserves under Project Tiger (1973) and biosphere reserves. Lane is protected places and their legal categories with real counts, species-specific stories are the sibling."
             },
             {
               "id": "wildlife-species",
-              "label": "Endangered Species"
+              "label": "Endangered Species",
+              "style": "Individual species with stakes: their IUCN and Wildlife Protection Act Schedule status, population counts (around 3,682 tigers, the rhino strongholds, the Asiatic lion in Gir), and one recovery or decline story per episode. Lane is the species itself, the reserves that hold it are the adjacent submodule."
             },
             {
               "id": "conventions",
-              "label": "Environmental Conventions"
+              "label": "Environmental Conventions",
+              "style": "The international agreements India has signed: CITES (1975), the CMS, Ramsar (1971), the CBD (1992) and its Nagoya Protocol, and CoP outcomes. Lane is treaty machinery, the year, the mandate, India's obligations. Domestic laws like the Wildlife Act belong to the India & Environment module."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: From 1,411 to 3,682: how Project Tiger worked\nHOOK: In 2006 India counted just 1,411 wild tigers and campaigners feared the animal was slipping away. The 2022 census found around 3,682, one of conservation's rare wins.\nARC: 1) Project Tiger, launched in 1973, created dedicated tiger reserves with protected core zones under a specialized management structure. 2) After the 2006 low of 1,411 tigers, the National Tiger Conservation Authority was strengthened to run science-based monitoring and relocate villages from core areas. 3) India now holds the majority of the world's wild tigers, with the 2022 estimate at around 3,682.\nPAYOFF: Saving the tiger meant saving its whole forest and prey base, protecting an apex predator is really protecting an entire ecosystem, which is why it is an umbrella species.\nQUESTION: Which tiger reserve is nearest your state, and what prey and forest type sustains its tigers?",
+            "long": "TITLE: Three walls around a species: how conservation works\nHOOK: The Asiatic lion survives in exactly one place on Earth, the Gir forest, where around 670 of them cling on. Keeping them alive takes three separate lines of defense.\nARC: 1) The first wall is habitat: the Wildlife (Protection) Act, 1972 lets India declare national parks and sanctuaries where the land itself is protected. 2) The second wall is species status: the Act's Schedules give the strictest protection, Schedule I, to animals like the tiger, lion and rhino, with the harshest penalties for harming them. 3) The third wall is trade: CITES, which India joined in 1976, bans or regulates international trade in endangered species and their parts. 4) Institutions enforce it, the National Tiger Conservation Authority for tigers and the Wildlife Crime Control Bureau against trafficking. 5) Concentration is the hidden risk: the entire Asiatic lion population in one Gir landscape means a single epidemic or fire could wipe it out, which is why a second home at Kuno was long debated.\nPAYOFF: Protection only works in layers, a Schedule I listing is useless without habitat, and habitat is useless if the animal is poached for a market abroad, conservation fails at the weakest wall.\nQUESTION: For an endangered species in your region, which of the three walls, habitat, legal status or trade control, is the weakest, and why?"
+          }
         },
         {
           "id": "india-env",
           "label": "India & Environment",
+          "style": "law and land: the act, the year, the body (NGT, CPCB) and the real case where it was tested; renewable and scheme numbers stated as 'around' unless certain",
           "submodules": [
             {
               "id": "env-laws",
-              "label": "Environmental Laws & NGT"
+              "label": "Environmental Laws & NGT",
+              "style": "India's environmental statutes and enforcers: the Water Act 1974, Air Act 1981, the Environment (Protection) Act 1986 (post-Bhopal), the National Green Tribunal Act 2010, and the EIA process, enforced by the CPCB and the NGT. Lane is the law-and-institution layer with real cases, species conventions belong to the conservation module."
+            },
+            {
+              "id": "disaster-management",
+              "label": "Disaster Management",
+              "style": "GS3's scoring block — NDMA machinery, hazard-by-hazard India map, Sendai framework; institution + case study"
             },
             {
               "id": "renewable-energy",
-              "label": "Renewable Energy"
+              "label": "Renewable Energy",
+              "style": "India's clean-energy transition: installed renewable capacity (around 200 GW), solar and wind targets, the International Solar Alliance (2015), and the net-zero-by-2070 pledge. Lane is the energy shift with numbers hedged as 'around', the emissions it addresses sit in the Climate module."
             },
             {
               "id": "sustainable-dev",
-              "label": "Sustainable Development"
+              "label": "Sustainable Development",
+              "style": "Balancing growth and ecology: the Sustainable Development Goals, India's climate commitments (NDCs, the LiFE mission), the polluter-pays and precautionary principles, and schemes like Namami Gange. Lane is the development-versus-environment framework and its principles, concrete laws and energy targets are the sibling submodules."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The gas leak that wrote a law: EPA 1986\nHOOK: On the night of 2-3 December 1984, methyl isocyanate leaked from a Bhopal factory and killed thousands within days. Two years later India passed its most sweeping environmental law.\nARC: 1) The Bhopal gas tragedy exposed how fragmented India's environmental rules were, no single law gave the Centre broad power to act. 2) The Environment (Protection) Act, 1986, was enacted as an umbrella law empowering the central government to set standards and regulate any activity harming the environment. 3) It became the legal basis for later rules, on hazardous waste, coastal zones, and the Environmental Impact Assessment (EIA) notification.\nPAYOFF: It took a mass-casualty disaster to give India a general environmental law, most of the country's green regulation today hangs off this single 1986 umbrella.\nQUESTION: Does an industry near your city fall under EPA 1986 standards? Trace which pollutant it must monitor and who checks it.",
+            "long": "TITLE: The court only for the environment: the NGT\nHOOK: In 2015 a green court banned diesel vehicles over ten years old from Delhi's roads in one order, an environmental verdict no ordinary court had ever delivered so fast.\nARC: 1) The National Green Tribunal was set up under the NGT Act, 2010, as a specialized body to handle environmental disputes quickly, outside the regular court backlog. 2) Its benches carry both judicial and expert (scientific) members, so ecological questions are judged by people who understand the science. 3) It applies core principles now embedded in Indian law, polluter pays, the precautionary principle, and sustainable development. 4) It can hear cases under major environmental laws, order compensation, and halt polluting projects, as with its diesel-vehicle and construction-dust orders in Delhi-NCR. 5) Its reach has limits, it cannot hear matters under the Wildlife Protection Act or the Forest Rights Act, and its orders are appealed to the Supreme Court.\nPAYOFF: The NGT's real innovation is not speed but composition, putting scientists on the bench means an environmental case is decided on ecology, not just legal argument.\nQUESTION: Pick a local environmental problem, a polluting unit, an encroached wetland, or a dumping site. Would it fall within the NGT's jurisdiction? Reason it out."
+          }
         }
       ]
     },
@@ -1979,74 +2481,121 @@
         {
           "id": "architecture",
           "label": "Architecture",
+          "style": "read buildings like texts: name the parts on ONE real monument, contrast the style people confuse it with, and keep dynasty, century and patron precise",
           "submodules": [
             {
+              "id": "buddhist-jain-architecture",
+              "label": "Buddhist & Jain Architecture",
+              "style": "stupa, chaitya, vihara, cave — Sanchi to Ajanta-Ellora; architecture as chronology: site + patron + period"
+            },
+            {
               "id": "temple-styles",
-              "label": "Temple Architecture"
+              "label": "Temple Architecture",
+              "style": "Hindu and Jain temple grammar: Nagara vs Dravida vs Vesara, shikhara vs vimana, read on ONE monument per episode with dynasty and century — Brihadeeswarar (Chola, around 1010 CE), Kandariya Mahadev (Chandela, 11th century). Arches and domes belong to Indo-Islamic."
             },
             {
               "id": "indo-islamic",
-              "label": "Indo-Islamic Architecture"
+              "label": "Indo-Islamic Architecture",
+              "style": "Arch, dome and minaret from Sultanate to Mughal: one innovation per episode on a named building — the true arch at Alai Darwaza (Khalji, 1311), the double dome at Humayun's Tomb (1570s), pietra dura at the Taj. Trabeate temples stay next door."
             },
             {
               "id": "colonial-modern",
-              "label": "Colonial & Modern"
+              "label": "Colonial & Modern",
+              "style": "Indo-Saracenic to Corbusier: name the borrowed ingredients on one building — CST's Gothic Revival (1888), the chhatris Lutyens put on Rashtrapati Bhavan, Chandigarh's Capitol Complex (1950s). Focus on WHY each era borrowed Indian elements; the Mughal originals belong to Indo-Islamic."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: The 80-tonne capstone: Brihadeeswarar's crane-free miracle\nHOOK: At the top of a 66-metre stone tower in Thanjavur sits a capstone said to weigh around 80 tonnes — placed a thousand years ago, without a crane.\nARC: 1) Rajaraja Chola I completed the Brihadeeswarar temple around 1010 CE, its vimana the tallest of its age. 2) The story goes a long earthen ramp let elephants and rollers drag the stone up, inch by inch. 3) That tower over the sanctum is the giveaway: in Dravida temples the vimana rules the sky — towering gateway gopurams came to dominate later, at places like Madurai.\nPAYOFF: In the courtyard, look up from the sanctum, not the gate — the sky-owning vimana is the Chola signature.\nQUESTION: Brihadeeswarar's single vimana or Meenakshi's forest of gopurams — which is the greater statement, and why?",
+            "long": "TITLE: Nagara vs Dravida: read any temple in four clues\nHOOK: One temple tower curves like a beehive over Bhubaneswar; another climbs in straight-cut steps over Thanjavur. Same faith — two different grammars in stone.\nARC: 1) The tower: Nagara's curving shikhara (Lingaraja, Bhubaneswar, 11th century) versus Dravida's stepped vimana (Brihadeeswarar, Chola, around 1010 CE). 2) The crown: Nagara ends in a ribbed amalaka disc; Dravida in a dome-like stupi. 3) The compound: Dravida temples sit in walled courts behind gopurams, like Madurai's Meenakshi; Nagara temples usually stand freer. 4) The fusion: the Hoysalas' Chennakeshava at Belur (12th century) blends both into Vesara on a star-shaped plan. 5) The curveball: Konark's Sun Temple (Eastern Ganga, 13th century) is still Nagara — Odisha just calls it a deul.\nPAYOFF: Tower curve, crown, gateway — three glances and you name the style before the guide does.\nQUESTION: You can perfectly preserve only Khajuraho or Thanjavur for 500 years — which one, and what tips it?"
+          }
         },
         {
           "id": "performing",
           "label": "Performing Arts",
+          "style": "living traditions: what makes each form visibly and audibly distinct, the lineage behind it, and one legendary artist or performance story per episode",
           "submodules": [
             {
               "id": "classical-dance",
-              "label": "Classical Dance Forms"
+              "label": "Classical Dance Forms",
+              "style": "The Sangeet Natak Akademi's classical dance forms: what makes each visibly distinct — Odissi's tribhangi bend, Kathakali's painted face code, Kathak's spins — plus the revivalist (Rukmini Devi, Kelucharan Mohapatra) and home region. Music, gharanas and instruments sit with Classical Music."
             },
             {
               "id": "classical-music",
-              "label": "Classical Music"
+              "label": "Classical Music",
+              "style": "What you HEAR: raga, tala, dhrupad vs khyal, Hindustani gharanas, the Carnatic Trinity (Tyagaraja, Dikshitar, Syama Sastri). One legend or performance story per episode — Bismillah Khan's shehnai at Independence, 1947. Dance and drama belong to the sibling lanes."
             },
             {
               "id": "theatre-puppetry",
-              "label": "Theatre & Puppetry"
+              "label": "Theatre & Puppetry",
+              "style": "Folk drama and puppetry mapped to states: Ramnagar's month-long Ramlila, Yakshagana's towering headgear, Rajasthan's legless Kathputli strings, Andhra's leather Tholu Bommalata shadows. One visual or ritual detail per form, plus the community keeping it alive. Kathakali-style classical dance-drama stays with Dance."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Kathakali's face code: green heroes, red villains\nHOOK: In a Kerala courtyard at midnight, a face painted green with a white ridge along the jaw begins moving only its eyes — and the audience already knows he's the hero.\nARC: 1) In Kathakali, makeup is casting: green (pacha) marks noble heroes like Arjuna; a red knife-mark on green (kathi) marks arrogant anti-heroes like Ravana. 2) The red beard (chuvanna thadi) belongs to the vicious; Hanuman wears the white beard. 3) That jaw ridge, the chutti, is built from rice paste and paper over hours before every show.\nPAYOFF: Watch the face before the plot — a character's moral rank is painted on before a single step is danced.\nQUESTION: Kathakali paints character; Greek theatre masked it. Which serves a story better — paint or mask?",
+            "long": "TITLE: Sadir to Bharatanatyam: banned, renamed, reborn\nHOOK: In 1935, a Brahmin woman stepped onto a Madras stage to perform a temple dance polite society had learned to despise — and changed its name, costume and future.\nARC: 1) It descends from sadir, danced by hereditary devadasis and codified by the Thanjavur Quartet in the 19th-century Maratha court. 2) The anti-nautch campaign stigmatised those dancers; the Madras Devadasis Act of 1947 ended temple dedication. 3) Lawyer E. Krishna Iyer performed and argued for the art; Rukmini Devi Arundale relaunched it as 'Bharatanatyam' and founded Kalakshetra in 1936. 4) The grammar survived: a recital still runs alarippu to tillana, built from adavu steps and hasta mudras. 5) Its poses mirror the 108 karanas carved at Chidambaram's temple gopurams.\nPAYOFF: One recital holds three layers at once: temple ritual, court repertoire, and a 1930s reinvention.\nQUESTION: Rukmini Devi 'purified' the costume and repertoire to save the form — rescue or erasure? Argue one side."
+          }
         },
         {
           "id": "visual-arts",
           "label": "Visual & Folk Arts",
+          "style": "art the viewer can identify afterwards: the telltale features of each school or craft so they can spot it in a museum or an exam; real places and real GI tags",
           "submodules": [
             {
+              "id": "sculpture-bronzes",
+              "label": "Sculpture & Bronzes",
+              "style": "Gandhara vs Mathura vs Amaravati, Chola bronzes — school + material + patron precision with iconic pieces"
+            },
+            {
               "id": "painting-schools",
-              "label": "Painting Schools"
+              "label": "Painting Schools",
+              "style": "Court and cave painting lineages — Ajanta murals, Akbar's atelier, Kishangarh's Bani Thani, Kangra's Nainsukh. Each episode arms viewers with two or three telltale features to name the school on sight in a museum or exam hall. Ritual village art belongs to Folk & Tribal."
             },
             {
               "id": "folk-tribal",
-              "label": "Folk & Tribal Art"
+              "label": "Folk & Tribal Art",
+              "style": "Living ritual art by community: Gond dots (Jangarh Singh Shyam), Warli's white-on-red chauk, Saura ikons, Phad scrolls sung by bhopas. Lead with the ritual purpose behind each motif and the named village or family still practicing. Court miniatures stay with Painting Schools."
             },
             {
               "id": "handicrafts",
-              "label": "Handicrafts & GI Tags"
+              "label": "Handicrafts & GI Tags",
+              "style": "Craft technique plus its GI credential: Pashmina's months of handwork, Bidriware blackened with Bidar fort soil, Channapatna's lacquered ivory-wood toys. One material secret per episode and the exact town the tag protects. Paintings, even GI-tagged ones, live in the sibling lanes."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Bani Thani: India's Mona Lisa from Kishangarh\nHOOK: A woman in profile — arched brows, lotus eyes stretched to the temple, a razor-sharp nose — painted in a small Rajasthani court around the 1750s, now called India's Mona Lisa.\nARC: 1) Court artist Nihal Chand painted her at Kishangarh under Raja Savant Singh; the story goes the model was a singer-poet at court. 2) Those exaggerated features ARE the school: elongated eyes, sharp chin and nose, lovers cast as Radha and Krishna. 3) India Post put Bani Thani on a stamp in 1973 — she has travelled on Indian envelopes.\nPAYOFF: In any museum, impossibly stretched eyes and knife-edge profiles say 'Kishangarh' before the label does.\nQUESTION: Is calling her 'India's Mona Lisa' a compliment — or a habit of measuring Indian art by Europe's ruler?",
+            "long": "TITLE: Mughal miniatures: three emperors, three ways of seeing\nHOOK: Around 1618, a Mughal artist painted a dying nobleman's sunken face with unflinching honesty — because Emperor Jahangir ordered the death recorded.\nARC: 1) Akbar built the atelier: Persian masters Mir Sayyid Ali and Abd al-Samad trained Indian painters on the vast Hamzanama project in the 1560s-70s. 2) Jahangir turned it to observation: Ustad Mansur painted a zebra and a Siberian crane so precisely he was titled Nadir-ul-Asr, 'wonder of the age'. 3) That dying portrait — Inayat Khan, around 1618 — is the school's clinical realism at its peak. 4) Shah Jahan formalised it: profile portraits, jewelled borders, ceremony over story. 5) Spotting kit: single-hair brush detail, flattened architecture, figures scaled by rank.\nPAYOFF: Date a Mughal miniature by its mood — action under Akbar, observation under Jahangir, ceremony under Shah Jahan.\nQUESTION: Which atelier would you fund — Akbar's story factory or Jahangir's nature lab?"
+          }
         },
         {
           "id": "heritage",
           "label": "Heritage & Traditions",
+          "style": "India's treasures with credentials: the UNESCO year and criteria, the story that earned the tag, and festivals or texts with real dates — vivid but never vague",
           "submodules": [
             {
-              "id": "unesco-sites",
-              "label": "UNESCO Sites in India"
+              "id": "literature-languages",
+              "label": "Literature & Languages",
+              "style": "India's textual heritage: Sangam academies, Thirukkural's 1,330 couplets, Kabir's dohas, Ghalib's ghazals, classical-language criteria. One text or poet per episode with century and language, plus a line quoted in translation. Performed traditions belong to Performing Arts."
+            },
+            {
+              "id": "coins-inscriptions-science",
+              "label": "Coins, Inscriptions & Knowledge Traditions",
+              "style": "evidence India wrote in metal and stone — numismatics, Ashokan edicts, ancient science; artefact → inference method"
             },
             {
               "id": "festivals-fairs",
-              "label": "Festivals & Fairs"
+              "label": "Festivals & Fairs",
+              "style": "Festivals as living heritage with dates and mechanics: Tilak taking Ganesh Chaturthi public in 1893, Durga Puja's 2021 UNESCO intangible tag, why Kumbh rotates between four cities. One festival per episode — origin, ritual logic, region. Monument listings belong to UNESCO Sites."
             },
             {
-              "id": "literature-languages",
-              "label": "Literature & Languages"
+              "id": "unesco-sites",
+              "label": "UNESCO Sites in India",
+              "style": "The LISTING is the story: inscription year, criterion and the case that won it — Ajanta and Ellora in the 1983 first batch, Santiniketan in 2023, Khangchendzonga as the lone mixed site. The monuments' own architecture is covered next door."
             }
-          ]
+          ],
+          "exemplars": {
+            "short": "TITLE: Rani ki Vav: the temple built upside down\nHOOK: In Patan, Gujarat, you walk down seven storeys into the earth, past around 500 sculpted deities, to reach water — a temple inverted into a well.\nARC: 1) Queen Udayamati of the Solanki dynasty built it around the 1060s, likely as a memorial to King Bhima I. 2) The Saraswati river flooded and silted it for centuries; ASI excavation in the 1980s found the sculptures largely intact. 3) UNESCO inscribed it in 2014, and since 2018 it sits on the ₹100 note.\nPAYOFF: As you descend, look for Vishnu's ten avatars on the walls — a temple you enter from the sky.\nQUESTION: Stepwells stored water, cooled the air and gathered people — what modern building does all three? Should we build them again?",
+            "long": "TITLE: India's UNESCO list: what actually earns the tag\nHOOK: In 1983, four Indian sites — Ajanta, Ellora, the Taj Mahal and Agra Fort — walked onto the World Heritage list together. Every entry since has had to argue its way in.\nARC: 1) A site must prove Outstanding Universal Value against ten criteria — six cultural, four natural. 2) Khangchendzonga National Park (2016) is India's only mixed site: listed for nature and for its sacredness to indigenous communities. 3) The Great Living Chola Temples are 'living' because worship never stopped; Mumbai's Victorian Gothic and Art Deco ensemble (2018) is a working district. 4) The newest cultural entries: Santiniketan (2023) and Assam's Moidams, the Ahom royal burial mounds (2024). 5) Kumbh Mela (2017), Durga Puja (2021) and Garba (2023) sit on the separate Intangible Heritage list.\nPAYOFF: Always pair site, year and case — the tag is an argument, not a badge.\nQUESTION: Which Indian site NOT yet on the list most deserves the next nomination — and on which criterion?"
+          }
         }
       ]
     }

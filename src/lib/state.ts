@@ -13,7 +13,8 @@ const SUBJECTS_PATH = path.join(CONTENT_DIR, "subjects.json");
 const QUOTA_PATH = path.join(CONTENT_DIR, "quota.json");
 
 export type Submodule = { id: string; label: string; style?: string };
-export type Module = { id: string; label: string; style?: string; submodules: Submodule[] };
+/** exemplars: north-star episode cards (per format) shown to the blueprint stage as a quality bar. */
+export type Module = { id: string; label: string; style?: string; exemplars?: { short?: string; long?: string }; submodules: Submodule[] };
 export type Subject = {
   id: string;
   label: string;
@@ -129,30 +130,49 @@ function pacificDate(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 }
 
-async function readQuota(): Promise<{ date: string; used: Record<string, number> }> {
+type Quota = { date: string; used: Record<string, number>; byKey: Record<string, number> };
+
+async function readQuota(): Promise<Quota> {
   try {
-    const parsed = JSON.parse(await fs.readFile(QUOTA_PATH, "utf8")) as { date?: string; used?: unknown };
+    const parsed = JSON.parse(await fs.readFile(QUOTA_PATH, "utf8")) as { date?: string; used?: unknown; byKey?: unknown };
     if (parsed.date === pacificDate()) {
+      const byKey = parsed.byKey && typeof parsed.byKey === "object" ? (parsed.byKey as Record<string, number>) : {};
       // pre-chain files stored one number; those requests were served by gemini-2.5-flash
-      if (typeof parsed.used === "number") return { date: parsed.date, used: { "gemini-2.5-flash": parsed.used } };
+      if (typeof parsed.used === "number") return { date: parsed.date, used: { "gemini-2.5-flash": parsed.used }, byKey };
       if (parsed.used && typeof parsed.used === "object") {
-        return { date: parsed.date, used: parsed.used as Record<string, number> };
+        return { date: parsed.date, used: parsed.used as Record<string, number>, byKey };
       }
     }
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
   }
-  return { date: pacificDate(), used: {} };
+  return { date: pacificDate(), used: {}, byKey: {} };
 }
 
-export async function recordGeminiRequest(model: string): Promise<void> {
-  const quota = await readQuota();
-  quota.used[model] = (quota.used[model] ?? 0) + 1;
-  await fs.writeFile(QUOTA_PATH, JSON.stringify(quota, null, 2));
+/** Serializes quota writes. read → mutate → write is not atomic, and every Gemini
+ *  call in this single server process (UI + content factory, run concurrently) records
+ *  through here; without this chain, concurrent increments read the same snapshot and
+ *  clobber each other, silently losing counts. */
+let quotaWriteChain: Promise<void> = Promise.resolve();
+
+/** Records one successful Gemini call by model, and — for the free-vs-billed audit —
+ *  by the key label (e.g. "free-4", "billed-1") that actually served it. */
+export async function recordGeminiRequest(model: string, keyLabel?: string): Promise<void> {
+  quotaWriteChain = quotaWriteChain.then(async () => {
+    const quota = await readQuota();
+    quota.used[model] = (quota.used[model] ?? 0) + 1;
+    if (keyLabel) quota.byKey[keyLabel] = (quota.byKey[keyLabel] ?? 0) + 1;
+    await fs.writeFile(QUOTA_PATH, JSON.stringify(quota, null, 2));
+  }).catch(() => {});
+  return quotaWriteChain;
 }
 
 export async function geminiUsageToday(): Promise<Record<string, number>> {
   return (await readQuota()).used;
+}
+
+export async function geminiByKeyToday(): Promise<Record<string, number>> {
+  return (await readQuota()).byKey;
 }
 
 /** Topics already made for a submodule (any status) — direct tree lookup, no scan. */
@@ -165,6 +185,7 @@ export type DraftInfo = {
   slug: string;
   hasVideo: boolean;
   hasThumbnail: boolean;
+  hasCaptions: boolean;
   videoBytes: number;
   savedAt: string;
   format: string;
@@ -196,11 +217,13 @@ export async function listDrafts(): Promise<DraftInfo[]> {
         const meta = (raw.meta ?? {}) as Record<string, unknown>;
         const videoStat = await fs.stat(path.join(dir, "video.webm")).catch(() => null);
         const thumbStat = await fs.stat(path.join(dir, "thumbnail.png")).catch(() => null);
+        const captionStat = await fs.stat(path.join(dir, "captions.srt")).catch(() => null);
         const entry = history.find((h) => h.slug === slug);
         return {
           slug,
           hasVideo: Boolean(videoStat),
           hasThumbnail: Boolean(thumbStat),
+          hasCaptions: Boolean(captionStat),
           videoBytes: videoStat?.size ?? 0,
           savedAt: videoStat?.mtime.toISOString() ?? "",
           format: String(raw.format ?? "short"),
@@ -228,7 +251,7 @@ export async function deleteDraft(slug: string): Promise<void> {
   await fs.rm(path.join(VIDEOS_DIR, slug), { recursive: true, force: true });
 }
 
-export function draftFilePath(slug: string, name: "video.webm" | "thumbnail.png" | "script.json"): string {
+export function draftFilePath(slug: string, name: "video.webm" | "thumbnail.png" | "script.json" | "captions.srt"): string {
   return path.join(VIDEOS_DIR, slug, name);
 }
 

@@ -5,14 +5,6 @@
       "System Design": {
         "Design Patterns": [
           {
-            "date": "2026-07-10",
-            "topic": "The Strategy Pattern: Replacing complex If-Else chains",
-            "title": "Stop Using If-Else: Master the Strategy Pattern",
-            "format": "long",
-            "slug": "2026-07-10-10-57-long-the-strategy-pattern-replacing-complex-if-else-chains",
-            "status": "draft"
-          },
-          {
             "date": "2026-07-15",
             "topic": "The Singleton Pattern: Why global state is a trap",
             "title": "The Singleton Pattern: Why Global State is a Dangerous Trap",
@@ -33,137 +25,80 @@
             "videoId": "6rIbezK5xbw"
           }
         ],
-        "Caching & Queues": [
-          {
-            "date": "2026-07-13",
-            "topic": "Caching & Queues: How Redis makes apps 100x faster",
-            "title": "Caching and Queues: How Redis Makes Applications 100x Faster",
-            "format": "long",
-            "slug": "2026-07-13-13-40-long-caching-queues-how-redis-makes-apps-100x-faster",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "Caching & Queues: How Redis makes apps 100x faster",
-            "title": "Redis Caching: How to make your database 100x faster",
-            "format": "long",
-            "slug": "2026-07-13-13-55-long-caching-queues-how-redis-makes-apps-100x-faster",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "Caching & Queues: How Redis makes apps 100x faster",
-            "title": "Caching and Queues: How Redis Makes Applications 100x Faster",
-            "format": "long",
-            "slug": "2026-07-13-14-34-long-caching-queues-how-redis-makes-apps-100x-faster",
-            "status": "draft"
-          }
-        ]
+        "Caching & Queues": [],
+        "Web Architecture": []
       },
       "CS Fundamentals": {
-        "Networking & the Internet": []
+        "Networking & the Internet": [],
+        "Operating Systems": [
+          {
+            "date": "2026-07-18",
+            "topic": "Kernel Mode vs User Mode: The Privilege Boundary That Protects Your Computer",
+            "title": "Kernel Mode vs User Mode: How CPUs Protect Your System #Shorts",
+            "format": "short",
+            "slug": "2026-07-18-16-50-short-kernel-mode-vs-user-mode-the-privilege-boundary-that-protect",
+            "status": "uploaded",
+            "videoId": "Zx64ApWTRwg"
+          },
+          {
+            "date": "2026-07-19",
+            "topic": "Why Your Program Can't Just Talk to the Hardware",
+            "title": "Why Your Code Cannot Access Hardware Directly #Shorts",
+            "format": "short",
+            "slug": "2026-07-19-10-02-short-why-your-program-can-t-just-talk-to-the-hardware",
+            "status": "uploaded",
+            "videoId": "5MJl8neC60w"
+          }
+        ]
       },
       "Frontend": {
         "JavaScript": [
           {
-            "date": "2026-07-13",
+            "date": "2026-07-23",
             "topic": "The prototype chain: how objects find their methods",
             "title": "Your object doesn't own its methods — JS prototypes #Shorts",
             "format": "short",
-            "slug": "2026-07-13-12-05-short-the-prototype-chain-how-objects-find-their-methods",
+            "slug": "2026-07-23-17-01-short-the-prototype-chain-how-objects-find-their-methods",
             "status": "draft"
           },
           {
-            "date": "2026-07-13",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "date": "2026-07-24",
+            "topic": "Closures: How functions remember their environment",
+            "title": "JavaScript Closures: Why var vs let Matters #Shorts",
             "format": "short",
-            "slug": "2026-07-13-12-11-short-the-prototype-chain-how-objects-find-their-methods",
+            "slug": "2026-07-24-18-19-short-closures-how-functions-remember-their-environment",
             "status": "draft"
           },
           {
-            "date": "2026-07-13",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "date": "2026-07-24",
+            "topic": "Closures: How functions remember their environment",
+            "title": "JavaScript Closures: How Functions Remember #Shorts",
             "format": "short",
-            "slug": "2026-07-13-12-23-short-the-prototype-chain-how-objects-find-their-methods",
+            "slug": "2026-07-24-18-22-short-closures-how-functions-remember-their-environment",
             "status": "draft"
           },
           {
-            "date": "2026-07-13",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
+            "date": "2026-07-24",
+            "topic": "Closures: How functions remember their environment",
+            "title": "JavaScript Closures: How Functions Remember Their Scope #Shorts",
             "format": "short",
-            "slug": "2026-07-13-12-37-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-51-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-59-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-14",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-14-12-19-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-14",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-14-12-58-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-14",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-14-13-42-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-14",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-14-13-47-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-15",
-            "topic": "The prototype chain: how objects find their methods",
-            "title": "Your object doesn't own its methods — JS prototypes #Shorts",
-            "format": "short",
-            "slug": "2026-07-15-08-02-short-the-prototype-chain-how-objects-find-their-methods",
-            "status": "draft"
+            "slug": "2026-07-24-18-27-short-closures-how-functions-remember-their-environment",
+            "status": "uploaded",
+            "videoId": "vAN6wpuo8PQ"
           }
         ]
       },
       "Database": {
-        "Indexing & Performance": [
+        "Indexing & Performance": [],
+        "SQL": [
           {
-            "date": "2026-07-13",
-            "topic": "Composite Indexes: The art of order",
-            "title": "Composite Index Column Order: The Performance Mistake #Shorts",
+            "date": "2026-07-16",
+            "topic": "Why Databases Store Data in Tables, Not Files",
+            "title": "Why Databases Use Tables Instead of Files #Shorts",
             "format": "short",
-            "slug": "2026-07-13-12-14-short-composite-indexes-the-art-of-order",
-            "status": "draft"
+            "slug": "2026-07-16-18-13-short-why-databases-store-data-in-tables-not-files",
+            "status": "uploaded",
+            "videoId": "GSOUlpQvU3E"
           }
         ]
       },
@@ -177,8 +112,20 @@
             "slug": "2026-07-14-04-59-short-two-pointer-patterns-how-to-solve-array-problems-faster",
             "status": "uploaded",
             "videoId": "OEqEsREA7Io"
+          },
+          {
+            "date": "2026-07-19",
+            "topic": "Kadane’s Algorithm: the maximum subarray insight",
+            "title": "Kadane's Algorithm: How to Solve the Maximum Subarray Problem Efficiently",
+            "format": "long",
+            "slug": "2026-07-19-04-38-long-kadane-s-algorithm-the-maximum-subarray-insight",
+            "status": "uploaded",
+            "videoId": "SgaAxjMQFPU"
           }
         ]
+      },
+      "Engine": {
+        "Scene kinds": []
       }
     },
     "Money & Finance": {
@@ -186,16 +133,7 @@
         "Power of Compounding": []
       },
       "Psychology of Money": {
-        "Spending Traps": [
-          {
-            "date": "2026-07-13",
-            "topic": "Lifestyle Inflation: How your salary hike keeps you broke",
-            "title": "Lifestyle Inflation: Why your salary hike keeps you broke #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-48-short-lifestyle-inflation-how-your-salary-hike-keeps-you-broke",
-            "status": "draft"
-          }
-        ]
+        "Spending Traps": []
       }
     },
     "Psychology & the Mind": {
@@ -203,39 +141,32 @@
         "Anchoring & Framing": []
       },
       "Habits & Motivation": {
-        "Dopamine & Rewards": [
-          {
-            "date": "2026-07-13",
-            "topic": "Variable Rewards: the psychological trick behind every slot machine",
-            "title": "Variable Rewards: How Apps Use Slot Machine Psychology #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-07-short-variable-rewards-the-psychological-trick-behind-every-slot-m",
-            "status": "draft"
-          }
-        ]
+        "Dopamine & Rewards": []
       }
     },
     "History": {
       "Medieval India": {
-        "Vijayanagara Empire": [
-          {
-            "date": "2026-07-13",
-            "topic": "Why Hampi fell: The mystery of the Battle of Talikota",
-            "title": "Why the Vijayanagara Empire Fell: The Battle of Talikota #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-20-short-why-hampi-fell-the-mystery-of-the-battle-of-talikota",
-            "status": "draft"
-          }
-        ]
+        "Vijayanagara Empire": []
       },
       "Modern India": {
-        "Freedom Struggle": [
+        "Freedom Struggle": []
+      },
+      "Ancient India": {
+        "Indus Valley Civilisation": [
           {
-            "date": "2026-07-13",
-            "topic": "The Freedom Struggle: How 1857 changed India forever",
-            "title": "The 1857 Revolt: How a Sepoy Mutiny Actually Changed India Forever",
-            "format": "long",
-            "slug": "2026-07-13-14-14-long-the-freedom-struggle-how-1857-changed-india-forever",
+            "date": "2026-07-26",
+            "topic": "The Dancing Girl paradox: What bronze metallurgy reveals about Harappan society",
+            "title": "Indus Valley Dancing Girl: The Bronze Paradox #Shorts",
+            "format": "short",
+            "slug": "2026-07-26-10-50-short-the-dancing-girl-paradox-what-bronze-metallurgy-reveals-abou",
+            "status": "draft"
+          },
+          {
+            "date": "2026-07-26",
+            "topic": "The mystery of the seals: Why we cannot read Indus script",
+            "title": "Indus Script: Why we cannot read these ancient seals #Shorts",
+            "format": "short",
+            "slug": "2026-07-26-12-04-short-the-mystery-of-the-seals-why-we-cannot-read-indus-script",
             "status": "draft"
           }
         ]
@@ -243,102 +174,27 @@
     },
     "Geography": {
       "Earth in Action": {
-        "Volcanoes & Earthquakes": [
-          {
-            "date": "2026-07-13",
-            "topic": "The Ring of Fire: Why 75% of volcanoes are here",
-            "title": "The Ring of Fire: Why 75% of Volcanoes Are Here #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-26-short-the-ring-of-fire-why-75-of-volcanoes-are-here",
-            "status": "draft"
-          }
-        ]
+        "Volcanoes & Earthquakes": []
+      },
+      "India — Physical": {
+        "Mountains & Plateaus": []
       }
     },
     "Math & Aptitude": {
       "Arithmetic": {
-        "Percentages": [
-          {
-            "date": "2026-07-13",
-            "topic": "Successive percentage changes: The mistake everyone makes",
-            "title": "Successive Percentage Change: The Common Mistake #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-33-short-successive-percentage-changes-the-mistake-everyone-makes",
-            "status": "draft"
-          }
-        ],
-        "Time, Work & Speed": [
-          {
-            "date": "2026-07-13",
-            "topic": "Average Speed: Why the simple average is wrong",
-            "title": "Average Speed: Why the simple average is wrong #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-16-29-short-average-speed-why-the-simple-average-is-wrong",
-            "status": "draft"
-          }
-        ]
+        "Percentages": [],
+        "Time, Work & Speed": []
       }
     },
     "Science": {
       "How Things Work": {
-        "Flight & Vehicles": [
-          {
-            "date": "2026-07-13",
-            "topic": "The Turbulence Myth: What happens when planes hit bumps",
-            "title": "Why Turbulence Is Not an Air Pocket #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-43-short-the-turbulence-myth-what-happens-when-planes-hit-bumps",
-            "status": "draft"
-          }
-        ]
+        "Flight & Vehicles": []
       }
     },
     "English & Communication": {
       "Vocabulary": {
-        "Power Words": [
-          {
-            "date": "2026-07-13",
-            "topic": "Stop saying 'Very': Use these precise adjectives",
-            "title": "Stop saying Very: Use these precise Power Words #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-54-short-stop-saying-very-use-these-precise-adjectives",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "Stop saying 'Very': Use these precise adjectives",
-            "title": "Stop Saying Very: Use These 3 Precise Adjectives #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-12-59-short-stop-saying-very-use-these-precise-adjectives",
-            "status": "draft"
-          }
-        ],
-        "Idioms & Phrases": [
-          {
-            "date": "2026-07-13",
-            "topic": "The 'Elephant in the room': Idioms for complex situations",
-            "title": "The Elephant in the Room: How to use it correctly #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-15-16-short-the-elephant-in-the-room-idioms-for-complex-situations",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "The Elephant in the Room: How to use it correctly",
-            "title": "The Elephant in the Room: Stop using it wrong #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-15-37-short-the-elephant-in-the-room-how-to-use-it-correctly",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-15",
-            "topic": "Stop saying 'doing full enjoy': Correcting common Indian-English idioms",
-            "title": "Stop Saying Doing Full Enjoy: Correct Indian English Idioms #Shorts",
-            "format": "short",
-            "slug": "2026-07-15-03-48-short-stop-saying-doing-full-enjoy-correcting-common-indian-englis",
-            "status": "draft"
-          }
-        ]
+        "Power Words": [],
+        "Idioms & Phrases": []
       },
       "Spoken English": {
         "Daily Conversations": [
@@ -377,22 +233,69 @@
             "slug": "2026-07-15-03-42-short-agreeing-politely-stop-saying-yes-to-everything",
             "status": "uploaded",
             "videoId": "aWfF2YciPjI"
+          },
+          {
+            "date": "2026-07-16",
+            "topic": "Disagreeing without conflict: the 'Yes, but' softening technique",
+            "title": "Disagreeing politely: The Yes But technique for work #Shorts",
+            "format": "short",
+            "slug": "2026-07-16-18-28-short-disagreeing-without-conflict-the-yes-but-softening-technique",
+            "status": "uploaded",
+            "videoId": "5dnyyHXos2g"
+          },
+          {
+            "date": "2026-07-18",
+            "topic": "Giving opinions: the 'I feel' vs 'I think' trap",
+            "title": "I think vs I feel: How to sound more confident in English #Shorts",
+            "format": "short",
+            "slug": "2026-07-18-16-10-short-giving-opinions-the-i-feel-vs-i-think-trap",
+            "status": "uploaded",
+            "videoId": "UmUyowOen9E"
+          },
+          {
+            "date": "2026-07-19",
+            "topic": "Shopping for clothes: how to ask for a different size",
+            "title": "Ask for a Different Size: The Polite Way #Shorts",
+            "format": "short",
+            "slug": "2026-07-19-04-12-short-shopping-for-clothes-how-to-ask-for-a-different-size",
+            "status": "uploaded",
+            "videoId": "10pQCOfsD5I"
+          },
+          {
+            "date": "2026-07-24",
+            "topic": "Polite requests: the 'Could you' vs 'Can you' difference",
+            "title": "Could you vs Can you: Stop sounding bossy at work #Shorts",
+            "format": "short",
+            "slug": "2026-07-24-18-05-short-polite-requests-the-could-you-vs-can-you-difference",
+            "status": "uploaded",
+            "videoId": "VNPKR-TZkoI"
+          }
+        ],
+        "Interview English": [
+          {
+            "date": "2026-07-20",
+            "topic": "Tell Me About Yourself: the 3-part professional formula",
+            "title": "Tell Me About Yourself: The 3-Sentence Formula #Shorts",
+            "format": "short",
+            "slug": "2026-07-20-18-07-short-tell-me-about-yourself-the-3-part-professional-formula",
+            "status": "uploaded",
+            "videoId": "8ufNZHlNm90"
+          },
+          {
+            "date": "2026-07-22",
+            "topic": "Why 'What are your weaknesses?': the trap of being too honest",
+            "title": "The Weakness Question is a Trap! Try the Growth Pivot #Shorts",
+            "format": "short",
+            "slug": "2026-07-22-16-32-short-why-what-are-your-weaknesses-the-trap-of-being-too-honest",
+            "status": "uploaded",
+            "videoId": "GvX197THydM"
           }
         ]
       }
     },
     "GK & Amazing Facts": {
       "How the World Runs": {
-        "Shipping & Trade": [
-          {
-            "date": "2026-07-13",
-            "topic": "Flags of convenience: why every ship is registered in Panama",
-            "title": "Why ships use Flags of Convenience: Panama vs Home Country #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-04-short-flags-of-convenience-why-every-ship-is-registered-in-panama",
-            "status": "draft"
-          }
-        ]
+        "Shipping & Trade": []
       },
       "India GK": {
         "Constitution & Polity": [
@@ -421,88 +324,27 @@
     },
     "Business & Startups": {
       "Business Models": {
-        "How X Makes Money": [
-          {
-            "date": "2026-07-13",
-            "topic": "Jio's Data Strategy: Why they gave away the internet",
-            "title": "Why Jio Gave Away Free Internet: The Ecosystem Strategy #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-11-short-jio-s-data-strategy-why-they-gave-away-the-internet",
-            "status": "draft"
-          }
-        ]
+        "How X Makes Money": []
       }
     },
     "Health & Body": {
       "How Your Body Works": {
-        "Sleep": [
-          {
-            "date": "2026-07-13",
-            "topic": "The caffeine trap: how adenosine receptors lie",
-            "title": "Why Caffeine Actually Makes You Tired: The Adenosine Trap #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-15-short-the-caffeine-trap-how-adenosine-receptors-lie",
-            "status": "draft"
-          }
-        ]
+        "Sleep": []
       }
     },
     "Philosophy & Big Ideas": {
       "Thought Experiments": {
-        "Identity & the Ship of Theseus": [
-          {
-            "date": "2026-07-13",
-            "topic": "The Teleporter Problem: Would you survive digital teleportation?",
-            "title": "Would YOU survive digital teleportation? #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-19-short-the-teleporter-problem-would-you-survive-digital-teleportati",
-            "status": "draft"
-          }
-        ]
+        "Identity & the Ship of Theseus": []
       }
     },
     "Life Skills & Productivity": {
       "Learning How to Learn": {
-        "Memory Techniques": [
-          {
-            "date": "2026-07-13",
-            "topic": "The Memory Palace: Building a mental filing cabinet",
-            "title": "The Memory Palace: How to Build Your Mental Filing Cabinet #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-21-short-the-memory-palace-building-a-mental-filing-cabinet",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "The Memory Palace: Building a mental filing cabinet",
-            "title": "The Memory Palace: How to Actually Remember Everything #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-24-short-the-memory-palace-building-a-mental-filing-cabinet",
-            "status": "draft"
-          }
-        ]
+        "Memory Techniques": []
       }
     },
     "Mythology & Epics": {
       "World Mythology": {
-        "Norse": [
-          {
-            "date": "2026-07-13",
-            "topic": "The Viking Afterlife: Why Valhalla is not heaven",
-            "title": "Why Valhalla Is Not Heaven: The Viking Afterlife Explained #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-27-short-the-viking-afterlife-why-valhalla-is-not-heaven",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-13",
-            "topic": "The Viking Afterlife: Why Valhalla is not heaven",
-            "title": "Why Valhalla is Not Actually Heaven #Shorts",
-            "format": "short",
-            "slug": "2026-07-13-13-31-short-the-viking-afterlife-why-valhalla-is-not-heaven",
-            "status": "draft"
-          }
-        ]
+        "Norse": []
       }
     },
     "Polity & Governance": {
@@ -513,17 +355,22 @@
             "topic": "Why Governors have discretionary powers: The Article 163 nuance",
             "title": "Governor Discretionary Powers: Why Article 163 Matters #Shorts",
             "format": "short",
-            "slug": "2026-07-14-13-33-short-why-governors-have-discretionary-powers-the-article-163-nuan",
-            "status": "draft"
-          },
-          {
-            "date": "2026-07-14",
-            "topic": "Why Governors have discretionary powers: The Article 163 nuance",
-            "title": "Governor Discretionary Powers: Why Article 163 Matters #Shorts",
-            "format": "short",
             "slug": "2026-07-14-13-51-short-why-governors-have-discretionary-powers-the-article-163-nuan",
             "status": "uploaded",
             "videoId": "f5iS_23MYes"
+          }
+        ]
+      },
+      "Union Government": {
+        "Parliament": [
+          {
+            "date": "2026-07-19",
+            "topic": "A Bill's Journey: the step-by-step legislative life cycle",
+            "title": "How a Bill Becomes Law: The Legislative Process in the Indian Parliament",
+            "format": "long",
+            "slug": "2026-07-19-06-01-long-a-bill-s-journey-the-step-by-step-legislative-life-cycle",
+            "status": "uploaded",
+            "videoId": "6wLbfd8zdmI"
           }
         ]
       }
@@ -539,8 +386,23 @@
             "slug": "2026-07-15-16-40-short-gdp-vs-gnp-what-is-net-factor-income-from-abroad",
             "status": "uploaded",
             "videoId": "w6mMO0LK43o"
+          },
+          {
+            "date": "2026-07-16",
+            "topic": "MoSPI: The Ministry That Calculates India's GDP",
+            "title": "India's GDP Calculation: How MoSPI Actually Works #Shorts",
+            "format": "short",
+            "slug": "2026-07-16-18-58-short-mospi-the-ministry-that-calculates-india-s-gdp",
+            "status": "uploaded",
+            "videoId": "BcV_8apAp9E"
           }
         ]
+      },
+      "Engine": {
+        "Scene kinds": []
+      },
+      "Money & Banking": {
+        "RBI & Its Tools": []
       }
     }
   }

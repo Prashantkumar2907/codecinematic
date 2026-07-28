@@ -1,0 +1,115 @@
+import type { Subject } from "@/lib/state";
+import { SUBJECT_PLAYBOOKS } from "@/lib/prompt";
+
+/** Sections a script is graded on, benchmarked against the best channels in the niche. */
+export const RATING_SECTIONS = [
+  "hook_intro",
+  "structure_flow",
+  "depth_accuracy",
+  "engagement_voice",
+  "visual_variety",
+  "ending_cta",
+] as const;
+export type RatingSection = (typeof RATING_SECTIONS)[number];
+
+export type SectionRating = {
+  score: number;
+  evidence: string;
+  issues: { where: string; problem: string; fix: string }[];
+};
+
+export type ScriptRating = {
+  sections: Record<RatingSection, SectionRating>;
+  overall: number;
+  worst: number;
+  benchmark: string;
+};
+
+const BENCHMARKS: Record<string, string> = {
+  coding: "Fireship, NeetCode, ByteByteGo, 3Blue1Brown — channels whose coding explainers earn millions of views",
+  english: "the most-watched English-learning channels (English with Lucy, mmmEnglish) — warm, example-first, zero textbook stiffness",
+  history: "OverSimplified, Kings and Generals, and India's top UPSC history educators — story-first, date-precise",
+  geography: "Atlas Pro, RealLifeLore, and India's top UPSC geography educators — map-first, mechanism-driven",
+  polity: "India's most-subscribed polity educators (Laxmikanth-grade accuracy) with the clarity of a great explainer channel",
+  economy: "Economics Explained and India's top UPSC economy educators — number-anchored, jargon translated in the same breath",
+  environment: "India's top UPSC environment educators crossed with Veritasium-style curiosity — species/act/convention precision",
+  artculture: "India's best art & culture educators — visually evocative, site- and dynasty-precise",
+};
+
+export function ratingBenchmark(subjectId: string): string {
+  return BENCHMARKS[subjectId] ?? "the best educational channels in this niche (1M+ subscriber, top-retention creators)";
+}
+
+export function buildRatingPrompt(scriptJson: string, opts: {
+  subject: Subject;
+  format: "short" | "long";
+  topic: string;
+  lang?: "en" | "hi";
+}): string {
+  const { subject, format, topic, lang } = opts;
+  const playbook = SUBJECT_PLAYBOOKS[subject.id] ?? "";
+  const benchmark = ratingBenchmark(subject.id);
+  return `You are a ruthless YouTube content strategist. Grade this ${format} video script on "${topic}"
+for a ${subject.label} channel against the bar of the very best in the niche: ${benchmark}.
+A 9 means "would stand proudly next to their best work"; a 10 means "better than most of it".
+Most first drafts deserve 6-8. Do not grade on a curve and do not reward mere competence.
+${lang === "hi" ? "The script is in Hindi — apply the same bars to natural spoken Hindi." : ""}
+${playbook ? `Subject playbook the script should honour:\n${playbook}\n` : ""}
+Grade each section 1-10 with specific evidence from the script:
+
+1. hook_intro — Do the first beats open a specific curiosity loop (no "Have you ever", no greeting,
+   no definition-first)? Within two scenes, does a spoken beat say what the thing IS in plain words
+   AND why the viewer should care? Would the ${format === "short" ? "first 2 seconds survive the swipe" : "first 30 seconds survive the back button"}?
+2. structure_flow — Clear act structure with signposts; every scene ADVANCES (no restating a prior
+   scene in a new costume); section cards deliver what they promise; difficulty ladders smoothly.
+3. depth_accuracy — Real, subject-grade specifics (dates, article numbers, commands, ₹ figures,
+   latencies); facts correct as far as you can verify; one concrete worked example threads through;
+   no invented precision, no hand-waving where a specific belongs.
+4. engagement_voice — A creator talking, not a textbook: concrete images in nearly every beat, varied
+   sentence rhythm, no academic register ("utilize", "furthermore"), no formulaic transitions;
+   moments engineered for retention (pattern breaks, "wait, what?" turns, payoffs).
+5. visual_variety — The scene kinds fit and vary (not a wall of bullet scenes); beats map to visual
+   steps a viewer can follow; diagrams/charts/tables used where they beat words.
+6. ending_cta — A payoff/recap beat lands the promise; the final question is answerable from the
+   video and genuinely argue-worthy (drives comments); nothing after the question scene.
+
+For EVERY section scoring below 9, list 1-3 issues with surgically concrete fixes ("replace scene
+hook-1's first beat with ...", not "make it more engaging"). Fixes must be applicable directly by a
+scriptwriter without further judgment.
+
+Return STRICT JSON only:
+{"sections": {"hook_intro": {"score": n, "evidence": "...", "issues": [{"where": "scene id or 'meta'", "problem": "...", "fix": "..."}]},
+  "structure_flow": {...}, "depth_accuracy": {...}, "engagement_voice": {...}, "visual_variety": {...}, "ending_cta": {...}}}
+
+Script to grade:
+${scriptJson}`;
+}
+
+/** Coerce the model's verdict into a well-formed ScriptRating (clamped scores, arrays present). */
+export function normalizeRating(raw: unknown, subjectId: string): ScriptRating | null {
+  if (!raw || typeof raw !== "object") return null;
+  const sectionsIn = (raw as { sections?: unknown }).sections;
+  if (!sectionsIn || typeof sectionsIn !== "object") return null;
+  const sections = {} as Record<RatingSection, SectionRating>;
+  for (const name of RATING_SECTIONS) {
+    const s = (sectionsIn as Record<string, unknown>)[name];
+    if (!s || typeof s !== "object") return null;
+    const scoreRaw = Number((s as { score?: unknown }).score);
+    const score = Number.isFinite(scoreRaw) ? Math.min(10, Math.max(1, scoreRaw)) : 1;
+    const issuesRaw = (s as { issues?: unknown }).issues;
+    const issues = Array.isArray(issuesRaw)
+      ? issuesRaw
+          .filter((i): i is { where?: unknown; problem?: unknown; fix?: unknown } => !!i && typeof i === "object")
+          .map((i) => ({ where: String(i.where ?? "meta"), problem: String(i.problem ?? ""), fix: String(i.fix ?? "") }))
+          .filter((i) => i.problem || i.fix)
+      : [];
+    sections[name] = { score, evidence: String((s as { evidence?: unknown }).evidence ?? ""), issues };
+  }
+  const scores = RATING_SECTIONS.map((n) => sections[n].score);
+  return {
+    sections,
+    overall: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10,
+    worst: Math.min(...scores),
+    benchmark: ratingBenchmark(subjectId),
+  };
+}

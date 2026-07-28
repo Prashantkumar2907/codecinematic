@@ -15,13 +15,67 @@ export const THEME = {
   warn: "#facc15",
 } as const;
 
-export const FONT_SANS = "-apple-system, 'SF Pro Display', 'Segoe UI', Roboto, ui-sans-serif, sans-serif";
+export const FONT_SANS = "'Plus Jakarta Sans', -apple-system, 'SF Pro Display', 'Segoe UI', Roboto, ui-sans-serif, sans-serif";
 export const FONT_MONO = "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace";
 
 /** #rrggbb -> rgba(r,g,b,a). Lets one accent hex drive every derived glow/tint. */
 export function rgba(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+/** Lighten (amt>0 toward white) or darken (amt<0 toward black) a #rrggbb.
+ *  Used to shade the lit/shadowed faces of pseudo-3D boxes so a single accent
+ *  hex yields a consistent top/front/side family. */
+export function shade(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const target = amt < 0 ? 0 : 255;
+  const p = Math.min(1, Math.abs(amt));
+  const mix = (c: number) => Math.round((target - c) * p + c);
+  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
+
+/**
+ * Pseudo-3D extruded rounded box: a front face plus a lit top bevel and a
+ * shadowed right bevel, giving Canvas shapes real depth (the ByteByteGo look)
+ * without WebGL. `depth` is the extrusion offset in px; faces are shaded from
+ * `face`. Draw order is back→front so it composites correctly.
+ */
+export function isoBox(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  depth: number,
+  face: string,
+  r = Math.min(w, h) * 0.12
+) {
+  // Right (shadow) face.
+  ctx.beginPath();
+  ctx.moveTo(x + w, y + r);
+  ctx.lineTo(x + w + depth, y + r + depth * 0.5);
+  ctx.lineTo(x + w + depth, y + h - r + depth * 0.5);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.closePath();
+  ctx.fillStyle = shade(face, -0.42);
+  ctx.fill();
+  // Top (lit) face.
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.lineTo(x + w - r + depth, y + depth * 0.5);
+  ctx.lineTo(x + r + depth, y + depth * 0.5);
+  ctx.closePath();
+  ctx.fillStyle = shade(face, 0.22);
+  ctx.fill();
+  // Front face with a soft vertical gradient.
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, shade(face, 0.08));
+  g.addColorStop(1, shade(face, -0.16));
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = g;
+  ctx.fill();
 }
 
 /**
@@ -138,6 +192,23 @@ export const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 /** Progress of a sub-animation that starts at `from` and lasts `len` within scene progress p (all 0-1). */
 export function sub(p: number, from: number, len: number): number {
   return clamp01((p - from) / len);
+}
+
+/**
+ * Absolute-time ENTRANCE progress: 0→1 over `durMs`, starting `delayMs` into the
+ * scene. Use this (not sub(env.p, …)) for panel/title/frame entrances so content
+ * is on screen within a fixed few-hundred ms regardless of scene length — a
+ * scene-fraction entrance on a 40s scene leaves the viewer staring at emptiness
+ * while the first beat's narration already plays.
+ */
+export function enterT(env: { elapsedMs: number }, durMs = 380, delayMs = 0): number {
+  return clamp01((env.elapsedMs - delayMs) / Math.max(1, durMs));
+}
+
+/** Gentle deterministic 0-1 oscillator for idle "life" after reveal (breathing
+ *  glow, soft bob). Same elapsedMs → same value, so re-renders are identical. */
+export function idle(env: { elapsedMs: number }, periodMs = 2400, phase = 0): number {
+  return 0.5 + 0.5 * Math.sin((env.elapsedMs / periodMs) * Math.PI * 2 + phase);
 }
 
 export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -356,6 +427,62 @@ export function pointAlongPolyline(pts: { x: number; y: number }[], f: number): 
   return pts[pts.length - 1];
 }
 
+/** Insert rounded corners at each interior vertex of a polyline (quadratic
+ *  fillet), returning a denser polyline. Reusable for elbow connectors and any
+ *  right-angle routing that should read as ByteByteGo-clean, not sharp. */
+export function roundedCorners(pts: { x: number; y: number }[], r: number, seg = 6): { x: number; y: number }[] {
+  if (pts.length < 3) return pts.slice();
+  const out: { x: number; y: number }[] = [pts[0]];
+  const unit = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    return { x: dx / len, y: dy / len };
+  };
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i], a = pts[i - 1], b = pts[i + 1];
+    const da = Math.min(r, Math.hypot(a.x - p.x, a.y - p.y) / 2);
+    const db = Math.min(r, Math.hypot(b.x - p.x, b.y - p.y) / 2);
+    const va = unit(p, a), vb = unit(p, b);
+    const c1 = { x: p.x + va.x * da, y: p.y + va.y * da };
+    const c2 = { x: p.x + vb.x * db, y: p.y + vb.y * db };
+    out.push(c1);
+    for (let s = 1; s <= seg; s++) {
+      const t = s / seg, u = 1 - t;
+      out.push({ x: u * u * c1.x + 2 * u * t * p.x + t * t * c2.x, y: u * u * c1.y + 2 * u * t * p.y + t * t * c2.y });
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+/** Animated packets flowing along a polyline — the canonical directional-flow
+ *  motion for every connector/edge/pipe/wire. Deterministic from elapsedMs;
+ *  dots fade in/out at the ends so the loop is seamless. */
+export function flowDots(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  env: { elapsedMs: number },
+  opts: { count?: number; speedMs?: number; r: number; color: string; glow?: boolean }
+) {
+  const { count = 3, speedMs = 2000, r, color, glow = true } = opts;
+  if (pts.length < 2) return;
+  ctx.save();
+  for (let i = 0; i < count; i++) {
+    const f = ((env.elapsedMs / speedMs) + i / count) % 1;
+    const p = pointAlongPolyline(pts, f);
+    const fade = Math.sin(clamp01(f) * Math.PI); // 0 at ends, 1 mid
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = color;
+    if (glow) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = r * 2.4;
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 /** Stroke a polyline partially (0-1), for draw-on arrow animation. */
 export function strokePolylineProgress(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], progress: number) {
   if (pts.length < 2 || progress <= 0) return { x: pts[0].x, y: pts[0].y, angle: 0, done: false };
@@ -390,3 +517,107 @@ export function strokePolylineProgress(ctx: CanvasRenderingContext2D, pts: { x: 
   ctx.stroke();
   return tip;
 }
+
+/** Animated pulsing ring around a focused node or marker pin. */
+export function glowRing(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  color: string,
+  env: { elapsedMs: number },
+  speedMs = 1800
+) {
+  const p = (env.elapsedMs % speedMs) / speedMs;
+  const radius = r + p * r * 1.5;
+  const alpha = (1 - p) * 0.7;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(color, alpha);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Eased smooth pulse multiplier (1.0 -> maxScale -> 1.0) for active beat elements. */
+export function smoothPulse(env: { elapsedMs: number }, periodMs = 1200, maxScale = 1.08): number {
+  const phase = (env.elapsedMs % periodMs) / periodMs;
+  return 1 + Math.sin(phase * Math.PI * 2) * (maxScale - 1);
+}
+
+/**
+ * Enhanced pseudo-3D card box with lit top face, right shadow face, and optional glowing border.
+ * Used across architecture diagrams (diagram, pipeline, statemachine, decision) to give nodes depth.
+ */
+export function isoBox3D(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  depth: number,
+  face: string,
+  glowColor?: string,
+  r = Math.min(w, h) * 0.14
+) {
+  // Glow shadow behind node if active
+  if (glowColor) {
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = depth * 2.5;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fillStyle = rgba(face, 0.2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Right (shadow) face
+  ctx.beginPath();
+  ctx.moveTo(x + w, y + r);
+  ctx.lineTo(x + w + depth, y + r + depth * 0.55);
+  ctx.lineTo(x + w + depth, y + h - r + depth * 0.55);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.closePath();
+  ctx.fillStyle = shade(face, -0.45);
+  ctx.fill();
+
+  // Top (lit) face
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.lineTo(x + w - r + depth, y + depth * 0.55);
+  ctx.lineTo(x + r + depth, y + depth * 0.55);
+  ctx.closePath();
+  ctx.fillStyle = shade(face, 0.25);
+  ctx.fill();
+
+  // Front face with gradient
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, shade(face, 0.1));
+  g.addColorStop(1, shade(face, -0.18));
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = glowColor ?? shade(face, 0.3);
+  ctx.lineWidth = glowColor ? 2 : 1.2;
+  ctx.stroke();
+}
+
+/**
+ * Transpose 12x12 grid coordinates automatically for 9:16 vertical shorts layout.
+ * Turns left-to-right horizontal flows into top-to-bottom vertical flows.
+ */
+export function autoLayoutGrid(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  isVertical: boolean
+): { gx: number; gy: number; gw: number; gh: number } {
+  if (!isVertical) return { gx: x, gy: y, gw: w, gh: h };
+  // Swap grid x & y axes for top-to-bottom flow in 9:16
+  return { gx: y, gy: x, gw: h, gh: w };
+}
+
+

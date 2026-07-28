@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
 /* Wireframe kit theme — ported 1:1 from the "DevStudio Wireframes" doc:
    paper surfaces, 1.8px ink borders, Shantell Sans body, Caveat notes. */
 :root {
@@ -124,11 +126,46 @@ a:focus-visible,
   letter-spacing: 0.02em;
 }
 
+.model-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-pick:first-of-type {
+  margin-left: auto;
+}
+
+.model-pick + .model-pick {
+  margin-left: 10px;
+}
+
+.model-pick-label {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.model-pick select {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink);
+  background: var(--card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
 .quota {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* when the model picker holds the auto-margin, the quota pill just trails it */
+.model-pick ~ .quota {
+  margin-left: 14px;
 }
 
 .quota-label {

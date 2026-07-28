@@ -7,6 +7,7 @@ const ALLOWED = {
   "video.webm": "video/webm",
   "thumbnail.png": "image/png",
   "script.json": "application/json",
+  "captions.srt": "application/x-subrip",
 } as const;
 
 const SLUG_RE = /^[a-z0-9-]+$/;

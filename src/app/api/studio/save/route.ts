@@ -36,6 +36,10 @@ export async function POST(req: Request) {
   if (thumbnail instanceof File) {
     await fs.writeFile(path.join(dir, "thumbnail.png"), Buffer.from(await thumbnail.arrayBuffer()));
   }
+  const captions = form.get("captions");
+  if (captions instanceof File) {
+    await fs.writeFile(path.join(dir, "captions.srt"), Buffer.from(await captions.arrayBuffer()));
+  }
 
   await appendHistory({
     date: new Date().toISOString().slice(0, 10),

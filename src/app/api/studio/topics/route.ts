@@ -8,6 +8,7 @@ const requestSchema = z.object({
   subject: z.string().min(1),
   module: z.string().min(1),
   submodule: z.string().min(1),
+  freeOnly: z.boolean().optional(),
 });
 
 const topicsSchema = z.object({
@@ -41,7 +42,8 @@ export async function POST(req: Request) {
         covered,
         siblingLabels,
       }),
-      "fast"
+      "fast",
+      parsed.data.freeOnly ? { freeOnly: parsed.data.freeOnly } : undefined
     );
     const topics = topicsSchema.safeParse(raw);
     if (!topics.success) {
