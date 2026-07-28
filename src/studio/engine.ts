@@ -47,9 +47,12 @@ const SHORT_SCENE_TAIL_MS = 450;
 const TRANSITION_MS = 420;
 const END_HOLD_MS = 600;
 /* Branded intro sting / outro end-card. Shorts get NO intro — the hook must own
- * second zero or the swipe is lost; both formats get a subscribe outro. */
+ * second zero or the swipe is lost — and no outro either: Shorts have no end
+ * screens and any non-content tail costs the loop. Long-form needs >= 5 s of
+ * tail or YouTube will not let an end screen (subscribe / next video / playlist)
+ * be attached at all, which is why this was 0 and drawOutro was unreachable. */
 const INTRO_MS_LONG = 900;
-const OUTRO_MS_LONG = 0;
+const OUTRO_MS_LONG = 5200;
 const OUTRO_MS_SHORT = 0;
 
 /** Intro/outro extents for a format — page.tsx uses this to offset SRT captions
@@ -141,7 +144,9 @@ async function scheduleNarration(
 }
 
 /** Quiet music bed under the narration; fades in/out with the video. */
-const MUSIC_GAIN = 0.05;
+/** ~-22 dBFS: audible under narration without ducking, which is out of scope.
+ *  0.05 was ~-26 dBFS — inaudible even in the gaps between beats. */
+const MUSIC_GAIN = 0.079;
 const MUSIC_FADE_IN_S = 0.8;
 const MUSIC_FADE_OUT_S = 1.5;
 
@@ -154,7 +159,13 @@ async function scheduleMusic(
 ) {
   try {
     const res = await fetch("/music.mp3");
-    if (!res.ok) return;
+    if (!res.ok) {
+      // There was no public/ directory at all, so this 404'd on every render and
+      // every video shipped as bare narration over silence — silently, because
+      // the failure is a no-op by design. Say so once per render instead.
+      console.warn("[engine] no public/music.mp3 — rendering narration over silence");
+      return;
+    }
     const buffer = await audioCtx.decodeAudioData(await res.arrayBuffer());
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
@@ -362,6 +373,45 @@ function activeCaption(scene: SceneScript["scenes"][number], timing: SceneTiming
   return { text, progress: clamp01((sceneElapsedMs - b.startMs) / Math.max(1, b.durationMs)) };
 }
 
+/** Lines of caption on screen at once. More than this and the lower third
+ *  starts eating the frame; the rest of the beat pages in behind it. */
+const CAPTION_LINES = 3;
+
+type CaptionPage = {
+  lines: string[];
+  /** Index, within the whole beat, of this page's first word. */
+  firstWord: number;
+  totalWords: number;
+  /** 0-1 through this page, for per-page entrance animations. */
+  localProgress: number;
+};
+
+/**
+ * The slice of a wrapped beat that is on screen at `progress`. Pages advance in
+ * proportion to their word count, so the page turns roughly when the narration
+ * reaches it — the same linear assumption karaoke already makes, which is the
+ * best available until edge-tts word timings land (see improvement_plan Phase 12a).
+ */
+function paginate(allLines: string[], perPage: number, progress: number): CaptionPage {
+  const wordsIn = (line: string) => line.split(/\s+/).filter(Boolean).length;
+  const totalWords = allLines.reduce((n, l) => n + wordsIn(l), 0);
+  if (allLines.length <= perPage || totalWords === 0) {
+    return { lines: allLines, firstWord: 0, totalWords, localProgress: progress };
+  }
+  const spoken = clamp01(progress) * totalWords;
+  let firstWord = 0;
+  for (let start = 0; start < allLines.length; start += perPage) {
+    const lines = allLines.slice(start, start + perPage);
+    const pageWords = lines.reduce((n, l) => n + wordsIn(l), 0);
+    const isLast = start + perPage >= allLines.length;
+    if (isLast || spoken < firstWord + pageWords) {
+      return { lines, firstWord, totalWords, localProgress: clamp01((spoken - firstWord) / pageWords) };
+    }
+    firstWord += pageWords;
+  }
+  return { lines: allLines.slice(0, perPage), firstWord: 0, totalWords, localProgress: progress };
+}
+
 /**
  * Burned-in captions from the spoken beat text, drawn in the lower third so muted
  * autoplay still reads. Three deterministic looks: karaoke (word-by-word fill),
@@ -415,7 +465,12 @@ function drawCaptions(
   ctx.save();
   ctx.font = `800 ${fontPx}px ${FONT_SANS}`;
   ctx.textBaseline = "middle";
-  const lines = wrapText(ctx, text, maxW).slice(0, 3);
+  // A beat may be 320 chars but only ~3 lines fit. Page through the wrap in step
+  // with the narration instead of `.slice(0, 3)`, which dropped the end of the
+  // sentence with no ellipsis and left karaoke's word index pointing past the
+  // last rendered word — the highlight vanished and the block froze "done".
+  const page = paginate(wrapText(ctx, text, maxW), CAPTION_LINES, progress);
+  const lines = page.lines;
   const blockH = lines.length * lineH;
   const bottomY = isShort ? h * 0.7 : h * 0.82;
   const centerAnchor = pos === "top" ? h * 0.18 : pos === "center" ? h * 0.5 : bottomY;
@@ -446,7 +501,7 @@ function drawCaptions(
   ctx.fill();
 
   if (style === "pop") {
-    const inP = easeInOutCubic(clamp01(progress / 0.18));
+    const inP = easeInOutCubic(clamp01(page.localProgress / 0.18));
     ctx.textAlign = "center";
     ctx.globalAlpha = inP;
     ctx.translate(cx, 0);
@@ -461,8 +516,9 @@ function drawCaptions(
   }
 
   // karaoke: fill words up to the spoken position; the current word glows accent.
-  const words = text.split(/\s+/).filter(Boolean);
-  const spoken = Math.floor(progress * words.length);
+  // `spoken` counts from the start of the whole beat, so it is rebased onto the
+  // page actually on screen.
+  const spoken = Math.floor(progress * page.totalWords) - page.firstWord;
   ctx.textAlign = "left";
   let wi = 0;
   for (let i = 0; i < lines.length; i++) {
@@ -473,7 +529,10 @@ function drawCaptions(
     for (const word of lineWords) {
       const done = wi < spoken;
       const current = wi === spoken;
-      ctx.fillStyle = current ? palette.accent : done ? THEME.text : rgba("#e6edf3", 0.45);
+      // Unspoken at 0.45 measured 4.0:1 — the words you are about to hear were
+      // the least readable thing on screen. 0.6 is 6.3:1, still well below the
+      // 16.7:1 of the words already spoken.
+      ctx.fillStyle = current ? palette.accent : done ? THEME.text : rgba("#e6edf3", 0.6);
       ctx.fillText(word + " ", x, y);
       x += ctx.measureText(word + " ").width;
       wi++;
@@ -518,6 +577,9 @@ export function runPlan(
   // both deterministic so a re-render of the same script looks identical.
   const motif = variantOf(`${plan.script.topic}|${plan.script.subject}`, BG_MOTIFS);
   const introVariant = variantOf(`intro:${plan.script.topic}|${plan.brand}`, 4);
+  // Each scene owns the transition it ARRIVES on, keyed by its own id so the
+  // choice is deterministic. Index 0 is intentionally never read: the first
+  // scene arrives out of the intro, not out of another scene.
   const transitions = plan.script.scenes.map((s) => variantOf(`tr:${s.id}`, 4));
   const { introMs, outroMs } = introOutroMs(plan.script.format);
   const contentMs = totalDurationMs(plan.timings);
@@ -639,41 +701,46 @@ export function runPlan(
 
       paintAt(ctx, idx, elapsed);
 
+      // The transition runs over the INCOMING scene's first frames: the outgoing
+      // scene is finished, so holding its last frame and clearing it away is
+      // correct, whereas the reverse — which this used to do — painted the
+      // incoming scene at p=0/elapsedMs=0 for the whole 420 ms and turned every
+      // scene boundary into a dissolve onto a frozen still.
       const timing = plan.timings[idx];
-      const untilEnd = timing.startMs + timing.durationMs - elapsed;
-      if (idx < sceneCount - 1 && untilEnd < TRANSITION_MS) {
-        const alpha = 1 - untilEnd / TRANSITION_MS;
-        const e = easeInOutCubic(alpha);
-        paintAt(sceneCtx, idx + 1, timing.startMs + timing.durationMs);
-        const mode = transitions[idx + 1];
+      const sinceStart = elapsed - timing.startMs;
+      if (idx > 0 && sinceStart < TRANSITION_MS) {
+        const e = easeInOutCubic(clamp01(sinceStart / TRANSITION_MS));
+        const prev = plan.timings[idx - 1];
+        paintAt(sceneCtx, idx - 1, prev.startMs + prev.durationMs);
+        const mode = transitions[idx];
         ctx.save();
         if (mode === 1) {
-          // push: the next scene slides in over the current one
-          ctx.drawImage(sceneCanvas, (1 - e) * width, 0);
+          // push: the outgoing scene slides off to the left
+          ctx.drawImage(sceneCanvas, -e * width, 0);
         } else if (mode === 2) {
-          // wipe: reveal left-to-right behind a soft accent edge
+          // wipe: the incoming scene is revealed left-to-right behind an accent edge
           ctx.beginPath();
-          ctx.rect(0, 0, width * e, height);
+          ctx.rect(width * e, 0, width * (1 - e), height);
           ctx.clip();
           ctx.drawImage(sceneCanvas, 0, 0);
           ctx.restore();
           ctx.save();
-          if (e < 1) {
+          if (e > 0) {
             ctx.fillStyle = palette.accentGlow;
             ctx.fillRect(width * e - 2, 0, 4, height);
           }
         } else if (mode === 3) {
-          // zoom-fade: next scene settles from 1.05x
-          const s = 1.05 - 0.05 * e;
-          ctx.globalAlpha = e * e;
+          // zoom-fade: the outgoing scene pushes past the lens to 1.05x as it goes
+          const s = 1 + 0.05 * e;
+          ctx.globalAlpha = 1 - e;
           ctx.translate(width / 2, height / 2);
           ctx.scale(s, s);
           ctx.translate(-width / 2, -height / 2);
           ctx.drawImage(sceneCanvas, 0, 0);
         } else {
-          // classic crossfade with a slight rise
-          ctx.globalAlpha = alpha * alpha;
-          ctx.drawImage(sceneCanvas, 0, (1 - alpha) * layout.unit * 0.4);
+          // classic crossfade with a slight sink
+          ctx.globalAlpha = 1 - e;
+          ctx.drawImage(sceneCanvas, 0, e * layout.unit * 0.4);
         }
         ctx.restore();
       }

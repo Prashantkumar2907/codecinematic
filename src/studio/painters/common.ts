@@ -10,7 +10,10 @@ export const THEME = {
   secondary: "#8b5cf6",
   text: "#e6edf3",
   textDim: "#94a3b8",
-  textFaint: "rgba(148,163,184,0.45)",
+  // 0.45 composited to 2.4:1 on the background — below the 4.5:1 floor and gone
+  // entirely after VP9 compression at phone size. 0.76 measures 4.67:1 while
+  // staying clearly subordinate to textDim's 7.4:1.
+  textFaint: "rgba(148,163,184,0.76)",
   good: "#4ade80",
   warn: "#facc15",
 } as const;
@@ -127,7 +130,10 @@ const SUBJECT_PALETTES: Record<string, Palette> = {
   "Mindset & Self-Growth": makePalette("#e879f9", "#34d399"),
   Economy: makePalette("#10b981", "#f59e0b"),
   "Environment & Ecology": makePalette("#22c55e", "#14b8a6"),
-  "Art & Culture": makePalette("#e11d48", "#f59e0b"),
+  // The only accent below the 4.5:1 floor: #e11d48 measured 4.06:1 as text and
+  // 4.09:1 behind a boxed caption. #ef4444 is 5.07:1 and moves away from
+  // Mythology's #f43f5e rather than onto it. Every other palette already passes.
+  "Art & Culture": makePalette("#ef4444", "#f59e0b"),
 };
 
 export function paletteForSubject(subjectLabel: string): Palette {

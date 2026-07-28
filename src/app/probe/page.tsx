@@ -12,6 +12,7 @@ import { ASPECTS, sceneBeats, type Scene, type SceneKind, type SceneScript } fro
 import { ALL_SCENE_KINDS, paintScene } from "@/studio/painters";
 import { drawBackground, makeLayout, paletteForSubject } from "@/studio/painters/common";
 import { resetThree3D } from "@/studio/painters/three3d";
+import { ensureStudioFonts } from "@/studio/fonts";
 
 const DEMOS: Record<string, SceneScript> = {
   "geometry": DEMO.DEMO_GEOMETRY,
@@ -189,14 +190,6 @@ function sceneDurationMs(entry: KindEntry): number {
   return MS_PER_BEAT * Math.max(sceneBeats(entry.scene).length, 1);
 }
 
-/** Google-font text metrics differ from the fallback, so never measure before it lands. */
-async function fontsReady() {
-  if (typeof document === "undefined" || !document.fonts) return;
-  const weights = [400, 500, 600, 700, 800, 900];
-  await Promise.all(weights.map((wt) => document.fonts.load(`${wt} 48px 'Plus Jakarta Sans'`)));
-  await document.fonts.ready;
-}
-
 function drawCellLabel(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, cellW: number) {
   const px = Math.max(10, Math.round(cellW * 0.038));
   ctx.save();
@@ -290,7 +283,7 @@ export default function Probe() {
 
     win.__PROBE_RENDER = async ({ kind, sceneId, p = 0.9, ms, aspect = "short" }) => {
       win.__PROBE_DONE = false;
-      await fontsReady();
+      await ensureStudioFonts();
       resetThree3D();
       const entry = lookup(kind, sceneId);
       const canvas = canvasRef.current!;
@@ -324,7 +317,7 @@ export default function Probe() {
      * almost certainly clipped. Measures rubric section 1 instead of eyeballing it.
      */
     win.__PROBE_EDGEBLEED = async ({ kind, sceneId, aspect = "short", ps = [0.5, 0.9] }) => {
-      await fontsReady();
+      await ensureStudioFonts();
       const entry = lookup(kind, sceneId);
       if (!entry) return null;
       const dims = ASPECTS[aspect];
@@ -386,7 +379,7 @@ export default function Probe() {
     };
     win.__PROBE_FILMSTRIP = async ({ kind, sceneId, aspect = "short", cols = 4, rows = 4, cellW = DEFAULT_CELL_W, fromMs, toMs }) => {
       win.__PROBE_DONE = false;
-      await fontsReady();
+      await ensureStudioFonts();
       resetThree3D();
       const dims = ASPECTS[aspect];
       const cellH = Math.round((cellW * dims.height) / dims.width);

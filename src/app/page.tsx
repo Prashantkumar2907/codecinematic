@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type SceneScript, type Scene, type SceneTiming, type VerifyResult, ASPECTS, sceneScriptSchema } from "@/studio/schema";
 import { computeTimings, runPlan, introOutroMs, type RenderHandle, type BeatAudio, type CaptionStyle, type CaptionPos, CAPTION_STYLES, CAPTION_POSITIONS } from "@/studio/engine";
 import { buildSrt } from "@/studio/captions";
+import { ensureStudioFonts } from "@/studio/fonts";
 import { fetchNarration, verifyScript, VOICE_OPTIONS } from "@/studio/pipeline";
 import { renderThumbnail } from "@/studio/thumbnail";
 import { DEMO_SCRIPT, DEMO_KINDS_LONG, DEMO_KINDS_SHORT, DEMO_KINDS2_LONG, DEMO_KINDS2_SHORT, DEMO_WAVE1, DEMO_WAVE2 } from "@/studio/demo";
@@ -189,7 +190,10 @@ export default function Studio() {
   const [genModel, setGenModel] = useState("");
   const [keyProbes, setKeyProbes] = useState<KeyProbe[]>([]);
   const [selKey, setSelKey] = useState("");
-  const [captionStyle, setCaptionStyle] = useState<CaptionStyle | "auto">("off");
+  // "auto" lets the engine pick per format (karaoke on shorts, pop on long).
+  // Defaulting to "off" shipped every Short with no captions, on a surface that
+  // is watched muted; "off" is still selectable in the dropdown.
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle | "auto">("auto");
   const [captionPos, setCaptionPos] = useState<CaptionPos>("bottom");
   const [genVoice, setGenVoice] = useState("");
 
@@ -557,6 +561,8 @@ export default function Studio() {
       const narration =
         audio ?? (await fetchNarration(script, genVoice || undefined, (done, total) => setVoiceProgress({ done, total })));
       setAudio(narration);
+      // Before any painter measures text: canvas does not fetch webfonts.
+      await ensureStudioFonts();
       const sceneTimings = computeTimings(script, narration);
       setTimings(sceneTimings);
       setStage("rendering");

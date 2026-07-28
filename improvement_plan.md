@@ -733,6 +733,10 @@ and used by zero other painters. To add:
   different names with 3 different values** (0.75, 0.86, 0.88, 0.94) and two different gap constants. The
   clamp expression is byte-identical across 13 sites. One `makeLayout` field fixes all 23 — and 4 of the
   5 genuine edge-bleed failures in `qa/AUDIT.md` are this exact class.
+  **Confirmed live once Phase 2.2 turned captions on**: in a rendered 9:16 demo the karaoke block lands
+  *on top of* `mythfact`'s FACT card (scene 6/8), because no painter reserves the caption band. This was
+  invisible before only because every Short shipped without captions. The one `safeBottom` field must be
+  caption-aware, and this is now a **shipping-quality** issue rather than a tidiness one.
 
 **6a-bis. Camera language needs a central design, not a helper.** My earlier plan said "add a
 `camera()` helper". That would be **correctly rejected as a regression**: `qa/ledger.json` systemic entry
@@ -801,6 +805,9 @@ narration (a visual change on every beat), continuity into the next scene.
 
 - **Typography & brand**: establish a real type scale; `FONT_SANS` is a system stack today — load an
   actual display face, keep captions legible at Shorts size, one system so 110 painters read as one channel.
+  Carried over from Phase 2.1: **weight 900 is requested at 26 sites but Plus Jakarta Sans ships 200-800**,
+  so those are synthetically emboldened by the browser. Left alone deliberately — changing 26 call sites
+  to 800 alters the visual weight across the library, which is a type-scale decision, not a bug fix.
 - **Transitions**: the 4 variants at `engine.ts:644-678` (`TRANSITION_MS = 420`) are decorative. Replace
   with comprehension-serving moves — zoom punch-in on the detail just narrated, match cut when adjacent
   scenes share a subject, continuous camera across a section — and make a **hard cut the default**,

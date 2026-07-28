@@ -236,7 +236,8 @@ export function paintEventbus(ctx: CanvasRenderingContext2D, scene: EventbusScen
       const t2D = get2DWithActive(getTopicPos(i), isActive, i + 20);
       
       ctx.font = `600 ${Math.round(layout.unit * 0.45)}px ${FONT_MONO}`;
-      ctx.fillStyle = isActive ? THEME.bgBase : THEME.text;
+      // The active topic's block is lit accent, so its label goes dark.
+      ctx.fillStyle = isActive ? THEME.bgMid : THEME.text;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(topic.name, t2D.x, t2D.y);
@@ -279,7 +280,8 @@ export function paintEventbus(ctx: CanvasRenderingContext2D, scene: EventbusScen
               roundRect(ctx, mid.x - tw / 2 - unit * 0.3, mid.y - unit * 0.4, tw + unit * 0.6, unit * 0.8, unit * 0.2);
               ctx.fillStyle = palette.accentSoft;
               ctx.fill();
-              ctx.fillStyle = THEME.bgBase;
+              // accentSoft is a 14% wash over a dark scene, so the label stays light.
+              ctx.fillStyle = palette.accent;
               ctx.fillText(activeStep.publish.event, mid.x, mid.y);
           }
       }
