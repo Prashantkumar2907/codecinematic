@@ -12,7 +12,7 @@ import path from "node:path";
 const OUT_DIR = process.argv[2] ?? "output/render-probe";
 const QUERY = process.argv[3] ?? "demo=2&auto=1";
 const TIMEOUT_MS = (Number(process.argv[4]) || 900) * 1000;
-const BASE = "http://localhost:4321";
+const BASE = process.env.STUDIO_BASE ?? "http://localhost:4321";
 
 await mkdir(OUT_DIR, { recursive: true });
 const logPath = path.join(OUT_DIR, "console.log");

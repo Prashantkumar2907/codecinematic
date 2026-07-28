@@ -417,6 +417,26 @@ Every item is a confirmed defect with a file:line, not a preference.
 8. **No `public/` directory exists**, so `fetch('/music.mp3')` 404s on every render and **every video
    ships as bare narration over silence** (`engine.ts:157`). Even if present, `MUSIC_GAIN = 0.05` is
    ≈ −26 dBFS — inaudible under speech *and* in the gaps. (Music bed only; reveal SFX stay out of scope.)
+9. **⚠️ FOUND WHILE IMPLEMENTING PHASE 2 — the worst defect in the repo, and no earlier audit caught it.
+   `paintBigtext` leaks a `ctx.save()` on every frame, and it walks the whole video off-screen.**
+   `bigtext.ts:461` saves and applies `translate(offsetX, offsetY)`, where `offsetY` tracks
+   `Math.sin(env.elapsedMs / 1500)` through a 3D projection. Variants 2/3/4 restore it; **variants 0 and
+   1 `return` without restoring** (`:535`, `:600`). Canvas state persists across frames, so each frame
+   stacks another translate on the last and the offset *integrates* the sine: measured live, the main
+   context's transform went `f = −6.6 → −46 → −118 → −333 → −592` px on a 1080-tall frame within the
+   first seconds, after which the render shows almost nothing. A 22-scene long demo produced an
+   **18 MB webm for 271 s** (against 86 MB for a 95 s short) — the video is very nearly a still from the
+   first scene onward, for its whole length, for every subsequent scene.
+   `bigtext` is the **#1 kind at 18.8% of all scenes** and the opener of 42 of 89 videos, and the variant
+   is seeded by scene id, so roughly **40% of videos are destroyed from their first scene.** This is
+   likely a large part of the owner's verdict, and it is invisible to every existing QA instrument:
+   `qa/LEDGER.md` and `npm run filmstrip` render one kind at a time through `/probe`, which never carries
+   canvas state from one scene into the next.
+   **Two fixes, both landed:** the missing `ctx.restore()` in each variant, and — because trusting 110
+   painters to stay balanced is the real design flaw — `resetContext(target)` at the top of the engine's
+   `paintAt`, so one unbalanced painter can no longer poison the rest of a video.
+   **This also argues for pulling Phase 16 (post-render measurement) much earlier**: nothing in the
+   pipeline ever looks at the rendered artifact, which is how a defect this total survived 89 videos.
 
 ### Phase 3 — Instrument (nothing after this is verifiable without it)
 

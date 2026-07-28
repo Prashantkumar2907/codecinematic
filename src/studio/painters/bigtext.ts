@@ -458,6 +458,10 @@ export function paintBigtext(ctx: CanvasRenderingContext2D, scene: BigtextScene,
   const offsetX = baseP.x - w / 2;
   const offsetY = baseP.y - h / 2;
 
+  // Every branch below must restore this before returning — a leaked save keeps
+  // this translate alive into the next frame, and since offsetY tracks a sine it
+  // integrates: variants 0 and 1 walked the whole frame ~600 px off-screen over a
+  // few seconds and never came back.
   ctx.save();
   ctx.translate(offsetX, offsetY);
 
@@ -532,6 +536,7 @@ export function paintBigtext(ctx: CanvasRenderingContext2D, scene: BigtextScene,
       });
     }
     ctx.restore();
+    ctx.restore(); // the outer save at the top of the painter
     return;
   }
 
@@ -597,6 +602,7 @@ export function paintBigtext(ctx: CanvasRenderingContext2D, scene: BigtextScene,
       });
     }
     ctx.restore();
+    ctx.restore(); // the outer save at the top of the painter
     return;
   }
 

@@ -373,6 +373,30 @@ function activeCaption(scene: SceneScript["scenes"][number], timing: SceneTiming
   return { text, progress: clamp01((sceneElapsedMs - b.startMs) / Math.max(1, b.durationMs)) };
 }
 
+/**
+ * Drop any drawing state a previous frame left behind — the saved-state stack
+ * included, which is the part `setTransform` alone cannot reach. `reset()` also
+ * clears the bitmap, which is free here because every caller repaints an opaque
+ * background immediately afterwards.
+ */
+function resetContext(target: CanvasRenderingContext2D) {
+  const withReset = target as CanvasRenderingContext2D & { reset?: () => void };
+  if (typeof withReset.reset === "function") {
+    withReset.reset();
+    return;
+  }
+  // Pre-Chrome-110 fallback: unwind whatever depth the stack is at.
+  for (let i = 0; i < 32; i++) target.restore();
+  target.setTransform(1, 0, 0, 1, 0, 0);
+  target.globalAlpha = 1;
+  target.globalCompositeOperation = "source-over";
+  target.filter = "none";
+  target.shadowBlur = 0;
+  target.shadowOffsetX = 0;
+  target.shadowOffsetY = 0;
+  target.setLineDash([]);
+}
+
 /** Lines of caption on screen at once. More than this and the lower third
  *  starts eating the frame; the rest of the beat pages in behind it. */
 const CAPTION_LINES = 3;
@@ -662,6 +686,11 @@ export function runPlan(
 
     const paintAt = (target: CanvasRenderingContext2D, entryIndex: number, elapsed: number) => {
       const { scene, timing, windows, index } = scenesWithTiming[entryIndex];
+      // Canvas state persists across frames, so ONE painter that returns without
+      // restoring poisons every later frame of the video — a leaked translate
+      // compounds until the whole frame is off-screen. Start each scene from a
+      // clean slate rather than trusting 110 painters to be balanced.
+      resetContext(target);
       drawBackground(target, width, height, elapsed, palette, motif);
       try {
         paintScene(target, scene, {

@@ -55,13 +55,15 @@ everything else and links to it.)
 | 1.5 | 1 | animation | `tree.ts` 3D layer frozen at frame 0 (CORE kind) | verified | 0.1 | `filmstrip --kind=tree`: root at p=0.07, depth-1 at p=0.40, leaves at p=0.67 — 3D blocks track the reveal steps | d9e364a |
 | 1.6 | 1 | hygiene | `EventbusScene`/`TrafficflowScene` missing types | verified | 0.1 | `tsc` **99 → 73** (−26 across 1.2-1.6); eventbus/trafficflow now typed via `Extract<Scene, …>` | d9e364a |
 | 1.7 | 1 | animation | `drawSceneTitle` timing: 3 different fades → one `TITLE_IN_MS` | verified | 0.1 | 94 call sites swept, 50 `titleP`/`titleIn` consts deleted; `filmstrip --kind=steps --entrance`: title+underline complete at ~420 ms (was ~25% opacity at 500 ms). **Plan corrected: 11 slow sites, not 91** | d9e364a |
-| 2.1 | 2 | render | Load Plus Jakarta before any text measurement | todo | 0.1 | fonts identical across machines | — |
-| 2.2 | 2 | render | Captions default on (`page.tsx:192`) | todo | 0.1 | rendered short has captions | — |
-| 2.3 | 2 | render | Karaoke highlight breaks past ~18 words; 3-line silent truncation | todo | 2.2 | full beat visible + highlighted | — |
-| 2.4 | 2 | render | Transition paints incoming scene frozen at `p=0` (`engine.ts:647`) | todo | 0.1 | next scene animates through cut | — |
-| 2.5 | 2 | render | Re-enable outro so a YouTube end screen is possible | todo | 0.1 | tail ≥ 5 s | — |
-| 2.6 | 2 | render | `THEME.bgBase` undefined (`eventbus.ts:237,280`) | todo | 0.1 | no silent no-op fills | — |
-| 2.7 | 2 | render | Contrast: `textFaint` 2.41:1, karaoke unspoken 4.0:1 | todo | 0.1 | all ≥ 4.5:1 | — |
+| 2.1 | 2 | render | Load Plus Jakarta before any text measurement | verified | 0.1 | headless: `document.fonts.check("800 48px 'Plus Jakarta Sans'")` **false → true**; same `measureText("Own vs inherited")` **386.74px → 396.77px**. New `src/studio/fonts.ts`; `/probe` now shares it | 5ca4b50 |
+| 2.2 | 2 | render | Captions default on (`page.tsx:192`) | verified | 0.1 | rendered short (8 scenes, 85.8 MB): karaoke captions present on every scene | 5ca4b50 |
+| 2.3 | 2 | render | Karaoke highlight breaks past ~18 words; 3-line silent truncation | verified | 2.2 | 108-char beat pages: page 1 "…Comment your" with highlight inside it → page 2 "answer." — a word the old `.slice(0,3)` never displayed | 5ca4b50 |
+| 2.4 | 2 | render | Transition paints incoming scene frozen at `p=0` (`engine.ts:647`) | verified | 0.1 | 30 fps frames pulled from the rendered webm across the 4.17 s boundary: outgoing `bigtext` fades out while the incoming `diagram`'s title + underline visibly animate underneath, captions already on the incoming beat | 5ca4b50 |
+| 2.5 | 2 | render | Re-enable outro so a YouTube end screen is possible | verified | 0.1 | tail of the rendered long webm shows the brand, the SUBSCRIBE pill and "new videos daily" over the dimmed last scene — 5.2 s, above YouTube's 5 s floor | 5ca4b50 |
+| 2.6 | 2 | render | `THEME.bgBase` undefined (`eventbus.ts:237,280`) | verified | 0.1 | `tsc` 73 → 71; both fills now named colours | 5ca4b50 |
+| 2.7 | 2 | render | Contrast: `textFaint` 2.41:1, karaoke unspoken 4.0:1 | verified | 0.1 | measured: textFaint **2.42 → 4.67**, karaoke unspoken **3.99 → 6.32**, Art & Culture accent **4.06 → 5.07** (only failing palette of 16) | 5ca4b50 |
+| 2.8 | 2 | render | No `public/` → `/music.mp3` 404s; `MUSIC_GAIN` inaudible | verified | 0.1 | `public/` created + documented; render logs `no public/music.mp3` instead of failing silently; gain 0.05 → 0.079 (~−26 → ~−22 dBFS) | 5ca4b50 |
+| 2.9 | 2 | render | **NEW, worst defect found so far** — `paintBigtext` leaks a `ctx.save()` every frame; the translate integrates a sine and walks the video off-screen | verified | — | live transform drift `f = −6.6 → −592 px`; same 22-scene script **17.32 MB → 233.69 MB** webm (13.5×). Reproduced identically at `d9e364a`, so **pre-existing, not a Phase 2 regression**. Fixed in `bigtext.ts` variants 0+1 **and** guarded engine-wide by `resetContext()` in `paintAt` | (next) |
 | 3.1 | 3 | tooling | `src/studio/pacing.ts` — shared metric on real `sceneBeats()` | todo | 0.1 | unit-checked against corpus | — |
 | 3.2 | 3 | tooling | `scripts/pacing-audit.mjs` → `qa/PACING.md` | todo | 3.1 | baseline table above reproduced | — |
 | 4.1 | 4 | content | Per-kind narration caps + mirror in `sanitize.ts` | todo | 3.2 | no card > ~9 s | — |
