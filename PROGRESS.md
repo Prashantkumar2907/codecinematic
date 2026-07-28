@@ -35,8 +35,8 @@ everything else and links to it.)
 | Videos opening on a definition | **30%** (27 of 89) | same |
 | `"let's"` / `"here is"` uses | **101 / 61** across 89 scripts | same |
 | Running example threading all scenes | **0 of 86** | same |
-| Scene kinds reachable by the model | **75 of 110** | `KIND_LINE.size` in `prompt.ts` |
-| Typecheck errors | **99** | `npx tsc --noEmit 2>&1 \| grep -c "error TS"` — re-confirmed 99 at 25624d6 |
+| Scene kinds reachable by the model | **75 of 110** | `KIND_LINE.size` in `prompt.ts` — **closed by 1.1**, now 110 |
+| Typecheck errors | **99** | `npx tsc --noEmit 2>&1 \| grep -c "error TS"` — re-confirmed 99 at 25624d6; **73** after phase 1 (d9e364a) |
 | Untracked files in `src/` | **102 of 158** | `git ls-files src \| wc -l` vs `find src -type f \| wc -l` — **closed by 0.1**, now 158/158 |
 | Painters passing animation QA | **16 of 110** | `qa/LEDGER.md` |
 | Edge-bleed failures | **7 of 220** | `npm run edge-audit` |
@@ -48,13 +48,13 @@ everything else and links to it.)
 |---|---|---|---|---|---|---|---|
 | 0.1 | 0 | hygiene | Commit 102 untracked `src/` + `scripts/` files | verified | — | `git ls-files src \| wc -l` → **158** (was 56, `find src -type f` → 158); `git ls-files scripts` → **14** (was 6); 149 files in the commit | 25624d6 |
 | 0.2 | 0 | hygiene | Resolve deleted-but-tracked `DESIGN-BRIEF.md` | verified | 0.1 | deletion committed; `git status --porcelain \| grep -v '^??'` → empty. Content recoverable at `git show 012afb2:DESIGN-BRIEF.md` (274 lines, desktop-UI wireframe brief) | 25624d6 |
-| 1.1 | 1 | content | Menu regex `[a-z]+` → `[a-z0-9_]+` (`prompt.ts:139`) | todo | 0.1 | `KIND_LINE.size` 75 → 110 | — |
-| 1.2 | 1 | animation | `radar.ts:291` `cy` undefined — crashes every frame, in 12/19 kits | todo | 0.1 | filmstrip captures | — |
-| 1.3 | 1 | animation | `circuit.ts:197` 4 args to 2-arg helper | todo | 0.1 | filmstrip captures | — |
-| 1.4 | 1 | animation | `dayclock.ts:135,140` `.geometry` off a Group | todo | 0.1 | filmstrip captures | — |
-| 1.5 | 1 | animation | `tree.ts` 3D layer frozen at frame 0 (CORE kind) | todo | 0.1 | nodes animate across beats | — |
-| 1.6 | 1 | hygiene | `EventbusScene`/`TrafficflowScene` missing types | todo | 0.1 | −20 typecheck errors | — |
-| 1.7 | 1 | animation | `drawSceneTitle` 3.6 s fade → `enterT` (`common.ts:370`) | todo | 0.1 | `--entrance` filmstrip, 91 painters | — |
+| 1.1 | 1 | content | Menu regex `[a-z]+` → `[a-z0-9_]+` (`prompt.ts:142`, not :139) | verified | 0.1 | `KIND_LINE.size` **75 → 110**, 35 kinds unlocked (replayed the exact map/filter over `ALL_KINDS_MENU`) | d9e364a |
+| 1.2 | 1 | animation | `radar.ts:291` `cy` undefined — crashes every frame, in 12/19 kits | verified | 0.1 | `filmstrip --kind=radar`: renders both aspects, legend centred beside the web, `qa/radar/console.log` empty | d9e364a |
+| 1.3 | 1 | animation | `circuit.ts:197` 4 args to 2-arg helper | verified | 0.1 | `filmstrip --kind=circuit`: wires unlit→lit across beats, console.log empty (was "hex.slice is not a function" every frame) | d9e364a |
+| 1.4 | 1 | animation | `dayclock.ts:135,140` `.geometry` off a Group | verified | 0.1 | `filmstrip --kind=dayclock`: both hands sweep from the hub, console.log empty | d9e364a |
+| 1.5 | 1 | animation | `tree.ts` 3D layer frozen at frame 0 (CORE kind) | verified | 0.1 | `filmstrip --kind=tree`: root at p=0.07, depth-1 at p=0.40, leaves at p=0.67 — 3D blocks track the reveal steps | d9e364a |
+| 1.6 | 1 | hygiene | `EventbusScene`/`TrafficflowScene` missing types | verified | 0.1 | `tsc` **99 → 73** (−26 across 1.2-1.6); eventbus/trafficflow now typed via `Extract<Scene, …>` | d9e364a |
+| 1.7 | 1 | animation | `drawSceneTitle` timing: 3 different fades → one `TITLE_IN_MS` | verified | 0.1 | 94 call sites swept, 50 `titleP`/`titleIn` consts deleted; `filmstrip --kind=steps --entrance`: title+underline complete at ~420 ms (was ~25% opacity at 500 ms). **Plan corrected: 11 slow sites, not 91** | d9e364a |
 | 2.1 | 2 | render | Load Plus Jakarta before any text measurement | todo | 0.1 | fonts identical across machines | — |
 | 2.2 | 2 | render | Captions default on (`page.tsx:192`) | todo | 0.1 | rendered short has captions | — |
 | 2.3 | 2 | render | Karaoke highlight breaks past ~18 words; 3-line silent truncation | todo | 2.2 | full beat visible + highlighted | — |
