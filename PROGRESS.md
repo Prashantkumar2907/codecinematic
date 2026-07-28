@@ -36,8 +36,8 @@ everything else and links to it.)
 | `"let's"` / `"here is"` uses | **101 / 61** across 89 scripts | same |
 | Running example threading all scenes | **0 of 86** | same |
 | Scene kinds reachable by the model | **75 of 110** | `KIND_LINE.size` in `prompt.ts` |
-| Typecheck errors | **99** | `npx tsc --noEmit 2>&1 \| grep -c "error TS"` |
-| Untracked files in `src/` | **102 of 158** | `git ls-files src \| wc -l` vs `find src -type f \| wc -l` |
+| Typecheck errors | **99** | `npx tsc --noEmit 2>&1 \| grep -c "error TS"` — re-confirmed 99 at 25624d6 |
+| Untracked files in `src/` | **102 of 158** | `git ls-files src \| wc -l` vs `find src -type f \| wc -l` — **closed by 0.1**, now 158/158 |
 | Painters passing animation QA | **16 of 110** | `qa/LEDGER.md` |
 | Edge-bleed failures | **7 of 220** | `npm run edge-audit` |
 | Factory slots below bar | **72 of 86** | `content/factory/**/*.json` `status` field |
@@ -46,8 +46,8 @@ everything else and links to it.)
 
 | id | phase | stream | title | state | deps | evidence | commit |
 |---|---|---|---|---|---|---|---|
-| 0.1 | 0 | hygiene | Commit 102 untracked `src/` + `scripts/` files | todo | — | `git ls-files src \| wc -l` → 158 | — |
-| 0.2 | 0 | hygiene | Resolve deleted-but-tracked `DESIGN-BRIEF.md` | todo | 0.1 | `git status` clean | — |
+| 0.1 | 0 | hygiene | Commit 102 untracked `src/` + `scripts/` files | verified | — | `git ls-files src \| wc -l` → **158** (was 56, `find src -type f` → 158); `git ls-files scripts` → **14** (was 6); 149 files in the commit | 25624d6 |
+| 0.2 | 0 | hygiene | Resolve deleted-but-tracked `DESIGN-BRIEF.md` | verified | 0.1 | deletion committed; `git status --porcelain \| grep -v '^??'` → empty. Content recoverable at `git show 012afb2:DESIGN-BRIEF.md` (274 lines, desktop-UI wireframe brief) | 25624d6 |
 | 1.1 | 1 | content | Menu regex `[a-z]+` → `[a-z0-9_]+` (`prompt.ts:139`) | todo | 0.1 | `KIND_LINE.size` 75 → 110 | — |
 | 1.2 | 1 | animation | `radar.ts:291` `cy` undefined — crashes every frame, in 12/19 kits | todo | 0.1 | filmstrip captures | — |
 | 1.3 | 1 | animation | `circuit.ts:197` 4 args to 2-arg helper | todo | 0.1 | filmstrip captures | — |

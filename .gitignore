@@ -9,3 +9,10 @@ content/news/
 .venv/
 tsconfig.tsbuildinfo
 .DS_Store
+content/factory/
+content/
+graphify-out/
+playwright-report/
+audit/
+# Animation-QA capture artifacts (regenerate with: npm run filmstrip)
+qa/**/*.png
