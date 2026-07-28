@@ -26,8 +26,7 @@ export function paintTable(ctx: CanvasRenderingContext2D, scene: TableScene, env
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const key = scene.id + "-tbl3d";
 
-  const titleIn = Math.max(env.p, enterT(env, 400) * 0.12);
-  const band = drawSceneTitle(ctx, scene.title, layout, titleIn, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const nCols = scene.columns.length;
   const allDone = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const hasHighlight = scene.rows.some((r) => r.highlight);

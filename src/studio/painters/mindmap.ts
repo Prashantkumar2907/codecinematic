@@ -5,7 +5,6 @@ import {
   FONT_SANS,
   easeOutCubic,
   easeOutBack,
-  enterT,
   idle,
   clamp01,
   roundRect,
@@ -37,7 +36,7 @@ export function paintMindmap(ctx: CanvasRenderingContext2D, scene: MindmapScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent, { centered: true }) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
   // --- radial layout via d3-hierarchy -----------------------------------
   const areaY = contentY + band;

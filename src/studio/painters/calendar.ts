@@ -59,7 +59,7 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const ghostIn = easeOutCubic(enterT(env, 340));
 
-  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaTop = contentY + band;
   const areaH = contentH - band;
 

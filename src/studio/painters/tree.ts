@@ -6,7 +6,6 @@ import {
   FONT_SANS,
   easeOutCubic,
   easeOutBack,
-  enterT,
   idle,
   clamp01,
   roundRect,
@@ -25,6 +24,8 @@ import type { PaintEnv } from "./index";
 type TreeScene = Extract<Scene, { kind: "tree" }>;
 type TNode = TreeScene["nodes"][number];
 type Pt = { x: number; y: number };
+/** Per-frame state handed to the cached 3D bundle: node id -> reveal 0..1. */
+type TreeFrame = { appear: Map<string, number> };
 
 /**
  * ByteByteGo hierarchy tree: tidy auto-layout (model gives parent pointers, not
@@ -42,7 +43,7 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
   const activeStep = active - offset;
   const key = scene.id + "-tree3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent, { centered: true }) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.5;
 
   const byId = new Map(scene.nodes.map((n) => [n.id, n]));
   const childrenOf = (pid: string | null) => scene.nodes.filter((n) => (n.parent ?? null) === pid);
@@ -117,22 +118,25 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
       const pos = worldPos(n);
       g.position.copy(pos);
       s.add(g);
-      return { id: n.id, mesh: g, basePos: pos };
+      return { id: n.id, mesh: g, basePos: pos, depth: d };
     });
 
-    const update = (elapsedMs: number) => {
-      models.forEach(({ id, mesh, basePos }) => {
-        const ap = nodeAppear(id);
+    // `build` runs once and its closure freezes at frame 0, so every value that
+    // moves with the beat arrives through `data`, never off the captured env.
+    const update = (elapsedMs: number, data: TreeFrame) => {
+      models.forEach(({ id, mesh, basePos, depth }) => {
+        const ap = data.appear.get(id) ?? 0;
         const pop = easeOutBack(clamp01(ap * 1.3));
         mesh.scale.setScalar(Math.max(0.001, pop));
         mesh.visible = ap > 0.01;
-        mesh.position.y = basePos.y + Math.sin(elapsedMs / 1300 + depthOf(byId.get(id)!)) * 0.08;
+        mesh.position.y = basePos.y + Math.sin(elapsedMs / 1300 + depth) * 0.08;
       });
     };
     return { scene: s, camera, update };
   };
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs);
+  const frame: TreeFrame = { appear: new Map(scene.nodes.map((n) => [n.id, nodeAppear(n.id)])) };
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, frame);
   if (!cam) return;
 
   const get2D = (n: TNode) => projectToRect(cam, worldPos(n), rect);

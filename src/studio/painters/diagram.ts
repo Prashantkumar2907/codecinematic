@@ -231,7 +231,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
   // Node-shape family is a deterministic, purely-visual per-scene flourish.
   const nodeShape = NODE_SHAPES[variantOf(scene.id, NODE_SHAPES.length)];
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const extents: Node[] = [
     ...scene.nodes,
     ...scene.steps.flatMap((st) =>

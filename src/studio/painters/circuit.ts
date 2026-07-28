@@ -36,7 +36,7 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
   const frameIn = easeOutCubic(enterT(env, 340));
   const key = scene.id + "-circ3d";
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   
   const rect = { x: contentX, y: contentY + titleBand, w: contentW, h: contentH - titleBand };
 
@@ -194,7 +194,7 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
     ctx.globalAlpha = frameIn;
     ctx.lineCap = "round";
     ctx.lineWidth = unit * 0.2;
-    ctx.strokeStyle = lit > 0.5 ? accent : rgba(148,163,184,0.28);
+    ctx.strokeStyle = lit > 0.5 ? accent : rgba(THEME.textDim, 0.28);
     if (lit > 0.5) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.5 * lit;

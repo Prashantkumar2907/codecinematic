@@ -77,7 +77,7 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
   const frameIn = easeOutCubic(enterT(env, 360));
   const key = scene.id + "-bits3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 380) * 0.12), accent) + unit * 0.35;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.35;
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;

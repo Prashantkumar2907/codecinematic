@@ -42,7 +42,7 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const key = scene.id + "-dayclock3d";
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + titleBand;
   const availH = contentH - titleBand;
 
@@ -131,15 +131,22 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
     hub.position.y = 0.2;
     s.add(hub);
 
-    const minuteHand = makeBlock(0.1, 0.1, R * 0.78, accent, accent);
-    minuteHand.geometry.translate(0, 0, -R * 0.39); // Pivot at center
-    minuteHand.position.y = 0.3;
-    s.add(minuteHand);
+    // makeBlock centres its box on its own origin, so a hand rotated about that
+    // origin would sweep through the hub. Offset the arm inside a pivot group by
+    // half its length instead — translating the geometry would leave the baked
+    // EdgesGeometry behind.
+    const handOnPivot = (w: number, h: number, len: number, y: number) => {
+      const pivot = new THREE.Group();
+      const arm = makeBlock(w, h, len, accent, accent);
+      arm.position.z = -len / 2;
+      pivot.add(arm);
+      pivot.position.y = y;
+      s.add(pivot);
+      return pivot;
+    };
 
-    const hourHand = makeBlock(0.2, 0.15, R * 0.52, accent, accent);
-    hourHand.geometry.translate(0, 0, -R * 0.26); // Pivot at center
-    hourHand.position.y = 0.4;
-    s.add(hourHand);
+    const minuteHand = handOnPivot(0.1, 0.1, R * 0.78, 0.3);
+    const hourHand = handOnPivot(0.2, 0.15, R * 0.52, 0.4);
 
     // Pins
     const pinMeshes: THREE.Group[] = [];

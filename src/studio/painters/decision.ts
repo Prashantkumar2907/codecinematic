@@ -112,7 +112,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const introIn = easeOutCubic(enterT(env, 400));
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const rot = shouldRotate(scene.nodes, layout.vertical);
   const map = gridMap(scene.nodes, layout, titleBand, rot);
 

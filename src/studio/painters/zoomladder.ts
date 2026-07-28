@@ -32,7 +32,7 @@ export function paintZoomladder(ctx: CanvasRenderingContext2D, scene: Zoomladder
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = Math.min(Math.max(active - offset, 0), n - 1);
 
-  const titleBand = scene.title ? drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3 : 0;
+  const titleBand = scene.title ? drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3 : 0;
   const stageY = contentY + titleBand;
   const stageH = contentH - titleBand;
   const stageCx = contentX + contentW / 2;

@@ -353,21 +353,29 @@ export function fitFontSize(
   return minPx;
 }
 
+/** How long a scene title takes to arrive, for every painter. */
+export const TITLE_IN_MS = 420;
+
 /**
  * Scene title that can never overflow the frame: shrinks to fit one line,
  * falls back to a two-line wrap, draws the accent underline, and returns the
  * band height consumed below contentY so painters can lay out beneath it.
+ *
+ * Timing is absolute and owned here. It used to take scene progress and fade
+ * over `sub(p, 0, 0.12)` — 3.6 s on a 30 s scene — so 70 of 94 call sites hand-
+ * rolled `Math.max(env.p, enterT(env, 420) * 0.12)` to cancel it out, 11 passed
+ * `enterT(env, …)` straight in (a ~45 ms pop) and 11 still wore the slow fade.
  */
 export function drawSceneTitle(
   ctx: CanvasRenderingContext2D,
   text: string,
   layout: Layout,
-  p: number,
+  env: { elapsedMs: number },
   accent: string,
   opts: { centered?: boolean } = {}
 ): number {
   const { unit, contentX, contentY, contentW, w } = layout;
-  const titleIn = easeOutCubic(sub(p, 0, 0.12));
+  const titleIn = easeOutCubic(enterT(env, TITLE_IN_MS));
   ctx.save();
   ctx.globalAlpha = titleIn;
   let px = fitFontSize(ctx, text, { maxW: contentW, startPx: unit * 1.5, minPx: unit * 1.05, weight: 800 });

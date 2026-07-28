@@ -83,9 +83,8 @@ export function paintScalecompare(ctx: CanvasRenderingContext2D, scene: Scalecom
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset; // -1 intro, 0..n-1 an item's beat, n verdict
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   // Reserved up-front (not only once triggered) so the silhouette geometry
   // below never has to shift when the ratio badge pops in mid-scene.
   const ratioBandH = unit * (vertical ? 1.55 : 1.25);

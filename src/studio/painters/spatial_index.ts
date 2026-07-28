@@ -117,9 +117,8 @@ export function paintSpatialIndex(ctx: CanvasRenderingContext2D, scene: SpatialI
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
 
   const chipGutter = unit * 1.3; // reserved strip above the arena for the capacity chip, so it never overlaps the title band
   const bandY = contentY + band + chipGutter;

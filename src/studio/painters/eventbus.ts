@@ -12,7 +12,9 @@ import {
   rgba,
   roundRect,
 } from "./common";
-import type { EventbusScene } from "../schema";
+import type { Scene } from "../schema";
+
+type EventbusScene = Extract<Scene, { kind: "eventbus" }>;
 
 export function paintEventbus(ctx: CanvasRenderingContext2D, scene: EventbusScene, env: PaintEnv) {
   const { layout, palette } = env;

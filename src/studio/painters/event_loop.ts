@@ -74,9 +74,8 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent, { centered: true }) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
   let availH = contentH - band;
   if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + band));
   const cx = contentX + contentW / 2;

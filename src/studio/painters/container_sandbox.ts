@@ -58,13 +58,12 @@ export function paintContainerSandbox(ctx: CanvasRenderingContext2D, scene: Sand
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const step = activeStep >= 0 ? scene.steps[activeStep] : undefined;
   const isolateActive = !!step && step.kind === "isolate";
   const limitActive = !!step && step.kind === "limit";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const hostX = contentX;
   const hostY = contentY + band;
   const hostW = contentW;

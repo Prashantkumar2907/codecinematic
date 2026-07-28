@@ -72,9 +72,8 @@ export function paintTuringTape(ctx: CanvasRenderingContext2D, scene: TapeScene,
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

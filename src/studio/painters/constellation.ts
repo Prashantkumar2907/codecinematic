@@ -56,7 +56,7 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
   const finaleBeat = scene.finale ? totalBeats - 1 : -1;
   const finaleActive = finaleBeat >= 0 && active >= finaleBeat;
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
   const rect = { x: contentX, y: contentY + titleBand, w: contentW, h: contentH - titleBand };
 

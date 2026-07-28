@@ -39,7 +39,7 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
   const activeIdx = active - offset; // -1 during intro
   const key = scene.id;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent, { centered: true }) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
   // How many stages are revealed, and flow progress into the active one.
   const flowT = activeIdx >= 0 ? beatT(env.beats, offset + activeIdx, totalBeats, env.p) : 0;

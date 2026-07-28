@@ -38,7 +38,7 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   const entColors = [accent, secondary, THEME.good];
 
   // drawSceneTitle finishes its fade at p=0.12; feed it absolute time so the title lands in ~360ms.
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   
   const ax = contentX;
   const ay = contentY + band;
@@ -287,9 +287,11 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   if (entIdx >= 0 && entIdx < nEnt) drawEntity(entIdx);
 
   // ---- Legend ----
-  const legX = vertical ? ax + unit * 0.4 : ax + webAreaW + unit * 0.6;
-  const legTop = vertical ? ay + webAreaH + unit * 0.6 : cy - (nEnt * unit * 1.3) / 2;
+  // Landscape: the legend column sits beside the web, centred on it.
   const rowH = unit * 1.3;
+  const webCy = rect.y + rect.h / 2;
+  const legX = vertical ? ax + unit * 0.4 : ax + webAreaW + unit * 0.6;
+  const legTop = vertical ? ay + webAreaH + unit * 0.6 : webCy - (nEnt * rowH) / 2;
   scene.entities.forEach((ent, k) => {
     const t = beatT(env.beats, offset + k, totalBeats, env.p);
     if (t <= 0 && ghostIn <= 0) return;

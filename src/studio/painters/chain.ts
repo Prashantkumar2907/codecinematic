@@ -41,7 +41,7 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const ghostIn = easeOutCubic(enterT(env, 420));
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 380) * 0.12), accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   let availH = contentH - titleBand;
   if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + titleBand));
 

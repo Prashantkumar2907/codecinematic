@@ -66,9 +66,8 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
   const t = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const frameIn = easeOutCubic(enterT(env, 380));
   if (frameIn <= 0) return;
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.35;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.35;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

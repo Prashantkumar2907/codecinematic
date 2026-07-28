@@ -12,7 +12,9 @@ import {
   roundRect,
 } from "./common";
 import type { PaintEnv } from "./index";
-import type { TrafficflowScene } from "../schema";
+import type { Scene } from "../schema";
+
+type TrafficflowScene = Extract<Scene, { kind: "trafficflow" }>;
 
 export function paintTrafficflow(ctx: CanvasRenderingContext2D, scene: TrafficflowScene, env: PaintEnv) {
   const { layout, palette } = env;

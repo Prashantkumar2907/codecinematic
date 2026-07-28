@@ -47,7 +47,7 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const ghostIn = easeOutCubic(enterT(env, 360));
 
-  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   // Era "when" chip band under the title.
   const chipRowY = contentY + band;

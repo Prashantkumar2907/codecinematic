@@ -49,9 +49,8 @@ export function paintNeuralNetwork(ctx: CanvasRenderingContext2D, scene: NNScene
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
   const bottom = vertical ? Math.min(contentY + contentH, layout.h * 0.88) : contentY + contentH;
   const areaH = bottom - areaY;

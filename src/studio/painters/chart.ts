@@ -63,7 +63,7 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
   const lastEnd = beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
   // drawSceneTitle finishes its fade at p=0.12; feed it absolute time so the title lands in ~360ms.
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
   let maxIdx = 0;
@@ -162,7 +162,7 @@ function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pain
   const settledAll = env.p >= lastEnd;
   const key = scene.id + "-col3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const n = scene.items.length;
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
   let maxIdx = 0;
@@ -269,7 +269,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
   const totalBeats = offset + scene.items.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const n = scene.items.length;
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
 
@@ -404,7 +404,7 @@ function paintPie(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEn
   const totalBeats = offset + scene.items.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const plotTop = contentY + band;
   const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
   const plotH = safeBottom - plotTop;

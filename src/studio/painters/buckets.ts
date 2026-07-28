@@ -32,7 +32,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
   const totalBeats = offset + scene.pours.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ghostIn = easeOutCubic(enterT(env, 400));
   const key = scene.id + "-bkt3d";
 

@@ -41,7 +41,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
   const totalBeats = offset + scene.readings.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;

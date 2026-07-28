@@ -116,9 +116,8 @@ export function paintEcosystemWeb(ctx: CanvasRenderingContext2D, scene: Ecosyste
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, titleP, accent, { centered: true }) + unit * 0.3;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.3;
 
   // Reserve a thin strip right under the title for the kind legend (only the
   // kinds this web actually uses) so it never overlaps the title or the web.

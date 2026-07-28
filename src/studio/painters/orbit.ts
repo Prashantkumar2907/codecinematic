@@ -26,7 +26,7 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
   const activeIdx = active - offset;
   const key = scene.id;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent, { centered: true }) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
   const flowT = activeIdx >= 0 ? beatT(env.beats, offset + activeIdx, totalBeats, env.p) : 0;
   orbitState.set(key, { revealed: activeIdx < 0 ? 0 : activeIdx + easeOutCubic(clamp01(flowT * 1.4)) });
 

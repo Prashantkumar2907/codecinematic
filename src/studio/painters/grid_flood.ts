@@ -75,10 +75,9 @@ export function paintGridFlood(ctx: CanvasRenderingContext2D, scene: GridFloodSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
   const isDfs = scene.mode === "dfs";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
   // Legend chips naming each traversal group (islands / oceans / fronts).
   let legendH = 0;

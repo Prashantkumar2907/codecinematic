@@ -51,7 +51,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const step = activeStep >= 0 ? scene.steps[activeStep] : undefined;
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 400) * 0.12), accent, { centered: true });
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true });
   const chips: { label: string; color: string }[] = [];
   if (scene.steps.some((s) => s.add.length)) chips.push({ label: "Added", color: THEME.good });
   if (scene.steps.some((s) => s.remove.length)) chips.push({ label: "Removed", color: DANGER });

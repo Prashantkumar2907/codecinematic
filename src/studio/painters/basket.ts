@@ -62,7 +62,7 @@ export function paintBasket(ctx: CanvasRenderingContext2D, scene: BasketScene, e
   const base0 = scene.items.reduce((s, it) => s + it.prices[0], 0);
   const pctSince = base0 > 0 ? ((total - base0) / base0) * 100 : 0;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;

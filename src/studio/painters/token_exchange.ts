@@ -67,9 +67,8 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   const n = scene.actors.length;
   const colW = contentW / n;

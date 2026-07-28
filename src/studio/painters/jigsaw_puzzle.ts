@@ -112,9 +112,8 @@ export function paintJigsawPuzzle(ctx: CanvasRenderingContext2D, scene: JigsawSc
   const activeIdx = active - offset;
   const stepT = activeIdx >= 0 ? beatT(env.beats, offset + activeIdx, totalBeats, env.p) : 0;
   const groupIn = easeOutCubic(enterT(env, 420));
-  const titleP = Math.max(env.p, enterT(env, 460) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaX = contentX;
   const areaY = contentY + band;
   const areaW = contentW;

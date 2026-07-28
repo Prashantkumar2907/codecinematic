@@ -8,7 +8,6 @@ import {
   easeOutBack,
   easeOutCubic,
   easeInOutCubic,
-  sub,
   enterT,
   idle,
   clamp01,
@@ -38,10 +37,9 @@ export function paintMatrix(ctx: CanvasRenderingContext2D, scene: MatrixScene, e
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
   const key = scene.id + "-mat3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
   const { rows, cols } = scene;
   const hasRowLabels = scene.rowLabels.length > 0;

@@ -21,7 +21,7 @@ export function paintCompare(ctx: CanvasRenderingContext2D, scene: CompareScene,
   const divider = !vertical && variant === 1;
   const key = scene.id + "-comp3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent, { centered: true });
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true });
   const panelsTop = contentY + band + unit * 0.3;
   const verdictBand = scene.verdict ? unit * (vertical ? 4.8 : 3.2) : unit * 0.5;
   const gap = unit * (vertical ? 1.6 : 2.2);

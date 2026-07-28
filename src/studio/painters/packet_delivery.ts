@@ -80,9 +80,8 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

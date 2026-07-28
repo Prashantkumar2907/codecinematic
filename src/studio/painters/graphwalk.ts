@@ -6,7 +6,6 @@ import {
   easeOutBack,
   easeOutCubic,
   easeInOutCubic,
-  sub,
   enterT,
   clamp01,
   roundRect,
@@ -95,9 +94,8 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const { map } = layoutNodes(scene.nodes, layout, titleBand);
 
   // Replay steps 0..activeStep for cumulative state.

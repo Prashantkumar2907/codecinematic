@@ -17,8 +17,7 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const key = scene.id + "-tl3d" + (isHorizontal ? "h" : "v");
 
-  const titleIn = Math.max(env.p, enterT(env, 380) * 0.12);
-  const band = drawSceneTitle(ctx, scene.title, layout, titleIn, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const areaTop = contentY + band;
   const areaH = contentH - band;
   

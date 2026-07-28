@@ -47,8 +47,7 @@ export function paintScroll(ctx: CanvasRenderingContext2D, scene: ScrollScene, e
   const stepT = activeLine >= 0 ? beatT(env.beats, offset + activeLine, totalBeats, env.p) : 0;
 
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

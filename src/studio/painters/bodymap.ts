@@ -62,7 +62,7 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + titleBand;
   const availH = contentH - titleBand;
 

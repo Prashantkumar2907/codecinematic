@@ -3,10 +3,8 @@ import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
   FONT_SANS,
-  easeOutCubic,
   easeInOutCubic,
   clamp01,
-  enterT,
   roundRect,
   drawSceneTitle,
   beatT,
@@ -70,7 +68,7 @@ export function paintGlobe3d(ctx: CanvasRenderingContext2D, scene: Globe3dScene,
   const activeStep = active - offset;
   const key = scene.id;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 420) * 0.12), accent, { centered: true }) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
   const byId = new Map(scene.markers.map((m) => [m.id, m] as const));
   const revealed = new Set<string>();

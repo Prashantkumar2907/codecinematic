@@ -16,7 +16,7 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const n = scene.steps.length;
   // Centre within the VISIBLE band on 9:16. Centring in the full content box put
   // the list low, with a dead third under the title and the slack below it hidden

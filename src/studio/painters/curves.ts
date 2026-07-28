@@ -64,7 +64,7 @@ export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, e
   const frameIn = easeOutCubic(enterT(env, 400));
   const key = scene.id + "-crvs3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

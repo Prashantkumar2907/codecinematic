@@ -24,6 +24,7 @@ import {
 import type { PaintEnv } from "./index";
 
 type CycleScene = Extract<Scene, { kind: "cycle" }>;
+type Pt = { x: number; y: number };
 
 const ARC_GAP = (14 * Math.PI) / 180;
 
@@ -37,7 +38,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 380) * 0.12), accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   let availH = contentH - titleBand;
   if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + titleBand));
   const cx = contentX + contentW / 2;

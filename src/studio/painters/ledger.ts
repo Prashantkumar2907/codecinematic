@@ -90,7 +90,7 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const key = scene.id + "-ldgr3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   const ax = contentX;
   const ay = contentY + band;

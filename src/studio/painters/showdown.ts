@@ -35,7 +35,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const ghostIn = easeOutCubic(enterT(env, 400));
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent, { centered: true }) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.3;
 
   const roundLanded = (k: number): number => {
     const bw = beatWindow(env.beats, offset + k, totalBeats);

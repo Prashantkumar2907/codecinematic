@@ -37,9 +37,8 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.3;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   const n = scene.actors.length;
   const colW = contentW / n;

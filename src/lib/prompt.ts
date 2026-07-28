@@ -131,15 +131,17 @@ const ALL_KINDS_MENU = `
 - {"kind":"consensus_quorum","sayIntro":"optional","title":"<=60","nodes":[{"id","label":"<=14","role":"leader|follower, defaults follower — exactly one leader/coordinator"}, 3-7],"quorumSize":"optional int 2-7 (defaults to floor(n/2)+1 majority)","steps":[{"kind":"propose|ack|commit|fail|reset","from":"nodeId? — the broadcaster this step is about","ackFrom":[nodeIds acking this step, default []],"note":"<=24 e.g. 'Term 3' or 'Split vote'","say"}, 2-9]} — a cluster reaching distributed consensus: the leader/coordinator proposes (arrows fan out), followers ack back one by one while a segmented quorum meter fills, then the round commits (quorum crossed, whole cluster turns green) or fails (split vote / blocked coordinator, turns red) before an optional reset drains the meter to start a new term/round. Use for Raft leader election (terms, votes, split-vote) and Two-Phase Commit (prepare, commit, and a blocking coordinator).`;
 
 /**
- * The menu is filtered per subject so the LLM sees a focused ~20-30 kinds, not
- * all 56 (halves prompt tokens and sharpens choices). Built once from the text
- * above, keyed by the kind name in each line — the single source of truth.
+ * One entry per kind, built once from the menu text above and keyed by the kind
+ * name in each line — the single source of truth for what the model can see.
+ * The key pattern must allow digits and underscores: with `[a-z]+` the 35 kinds
+ * named like `iso3d` or `dp_table_fill` yielded "", were dropped by the filter
+ * below, and were never offered to the model in any prompt.
  */
 const KIND_LINE = new Map<string, string>(
   ALL_KINDS_MENU.split(/\n(?=- \{)/)
     .map((l) => l.trim())
     .filter((l) => l.startsWith("- {"))
-    .map((line) => [line.match(/"kind":"([a-z]+)"/)?.[1] ?? "", line] as const)
+    .map((line) => [line.match(/"kind":"([a-z0-9_]+)"/)?.[1] ?? "", line] as const)
     .filter(([k]) => k)
 );
 

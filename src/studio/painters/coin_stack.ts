@@ -90,9 +90,8 @@ export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
   const u = scene.unit.trim();
   // ₹ amounts group Indian-style (₹23,00,000); other currencies Western (see ledger.ts).

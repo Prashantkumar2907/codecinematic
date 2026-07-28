@@ -205,7 +205,7 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const key = scene.id + "-schm3d";
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaX = contentX;
   const areaY = contentY + titleBand;
   const areaW = contentW;

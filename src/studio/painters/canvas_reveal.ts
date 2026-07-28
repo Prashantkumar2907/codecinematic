@@ -88,9 +88,8 @@ export function paintCanvasReveal(ctx: CanvasRenderingContext2D, scene: CanvasRe
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   // Reserved strips BELOW the frame, stacked caption-then-swatches, both inside contentH.
   const captionBandH = scene.artLabel ? unit * 1.3 : 0;
   const swatchBandH = scene.swatches.length > 0 ? unit * 2.15 : 0;

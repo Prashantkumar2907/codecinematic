@@ -46,7 +46,7 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
   const frameIn = easeOutCubic(enterT(env, 400));
   const key = scene.id + "-frmla3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

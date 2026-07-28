@@ -74,7 +74,7 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
   const activeStep = active - offset;
   const key = scene.id;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 420) * 0.12), accent, { centered: true }) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
   // --- Replay the blade grid up to the active step (latest write wins). ---
   const rackIdx = new Map(scene.racks.map((r, i) => [r.id, i] as const));

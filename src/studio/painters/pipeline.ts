@@ -35,7 +35,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const ghostIn = easeOutCubic(enterT(env, 420));
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, Math.max(env.p, enterT(env, 380) * 0.12), accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   // Vertical: keep the last station above the caption band (bottom ~14%).
   let availH = contentH - titleBand;
   if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + titleBand));

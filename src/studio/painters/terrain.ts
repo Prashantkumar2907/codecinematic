@@ -345,7 +345,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
   const totalBeats = offset + scene.features.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + titleBand;
   const areaH = contentH - titleBand;
   const groundBottom = areaY + areaH;

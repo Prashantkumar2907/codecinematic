@@ -70,10 +70,9 @@ export function paintVectorSpace(ctx: CanvasRenderingContext2D, scene: VectorSpa
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
   const key = scene.id;
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
 
   // Replay every step up to the active one: which points/boundary/distances are on screen.
   const revealInfo = new Map<string, RevealInfo>();

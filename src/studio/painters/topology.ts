@@ -60,9 +60,8 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const map = layoutNodes(scene.nodes, layout, band);
   const byId = new Map(scene.nodes.map((n) => [n.id, n] as const));
 

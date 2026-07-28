@@ -61,7 +61,7 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const ghostIn = easeOutCubic(enterT(env, 380));
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, env.p, accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaX = contentX;
   const areaY = contentY + titleBand;
   const areaW = contentW;

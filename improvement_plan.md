@@ -328,8 +328,8 @@ by an unguarded git checkout on 2026-07-27"*, and 8 ledger rows read `commit: (u
 All recorded as live failures in `qa/LEDGER.md`, not type noise. Most are collateral damage from the
 `rewrite_*.js` codemods that already ran against `src/`.
 
-1. **The menu regex** (root cause 4) — `prompt.ts:139`, `[a-z]+` → `[a-z0-9_]+`. Unlocks 35 kinds.
-   **Do this first; it changes the scope of every later animation decision by a third.**
+1. **The menu regex** (root cause 4) — `prompt.ts:142` (the plan said :139), `[a-z]+` → `[a-z0-9_]+`.
+   Unlocks 35 kinds. **Do this first; it changes the scope of every later animation decision by a third.**
 2. **`radar.ts:291`** — `Cannot find name 'cy'`; crashes every frame. `radar` is in **12 of 19 subject
    kits** — the highest-severity single defect in the library. (`TS2304`)
 3. **`circuit.ts:197`** — 4 arguments to a 2-arg helper. `qa/LEDGER.md`: *"CAPTURE CRASHES: hex.slice is
@@ -344,12 +344,24 @@ All recorded as live failures in `qa/LEDGER.md`, not type noise. Most are collat
 7. **`eventbus.ts:15` / `trafficflow.ts:15`** — import `EventbusScene` / `TrafficflowScene`, **types that
    do not exist** (`TS2305`). They resolve to `any`, cascading into 18 implicit-any errors. Fix is the
    idiom every other painter uses: `Extract<Scene, { kind: "eventbus" }>`.
-8. **`drawSceneTitle` makes every title fade in over 3.6 seconds.** `common.ts:370` uses
-   `sub(p, 0, 0.12)` — scene-fraction timing, the exact anti-pattern that `enterT`'s own doc comment
-   (`common.ts:200-202`) exists to forbid. On a 30 s scene the title and its underline take 3.6 s to
-   arrive. **91 painters call this.** `bullets.ts:36` already does it correctly with `enterT(env, 380)`.
-   One line, 91 painters improved — and it is very likely a visible contributor to the "dead opening"
-   feel across the whole library.
+8. **`drawSceneTitle` times its fade off scene progress.** `common.ts:370` uses `sub(p, 0, 0.12)` —
+   scene-fraction timing, the exact anti-pattern that `enterT`'s own doc comment (`common.ts:200-202`)
+   exists to forbid. On a 30 s scene the title and its underline take 3.6 s to arrive.
+
+   > **Correction, measured at implementation time.** I wrote "91 painters fade in over 3.6 s". Only
+   > **11 of the 94 call sites** actually did: bodymap, calendar, circuit, constellation, dayclock,
+   > schematic, skyline, **steps**, storyboard, terrain, zoomladder. The other 83 had already hand-rolled
+   > a workaround — **70** passed `Math.max(env.p, enterT(env, 380..460) * 0.12)` (48 of them via a copied
+   > `const titleP`), **11** passed `enterT(env, 360)` straight in, which `sub(…, 0, 0.12)` turns into a
+   > ~45 ms pop, and 2 aliased it as `titleIn`. So the real defect was **three different title timings
+   > across the library**, not one slow one — and note `steps.ts`, cited elsewhere in this plan as the
+   > reference painter, was one of the 11 slow ones.
+   >
+   > It is also **not a one-line fix**: `drawSceneTitle` received only `p` and had no access to
+   > `elapsedMs`, so no change inside the function could make it time-based. The fix is a signature
+   > change — the 4th parameter becomes the env — plus a sweep of all 94 call sites, which deletes the
+   > 70 workarounds and the 50 `titleP`/`titleIn` consts that fed them. Timing is now owned in one place
+   > (`TITLE_IN_MS = 420`).
 
 Items 6-7 kill 20 of the 99 typecheck errors. Items 2-5 are user-visible breakage in kinds that are
 offered to most subjects.

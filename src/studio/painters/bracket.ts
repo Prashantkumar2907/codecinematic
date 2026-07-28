@@ -36,7 +36,7 @@ export function paintBracket(ctx: CanvasRenderingContext2D, scene: BracketScene,
   const totalBeats = offset + scene.matches.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const ghostIn = easeOutCubic(enterT(env, 400));
 
   const n = scene.contenders.length;

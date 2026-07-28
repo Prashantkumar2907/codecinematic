@@ -40,7 +40,7 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const ghostIn = easeOutCubic(enterT(env, 400));
 
-  const band = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.3;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;

@@ -131,9 +131,8 @@ export function paintHashRing(ctx: CanvasRenderingContext2D, scene: HashRingScen
   const activeStep = activeIdx - offset;
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent, { centered: true }) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.5;
   const areaY = contentY + band;
   const areaH = contentH - band;
 

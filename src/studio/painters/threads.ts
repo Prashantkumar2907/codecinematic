@@ -6,7 +6,6 @@ import {
   FONT_SANS,
   FONT_MONO,
   easeOutCubic,
-  sub,
   enterT,
   clamp01,
   roundRect,
@@ -51,10 +50,9 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
   const key = scene.id + "-thr3d";
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   
   const nLanes = scene.lanes.length;
   const labelW = vertical ? unit * 3.2 : unit * 3.8;

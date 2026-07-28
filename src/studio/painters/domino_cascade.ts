@@ -52,9 +52,8 @@ export function paintDominoCascade(ctx: CanvasRenderingContext2D, scene: DominoS
   const activeIdx = active - offset;
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const introIn = easeOutCubic(enterT(env, 380));
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
 
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.5;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
   let areaH = contentH - band;
   if (vertical) areaH = Math.min(areaH, layout.h * 0.86 - areaY);

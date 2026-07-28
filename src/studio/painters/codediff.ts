@@ -40,8 +40,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
-  const titleP = Math.max(env.p, enterT(env, 420) * 0.12);
-  const band = drawSceneTitle(ctx, scene.title, layout, titleP, accent) + unit * 0.4;
+  const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
   // Earliest step that focuses each line → when it reveals. `same` context lines
   // are always visible (-1); a diff line no step references reveals at step 0.

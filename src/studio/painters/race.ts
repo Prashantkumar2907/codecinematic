@@ -40,7 +40,7 @@ export function paintRace(ctx: CanvasRenderingContext2D, scene: RaceScene, env: 
   const ghostIn = easeOutCubic(enterT(env, 420));
 
   // drawSceneTitle finishes its fade at p=0.12; feed it absolute time so the title lands in ~360ms.
-  let band = drawSceneTitle(ctx, scene.title, layout, enterT(env, 360) * 0.12, accent) + unit * 0.3;
+  let band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   // Interpolated race state: values and lane ranks glide from checkpoint j-1
   // to checkpoint j over the first 60% of beat j.

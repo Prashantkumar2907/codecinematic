@@ -126,7 +126,7 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const introIn = easeOutCubic(enterT(env, 400));
 
-  const titleBand = drawSceneTitle(ctx, scene.title, layout, 0.12 * enterT(env, 350), accent) + unit * 0.4;
+  const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const rot = shouldRotate(scene.states, layout.vertical);
   const map = gridMap(scene.states, layout, titleBand, rot);
 
