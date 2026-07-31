@@ -115,22 +115,54 @@ pronunciation lexicon and enforced pausing is the bulk of the perceived gain, be
 
 ## 1. Diagnosis (measured across all 89 generated scripts: 1,857 beats, 39,704 words ≈ 255 min audio)
 
-| Measured fact | Value | Owner symptom |
-|---|---|---|
-| Audio over single-beat static cards | **88 of 255 min = 34%** | powerpoint |
-| Long videos: static-card scenes | **7 of 17 = 41%**, 25% of runtime | powerpoint |
-| `bigtext` seconds per card (long) | **15.7 s avg**, worst **26.9 s** | powerpoint |
-| `bigtext` share of all scenes | **18.8%** — the #1 kind of 110 | powerpoint |
-| Videos opening on a static card | **42 of 89** | powerpoint |
-| First spoken beat is a definition | **27 of 89 = 30%** | reading a book |
-| Beats shaped "X is a …" | **19% of all beats** | reading a book |
-| Scene kinds ever used | **36 of 110** — but 35 are *unreachable*, see root cause 4 | powerpoint |
-| `"let's"` / `"here is"` (both banned in prompt) | 101 / 61 uses, in 39 / 45 scripts | reading a book |
-| Running example threading all scenes (mandated 4×) | **median 0.29 coverage, 0 of 86 complete** | unrelatable |
-| Factory slots below bar after median 5 attempts | **72 of 86** | all of it |
+| Measured fact | Value | Re-measured by `pacing-audit` | Owner symptom |
+|---|---|---|---|
+| Audio over single-beat static cards | **88 of 255 min = 34%** | **27.8%** (69.4 of 249.9 min) | powerpoint |
+| Long videos: static-card scenes | **7 of 17 = 41%**, 25% of runtime | **40.2%** (170 of 423 scenes), 25.9% | powerpoint |
+| `bigtext` seconds per card (long) | **15.7 s avg**, worst **26.9 s** | **15.4 s median**, worst 26.5 s | powerpoint |
+| `bigtext` share of all scenes | **18.8%** — the #1 kind of 110 | **18.8%** (154 scenes) ✓ exact | powerpoint |
+| Videos opening on a static card | **42 of 89** | **64 of 88** — worse than reported | powerpoint |
+| First spoken beat is a definition | **27 of 89 = 30%** | **3 of 88** — see the correction below | reading a book |
+| Beats shaped "X is a …" | **19% of all beats** | **4.3%** (78 of 1,814) | reading a book |
+| Beats over 12 s | *not measured* | **354 of 1,814** | powerpoint |
+| Seconds per visual change | *not measured directly* | **8.3 s mean** (target 4-8) | powerpoint |
+| Scene kinds ever used | **36 of 110** — but 35 are *unreachable*, see root cause 4 | **36** ✓ exact | powerpoint |
+| `"let's"` / `"here is"` (both banned in prompt) | 101 / 61 uses, in 39 / 45 scripts | 89 / 53, in 37 / 42 | reading a book |
+| Running example threading all scenes (mandated 4×) | **median 0.29 coverage, 0 of 86 complete** | median **0.50** by a different proxy | unrelatable |
+| Factory slots below bar after median 5 attempts | **72 of 86** | **72 of 86** ✓ exact | all of it |
 
 Method: parse every `content/factory/**/*.json` + `content/videos/*/script.json`, replicate
 `sceneBeats()`, estimate seconds at 2.6 spoken words/sec (≈156 wpm, matching edge-tts neural default).
+The right-hand column is `node scripts/pacing-audit.mjs` (Phase 3), which calls the **real**
+`sceneBeats()` rather than replicating it, and excludes the 5 demo-fixture renders. It scores 88
+scripts where the original pass claimed 89 — the exact-match rows (bigtext share, kinds used, factory
+status, worst beat) confirm it is the same corpus.
+
+> ### ⚠️ Correction: "30% of videos open with a definition" is an artifact of the regex, not a finding.
+>
+> This was §1's headline evidence for "reading a book" and the entire basis of the Phase 4.3 gate.
+> The pattern §4 specifies — `^(a|an|the)?\s*X (is|are|refers to|means)` — reproduces the number
+> (**25 of 88**), and it is measuring the wrong thing: it matches *any* `X is Y` sentence. Of its 25
+> matches, **21 open `Your…` / `You…` / `This…`**:
+>
+> - *"Your div-button is a trap. A keyboard user just hit Tab, and your entire UI just broke."*
+> - *"Your Python server is sitting idle at 5% CPU, yet it's completely dropping requests."*
+> - *"Your computer is lying to you. Every line of your code assumes a perfect, binary world…"*
+>
+> Those are concrete, second-person, high-tension cold-opens — **exactly what §2 and Phase 5 ask for.**
+> A stricter pattern that also requires a category article (`is a` / `refers to a`) finds **3 of 88**,
+> and reading those three, even they are metaphor hooks (*"The Atlantic Ocean is a wound, and if you
+> could pull the continents back together, you'd heal it."*) rather than definitions.
+>
+> **Consequences.** (a) The corpus does not have a definition-opener problem — the hooks are broadly
+> good. (b) **Phase 4.3 must not ship the loose pattern**: a gate on it would push the model away from
+> its best current writing. It is kept in `pacing.ts` as `isDefinitionOpenerLoose` only so this number
+> stays reproducible, with the strict version as the reported metric. (c) The "reading a book" feeling
+> has to come from somewhere else. On the evidence now available, the strongest candidates are the
+> **354 beats over 12 s**, the **8.3 s mean hold** against a 4-6 s target, the **167 crutch hits**, and
+> — very likely dominant — the **`bigtext` save-leak** in Phase 2 item 9, which made roughly 40% of all
+> output literally unwatchable. Do not treat pacing gates as the fix for voice until that is re-judged
+> on output rendered *after* the leak fix.
 
 ### Root cause 1 — the prompt *specifies* the PowerPoint
 
@@ -449,6 +481,25 @@ Every item is a confirmed defect with a file:line, not a preference.
 - **New `scripts/pacing-audit.mjs`** — runs it over `content/factory/**` + `content/videos/*`, writes
   `qa/PACING.md` worst-first, in the style of `scripts/edge-audit.mjs`. This is the before/after instrument.
 
+> **How the `.mjs` reuses the TypeScript — resolved at implementation time.** No existing script imports
+> anything from `src/`: `edge-audit`, `edge-check` and `filmstrip` all drive the dev server through
+> Playwright, and `content-factory` only touches `fs` plus the HTTP API. That would have forced this
+> phase to either re-implement `sceneBeats()` (the exact drift the module exists to prevent) or boot a
+> browser to do JSON arithmetic. Neither is necessary: **Node 22.20 strips TypeScript types on import**,
+> so `pacing-audit.mjs` imports `../src/studio/pacing.ts` and gets the real implementation. Verified end
+> to end — `node` runs it, `npx tsc --noEmit` accepts it (with `allowImportingTsExtensions`, safe under
+> the existing `noEmit`), and `next build` reports "✓ Compiled successfully" on it. The only cost is
+> explicit `.ts` extensions on relative imports inside `pacing.ts`, and the constraint that it may never
+> import the engine or a painter (canvas/three would not load outside a browser).
+>
+> Two things the audit also does, which the spec did not ask for and should keep:
+> 1. It **excludes the demo fixtures** by reading their topics out of `demo.ts`, so a `?demo=` render
+>    can never contaminate a corpus statistic. Five such renders already existed on disk.
+> 2. It **asserts `pacing.countWords` agrees with `schema.narrationWordCount` on every script**, and
+>    fails loudly if not. This is the mechanical guard against the deadlock the verifier proved in
+>    §"Root cause 2": if the new caps and the existing word-floor gate ever count words differently they
+>    will fight for all three repair rounds and exhaust. Currently 88 of 88 agree.
+
 ### Phase 4 — Mechanical content gates (schema.ts / sanitize.ts) — the model cannot ignore these
 
 Prompt rules the corpus already violates are proof that prompting alone fails here.
@@ -466,9 +517,13 @@ Prompt rules the corpus already violates are proof that prompting alone fails he
   flags any single-beat scene over its cap, and any long-format single beat over ~12 s. Wire in **three**
   places or the factory degrades to a generic message: `generate/route.ts:136-174` (repair text),
   `:183-204` (warning), `content-factory.mjs:228-244` (`warningsToDirectives`).
-- **New soft gate `definitionOpener(script)`** — first spoken beat matching `^(a|an|the)?\s*X (is|are|
-  refers to|means)`. 30% of the corpus fails this; strongest single "reading a book" signal. Extend the
-  existing `firstBeatFormulaic` (`schema.ts:3513-3519`) rather than duplicating it.
+- ~~**New soft gate `definitionOpener(script)`**~~ — **DOWNGRADED, see the correction in §1.** The
+  pattern this specified reproduces the "30%" figure but measures any `X is Y` sentence, so 21 of its 25
+  matches are the good second-person cold-opens the plan asks for. Measured with a pattern that actually
+  requires a definition shape, the corpus fails **3 of 88** — there is no problem here worth a gate, and
+  a gate on the loose pattern would actively degrade the writing. `pacing.ts` exports both predicates and
+  the audit reports both; if this is ever revisited, extend `firstBeatFormulaic`
+  (`schema.ts:3513-3519`) rather than duplicating it, and validate against real first beats first.
 - **New soft gate `crutchPhrases(script)`** — counts banned openers (`let's`, `here is/here's`,
   sentence-initial `Now,/Next,/So,`) and names offending beats. 101 + 61 uses prove the prompt ban isn't enough.
 - **New soft gate `runningExampleCoverage(script)`** — the prompt demands one threaded example in **four**

@@ -29,18 +29,22 @@ everything else and links to it.)
 
 | Metric | Value | How to re-measure |
 |---|---|---|
-| Static-card audio share | **34%** (88 of 255 min) | `node scripts/pacing-audit.mjs` (Phase 3 builds it) |
-| Long videos: static-card scenes | **41%** (7 of 17), 25% of runtime | same |
-| Worst single frozen card | **26.9 s** | same |
-| Videos opening on a definition | **30%** (27 of 89) | same |
-| `"let's"` / `"here is"` uses | **101 / 61** across 89 scripts | same |
-| Running example threading all scenes | **0 of 86** | same |
+| Static-card audio share | ~~34%~~ → **27.8%** (69.4 of 249.9 min) | `node scripts/pacing-audit.mjs` — **built, row 3.2** |
+| Long videos: static-card scenes | **40.2%** (170 of 423 scenes), 25.9% of runtime | same |
+| Worst single frozen card | **26.9 s** (confirmed exactly) | same |
+| Beats over 12 s | **354 of 1,814** (not previously measured) | same |
+| Seconds per visual change | **8.3 s** mean (target 4-8) | same |
+| Videos opening on a definition | ~~30% (27 of 89)~~ → **3 of 88** | same — the old figure was a regex artifact, see row 3.3 |
+| Videos opening on a static card | ~~42 of 89~~ → **64 of 88** (worse) | same |
+| `"let's"` / `"here is"` uses | **89 / 53** across 88 scripts | same |
+| Running example threading all scenes | median coverage **0.50** by proxy | same (the proxy differs from the original pass — see `pacing.ts`) |
 | Scene kinds reachable by the model | **75 of 110** | `KIND_LINE.size` in `prompt.ts` — **closed by 1.1**, now 110 |
 | Typecheck errors | **99** | `npx tsc --noEmit 2>&1 \| grep -c "error TS"` — re-confirmed 99 at 25624d6; **73** after phase 1 (d9e364a) |
 | Untracked files in `src/` | **102 of 158** | `git ls-files src \| wc -l` vs `find src -type f \| wc -l` — **closed by 0.1**, now 158/158 |
 | Painters passing animation QA | **16 of 110** | `qa/LEDGER.md` |
 | Edge-bleed failures | **7 of 220** | `npm run edge-audit` |
 | Factory slots below bar | **72 of 86** | `content/factory/**/*.json` `status` field |
+| `npm run build` | **already failing** (pre-existing) | webpack reports "✓ Compiled successfully" then the type-check dies on `demo.ts:4` — the 55-error `meta` cluster Phase 8 owns. So §7b's "build clean" is not a regression to watch for, it is a target to reach. |
 
 ## Work items
 
@@ -64,11 +68,12 @@ everything else and links to it.)
 | 2.7 | 2 | render | Contrast: `textFaint` 2.41:1, karaoke unspoken 4.0:1 | verified | 0.1 | measured: textFaint **2.42 → 4.67**, karaoke unspoken **3.99 → 6.32**, Art & Culture accent **4.06 → 5.07** (only failing palette of 16) | 5ca4b50 |
 | 2.8 | 2 | render | No `public/` → `/music.mp3` 404s; `MUSIC_GAIN` inaudible | verified | 0.1 | `public/` created + documented; render logs `no public/music.mp3` instead of failing silently; gain 0.05 → 0.079 (~−26 → ~−22 dBFS) | 5ca4b50 |
 | 2.9 | 2 | render | **NEW, worst defect found so far** — `paintBigtext` leaks a `ctx.save()` every frame; the translate integrates a sine and walks the video off-screen | verified | — | live transform drift `f = −6.6 → −592 px`; same 22-scene script **17.32 MB → 233.69 MB** webm (13.5×). Reproduced identically at `d9e364a`, so **pre-existing, not a Phase 2 regression**. Fixed in `bigtext.ts` variants 0+1 **and** guarded engine-wide by `resetContext()` in `paintAt` | bc8c424 |
-| 3.1 | 3 | tooling | `src/studio/pacing.ts` — shared metric on real `sceneBeats()` | todo | 0.1 | unit-checked against corpus | — |
-| 3.2 | 3 | tooling | `scripts/pacing-audit.mjs` → `qa/PACING.md` | todo | 3.1 | baseline table above reproduced | — |
+| 3.1 | 3 | tooling | `src/studio/pacing.ts` — shared metric on real `sceneBeats()` | verified | 0.1 | imports the real `sceneBeats` (no re-implementation): Node 22 strips types, `tsc` clean, `next build` "✓ Compiled successfully". `countWords` agrees with `schema.narrationWordCount` on **88 of 88** scripts | 9acb63d |
+| 3.2 | 3 | tooling | `scripts/pacing-audit.mjs` → `qa/PACING.md` | verified | 3.1 | 88 scripts, 1814 beats, 249.9 min. Exact matches to the plan: bigtext share **18.8%**, kinds used **36**, factory status **72/86**, worst beat **26.9 s** — same corpus. New: **354 beats > 12 s**, mean hold **8.3 s** | 9acb63d |
+| 3.3 | 3 | content | **Plan correction** — "30% open with a definition" is a regex artifact | verified | 3.2 | the plan's pattern reproduces it (25 of 88) but 21 of those open `Your…/You…/This…` — good cold-opens. Strict pattern: **3 of 88**. §1 amended, **4.3 downgraded** | 9acb63d |
 | 4.1 | 4 | content | Per-kind narration caps + mirror in `sanitize.ts` | todo | 3.2 | no card > ~9 s | — |
 | 4.2 | 4 | content | Soft gate `staticCardOverrun` (3 wiring sites) | todo | 4.1 | fires on the old corpus | — |
-| 4.3 | 4 | content | Soft gate `definitionOpener` | todo | 3.2 | flags 27 of 89 historic | — |
+| 4.3 | 4 | content | ~~Soft gate `definitionOpener`~~ | wont-do | 3.2 | **the problem does not exist**: 3 of 88 by a real definition pattern. The plan's pattern flags 25 but 21 are good `Your…` cold-opens, so gating on it would degrade the writing. Both predicates stay in `pacing.ts`; the audit reports both. See 3.3 | 9acb63d |
 | 4.4 | 4 | content | Soft gate `crutchPhrases` | todo | 3.2 | flags 101 "let's" historic | — |
 | 4.5 | 4 | content | Soft gate `runningExampleCoverage` | todo | 3.2 | flags 86 of 86 historic | — |
 | 4.6 | 4 | content | Soft gate `jargonDensity` (first-use anchoring) | todo | 3.2 | anchored share reported | — |
