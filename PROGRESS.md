@@ -110,7 +110,7 @@ everything else and links to it.)
 | 8.7 | 8 | hygiene | Single-source `LIMITS`, split `page.tsx`/`schema.ts`, remove 25 dead exports | todo | 8.1 | **not done** — the remaining Phase 8 scope. `SPOKEN_LIMITS` (Phase 4) is a partial first step | — |
 | 9.x | 9 | animation | Motion toolkit + house style, then top-traffic kinds by tier | todo | 1.1, 8.x | `qa/LEDGER.md` rows | — |
 | 10.x | 10 | render | Typography scale, transition language, encode audit | todo | 9.x | — | — |
-| 16.1 | 16 | integration | Post-render measurement of the actual video | todo | 3.1 | dead frames measured on output | — |
+| 16.1 | 16 | integration | Post-render measurement of the actual video | verified | 3.1 | new `scripts/render-audit.mjs` → `qa/RENDER.md`: samples 4 fps, diffs 64×36 greyscale, reports frozen share, longest frozen stretch, cuts, median motion, and A/V skew. **It independently re-derives row 2.9's `paintBigtext` bug from the output alone** — the two pre-fix renders measure **96.4% / 96.3% frozen with median motion 0.00** and a **198.8 s** dead stretch starting at 3 s, against **0.0-16.4% frozen, median motion 0.15-0.22** for healthy videos. Threshold is measured, not chosen: a frozen frame is bit-identical (p10-p90 all **0.000**), so the separator is 0.05 — **an earlier guess of 0.5 was wrong** and reported a healthy captioned short as 73% dead by sweeping up the karaoke caption band | |
 | 13.1 | 13 | content | **Research** short + long craft per archetype (the failed pass) | todo | — | written into the plan | — |
 | 13.2 | 13 | content | Cached `creatorBrief` per submodule (373, one-time) | todo | 13.1 | stored in taxonomy | — |
 | 14.x | 14 | animation | New scene kinds — only after 1.1 and 9.x | todo | 1.1, 9.x | — | — |
