@@ -14,37 +14,10 @@ import {
   activeBeatIndex
 } from "./common";
 import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
+import type { Scene } from "../schema";
 
-export type GeometryScene = {
-  kind: "geometry";
-  id: string;
-  sayIntro?: string;
-  title: string;
-  points: { id: string; x: number; y: number; label?: string }[];
-  segments?: {
-    a: string;
-    b: string;
-    label?: string;
-    style?: "side" | "aux" | "ray" | "radius";
-  }[];
-  angles?: {
-    at: string;
-    from: string;
-    to: string;
-    label?: string;
-    right?: boolean;
-  }[];
-  fills?: {
-    pts: string[];
-    label?: string;
-    value?: string;
-  }[];
-  steps: {
-    reveal?: string[];
-    highlight?: string[];
-    say: string;
-  }[];
-};
+type GeometryScene = Extract<Scene, { kind: "geometry" }>;
+type GeometryStep = GeometryScene["steps"][number];
 
 export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScene, env: PaintEnv) {
   const { layout, palette } = env;
@@ -149,7 +122,7 @@ export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScen
       });
     }
 
-    const update = (elapsedMs: number, ctxData: { activeStep: any, p: number }) => {
+    const update = (elapsedMs: number, ctxData: { activeStep: GeometryStep, p: number }) => {
       const { activeStep, p } = ctxData;
       
       // Animate points
@@ -245,7 +218,7 @@ export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScen
       if (Math.min(1, env.p * 1.4) < 1) return; // Wait until mostly drawn
 
       const style = seg.style ?? "side";
-      let color = THEME.text;
+      let color: string = THEME.text;
       if (style === "aux") color = THEME.textDim;
       else if (style === "ray") color = palette.accent;
       else if (style === "radius") color = palette.secondary;

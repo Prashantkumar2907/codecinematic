@@ -10,35 +10,41 @@ This file has three parts:
 
 ---
 
-## Ground truth (verified 2026-07-27)
+## Ground truth (verified 2026-07-31)
 
 | Fact | Value | Source |
 |---|---|---|
-| Registered painters | **110** (not 113) | `src/studio/painters/index.ts:133-244` |
-| Painter files | 113 (= 110 + `index.ts` + `code.ts.bak` + `trace.ts.bak`) | `src/studio/painters/` |
+| Registered painters | **110** | `src/studio/painters/index.ts:133-244` |
+| Painter files | 114 = 110 painter modules + `index.ts` + `common.ts` + `three3d.ts` + `icons.ts`. The `.ts.bak` files are gone. One filename differs from its kind: `sliding_window.ts` registers as `slidingwindow` | `src/studio/painters/` |
 | Isolated preview | `/probe?demo=&scene=&p=&ms=&aspect=` — one scene, one frame, no TTS/recorder | `src/app/probe/page.tsx` |
-| Probe done-signal | `window.__PROBE_DONE = true` | `probe/page.tsx:111` |
+| Probe done-signal | `window.__PROBE_DONE = true` | `probe/page.tsx:308` |
 | Screenshot script | `scripts/probe-shot.mjs` (1 browser launch → 1 frame) | `scripts/probe-shot.mjs` |
 | Playwright | `^1.49.0`, already a devDependency | `package.json` |
 | Dev server | `npm run dev` → port **4321** | `package.json` |
 | Available checks | `npm run typecheck` only — **no test, no lint script exists** | `package.json` |
-| Typecheck baseline | **99 errors already failing** (eventbus, geomap, geometry, radar, timeline, trafficflow) | `npx tsc --noEmit` |
-| Demo coverage | 109/110 kinds have a scene somewhere in `demo.ts`; **`vocab` has none** | scan of `demo.ts` |
-| Probe `DEMOS` map | only ~44 named keys — most kinds unreachable without knowing the `scene=` id | `probe/page.tsx:12-73` |
+| Typecheck | **clean — 0 errors.** It was 71 at the start of this cleanup (66 in `src/studio/demo.ts`, whose fixtures predated the required `meta` field, plus geometry 3, timeline 1, geomap 1); all were fixed on 2026-07-31. Re-measure, do not trust this cell: `npx tsc --noEmit 2>&1 \| grep -c "error TS"` | `npx tsc --noEmit` |
+| ⚠️ Stale baseline | `qa/ledger.json` → `typecheckBaseline` still reads **99**. Typecheck now passes, so the rule is the stronger "**tsc must stay clean**", not "must not exceed the baseline" | `qa/ledger.json` |
+| Demo coverage | all 110 kinds have a scene in `demo.ts` — `DEMO_VOCAB` closed the last gap | `demo.ts:4104` |
+| Probe `DEMOS` map | 61 named keys; `KIND_INDEX` reaches all 110 regardless, so `--kind=` never needs a `scene=` id | `probe/page.tsx:17-80`, `:271` |
 
 **Two facts that change everything:**
 
 1. `/probe` renders **one static frame**. Smoothness, easing, pop-in and dead-time are *temporal*
    properties — they are physically not judgeable from one frame. The harness must produce a
    **filmstrip**, or the whole exercise is guesswork.
-2. Typecheck is **already red with 99 errors**. The rule cannot be "typecheck must pass". It must be
-   "error count must not increase, and the file you touched must have zero errors".
+2. Typecheck **now passes**, so the rule has tightened: it used to be "the count must not increase"
+   while 71 errors stood. It is now simply **"`npx tsc --noEmit` must stay clean"**. Anything you
+   introduce is yours and is visible immediately.
 
 ---
 
 # PART A — One-time harness build
 
-> Paste this once. Do not start polishing animations until Part A is committed and working.
+> **Already built — kept as the record of what the harness is required to do, not as a task.**
+> All four deliverables exist: `KIND_INDEX` + the window hooks (`probe/page.tsx:271-380`),
+> `scripts/filmstrip.mjs`, and `qa/LEDGER.md` + `qa/ledger.json`. Its CONTEXT block below is the
+> *pre-build* state (44 probe keys, no `vocab` demo); read the ground-truth table above for what is
+> true now. Skip to Part B.
 
 ```
 Build the animation-QA harness for devstudio. Do not modify any painter yet — this task is
@@ -111,8 +117,7 @@ BUILD THESE FOUR THINGS:
 VERIFY BEFORE YOU REPORT DONE:
 - `npm run filmstrip -- --all` completes and writes 110 x 2 contact sheets.
 - Record the current typecheck error count (`npx tsc --noEmit 2>&1 | grep -c "error TS"`) into
-  qa/ledger.json as `typecheckBaseline`. It is 99 today; if your harness changed it, you broke
-  something.
+  qa/ledger.json as `typecheckBaseline`. If your harness changed it, you broke something.
 - Open 3 contact sheets yourself (bigtext, sankey, orbit) and confirm the frames actually
   progress — if all 16 cells look identical, the p/ms wiring is wrong and you must fix it before
   reporting done.
@@ -155,8 +160,9 @@ ROUND 2 — FIX
      - Named constants, not magic numbers. Match the file's existing style.
      - Do not change the scene's schema or its demo data to make a bug disappear. If the demo
        data is genuinely unrepresentative, say so explicitly and fix the demo separately.
-  g. npx tsc --noEmit — the file you touched must have ZERO errors, and the total error count
-     must be <= qa/ledger.json typecheckBaseline. Never raise the baseline.
+  g. npx tsc --noEmit must be CLEAN. It passes as of 2026-07-31, so any error at all is yours.
+     (qa/ledger.json still records typecheckBaseline: 99 from when the tree was red — ignore it
+     in favour of a live run.)
 
 ROUND 3 — RE-OBSERVE
   h. Re-run the filmstrip. Re-read the sheets. Re-score.
@@ -270,5 +276,8 @@ they exercise the shared `common.ts` helpers, so fixes there lift everything dow
   the probe.
 - The probe always uses background motif 0; the engine varies the motif. Check contrast against
   more than one motif before calling a colour fix done.
-- `code.ts.bak` and `trace.ts.bak` are dead files, not painters. Ignore them, or delete them in a
-  separate cleanup commit.
+- The probe renders one scene into a fresh context, so it cannot see canvas state leaking from one
+  scene into the next. That class of bug — an unbalanced `ctx.save()` — is invisible here by
+  construction; see `devstudio/CLAUDE.md`.
+- A filmstrip that times out is usually a wedged dev server, not a stuck painter: restart
+  `npm run dev` before you start debugging the painter (`PROGRESS.md` row 7.3).

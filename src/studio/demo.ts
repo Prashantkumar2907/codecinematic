@@ -1,5 +1,18 @@
 import type { SceneScript } from "./schema";
 
+/**
+ * Publish metadata shared by every fixture that has no hand-written copy of its own.
+ * These scripts are never uploaded, but `metaSchema` is not optional, so the defaults
+ * still have to satisfy its length and hashtag rules.
+ */
+const DEMO_META: SceneScript["meta"] = {
+  title: "DevStudio probe fixture — single scene smoke test",
+  description:
+    "Hardcoded fixture used by the probe and filmstrip to exercise one scene painter without a Gemini call. Not for publishing.",
+  tags: ["devstudio", "probe", "fixture", "render test"],
+  hashtags: ["#DevStudio", "#Probe", "#RenderTest"],
+};
+
 /** Hardcoded script for the render spike and manual smoke-testing (no Gemini call). */
 export const DEMO_CHART: SceneScript = {
   format: "short",
@@ -22,7 +35,8 @@ export const DEMO_CHART: SceneScript = {
         { label: "Fri", value: 28, unit: "ms", say: "Friday it settles near 28." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_TREE: SceneScript = {
@@ -52,7 +66,8 @@ export const DEMO_TREE: SceneScript = {
         { reveal: ["ram", "rom", "ssd", "hdd"], say: "Each splits again into the types you actually buy." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BULLETS: SceneScript = {
@@ -74,7 +89,8 @@ export const DEMO_BULLETS: SceneScript = {
         { text: "Lowers tail latency", say: "And it lowers your tail latency." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_QUOTE: SceneScript = {
@@ -88,10 +104,12 @@ export const DEMO_QUOTE: SceneScript = {
     {
       kind: "quote",
       id: "qt",
+      narration: "Alan Kay on why your first programming language is the hardest thing to unlearn.",
       text: "The most disastrous thing that you can ever learn is your first programming language.",
       author: "Alan Kay",
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_MEMGRID: SceneScript = {
@@ -118,7 +136,8 @@ export const DEMO_MEMGRID: SceneScript = {
         { write: [], free: [], highlight: [], pointer: { label: "ptr", index: 2 }, say: "Pointer points to C." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_STATEMACHINE: SceneScript = {
@@ -149,7 +168,8 @@ export const DEMO_STATEMACHINE: SceneScript = {
         { go: "closed", say: "Closing tears it back down to CLOSED." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_DIAGRAM: SceneScript = {
@@ -195,7 +215,8 @@ export const DEMO_DIAGRAM: SceneScript = {
         },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_TABLE: SceneScript = {
@@ -219,7 +240,8 @@ export const DEMO_TABLE: SceneScript = {
       ],
       sayIntro: "Notice where each method actually lives.",
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_CALLSTACK: SceneScript = {
@@ -244,7 +266,8 @@ export const DEMO_CALLSTACK: SceneScript = {
         { op: "pop", say: "And pops." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_MATRIX: SceneScript = {
@@ -284,7 +307,8 @@ export const DEMO_MATRIX: SceneScript = {
         },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_COMPARE: SceneScript = {
@@ -314,7 +338,8 @@ export const DEMO_COMPARE: SceneScript = {
       verdict: "Pick by access pattern, not by hype.",
       sayVerdict: "Choose based on how you actually read and write.",
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BROWSERFRAME: SceneScript = {
@@ -350,7 +375,8 @@ export const DEMO_BROWSERFRAME: SceneScript = {
         },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BUCKETS: SceneScript = {
@@ -375,7 +401,8 @@ export const DEMO_BUCKETS: SceneScript = {
         { amount: 80, say: "Then a spike of 80." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BASKET: SceneScript = {
@@ -402,52 +429,57 @@ export const DEMO_BASKET: SceneScript = {
         { label: "College", icon: "🎓", prices: [10000, 40000] },
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BITS: SceneScript = {
   format: "short",
   lang: "en",
-  title: "Bits",
-  hooks: "",
-  visual: "bits",
-  audio: { url: "", start: 0, duration: 10, offset: 0, text: "" },
-  beats: [{ t: 0 }, { t: 2 }, { t: 4 }],
-  scene: {
-    kind: "bits",
-    id: "b1",
-    title: "BITWISE",
-    width: 8,
-    steps: [
-      { op: "set", value: "10101010", say: "Set" },
-      { op: "and", value: "11110000", say: "AND" },
-      { op: "shl", say: "Shift Left" }
-    ]
-  }
+  subject: "Testing",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Bits",
+  scenes: [
+    {
+      kind: "bits",
+      id: "b1",
+      title: "BITWISE",
+      width: 8,
+      steps: [
+        { op: "set", value: "10101010", say: "Start with the alternating pattern one zero one zero." },
+        { op: "and", value: "11110000", say: "AND against the top nibble keeps only the high four bits." },
+        { op: "shl", say: "Shift left once and every bit walks one place up." }
+      ]
+    }
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_THREADS: SceneScript = {
   format: "short",
   lang: "en",
-  title: "Threads",
-  hooks: "",
-  visual: "threads",
-  audio: { url: "", start: 0, duration: 10, offset: 0, text: "" },
-  beats: [{ t: 0 }, { t: 2 }, { t: 4 }],
-  scene: {
-    kind: "threads",
-    id: "t1",
-    title: "CONCURRENCY",
-    lanes: [{ label: "Thread 1" }, { label: "Thread 2" }],
-    tasks: [
-      { id: "tk1", lane: 0, label: "Fetch", start: 0, len: 4, kind: "run" },
-      { id: "tk2", lane: 1, label: "Parse", start: 1, len: 3, kind: "wait" }
-    ],
-    steps: [
-      { reveal: ["tk1"], say: "Start" },
-      { reveal: ["tk2"], clash: ["tk1", "tk2"], say: "Clash" }
-    ]
-  }
+  subject: "Testing",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Threads",
+  scenes: [
+    {
+      kind: "threads",
+      id: "t1",
+      title: "CONCURRENCY",
+      lanes: [{ label: "Thread 1" }, { label: "Thread 2" }],
+      tasks: [
+        { id: "tk1", lane: 0, label: "Fetch", start: 0, len: 4, kind: "run" },
+        { id: "tk2", lane: 1, label: "Parse", start: 1, len: 3, kind: "wait" }
+      ],
+      steps: [
+        { reveal: ["tk1"], clash: [], say: "Thread one starts fetching and holds the lane for four ticks." },
+        { reveal: ["tk2"], clash: ["tk1", "tk2"], say: "Thread two wakes up mid-fetch and now both want the same resource." }
+      ]
+    }
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_CIPHER: SceneScript = {
@@ -470,7 +502,8 @@ export const DEMO_CIPHER: SceneScript = {
         { op: "digest", say: "Digest" }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_CIRCUIT: SceneScript = {
@@ -512,7 +545,8 @@ export const DEMO_CIRCUIT: SceneScript = {
         },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_SCRIPT: SceneScript = {
@@ -1975,7 +2009,8 @@ export const DEMO_TERRAIN: SceneScript = {
         { at: 7, kind: "delta", label: "Delta", say: "It fans out into a delta at the sea." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_MOLECULE: SceneScript = {
@@ -2007,7 +2042,8 @@ export const DEMO_MOLECULE: SceneScript = {
         ],
       },
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_ORBIT: SceneScript = {
@@ -2024,12 +2060,13 @@ export const DEMO_ORBIT: SceneScript = {
       title: "Solar System",
       center: "Sun",
       bodies: [
-        { label: "Mercury" },
-        { label: "Venus" },
-        { label: "Earth" },
+        { label: "Mercury", say: "Mercury rides the innermost ring, closest to the Sun." },
+        { label: "Venus", say: "Venus sits one ring out, hotter than Mercury despite that." },
+        { label: "Earth", say: "Earth is the third ring, and the only one with liquid water." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_WAVE1: SceneScript = {
@@ -3143,35 +3180,51 @@ export const DEMO_WAVE3D: SceneScript = {
 };
 
 export const DEMO_TIMELINE: SceneScript = {
-  duration: 4000,
-  scene: {
-    id: "s1",
-    kind: "timeline",
-    title: "Project Evolution",
-    orient: "vertical",
-    events: [
-      { when: "2021", label: "Initial idea and prototyping phase." },
-      { when: "2022", label: "Seed funding and core team assembly." },
-      { when: "2023", label: "Beta launch with 10k active users.", highlight: true },
-      { when: "2024", label: "Global expansion and new features." }
-    ]
-  }
+  format: "short",
+  lang: "en",
+  subject: "Testing",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Timeline",
+  scenes: [
+    {
+      kind: "timeline",
+      id: "s1",
+      title: "Project Evolution",
+      orient: "vertical",
+      events: [
+        { when: "2021", label: "Initial idea and prototyping", say: "Twenty twenty-one is just an idea and a prototype." },
+        { when: "2022", label: "Seed funding and core team", say: "Seed money lands and the core team comes together." },
+        { when: "2023", label: "Beta launch, 10k users", say: "The beta ships and ten thousand people actually use it." },
+        { when: "2024", label: "Global expansion", say: "By twenty twenty-four it goes global." }
+      ]
+    }
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_SANKEY: SceneScript = {
-  duration: 4000,
-  scene: {
-    id: "s1",
-    kind: "sankey",
-    title: "Traffic Sources",
-    source: { label: "Total Visits", total: 10000 },
-    branches: [
-      { label: "Organic Search", value: 5000 },
-      { label: "Direct", value: 2500 },
-      { label: "Social Media", value: 1500 },
-      { label: "Referral", value: 1000 }
-    ]
-  }
+  format: "short",
+  lang: "en",
+  subject: "Testing",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Sankey",
+  scenes: [
+    {
+      kind: "sankey",
+      id: "s1",
+      title: "Traffic Sources",
+      source: { label: "Total Visits", total: 10000 },
+      branches: [
+        { label: "Organic Search", value: 5000, say: "Half of all visits arrive from organic search." },
+        { label: "Direct", value: 2500, say: "A quarter type the address in directly." },
+        { label: "Social Media", value: 1500, say: "Social media brings fifteen percent." },
+        { label: "Referral", value: 1000, say: "The last tenth comes from referrals." }
+      ]
+    }
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_GAUGE: SceneScript = {
@@ -3199,7 +3252,8 @@ export const DEMO_GAUGE: SceneScript = {
         { label: "Under load", value: 78, say: "Under heavy load it climbs into the warm zone." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_PICTOGRAM: SceneScript = {
@@ -3221,7 +3275,8 @@ export const DEMO_PICTOGRAM: SceneScript = {
         { label: "Offline", count: 35, say: "The remaining third are still unconnected." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_TRAFFICFLOW: SceneScript = {
@@ -3237,6 +3292,7 @@ export const DEMO_TRAFFICFLOW: SceneScript = {
       id: "tf1",
       title: "Load Balancing",
       algorithm: "round-robin",
+      clients: 2,
       servers: [
         { id: "s1", label: "Server A", load: 20 },
         { id: "s2", label: "Server B", load: 30 }
@@ -3246,7 +3302,8 @@ export const DEMO_TRAFFICFLOW: SceneScript = {
         { targetServer: "s2", say: "Second request goes to Server B" }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_EVENTBUS: SceneScript = {
@@ -3278,7 +3335,8 @@ export const DEMO_EVENTBUS: SceneScript = {
         { consume: { consumerId: "c2", topicId: "t1" }, say: "Analytics also consumes it." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_CODE: SceneScript = {
@@ -3301,7 +3359,8 @@ export const DEMO_CODE: SceneScript = {
       focusLines: [],
       expectedOutput: "",
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_TRACE: SceneScript = {
@@ -3338,7 +3397,8 @@ export const DEMO_TRACE: SceneScript = {
         }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_GEOMAP: SceneScript = {
@@ -3365,7 +3425,8 @@ export const DEMO_GEOMAP: SceneScript = {
         { reveal: ["m1", "r1", "m2"], say: "A route from Delhi to Mumbai." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_LAYERS: SceneScript = {
@@ -3387,7 +3448,8 @@ export const DEMO_LAYERS: SceneScript = {
         { label: "Network", detail: "IP", say: "Layer 3 routes packets." },
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BRACKET: SceneScript = {
@@ -3409,12 +3471,13 @@ export const DEMO_BRACKET: SceneScript = {
         { label: "D", icon: "D" }
       ],
       matches: [
-        { winner: 0 },
-        { winner: 1 },
-        { winner: 0 }
+        { winner: 0, say: "A beats B in the first semifinal." },
+        { winner: 1, say: "D takes the second semifinal from C." },
+        { winner: 0, say: "And A wins the final." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_SHOWDOWN: SceneScript = {
@@ -3432,13 +3495,14 @@ export const DEMO_SHOWDOWN: SceneScript = {
       left: { label: "SQL", icon: "Q" },
       right: { label: "NoSQL", icon: "N" },
       rounds: [
-        { criterion: "Scale", winner: "right" },
-        { criterion: "ACID", winner: "left" },
-        { criterion: "Flexibility", winner: "right" }
+        { criterion: "Scale", winner: "right", say: "On horizontal scale, NoSQL wins outright." },
+        { criterion: "ACID", winner: "left", say: "On transactional guarantees, SQL takes it back." },
+        { criterion: "Flexibility", winner: "right", say: "On schema flexibility, NoSQL again." }
       ],
       verdict: "Pick your poison"
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_SKYLINE: SceneScript = {
@@ -3457,6 +3521,7 @@ export const DEMO_SKYLINE: SceneScript = {
         {
           when: "1900",
           stat: "100k",
+          say: "In nineteen hundred it is houses and a mill, a hundred thousand people.",
           buildings: [
             { kind: "house", h: 2 },
             { kind: "mill", h: 3 }
@@ -3465,6 +3530,7 @@ export const DEMO_SKYLINE: SceneScript = {
         {
           when: "2000",
           stat: "2M",
+          say: "A century later, towers and landmarks house two million.",
           buildings: [
             { kind: "skyscraper", h: 8 },
             { kind: "tower", h: 6 },
@@ -3473,7 +3539,8 @@ export const DEMO_SKYLINE: SceneScript = {
         }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 export const DEMO_TERMINAL: SceneScript = {
   format: "short",
@@ -3486,14 +3553,15 @@ export const DEMO_TERMINAL: SceneScript = {
     {
       kind: "terminal",
       id: "term",
-      title: "Run Server",
+      narration: "One command starts the dev server and it is listening on port three thousand.",
       lines: [
         "$ npm run dev",
         "Starting development server...",
         "Ready on http://localhost:3000"
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_STORYBOARD: SceneScript = {
@@ -3509,12 +3577,13 @@ export const DEMO_STORYBOARD: SceneScript = {
       id: "story",
       title: "Flow",
       panels: [
-        { icons: ["📦", "⚙️"], caption: "Build" },
-        { icons: ["🚀"], caption: "Deploy" },
-        { icons: ["🎉"], caption: "Success" }
+        { icons: ["📦", "⚙️"], caption: "Build", say: "First the bundler packs everything into one artifact." },
+        { icons: ["🚀"], caption: "Deploy", say: "Then that artifact ships to production." },
+        { icons: ["🎉"], caption: "Success", say: "And the health check comes back green." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_ZOOMLADDER: SceneScript = {
@@ -3531,7 +3600,8 @@ export const DEMO_ZOOMLADDER: SceneScript = {
         { label: "Earth", scale: "10⁷ m", icon: "🌍", say: "The entire planet." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_BODYMAP: SceneScript = {
@@ -3548,7 +3618,8 @@ export const DEMO_BODYMAP: SceneScript = {
         { region: "kidneys", label: "Mild diuretic", say: "Flushes more fluid." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_CONSTELLATION: SceneScript = {
@@ -3572,12 +3643,17 @@ export const DEMO_CONSTELLATION: SceneScript = {
         { connect: [{ a: "p4", b: "p5" }], say: "Next line" }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_DAYCLOCK: SceneScript = {
-  subject: "Time",
   format: "long",
+  lang: "en",
+  subject: "Time",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Dayclock",
   scenes: [
     {
       id: "demo-dayclock-1",
@@ -3585,17 +3661,22 @@ export const DEMO_DAYCLOCK: SceneScript = {
       title: "Daily Schedule",
       face: "24h",
       pins: [
-        { at: "08:00", label: "Wake up", icon: "☀️" },
-        { at: "12:30", label: "Lunch", icon: "🍔" },
-        { at: "19:00", label: "Dinner", icon: "🍽️" },
+        { at: "08:00", label: "Wake up", icon: "☀️", say: "Eight in the morning, the day starts." },
+        { at: "12:30", label: "Lunch", icon: "🍔", say: "Half twelve is the lunch break." },
+        { at: "19:00", label: "Dinner", icon: "🍽️", say: "Seven in the evening, dinner." },
       ],
     },
   ],
+  meta: DEMO_META,
 };
 
 export const DEMO_GEOMETRY: SceneScript = {
-  subject: "Math",
   format: "long",
+  lang: "en",
+  subject: "Math",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Geometry",
   scenes: [
     {
       id: "demo-geometry-1",
@@ -3607,9 +3688,9 @@ export const DEMO_GEOMETRY: SceneScript = {
         { id: "C", x: 50, y: 20, label: "C" },
       ],
       segments: [
-        { a: "A", b: "B", label: "Base" },
-        { a: "B", b: "C" },
-        { a: "C", b: "A" },
+        { a: "A", b: "B", label: "Base", style: "side" },
+        { a: "B", b: "C", style: "side" },
+        { a: "C", b: "A", style: "side" },
       ],
       fills: [
         { pts: ["A", "B", "C"], label: "Area" }
@@ -3618,12 +3699,17 @@ export const DEMO_GEOMETRY: SceneScript = {
         { highlight: ["A", "B", "C"], say: "Points of a triangle" }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_NUMBERLINE: SceneScript = {
-  subject: "Math",
   format: "long",
+  lang: "en",
+  subject: "Math",
+  module: "Test",
+  submodule: "Test",
+  topic: "Testing Numberline",
   scenes: [
     {
       id: "demo-numberline-1",
@@ -3631,14 +3717,16 @@ export const DEMO_NUMBERLINE: SceneScript = {
       title: "Number Line Jumps",
       min: 0,
       max: 10,
+      mode: "line",
       marks: [
-        { value: 2, label: "Start at 2", say: "Start at 2" },
-        { value: 2, to: 5, kind: "jump", label: "+3", say: "Jump forward 3" },
-        { value: 5, label: "Land at 5", say: "Land at 5" },
-        { value: 5, to: 8, kind: "range", label: "Zone", say: "This is a zone" },
+        { value: 2, kind: "point", label: "Start at 2", say: "We start at two." },
+        { value: 2, to: 5, kind: "jump", label: "+3", say: "Jump forward three places." },
+        { value: 5, kind: "point", label: "Land at 5", say: "And we land on five." },
+        { value: 5, to: 8, kind: "range", label: "Zone", say: "Five to eight is the shaded zone." },
       ],
     },
   ],
+  meta: DEMO_META,
 };
 
 export const DEMO_FORMULA: SceneScript = {
@@ -3661,7 +3749,8 @@ export const DEMO_FORMULA: SceneScript = {
       resultValue: "1610",
       sayResult: "After the years compound, the balance grows to sixteen-ten."
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_CURVES: SceneScript = {
@@ -3684,7 +3773,8 @@ export const DEMO_CURVES: SceneScript = {
       ],
       mark: { x: 50, label: "Equilibrium", say: "Where they cross sets the market price." },
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_SCHEMATIC: SceneScript = {
@@ -3711,7 +3801,8 @@ export const DEMO_SCHEMATIC: SceneScript = {
         { reveal: ["deck"], highlight: [], say: "Finally the deck lays flat across the top." },
       ],
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 
@@ -3723,6 +3814,7 @@ export const DEMO_BIGTEXT: SceneScript = {
   scenes: [
     {
       kind: "bigtext", id: "t-bigtext",
+      narration: "Baseline coverage: whichever entrance variant this id hashes to.",
       text: "The **future** of rendering is __3D__ and beyond.",
       sub: "Embrace the **new** dimension.",
       icon: "🚀"
@@ -3755,7 +3847,8 @@ export const DEMO_BIGTEXT: SceneScript = {
       sub: "Embrace the **new** dimension.",
       icon: "🚀",
     },
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_STAT: SceneScript = {
@@ -3768,7 +3861,8 @@ export const DEMO_STAT: SceneScript = {
       label: "Faster rendering after the WebGL switch",
       context: "Measured across 500 scene renders on the same machine.",
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_STEPS: SceneScript = {
@@ -3778,12 +3872,13 @@ export const DEMO_STEPS: SceneScript = {
       kind: "steps", id: "t-steps",
       title: "Evolution",
       steps: [
-        "Plan the changes",
-        "Implement in **Three.js**",
-        "Capture and __verify__"
+        { text: "Plan the changes", say: "First we plan what actually has to change." },
+        { text: "Implement in **Three.js**", say: "Then the painter gets rewritten in Three.js." },
+        { text: "Capture and __verify__", say: "Finally we capture a filmstrip and verify it." }
       ]
     }
-  ]
+  ],
+  meta: DEMO_META,
 };
 
 export const DEMO_WAVE3E: SceneScript = {
@@ -3880,8 +3975,8 @@ export const DEMO_WAVE3E: SceneScript = {
     { kind: "isolate", hide: ["pid"], say: "A new PID namespace hides the host's process tree — this container only sees itself as PID 1." },
     { kind: "isolate", hide: ["mnt", "usr"], say: "Mount and user namespaces cut it off from the host filesystem and its real UID map." },
     { kind: "isolate", hide: ["host"], say: "Even the hostname gets its own namespace — but notice net is still open." },
-    { kind: "limit", usagePct: 55, say: "A cgroup then caps how much memory this process can actually use, say 55 percent." },
-    { kind: "limit", usagePct: 82, say: "Push past the 70 percent cap and the kernel throttles it — the namespace never stopped that; the cgroup did." },
+    { kind: "limit", hide: [], usagePct: 55, say: "A cgroup then caps how much memory this process can actually use, say 55 percent." },
+    { kind: "limit", hide: [], usagePct: 82, say: "Push past the 70 percent cap and the kernel throttles it — the namespace never stopped that; the cgroup did." },
   ],
 },
     {

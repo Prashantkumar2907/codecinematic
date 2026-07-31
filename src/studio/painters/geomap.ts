@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import * as d3Geo from "d3-geo";
 import { render3D, projectToRect, studioLights, makeCylinder, type ThreeBundle } from "./three3d";
+import type { Scene } from "../schema";
 import type { PaintEnv } from "./index";
 import {
   FONT_SANS,
@@ -17,38 +18,7 @@ import {
   activeBeatIndex
 } from "./common";
 
-export type GeomapScene = {
-  kind: "geomap";
-  id: string;
-  sayIntro?: string;
-  title: string;
-  base: "india" | "world" | "asia" | "subcontinent" | "europe";
-  markers?: {
-    id: string;
-    label: string;
-    lon: number;
-    lat: number;
-    kind?: "city" | "battle" | "capital" | "port" | "peak" | "dot";
-    icon?: string;
-  }[];
-  routes?: {
-    id: string;
-    points: { lon: number; lat: number }[];
-    label?: string;
-    style?: "route" | "river" | "wind" | "front";
-  }[];
-  regions?: {
-    id: string;
-    name: string;
-    bounds?: { lon: number; lat: number }[];
-  }[];
-  steps: {
-    reveal?: string[];
-    highlight?: string[];
-    focus?: { lon: number; lat: number; zoom?: number };
-    say: string;
-  }[];
-};
+type GeomapScene = Extract<Scene, { kind: "geomap" }>;
 
 const MAP_BOUNDS: Record<string, { center: [number, number]; scale: number }> = {
   india: { center: [78.9, 22.5], scale: 1200 },
@@ -188,8 +158,8 @@ export function paintGeomap(ctx: CanvasRenderingContext2D, scene: GeomapScene, e
   ctx.beginPath();
   lines.forEach(line => {
       let first = true;
-      line.coordinates.forEach(coord => {
-          const pt = projection(coord);
+      line.coordinates.forEach(([lon, lat]) => {
+          const pt = projection([lon, lat]);
           if(pt) {
               const wp = worldPos(pt[0], pt[1]);
               const sp = projectToRect(cam, wp, rect);

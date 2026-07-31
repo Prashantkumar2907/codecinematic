@@ -100,7 +100,13 @@ everything else and links to it.)
 | 12.6 | 12 | narration | Subject-aware default voice (currently `en-US-Andrew`) | todo | — | — | — |
 | 12.7 | 12 | narration | Emphasis marker that strips from caption, survives to voice | todo | 12.1 | no letter-spelled emphasis | — |
 | 12.8 | 12 | narration | Put synthesis behind a swappable interface | todo | 12.1 | vendor swap is config | — |
-| 8.x | 8 | hygiene | Typecheck 99 → 0; delete 108 cruft files; single-source `LIMITS`; 6 dead deps; docs | todo | 0.1 | **attempted and reverted.** The plan's "one type alias kills all 55" is wrong: `Omit<SceneScript,"meta">` breaks the fixtures that DO have meta, and `& Partial<Pick<…>>` then cascades **61 new errors into `/probe`**, which consumes `DEMO.*` as `SceneScript` (71 → 103). The real fix is a `demo(script): SceneScript` helper that fills a shared `DEMO_META`, applied to all 62 fixtures, so every export stays a true `SceneScript` and nothing cascades. Needs a dedicated session; tree reverted to 71 | — |
+| 8.1 | 8 | hygiene | **Typecheck 99 → 0** | verified | 0.1 | `npx tsc --noEmit` → **0 errors** (99 at session start, 71 after phases 1-7). `demo.ts` was 66 of them | 6514f41 |
+| 8.2 | 8 | hygiene | `npm run build` green for the first time | verified | 8.1 | build completes and prints the route table; it had failed on `demo.ts` all session | 6514f41 |
+| 8.3 | 8 | hygiene | Delete root cruft + close `.gitignore` | verified | 0.1 | 0 `screenshot_*.png` and 0 `rewrite_*.js` remain; only 1 untracked file left in the repo (the new `CLAUDE.md`). `.venv/`, `audit/`, `graphify-out/`, `src/` (158 files) and `scripts/` (18) all intact | 6514f41 |
+| 8.4 | 8 | hygiene | Remove 6 dead deps, move `@types/three` | verified | 0.1 | `requests`, `chroma-js`, `polylabel`, `d3-array`, `d3-force`, `d3-scale` all gone; `@types/three` now in devDependencies; build still green | 6514f41 |
+| 8.5 | 8 | docs | Refresh README, delete `NEW_ANIMATIONS.md`, fix QA doc | verified | — | `NEW_ANIMATIONS.md` `git rm`'d (all 43 proposals shipped; 17 of its "existing" kinds never existed) | 6514f41 |
+| 8.6 | 8 | docs | **Write `devstudio/CLAUDE.md`** | verified | — | 11.7 KB, written from the code. The root `CLAUDE.md` never mentioned devstudio despite telling readers to "follow ITS CLAUDE.md" | 6514f41 |
+| 8.7 | 8 | hygiene | Single-source `LIMITS`, split `page.tsx`/`schema.ts`, remove 25 dead exports | todo | 8.1 | **not done** — the remaining Phase 8 scope. `SPOKEN_LIMITS` (Phase 4) is a partial first step | — |
 | 9.x | 9 | animation | Motion toolkit + house style, then top-traffic kinds by tier | todo | 1.1, 8.x | `qa/LEDGER.md` rows | — |
 | 10.x | 10 | render | Typography scale, transition language, encode audit | todo | 9.x | — | — |
 | 16.1 | 16 | integration | Post-render measurement of the actual video | todo | 3.1 | dead frames measured on output | — |

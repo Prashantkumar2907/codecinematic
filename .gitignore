@@ -7,12 +7,16 @@ content/videos/
 content/news/
 *.log
 .venv/
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 .DS_Store
 content/factory/
 content/
 graphify-out/
 playwright-report/
 audit/
+.gemini/
+*.ts.bak
 # Animation-QA capture artifacts (regenerate with: npm run filmstrip)
 qa/**/*.png
+# Superseded by the above: filmstrip writes to qa/<kind>/, not the repo root
+screenshot_*.png

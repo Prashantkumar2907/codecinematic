@@ -4,10 +4,12 @@ Personal AI teaching-video studio: pick Subject → Module → Sub-module, let
 Gemini suggest 10 unmade topics, generate a scene-scripted, narrated,
 output-verified YouTube video (Short 9:16 or Long 16:9), review it in the
 Library (copy metadata, download webm/thumbnail), and upload on approval.
-14 subjects ship: Coding, History, Geography, Math & Aptitude, Science,
+19 subjects ship: Coding, History, Geography, Math & Aptitude, Science,
 Money & Finance, English & Communication, GK & Amazing Facts, Psychology &
 the Mind, Business & Startups, Health & Body, Philosophy & Big Ideas, Life
-Skills & Productivity, and Mythology & Epics — edit `content/subjects.json`
+Skills & Productivity, Mythology & Epics, Polity & Governance, Mindset &
+Self-Growth, Economy, Environment & Ecology, and Art & Culture — edit
+`content/subjects.json`
 to add more (give new subjects a palette in `src/studio/painters/common.ts`
 and a playbook in `src/lib/prompt.ts`). Any module or sub-module may also
 carry an optional `"style"` string in subjects.json — it is injected into the
@@ -24,10 +26,16 @@ python3 -m venv .venv && .venv/bin/pip install edge-tts
 # News tab only — renders branded news Shorts with headless Chromium:
 .venv/bin/pip install playwright && .venv/bin/playwright install chromium
 npm run dev          # http://localhost:4321
-npm run typecheck
+npm run typecheck    # the ONLY check that exists — there is no lint and no test script
 node scripts/spike.mjs                                              # demo Short smoke test (dev server must be running)
 node scripts/spike.mjs out "gen=1&subject=coding&module=frontend&sub=javascript&format=long&auto=1" 1200   # full-real long run via Gemini
 ```
+
+`npm run typecheck` is **clean** as of 2026-07-31 and is expected to stay that
+way. It was red for a long stretch — 71 errors, 66 of them in `src/studio/demo.ts`
+from fixtures predating the required `meta` field — so older notes (and
+`qa/ledger.json` → `typecheckBaseline: 99`) still describe a "never raise the
+count" rule. That is obsolete: run it and expect zero.
 
 `.env.local` (gitignored) needs: `GEMINI_API_KEY`, `YT_CLIENT_ID`,
 `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`, `NEXT_PUBLIC_BRAND`, `VOICE`. For the
@@ -41,8 +49,9 @@ model default; set `0` to disable thinking for the fastest generation — the
 script otherwise).
 
 > **Free-tier keys are rate-limited to roughly one request per minute** and
-> ~20/day for the flagship flash models. A full run makes 2–4 calls (topics +
-> generate + up to two repairs), so on a free key generation waits between
+> ~20/day for the flagship flash models. A full run makes 2–5 calls (topics +
+> generate + up to three repairs), and an `ENHANCED_SUBJECTS` run adds up to
+> three more (blueprint + critique + refine), so on a free key generation waits between
 > per-minute windows (the client now backs off and retries for up to 2 minutes
 > rather than failing instantly). For smooth use, put a **paid / higher-quota
 > `GEMINI_API_KEY`** here, or set `GEMINI_THINKING_BUDGET=0` to cut per-call time.
@@ -51,13 +60,13 @@ script otherwise).
 
 1. **Pick & Generate** — `content/subjects.json` defines the taxonomy
    (subject → module → sub-module, each subject with its own audience + style
-   fed into prompts). `/api/studio/topics` asks Gemini for the 10 best unmade
-   topics (excluding `content/history.json` for that sub-module);
+   fed into prompts). `/api/studio/topics` asks Gemini for the best unmade
+   topics (5–12, excluding `content/history.json` for that sub-module);
    `/api/studio/generate` turns the chosen topic into a `SceneScript`
-   (strict zod schema in `src/studio/schema.ts` — 15 scene kinds:
-   bigtext, bullets, code, terminal, diagram, compare, question, timeline,
-   stat, steps, quiz, vocab, chart, quote, mythfact). Each subject carries its
-   own accent **palette** (`paletteForSubject` in
+   (strict zod schema in `src/studio/schema.ts` — **110 scene kinds**, one
+   painter each, registered in `src/studio/painters/index.ts`; that registry is
+   re-exported as `ALL_SCENE_KINDS` so tooling cannot drift from it). Each
+   subject carries its own accent **palette** (`paletteForSubject` in
    `src/studio/painters/common.ts`) and a prompt **playbook**
    (`SUBJECT_PLAYBOOKS` in `src/lib/prompt.ts`) steering which kinds it
    favours — so History reads as an amber timeline, English as violet vocab
@@ -66,14 +75,41 @@ script otherwise).
    styles, 3 bullet marker styles and 3 thumbnail layouts are all seeded from
    scene/topic ids (same script → identical re-render). Non-coding subjects
    use lang-"text" code panels for worked examples instead of executable code.
-   Display-only strings are clamped deterministically
-   (`src/lib/sanitize.ts`) before validation; remaining failures get up to two
-   Gemini repair rounds. `/api/studio/generate` streams NDJSON stage events
-   (`writing` → `validating` → `repairing`) so the 30–180s wait shows honest
-   progress in the UI. NOTE: free-tier gemini-2.5-flash allows only
-   ~20 requests/day (resets midnight PT) — switch `GEMINI_MODEL` or enable
-   billing for real volume. Requests are counted in `content/quota.json` and
-   shown as a meter in the masthead.
+   NOTE: free-tier gemini-2.5-flash allows only ~20 requests/day (resets
+   midnight PT) — switch `GEMINI_MODEL` or enable billing for real volume.
+   Requests are counted in `content/quota.json` and shown as a meter in the
+   masthead.
+
+   **Two generation paths.** The 8 subjects in `ENHANCED_SUBJECTS`
+   (`src/lib/prompt.ts:949` — coding, history, geography, polity, economy,
+   environment, artculture, english) run the full **creator pipeline**:
+
+   ```
+   planning  → blueprint    (fast model designs the episode arc)
+   writing   → script       (quality model writes it, from the blueprint)
+   reviewing → critique     (fast model returns {verdict, issues[]})
+   refining  → revise       (quality model applies the critique) — only if verdict == "revise"
+   ```
+
+   Every other subject goes straight to `writing` in one shot. The blueprint
+   and critique stages are **best-effort**: if either call fails, generation
+   falls through to the plain prompt / ships the un-refined draft rather than
+   dying (`generate/route.ts:100-145`). Both sub-calls honour `freeOnly` so an
+   automated run never bills a key on planning or review.
+
+   **Then the gate loop.** Display-only strings are clamped deterministically
+   (`src/lib/sanitize.ts`) before validation. A script must pass the zod schema
+   *and* a set of soft quality gates — word budget, no adjacent bigtext section
+   cards, no card after the ending question, no formulaic hook, vocab examples
+   that actually use their word, plus the seven pacing/voice gates imported
+   from `src/studio/pacing.ts` (`PACING_GATES`, `generate/route.ts:18-26`).
+   Failures drive up to **3 repair rounds** (`REPAIR_ROUNDS`,
+   `generate/route.ts:50`). Soft gates never hard-fail: after the last round a
+   schema-valid script ships with honest `warnings[]`, because a complete video
+   beats no video. Only a still-schema-invalid script errors out.
+   `/api/studio/generate` streams NDJSON stage events — `planning` →
+   `writing` → `reviewing` → `refining` → `validating` → `repairing` →
+   `optimizing` → `done` — so the 30–180s wait shows honest progress in the UI.
 2. **Verify** — every runnable code scene (js/ts, python, sql) is executed via
    `/api/studio/exec`; wrong `expectedOutput` and stale terminal scenes are
    patched with the real stdout (badges: verified / patched / failed).
@@ -101,6 +137,71 @@ script otherwise).
 State ownership: `src/lib/state.ts` is the only writer of history/subjects
 files and draft deletion; `/api/studio/save` is the only writer of
 `content/videos/`.
+
+Post-generation routes the Create tab also uses: `/api/studio/rate` (LLM rubric
+score, with the pacing facts computed rather than guessed — `src/lib/rate.ts`),
+`/api/studio/refine` (apply critique to a whole script), `/api/studio/regen-scene`
+(re-roll one scene) and `/api/studio/tune` (persist learned directives).
+
+## Animation QA
+
+110 painters is more surface than a human can eyeball, so the visual quality of
+the scene kinds has its own subsystem. **`qa/LEDGER.md` is the source of truth
+for polish progress — not the conversation**, which gets summarised and lost;
+update a kind's row in the same commit that polishes it.
+
+`/probe` (`src/app/probe/page.tsx`) renders **one scene at one fixed progress**,
+deterministically, with no TTS and no recorder. It builds a `KIND_INDEX` over
+every `DEMO_*` fixture in `src/studio/demo.ts` and picks the *richest* scene per
+kind (a two-item demo hides layout bugs a six-item demo exposes), so all 110
+kinds are reachable by name. It also exposes window hooks that the scripts drive
+— `__PROBE_RENDER`, `__PROBE_FILMSTRIP`, `__PROBE_EDGEBLEED` — which is why one
+browser launch can capture the whole registry.
+
+```bash
+npm run filmstrip -- --kind=chart          # contact sheet + p50/p90 detail frames -> qa/chart/
+npm run filmstrip -- --kind=chart --entrance   # first 500ms at ~33ms/cell (motion scoring needs this)
+npm run filmstrip -- --all                 # all 110 kinds, both aspects, one browser
+npm run edge-audit                         # containment across every kind -> qa/AUDIT.md, worst-first
+npm run edge-check -- --kind=chart         # same measurement, one kind, writes nothing
+```
+
+All three need the dev server running. **A filmstrip that times out is almost
+always a wedged dev server, not a stuck painter** — restart `npm run dev` before
+you start debugging the painter (`PROGRESS.md` row 7.3). Capture output under
+`qa/**/*.png` is gitignored and regenerable; the ledger is not.
+
+Why a filmstrip and not a screenshot: pop-in, easing, dead time and "does it
+settle" are *temporal* properties that a single frame physically cannot show.
+The scoring rubric and the ship gate live in `ANIMATION-QA-PROMPT.md` Part C.
+
+## Content & pacing tooling
+
+```bash
+node scripts/content-factory.mjs --subject coding --formats short,long   # generate -> rate -> refine loop
+node scripts/pacing-audit.mjs                    # every generated script -> qa/PACING.md, worst-first
+node scripts/drift-check.mjs <script.json> [voice]   # estimated vs MEASURED beat timing
+```
+
+`content-factory.mjs` walks curriculum submodules and runs generate → rate →
+refine until a script clears the bar; it saves scripts and ratings under
+`content/factory/` and renders nothing. It is resumable — a submodule+format
+with a saved pass is skipped unless `--force`.
+
+**`src/studio/pacing.ts` is the single source for every pacing number.** The
+soft gates in the generate route, the rating rubric in `src/lib/rate.ts` and
+`scripts/pacing-audit.mjs` all read their thresholds from it, so they cannot
+quietly disagree about what "a 12-second beat" means. Surprising detail: the
+`.mjs` scripts **import that TypeScript module directly** —
+`import { pacingReport } from "../src/studio/pacing.ts"` — relying on Node 22's
+on-the-fly type stripping. That is why its own relative imports carry explicit
+`.ts` extensions, and why nothing in that module may import the engine or a
+painter: those pull in canvas and three.js and would not load outside a browser.
+
+The numbers there are **estimates from word counts**, not measurements.
+`SPOKEN_WORDS_PER_SEC = 2.06` was calibrated by voicing a real 85-beat script
+and timing every clip; re-measure with `drift-check.mjs`, and note Hindi is
+uncalibrated.
 
 ## News tab (channel posting)
 
@@ -155,7 +256,11 @@ UIs expose a privacy select + a "Schedule at" datetime picker.
   YouTube Audio Library, which is free for monetized videos) at
   `public/music.mp3` and it is mixed under the narration at low volume with
   fade in/out, in playback and the recording. No file = narration-only.
-- **Pacing**: scripts carry a hard word budget (short 130-220, long 950-1700
-  words), shorts are voiced at +5% rate and use tighter beat/scene gaps.
+- **Pacing**: scripts carry a word budget (short 110-240, long 850-1900 words —
+  `NARRATION_BUDGET` in `src/studio/schema.ts:3491`), shorts are voiced at +5%
+  rate and use tighter beat/scene gaps.
 - `?demo=1&auto=1` URL params: load the hardcoded demo script and auto
   render+save (used by `scripts/spike.mjs`).
+- **Shorts safe area**: the YouTube UI covers the bottom ~25% and right ~15% of
+  a 9:16 frame. Nothing load-bearing may land there; painters are scored on it
+  (`ANIMATION-QA-PROMPT.md` Part C §1).

@@ -80,19 +80,19 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
     const line = new THREE.Line(lineGeo, lineMat);
     s.add(line);
 
-    const models: { mesh: THREE.Group, idx: number, isHighlighted: boolean }[] = [];
+    const models: { mesh: THREE.Group, idx: number }[] = [];
     for (let i = 0; i < n; i++) {
         const g = makeBlock(blockW, blockH, blockD, "#1e293b", "#31435a");
         g.position.copy(worldPos(i));
         s.add(g);
-        models.push({ mesh: g, idx: i, isHighlighted: scene.events[i].highlight || false });
+        models.push({ mesh: g, idx: i });
     }
 
     const update = (elapsedMs: number, ctxData: { p: number, active: number }) => {
       const frameIn = easeOutCubic(enterT(env, 420));
       lineMat.opacity = frameIn * 0.3;
       
-      models.forEach(({ mesh, idx, isHighlighted }) => {
+      models.forEach(({ mesh, idx }) => {
         const beatIdx = offset + idx;
         const t = beatT(env.beats, beatIdx, totalBeats, ctxData.p);
         const appear = easeOutCubic(Math.min(1, Math.max(0, t * 3)));
@@ -107,7 +107,7 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
         
         mesh.position.y = base.y + (isHorizontal ? bob : 0);
         mesh.position.x = base.x + (!isHorizontal ? bob : 0);
-        mesh.position.z = isCurrent ? 0.5 : isHighlighted ? 0.2 : 0;
+        mesh.position.z = isCurrent ? 0.5 : 0;
 
         mesh.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
@@ -118,9 +118,6 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
                 if (isCurrent) {
                     mat.color.setStyle(accentSoft);
                     mat.emissive.setStyle(accentSoft);
-                } else if (isHighlighted) {
-                    mat.color.setStyle("#0e2433");
-                    mat.emissive.setStyle("#0e2433");
                 } else {
                     mat.color.setStyle("#1e293b");
                     mat.emissive.setStyle("#1e293b");
