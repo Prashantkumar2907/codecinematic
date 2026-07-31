@@ -100,7 +100,7 @@ everything else and links to it.)
 | 12.6 | 12 | narration | Subject-aware default voice (currently `en-US-Andrew`) | todo | — | — | — |
 | 12.7 | 12 | narration | Emphasis marker that strips from caption, survives to voice | todo | 12.1 | no letter-spelled emphasis | — |
 | 12.8 | 12 | narration | Put synthesis behind a swappable interface | todo | 12.1 | vendor swap is config | — |
-| 8.x | 8 | hygiene | Typecheck 99 → 0; delete 108 cruft files; single-source `LIMITS`; 6 dead deps; docs | todo | 0.1 | `tsc` → 0, `npm run build` ok | — |
+| 8.x | 8 | hygiene | Typecheck 99 → 0; delete 108 cruft files; single-source `LIMITS`; 6 dead deps; docs | todo | 0.1 | **attempted and reverted.** The plan's "one type alias kills all 55" is wrong: `Omit<SceneScript,"meta">` breaks the fixtures that DO have meta, and `& Partial<Pick<…>>` then cascades **61 new errors into `/probe`**, which consumes `DEMO.*` as `SceneScript` (71 → 103). The real fix is a `demo(script): SceneScript` helper that fills a shared `DEMO_META`, applied to all 62 fixtures, so every export stays a true `SceneScript` and nothing cascades. Needs a dedicated session; tree reverted to 71 | — |
 | 9.x | 9 | animation | Motion toolkit + house style, then top-traffic kinds by tier | todo | 1.1, 8.x | `qa/LEDGER.md` rows | — |
 | 10.x | 10 | render | Typography scale, transition language, encode audit | todo | 9.x | — | — |
 | 16.1 | 16 | integration | Post-render measurement of the actual video | todo | 3.1 | dead frames measured on output | — |
