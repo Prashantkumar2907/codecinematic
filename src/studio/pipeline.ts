@@ -1,5 +1,6 @@
 import type { SceneScript, VerifyResult, WordTiming } from "./schema";
 import { EXECUTABLE_LANGS, sceneBeats } from "./schema";
+import { beatRoles, deliveryFor } from "./delivery";
 import type { BeatAudio } from "./engine";
 
 /* Beats are voiced in chunks so onProgress reports a true voiced/total count. */
@@ -9,7 +10,7 @@ const TTS_CHUNK_SIZE = 12;
 const TTS_CHUNK_TIMEOUT_MS = 200_000;
 
 /** Shorts are narrated a touch brisker; beat windows follow the real audio, so sync holds. */
-const SHORT_TTS_RATE = "+5%";
+const SHORT_TTS_RATE_PCT = 5;
 
 /** Indian native voices per content language. Hindi uses an Indian speaker so
  *  Devanagari and constitutional/legal terms are pronounced correctly. */
@@ -44,7 +45,9 @@ export async function fetchNarration(
   onProgress?: (voiced: number, total: number) => void
 ): Promise<BeatAudio[]> {
   const beats = script.scenes.flatMap((s) => sceneBeats(s));
-  const rate = script.format === "short" ? SHORT_TTS_RATE : undefined;
+  const baseRatePct = script.format === "short" ? SHORT_TTS_RATE_PCT : 0;
+  const rate = baseRatePct === 0 ? undefined : `+${baseRatePct}%`;
+  const roles = beatRoles(script);
   const resolvedVoice = voice ?? VOICE_BY_LANG[(script as { lang?: string }).lang ?? "en"];
   onProgress?.(0, beats.length);
 
@@ -57,7 +60,11 @@ export async function fetchNarration(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          segments: chunk.map((b) => ({ id: b.beatId, text: b.text })),
+          segments: chunk.map((b) => ({
+            id: b.beatId,
+            text: b.text,
+            ...deliveryFor(roles.get(b.beatId) ?? "teach", baseRatePct),
+          })),
           voice: resolvedVoice,
           rate,
         }),

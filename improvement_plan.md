@@ -638,9 +638,9 @@ voice/caption split that most TTS work needs **already exists**, which is why "�
 > **SPIKE RESULT (row 12.1, measured against the live `.venv`, `edge-tts 7.2.8`).** All three questions
 > answered. The headline: **word timings exist, and the CLI cannot reach them.**
 >
-> - **`--pitch` and `--volume`: YES.** Both are real CLI flags (`edge-tts --help`) and keyword args on
->   `Communicate`. Verified `--pitch=+40Hz` against `-0Hz` on identical text: same byte length, different
->   md5, so it re-synthesises rather than being ignored. 12.2 is unblocked.
+> - **`--pitch` and `--volume`: accepted, but NOT usable — see the correction below.** Both are real CLI
+>   flags (`edge-tts --help`) and keyword args on `Communicate`. Verified `--pitch=+40Hz` against `-0Hz`
+>   on identical text: same byte length, different md5, so it re-synthesises rather than being ignored.
 > - **Word-boundary timestamps: YES — but only through the Python API.** `Communicate.__init__` takes
 >   `boundary: Literal["WordBoundary","SentenceBoundary"] = "SentenceBoundary"`. The **default is
 >   sentence-level**, which is why this looked unavailable: `--write-subtitles` emits one SRT cue per
@@ -660,6 +660,25 @@ voice/caption split that most TTS work needs **already exists**, which is why "�
 > located by `silencedetect` is now exact: **lead 0.087-0.100 s, trail 0.325-0.462 s.** On a 4.65 s clip
 > the trail is 7% dead air; on a 1.75 s question beat it is **26%**. Word timings make this trimmable
 > precisely rather than by threshold guessing.
+
+> **CORRECTION from row 12.2 — pitch is not a tonal control, and this plan was wrong to assume it was.**
+> The bullet above says "lift pitch slightly on a question beat, drop it on a payoff". Measured, that
+> instruction would have injected uncontrolled *pacing* noise into every video:
+>
+> | control | measured on an 11-word line, baseline 3312 ms, en-US-Andrew |
+> |---|---|
+> | `rate` | **monotonic and reproducible.** −20% → +17.5%, −10% → +9.9%, −5% → +6.5%, +5% → −4.4%, +15% → −13.7%. Same shape on a second text; repeat passes are byte-identical (edge-tts is fully deterministic — 6 identical calls gave 0.0% spread). |
+> | `pitch` | **+8 Hz alone reads 12.1% FASTER**, and it is non-monotonic: −6 Hz → −3.0% but −20 Hz → +2.6%. |
+> | `pitch` × `rate` | **non-additive.** −6 Hz with +4% → **−24.5%**. −5% and −2% at +8 Hz produce byte-identical audio, so the service also quantizes. |
+> | `volume` | non-monotonic too: −30% → −1.5%, −15% → −3.0%, +15% → −5.3%, +30% → −4.5%. |
+>
+> No case dropped a word, so this is a timing artifact rather than corruption — but beat duration drives
+> the whole timing model and slow pacing is the defect this programme exists to fix, so a knob that
+> silently moves duration by up to 25% is worse than no knob. **12.2 therefore ships rate-only delivery**
+> (`src/studio/delivery.ts`); pitch and volume stay plumbed through `lib/tts.ts` and the route for a
+> future vendor that handles them cleanly. The honest limitation: rate-only varies *pace*, not *pitch*,
+> so it reduces the monotone rather than removing it. Real tonal variation needs a different vendor —
+> which is exactly what 12.8's interface is for.
 
 **12b. Pausing.** There is no pause control today beyond whatever punctuation the model happens to write.
 `prompt.ts` TTS_RULES asks for `...` and ` — ` and nothing checks compliance. Make it mechanical: a soft
