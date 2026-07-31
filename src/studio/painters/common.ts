@@ -165,6 +165,22 @@ export type Layout = {
   contentH: number;
   /** Base unit: all font sizes/paddings scale from this so 9:16 and 16:9 both look right. */
   unit: number;
+  /**
+   * Lowest y a painter may draw to without colliding with the burned-in caption.
+   *
+   * The Shorts safe-area clamp is currently re-derived in 23 painters under 4
+   * different names with 3 different values (0.75, 0.86, 0.88, 0.94), and the
+   * clamp expression is byte-identical across 13 of them. Four of the five
+   * genuine edge-bleed failures in `qa/AUDIT.md` are this class.
+   *
+   * Caption-aware on purpose: captions default ON since row 2.2, and the karaoke
+   * block was confirmed landing on top of `mythfact`'s FACT card in a rendered
+   * 9:16 demo because no painter reserved the band. The values track the engine's
+   * own caption geometry (`engine.ts:544`: `h*0.7` short, `h*0.82` long).
+   */
+  safeBottom: number;
+  /** Height from `contentY` down to `safeBottom`. */
+  safeH: number;
 };
 
 export function makeLayout(w: number, h: number): Layout {
@@ -173,6 +189,9 @@ export function makeLayout(w: number, h: number): Layout {
   const margin = unit * 1.4;
   const topBand = vertical ? unit * 4 : unit * 2.4;
   const bottomBand = vertical ? unit * 3 : unit * 1.6;
+  // Reserve the caption band, plus a small gap so a descender never touches it.
+  const captionTop = (vertical ? h * 0.7 : h * 0.82) - unit * 0.5;
+  const safeBottom = Math.min(h - bottomBand, captionTop);
   return {
     w,
     h,
@@ -183,6 +202,8 @@ export function makeLayout(w: number, h: number): Layout {
     contentY: topBand,
     contentW: w - margin * 2,
     contentH: h - topBand - bottomBand,
+    safeBottom,
+    safeH: safeBottom - topBand,
   };
 }
 
@@ -194,6 +215,112 @@ export const easeOutBack = (t: number) => {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 };
 export const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+
+/* ─────────────────────────── motion vocabulary ───────────────────────────────
+ * Phase 9 of improvement_plan.md: `painters/` is ~40,000 lines and its shared
+ * layer held THREE easing curves, so every painter invented its own timing,
+ * radius, stroke and stagger. These are the shared words. They are additions
+ * only — no painter changes with them — so adopting one is a per-painter
+ * decision made in that painter's own polish commit.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Damped elastic settle. Was private to `bigtext.ts` and used by zero other
+ * painters despite being the nicest curve in the tree; promoted verbatim so the
+ * overshoot reads the same wherever it is used.
+ */
+export const easeSpring = (t: number): number => {
+  const c4 = (2 * Math.PI) / 2.2;
+  return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -8 * t) * Math.sin((t * 8 - 0.75) * c4) + 1;
+};
+
+/**
+ * Pulls genuinely BACKWARD before moving forward — the return value goes
+ * negative over the first `leadIn` of the curve, so a caller mapping it onto a
+ * position sees the element wind up before it travels. Only `domino_cascade.ts`
+ * does anticipation today, hand-rolled; without it every entrance starts from
+ * rest and reads mechanical.
+ *
+ * Callers that cannot accept a negative (opacity, scale) should clamp01 it.
+ */
+export const anticipate = (t: number, amount = 0.12, leadIn = 0.3): number => {
+  const k = clamp01(t);
+  if (k <= 0) return 0;
+  if (k < leadIn) return -amount * Math.sin(Math.PI * (k / leadIn));
+  return easeOutCubic((k - leadIn) / (1 - leadIn));
+};
+
+export const easeInOutQuint = (t: number) =>
+  t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+
+/** Linear interpolation. Was privately redefined in 6 painters with 3 signatures. */
+export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * Interpolate between two `#rrggbb` colours.
+ *
+ * There was no colour interpolation anywhere in the tree, and `qa/LEDGER.md`
+ * records the same "hard colour pop" bug being found and hand-fixed twice
+ * (bigtext, mythfact). Interpolating in sRGB is not perceptually ideal, but it
+ * is what the palette values already are and it removes the pop.
+ */
+export function lerpColor(from: string, to: string, t: number): string {
+  const a = parseInt(from.slice(1), 16);
+  const b = parseInt(to.slice(1), 16);
+  const k = clamp01(t);
+  const mix = (shift: number) =>
+    Math.round(lerp((a >> shift) & 255, (b >> shift) & 255, k));
+  return `rgb(${mix(16)}, ${mix(8)}, ${mix(0)})`;
+}
+
+/**
+ * Per-index entrance delay in ms, for revealing siblings in sequence.
+ *
+ * The only stagger primitive was `enterT`'s third argument, hand-computed at
+ * every call site — 12 distinct per-index increments across 36 painters, plus
+ * six painters that re-invented a named constant for it. The other 74 do not
+ * stagger siblings at all.
+ */
+export function stagger(
+  i: number,
+  n: number,
+  stepMs = DUR.step,
+  direction: "in" | "out" | "center" = "in"
+): number {
+  if (n <= 1) return 0;
+  const idx =
+    direction === "in" ? i
+    : direction === "out" ? n - 1 - i
+    : Math.abs(i - (n - 1) / 2);
+  return idx * stepMs;
+}
+
+/**
+ * Departure progress: 1 → 0 over the last `durMs` of the scene.
+ *
+ * The string "exit" appears in ZERO painters. Everything accumulates and holds,
+ * and departure is delegated entirely to the engine's 420 ms crossfade — which
+ * is why scenes feel like they pile up rather than resolve.
+ */
+export function exitT(env: { elapsedMs: number; durationMs?: number }, durMs = DUR.base): number {
+  const total = env.durationMs ?? 0;
+  if (!(total > 0)) return 1;
+  return 1 - clamp01((env.elapsedMs - (total - durMs)) / Math.max(1, durMs));
+}
+
+/**
+ * Design scales. 314 `enterT` calls used 20 distinct durations; the same card
+ * corner was written 25 different ways (`unit*0.7` in one painter against
+ * `unit*0.35` in another, a 2× difference inside one frame).
+ *
+ * RADIUS and STROKE are multiples of `unit`, never absolute px — a painter has
+ * to work at both 1080×1920 and 1920×1080, and 41 raw `lineWidth = 1` sites
+ * violate that rule today (two of them inside this very file).
+ */
+export const DUR = { fast: 220, base: 380, slow: 620, step: 70 } as const;
+export const RADIUS = { sm: 0.18, md: 0.3, lg: 0.5 } as const;
+export const STROKE = { hair: 0.02, thin: 0.035, base: 0.055, bold: 0.09 } as const;
+export const GLOW = { none: 0, soft: 0.5, base: 1.1, strong: 2.2 } as const;
 
 /** Progress of a sub-animation that starts at `from` and lasts `len` within scene progress p (all 0-1). */
 export function sub(p: number, from: number, len: number): number {
