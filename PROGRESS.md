@@ -114,7 +114,7 @@ everything else and links to it.)
 | 13.1 | 13 | content | **Research** short + long craft per archetype (the failed pass) | todo | — | written into the plan | — |
 | 13.2 | 13 | content | Cached `creatorBrief` per submodule (373, one-time) | todo | 13.1 | stored in taxonomy | — |
 | 14.x | 14 | animation | New scene kinds — only after 1.1 and 9.x | todo | 1.1, 9.x | — | — |
-| 18.x | 18 | growth | Thumbnail legibility at 168×94, title/CTR audit | todo | — | — | — |
+| 18.x | 18 | growth | Thumbnail legibility at 168×94, title/CTR audit | verified | — | new `scripts/thumb-audit.mjs` → `qa/THUMBNAIL.md`, computed over all 93 scripts. **Legibility:** a feed card is 168×94 against a 1280×720 render, so ×0.131 — only the headline survives. Pill **3.9 px**, brand line **3.7 px**, variant-2 subject label **3.3 px**, and the headline's own floor is **7.8 px**. Confirmed visually by downscaling a real `thumbnail.png` to 168×94: the brand line is unreadable mush. **Headline length:** p50 **5** words, p90 11, max 12 — **56 of 93 (60%) exceed the ≤4-word guideline**. **Complement vs repeat:** **37 of 93 (40%)** have a headline ≥80% contained in the title. **Titles are the negative result** — p50 58 chars, only 6/93 over 70, 64/65 shorts carry `#Shorts`: the prompt's title rules are being followed, so the thumbnail is where the work is | |
 | 11.1 | 11 | docs | Rewrite `CLAUDE_PROMPT.md` as the master spec | todo | all | — | — |
 
 ## Milestone 1 — one genuinely good video
