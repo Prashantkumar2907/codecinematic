@@ -62,18 +62,20 @@ Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch 
 
 | Gate | Fires on | Share |
 |---|---|---|
+| definition opener | 3 of 88 | 3.4% |
+| too many title cards | 24 of 88 | 27.3% |
 | frozen card | 40 of 88 | 45.5% |
 | beat length | 24 of 88 | 27.3% |
 | filler openers | 23 of 88 | 26.1% |
 | no running example | 14 of 88 | 15.9% |
-| unexplained jargon | 9 of 88 | 10.2% |
-| **any gate** | **53 of 88** | **60.2%** |
+| unexplained jargon | 10 of 88 | 11.4% |
+| **any gate** | **56 of 88** | **63.6%** |
 
 ### Jargon anchoring
 
 | | |
 |---|---|
-| Technical terms introduced | 290 (median 3 per script) |
+| Technical terms introduced | 288 (median 3 per script) |
 | Terms per 100 narration words | median 0.9 |
 | Glossed at first use | median **0.50** of terms |
 

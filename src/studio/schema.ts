@@ -3637,6 +3637,23 @@ export const sceneScriptSchema = z
     submodule: z.string().min(2).max(60),
     topic: z.string().min(3).max(120),
     scenes: z.array(sceneSchema),
+    /**
+     * YouTube chapters, declared at the video level instead of inferred from
+     * `bigtext` scenes. Chapters used to be derived by `page.tsx` from every
+     * bigtext, which is why the prompt had to mandate 4-6 "section card" title
+     * slides to get them — the single biggest cause of the slide-deck feel. A
+     * section now points at the id of the teaching scene that OPENS it, so the
+     * chapter exists without a card sitting in front of it.
+     */
+    sections: z
+      .array(
+        z.object({
+          atSceneId: id,
+          title: z.string().min(2).max(50),
+        })
+      )
+      .max(10)
+      .optional(),
     meta: metaSchema,
   })
   .superRefine((script, ctx) => {

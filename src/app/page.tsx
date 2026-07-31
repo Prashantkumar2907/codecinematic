@@ -56,11 +56,24 @@ function descriptionWithChapters(script: SceneScript, timings: SceneTiming[]): s
   const base = script.meta.description.split("\n\nChapters:")[0].trimEnd();
   const { introMs } = introOutroMs(script.format);
   const marks: { atS: number; label: string }[] = [];
-  script.scenes.forEach((scene, i) => {
-    if (scene.kind === "bigtext" && timings[i]) {
-      marks.push({ atS: Math.floor((introMs + timings[i].startMs) / 1000), label: scene.text.slice(0, 50) });
+  const atS = (i: number) => Math.floor((introMs + timings[i].startMs) / 1000);
+  if (script.sections?.length) {
+    // Declared sections win: a chapter can now start on a real teaching scene, so
+    // the video no longer needs a title card in front of every chapter just to get
+    // one. See the `sections` field in schema.ts.
+    for (const section of script.sections) {
+      const i = script.scenes.findIndex((s) => s.id === section.atSceneId);
+      if (i >= 0 && timings[i]) marks.push({ atS: atS(i), label: section.title.slice(0, 50) });
     }
-  });
+    marks.sort((a, b) => a.atS - b.atS);
+  } else {
+    // Fallback for scripts written before `sections` existed.
+    script.scenes.forEach((scene, i) => {
+      if (scene.kind === "bigtext" && timings[i]) {
+        marks.push({ atS: atS(i), label: scene.text.slice(0, 50) });
+      }
+    });
+  }
   const chapters: { atS: number; label: string }[] = [];
   for (const mark of marks) {
     const last = chapters[chapters.length - 1];

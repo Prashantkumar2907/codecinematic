@@ -310,6 +310,8 @@ export function singleBeatCapSeconds(): number {
  *   jargon anchored <0.40   14%   (<0.60 would be 26%)
  */
 export const GATE_THRESHOLDS = {
+  /** A long video gets a hook card and a recap card. Nothing else. */
+  maxBigtextPerLong: 2,
   overlongBeatCount: 3,
   crutchHits: 3,
   runningExampleCoverage: 0.4,
@@ -380,6 +382,31 @@ export function overlongBeats(
     detail:
       `${report.overlongBeats.length} beat(s) run over ${OVERLONG_BEAT_SEC}s, so the visual holds ` +
       `while the voice keeps going. Worst: ${list}. Split each into two beats, or shorten it.`,
+  };
+}
+
+/**
+ * Too many `bigtext` cards in a long video.
+ *
+ * This is the measurable half of Phase 5. `prompt.ts` used to *mandate* "4-6
+ * sections, each a bigtext section card followed by 2-4 teaching scenes", i.e.
+ * 5-8 title slides, and the corpus median was exactly 5 — the model was complying,
+ * which is why no amount of extra prompt wording ever fixed the slide-deck feel.
+ * The mandate is gone and chapters now come from the `sections` array instead, so
+ * `bigtext` is allowed exactly twice: the opening hook and the closing recap.
+ */
+export function tooManyBigtext(script: SceneScript, max = GATE_THRESHOLDS.maxBigtextPerLong): { count: number; detail: string } | null {
+  if (script.format !== "long") return null;
+  const cards = script.scenes.filter((s) => s.kind === "bigtext");
+  if (cards.length <= max) return null;
+  const ids = cards.map((c) => c.id).join(", ");
+  return {
+    count: cards.length,
+    detail:
+      `${cards.length} "bigtext" scenes (${ids}) — a long video gets ${max}: the opening hook and the ` +
+      `closing recap. Every other one is a title slide the viewer reads in two seconds and then stares ` +
+      `at. Replace each with the teaching scene it was introducing, put that section's title on THAT ` +
+      `scene, and list the section in the "sections" array so it still becomes a YouTube chapter.`,
   };
 }
 
@@ -499,8 +526,19 @@ export function jargonReport(script: SceneScript): JargonReport {
   // generation, these were 5 of the 6 terms the gate complained about.
   const ownIdentifiers = new Set<string>();
   for (const scene of script.scenes) {
+    // Every kind that puts literal source on screen. `codediff` was missed on the
+    // first pass and immediately produced false positives (`hugeData`, `lightId`),
+    // which is why this reads the union rather than a hand-picked pair.
     const source =
-      scene.kind === "code" ? scene.code : scene.kind === "terminal" ? scene.lines.join("\n") : null;
+      scene.kind === "code"
+        ? scene.code
+        : scene.kind === "terminal"
+          ? scene.lines.join("\n")
+          : scene.kind === "codediff"
+            ? scene.lines.map((l) => l.text).join("\n")
+            : scene.kind === "trace"
+              ? scene.code.join("\n")
+              : null;
     if (!source) continue;
     for (const token of source.match(/[A-Za-z_$][\w$]*/g) ?? []) ownIdentifiers.add(token.toLowerCase());
   }

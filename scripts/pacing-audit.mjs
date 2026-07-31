@@ -17,7 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   pacingReport, jargonReport, singleBeatCapSeconds,
-  staticCardOverrun, overlongBeats, crutchPhrases, runningExampleWeak, jargonUnanchored,
+  staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored,
   OVERLONG_BEAT_SEC, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC, GATE_THRESHOLDS,
 } from "../src/studio/pacing.ts";
 import { narrationWordCount } from "../src/studio/schema.ts";
@@ -259,6 +259,8 @@ if (totals.crutchBy.size) {
 // everything costs throughput without improving anything, and the factory already
 // exhausts its attempts on 72 of 86 slots.
 const GATES = [
+  ["definition opener", definitionOpener],
+  ["too many title cards", tooManyBigtext],
   ["frozen card", staticCardOverrun],
   ["beat length", overlongBeats],
   ["filler openers", crutchPhrases],

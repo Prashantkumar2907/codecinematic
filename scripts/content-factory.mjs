@@ -256,6 +256,8 @@ function warningsToDirectives(warnings) {
     // Pacing gates from studio/pacing.ts, wired in the generate route. Without
     // these arms every one degrades to the generic `Fix: ${w}` below, which hands
     // the model back its own diagnostic instead of an instruction.
+    if (/^too many title cards:/.test(w))
+      return "A long video contains exactly TWO bigtext scenes: the opening hook and the closing recap. Sections are announced by the title of their first teaching scene plus a forward-hook line closing the previous section, and listed in the \"sections\" array for chapters — never by a title card.";
     if (/^definition opener:/.test(w))
       return "Never open by defining the topic. The first beat is a concrete moment — the thing going wrong, a number that stings, or the exact line of code that betrays the reader. The definition arrives later, once it is needed.";
     if (/^frozen card:/.test(w))
@@ -269,7 +271,7 @@ function warningsToDirectives(warnings) {
     if (/^unexplained jargon:/.test(w))
       return "Every technical term gets a six-word everyday translation the first time it is spoken, in the same beat or the next one.";
     if (/narration is \d+ words/.test(w) && /short/.test(w))
-      return "Write more depth: reach the word budget — every teaching beat is 3-5 full sentences explaining the mechanism and the why, not a caption.";
+      return "Write more depth: reach the word budget by adding MORE BEATS, not longer ones. No beat may exceed ~31 spoken words — a beat is one visual step. Add the missing mechanism step, the worked number, the trade-off, each as its own beat with its own visual.";
     if (/narration is \d+ words/.test(w) && /long/.test(w))
       return "Tighten: cut to the word budget — trim every beat to its sharpest form, keep each scene's meaning.";
     if (/back to back|section cards/.test(w))

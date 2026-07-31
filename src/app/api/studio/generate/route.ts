@@ -6,7 +6,7 @@ import { buildScriptPrompt, buildRepairPrompt, buildBlueprintPrompt, buildScript
 import { sanitizeScript } from "@/lib/sanitize";
 import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
-import { staticCardOverrun, overlongBeats, definitionOpener, crutchPhrases, runningExampleWeak, jargonUnanchored } from "@/studio/pacing";
+import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored } from "@/studio/pacing";
 
 /**
  * Pacing/voice soft gates, in the order a viewer would notice them. Each returns
@@ -17,6 +17,7 @@ import { staticCardOverrun, overlongBeats, definitionOpener, crutchPhrases, runn
  */
 const PACING_GATES: { label: string; run: (s: SceneScript) => { detail: string } | null }[] = [
   { label: "definition opener", run: definitionOpener },
+  { label: "too many title cards", run: tooManyBigtext },
   { label: "frozen card", run: staticCardOverrun },
   { label: "beat length", run: overlongBeats },
   { label: "filler openers", run: crutchPhrases },
@@ -161,7 +162,7 @@ export async function POST(req: Request) {
               issues.push(
                 words > budget.max
                   ? `total spoken narration is ${words} words but a ${format} must be ${budget.min}-${budget.max} — cut about ${words - budget.max} words: tighten every beat, keep every scene's meaning`
-                  : `total spoken narration is only ${words} words but a ${format} must be ${budget.min}-${budget.max}: add about ${target - words} more words of REAL teaching. Expand each teaching scene's beats to 3-5 full sentences that explain the mechanism and the why (define the core term, walk the example step by step, name the trade-off). Do NOT add filler, new sign-off cards, or repeat yourself — deepen the existing scenes and add a missing mechanism step.`
+                  : `total spoken narration is only ${words} words but a ${format} must be ${budget.min}-${budget.max}: add about ${target - words} more words of REAL teaching. Depth comes from MORE BEATS, not longer ones: no single beat may exceed ~31 spoken words, because a beat is one visual step and the picture cannot change while it is still being read. Add the missing mechanism step, the worked number, the trade-off — split each into its own beat with its own visual. Do NOT add filler, new sign-off cards, or repeat yourself.`
               );
             }
             const bt = firstAdjacentBigtext(validated.data);
