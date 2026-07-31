@@ -271,7 +271,7 @@ function warningsToDirectives(warnings) {
     if (/^unexplained jargon:/.test(w))
       return "Every technical term gets a six-word everyday translation the first time it is spoken, in the same beat or the next one.";
     if (/narration is \d+ words/.test(w) && /short/.test(w))
-      return "Write more depth: reach the word budget by adding MORE BEATS, not longer ones. No beat may exceed ~31 spoken words — a beat is one visual step. Add the missing mechanism step, the worked number, the trade-off, each as its own beat with its own visual.";
+      return "Write more depth: reach the word budget by adding MORE BEATS, not longer ones. No beat may exceed ~24 spoken words — a beat is one visual step. Add the missing mechanism step, the worked number, the trade-off, each as its own beat with its own visual.";
     if (/narration is \d+ words/.test(w) && /long/.test(w))
       return "Tighten: cut to the word budget — trim every beat to its sharpest form, keep each scene's meaning.";
     if (/back to back|section cards/.test(w))

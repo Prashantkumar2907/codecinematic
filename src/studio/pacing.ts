@@ -21,15 +21,24 @@ import { sceneBeats, SPOKEN_LIMITS, type Scene, type SceneScript } from "./schem
  */
 
 /**
- * Spoken words per second. 2.6 ≈ 156 wpm, which is edge-tts's neural default and
- * already sits inside the 120-150 wpm educational band — narration *rate* is not
- * the problem this module exists to find, visual change rate is.
+ * Spoken words per second — MEASURED, not assumed.
  *
- * This is the only words-per-second constant in the codebase; duration is
- * otherwise always measured. Treat every second produced here as a pre-render
- * approximation.
+ * The plan and every earlier estimate used 2.6 (≈156 wpm, "edge-tts's neural
+ * default"). Voicing a real 85-beat script through the actual TTS route and timing
+ * every clip with ffmpeg gives **2.06** (≈124 wpm): estimates at 2.6 ran 26% short
+ * of reality, so every pacing threshold in the app was that much too lenient.
+ *
+ * The gap is not the voice talking slowly. Fitting `actual = words/rate + overhead`
+ * across the 85 beats gives ~3.5 words/s of real speech plus a fixed cost per clip,
+ * and `silencedetect` confirms where it goes: each clip carries ~0.15 s of leading
+ * silence and 0.34-1.15 s of trailing silence, plus sentence-final pauses inside.
+ * 2.06 is the EFFECTIVE rate a viewer experiences, which is what a gate needs.
+ *
+ * Calibrated from one English script on the default voice. Re-measure with
+ * `node scripts/drift-check.mjs <script.json> [voice]` — and note Hindi is
+ * uncalibrated: it is not safe to assume it speaks at the same rate (row 15.2).
  */
-export const SPOKEN_WORDS_PER_SEC = 2.6;
+export const SPOKEN_WORDS_PER_SEC = 2.06;
 
 /**
  * A beat holds one visual state, so a beat longer than this is a frame the
@@ -271,6 +280,84 @@ function percentile(sorted: number[], p: number): number {
   if (!sorted.length) return 0;
   const at = Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1));
   return sorted[at];
+}
+
+/* ───────────────────── estimate vs measured (Phase 15) ─────────────────────
+ * Every threshold in this module is enforced against an ESTIMATE computed before
+ * the script is voiced, while the video's real timing comes from measured audio.
+ * Nothing compared the two, so a beat gated at an estimated 9 s could voice at
+ * 13 s and the gate would report success — which made every pacing number in
+ * Phases 3-6 unfalsifiable, and made feeding them to the rating judge (Phase 6)
+ * worse than feeding it nothing.
+ *
+ * The shape below is `BeatAudio` minus its mp3, declared locally on purpose: the
+ * real type lives in engine.ts, and importing engine.ts here would drag canvas and
+ * three.js into a module that has to load in plain Node.
+ * ────────────────────────────────────────────────────────────────────────────── */
+
+export type MeasuredBeat = { beatId: string; durationMs: number };
+
+export type DriftReport = {
+  beats: number;
+  estSeconds: number;
+  actualSeconds: number;
+  /** actual / estimated. >1 means we speak SLOWER than SPOKEN_WORDS_PER_SEC claims. */
+  ratio: number;
+  /** The words-per-second this measurement implies — feed into SPOKEN_WORDS_PER_SEC. */
+  measuredWordsPerSec: number;
+  /** Beats whose measured length missed the estimate by more than the tolerance. */
+  outliers: { beatId: string; words: number; estSeconds: number; actualSeconds: number; ratio: number }[];
+  /** Beats the gate passed on estimate but which actually exceed OVERLONG_BEAT_SEC. */
+  missedOverlong: { beatId: string; estSeconds: number; actualSeconds: number }[];
+  unmatchedBeats: string[];
+};
+
+/** Ratio beyond which a single beat's estimate is reported as wrong, not noisy. */
+export const DRIFT_TOLERANCE = 0.25;
+
+export function driftReport(
+  script: SceneScript,
+  measured: MeasuredBeat[],
+  tolerance = DRIFT_TOLERANCE
+): DriftReport {
+  const byId = new Map(measured.map((m) => [m.beatId, m.durationMs]));
+  const report = pacingReport(script);
+  let estSeconds = 0;
+  let actualSeconds = 0;
+  let words = 0;
+  const outliers: DriftReport["outliers"] = [];
+  const missedOverlong: DriftReport["missedOverlong"] = [];
+  const unmatchedBeats: string[] = [];
+
+  for (const beat of report.beatSeconds) {
+    const ms = byId.get(beat.beatId);
+    if (ms === undefined) {
+      unmatchedBeats.push(beat.beatId);
+      continue;
+    }
+    const actual = ms / 1000;
+    estSeconds += beat.seconds;
+    actualSeconds += actual;
+    words += beat.words;
+    const ratio = beat.seconds > 0 ? actual / beat.seconds : 1;
+    if (Math.abs(ratio - 1) > tolerance) {
+      outliers.push({ beatId: beat.beatId, words: beat.words, estSeconds: beat.seconds, actualSeconds: actual, ratio });
+    }
+    if (beat.seconds <= OVERLONG_BEAT_SEC && actual > OVERLONG_BEAT_SEC) {
+      missedOverlong.push({ beatId: beat.beatId, estSeconds: beat.seconds, actualSeconds: actual });
+    }
+  }
+
+  return {
+    beats: report.beatSeconds.length - unmatchedBeats.length,
+    estSeconds,
+    actualSeconds,
+    ratio: estSeconds > 0 ? actualSeconds / estSeconds : 1,
+    measuredWordsPerSec: actualSeconds > 0 ? words / actualSeconds : SPOKEN_WORDS_PER_SEC,
+    outliers: outliers.sort((a, b) => Math.abs(b.ratio - 1) - Math.abs(a.ratio - 1)),
+    missedOverlong,
+    unmatchedBeats,
+  };
 }
 
 /**

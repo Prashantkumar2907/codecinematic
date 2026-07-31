@@ -162,7 +162,7 @@ export async function POST(req: Request) {
               issues.push(
                 words > budget.max
                   ? `total spoken narration is ${words} words but a ${format} must be ${budget.min}-${budget.max} — cut about ${words - budget.max} words: tighten every beat, keep every scene's meaning`
-                  : `total spoken narration is only ${words} words but a ${format} must be ${budget.min}-${budget.max}: add about ${target - words} more words of REAL teaching. Depth comes from MORE BEATS, not longer ones: no single beat may exceed ~31 spoken words, because a beat is one visual step and the picture cannot change while it is still being read. Add the missing mechanism step, the worked number, the trade-off — split each into its own beat with its own visual. Do NOT add filler, new sign-off cards, or repeat yourself.`
+                  : `total spoken narration is only ${words} words but a ${format} must be ${budget.min}-${budget.max}: add about ${target - words} more words of REAL teaching. Depth comes from MORE BEATS, not longer ones: no single beat may exceed ~24 spoken words, because a beat is one visual step and the picture cannot change while it is still being read. Add the missing mechanism step, the worked number, the trade-off — split each into its own beat with its own visual. Do NOT add filler, new sign-off cards, or repeat yourself.`
               );
             }
             const bt = firstAdjacentBigtext(validated.data);

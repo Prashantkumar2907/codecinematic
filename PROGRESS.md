@@ -29,11 +29,11 @@ everything else and links to it.)
 
 | Metric | Value | How to re-measure |
 |---|---|---|
-| Static-card audio share | ~~34%~~ → **27.8%** (69.4 of 249.9 min) | `node scripts/pacing-audit.mjs` — **built, row 3.2** |
+| Static-card audio share | ~~34%~~ → **27.8%** (87.7 of 315.4 min) | `node scripts/pacing-audit.mjs` — **built, row 3.2** |
 | Long videos: static-card scenes | **40.2%** (170 of 423 scenes), 25.9% of runtime | same |
 | Worst single frozen card | **26.9 s** (confirmed exactly) | same |
-| Beats over 12 s | **354 of 1,814** (not previously measured) | same |
-| Seconds per visual change | **8.3 s** mean (target 4-8) | same |
+| Beats over 12 s | ~~354~~ → **571 of 1,814** at the measured rate | same — the 354 figure used the uncalibrated 2.6 w/s (row 15.2) |
+| Seconds per visual change | ~~8.3 s~~ → **10.4 s** mean at the measured rate (target 4-8) | same |
 | Videos opening on a definition | ~~30% (27 of 89)~~ → **3 of 88** | same — the old figure was a regex artifact, see row 3.3 |
 | Videos opening on a static card | ~~42 of 89~~ → **64 of 88** (worse) | same |
 | `"let's"` / `"here is"` uses | **89 / 53** across 88 scripts | same |
@@ -87,8 +87,8 @@ everything else and links to it.)
 | 6.1 | 6 | loop | 7th rubric section `pacing_density`, fed computed facts (5 edits) | todo | 3.1, 15.1 | ratings still parse | — |
 | 7.1 | 7 | render | Re-lock 7 desynced painters to beat windows | todo | 0.1 | visuals track audio | — |
 | 7.2 | 7 | render | Progressive reveal for the 5 single-beat painters | todo | 4.1 | no dead frame at cap | — |
-| 15.1 | 15 | integration | **Estimate↔actual drift**: compare gate estimate to measured TTS | todo | 3.1 | drift reported per beat | — |
-| 15.2 | 15 | integration | Calibrate words/sec per voice **and per language** | todo | 15.1 | hi vs en measured separately | — |
+| 15.1 | 15 | integration | **Estimate↔actual drift**: compare gate estimate to measured TTS | verified | 3.1 | `scripts/drift-check.mjs` voices a real script and times every clip with ffmpeg. 85-beat script: estimated 408.5 s, **measured 515 s, ratio 1.26** — every threshold was 26% too lenient. 50 of 85 beats off by >25% | 13c8391 |
+| 15.2 | 15 | integration | Calibrate words/sec per voice **and per language** | done | 15.1 | `SPOKEN_WORDS_PER_SEC` **2.6 → 2.06** (measured, en, default voice). Fit `actual = words/3.5 + overhead`; `silencedetect` shows ~0.15 s lead + 0.34-1.15 s trail per clip. **Hindi still uncalibrated** — re-measure per voice with `drift-check.mjs` | 13c8391 |
 | 17.1 | 17 | content | Hand-author gold short + long per archetype (~20 scripts) | todo | 5.1 | scripts pass all gates | — |
 | 17.2 | 17 | content | Wire `exemplarScript` — factory never sends it today | todo | 17.1 | present in the prompt | — |
 | 12.1 | 12 | narration | **SPIKE**: does edge-tts accept `--pitch`/`--volume`? word timings? SSML? | todo | — | written into the plan | — |

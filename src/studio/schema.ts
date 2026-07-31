@@ -9,9 +9,15 @@ export const EXECUTABLE_LANGS: CodeLang[] = ["js", "python", "sql"];
 const MAX_BEAT_CHARS = 320;
 /**
  * A single-beat scene cannot advance while its narration plays, so its narration
- * length IS how long the frame is frozen. 190 chars ≈ 32 words ≈ 12 s at the
- * corpus-measured 5.98 chars/word — i.e. exactly `pacing.OVERLONG_BEAT_SEC`,
- * which is where a card stops being read and starts being stared at.
+ * length IS how long the frame is frozen. 150 chars ≈ 25 words ≈ 12 s at the
+ * MEASURED 2.06 words/sec and 5.98 chars/word — i.e. exactly
+ * `pacing.OVERLONG_BEAT_SEC`, where a card stops being read and starts being
+ * stared at.
+ *
+ * This was briefly 190, argued from the uncalibrated 2.6 words/sec. Once the rate
+ * was measured against real TTS (Phase 15), 190 chars turned out to be 15.4 s —
+ * well over the target — and 150 to be 12.2 s. The plan's original 150 was right;
+ * the reasoning for it here is now measured rather than asserted.
  *
  * Was 400, and 400 was the ONLY number the prompt ever attached to `narration`
  * (transcribed three times as a hard limit), so the model anchored on it: the
@@ -20,13 +26,13 @@ const MAX_BEAT_CHARS = 320;
  * 1028 → 962 words, and 4 more long scripts land under the 850-word floor —
  * which is why Phase 5's scene-count raise is a hard dependency, not a nicety.
  */
-const MAX_SINGLE_BEAT_CHARS = 190;
+const MAX_SINGLE_BEAT_CHARS = 150;
 /**
  * `terminal` earns more: its typewriter is the one painter that paces itself to
  * the beat's real duration (`painters/terminal.ts:144` budgets 62% of
  * `env.durationMs`), so the card is genuinely animating rather than held.
  */
-const MAX_TERMINAL_NARRATION_CHARS = 260;
+const MAX_TERMINAL_NARRATION_CHARS = 210;
 /** Kept only for the three HARD LIMITS blocks in prompt.ts that still quote it. */
 const MAX_NARRATION_CHARS = 400;
 const MAX_CODE_LINES = 22;

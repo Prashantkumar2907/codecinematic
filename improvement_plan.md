@@ -710,7 +710,27 @@ infrastructure and needs reworking. Prerequisites: Phase 1 (the regex — 35 kin
 unreachable, so **check whether the gap is actually a missing kind or a hidden one** before building
 anything) and Phase 9 (toolkit + house style).
 
-### Phase 15 — Close the content↔narration seam (estimate vs actual)
+### Phase 15 — Close the content↔narration seam (estimate vs actual) — **DONE, and it moved every number**
+
+> **Measured result.** `scripts/drift-check.mjs` voices a script through the real TTS route and times
+> every clip with ffmpeg. On an 85-beat script: **estimated 408.5 s, measured 515 s, ratio 1.26.** The
+> plan's 2.6 words/sec (≈156 wpm, "edge-tts's neural default") was 26% optimistic; the effective rate is
+> **2.06** (≈124 wpm). Fitting `actual = words/rate + overhead` gives ~3.5 w/s of real speech plus a
+> fixed per-clip cost, and `silencedetect` locates it: **~0.15 s of leading and 0.34-1.15 s of trailing
+> silence in every clip**, plus sentence-final pauses inside.
+>
+> Consequences, all of which make the diagnosis WORSE than §1 states:
+> - Corpus runtime **249.9 → 315.4 min**; beats over 12 s **354 → 571**; mean hold **8.3 → 10.4 s**.
+> - The Phase 4 narration cap was argued at 190 chars on the uncalibrated rate. At the measured rate
+>   190 chars is **15.4 s** and 150 chars is **12.2 s** — so **the plan's original 150 was right** and my
+>   Phase 4 comparison table was reasoning from a wrong constant. Corrected to 150 (terminal 210).
+> - Every prompt number derived from it (`~31 spoken words` → `~24`) corrected in all four places.
+> - **Hindi remains uncalibrated.** One global rate across `lang: "en"|"hi"` is an assumption, not a
+>   measurement; re-run `drift-check.mjs` with a Hindi script and an `en-IN`/`hi-IN` voice before
+>   trusting any Hindi pacing number.
+> - The per-clip silence is itself a finding for Phase 12: ~0.5-1.3 s of dead air per beat, on top of the
+>   engine's own `INTER_BEAT_GAP_MS`, is a real contributor to the video feeling slow.
+
 
 **This is the integration hole.** Every pacing threshold in this plan is enforced against an *estimate*
 (`SPOKEN_WORDS_PER_SEC = 2.6`, computed pre-TTS), while the video's real timing comes from *measured*
