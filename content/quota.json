@@ -2,9 +2,9 @@
   "date": "2026-07-30",
   "used": {
     "gemini-3.1-flash-lite": 6,
-    "gemini-3.6-flash": 10
+    "gemini-3.6-flash": 11
   },
   "byKey": {
-    "free-1": 16
+    "free-1": 17
   }
 }
