@@ -64,13 +64,13 @@ Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch 
 |---|---|---|
 | definition opener | 3 of 88 | 3.4% |
 | too many title cards | 24 of 88 | 27.3% |
-| frozen card | 68 of 88 | 77.3% |
+| frozen card | 28 of 88 | 31.8% |
 | beat length | 24 of 88 | 27.3% |
 | filler openers | 23 of 88 | 26.1% |
 | no breathing room | 23 of 88 | 26.1% |
 | no running example | 14 of 88 | 15.9% |
 | unexplained jargon | 10 of 88 | 11.4% |
-| **any gate** | **74 of 88** | **84.1%** |
+| **any gate** | **48 of 88** | **54.5%** |
 
 ### Jargon anchoring
 

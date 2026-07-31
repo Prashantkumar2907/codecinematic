@@ -454,11 +454,15 @@ export function singleBeatCapSeconds(): number {
  * draft right instead of adding rounds.
  *
  * Measured firing rates on the historic corpus, at these values:
+ *   staticCardOverrun ≥3    32%   (≥1 was 77% — it had no count knob at all)
  *   overlongBeats ≥3        27%   (≥1 would be 59%)
  *   crutchHits ≥3           26%   (≥1 would be 73%)
- *   unbrokenClause >16w ≥2  25%   (≥1 would be 45%)
+ *   unbrokenClause >16w ≥2  26%   (≥1 would be 45%)
  *   runningExample <0.40    16%   (<0.50 would be 44%)
- *   jargon anchored <0.40   14%   (<0.60 would be 26%)
+ *   jargon anchored <0.40   11%   (<0.60 would be 26%)
+ *
+ * Together they now fire on **54.5%** of the corpus, down from 84.1%: the single
+ * un-knobbed gate was responsible for nearly a third of all repair rounds.
  */
 export const GATE_THRESHOLDS = {
   /** A long video gets a hook card and a recap card. Nothing else. */
@@ -475,6 +479,20 @@ export const GATE_THRESHOLDS = {
    */
   maxClauseWords: 16,
   unbrokenClauseCount: 2,
+  /**
+   * `staticCardOverrun` had no count knob at all — it fired on the single worst
+   * scene, i.e. `>= 1`, which is why it tripped 73-77% of the corpus while every
+   * sibling sat at 14-27%. Measured by count: >=1 73.1%, >=2 45.2%, **>=3 28.0%**,
+   * >=4 23.7%. Three matches `overlongBeatCount`, which is the same shape of rule.
+   */
+  staticCardCount: 3,
+  /**
+   * Severity escape hatch, so one catastrophic card is not waved through just
+   * because it is alone: a scene at twice the allowed length fires on its own.
+   * Adds 2 scripts (28.0% -> 30.1%). Deliberately a principled multiple rather
+   * than a number reverse-engineered to land inside the band.
+   */
+  staticCardHardMultiple: 2,
 } as const;
 
 /**
@@ -498,29 +516,46 @@ export function longestUnbrokenClause(text: string): number {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /**
- * A single-beat scene that holds longer than the schema cap allows — which after
- * Phase 4 means, in practice, a MULTI-beat kind the model collapsed to one entry.
- * `narration` is capped at 190 chars, but a `say` is capped at 320, so a one-item
- * `steps` or `bullets` scene is a disguised static card that can hold ~21 s and no
- * per-kind narration cap can reach it.
+ * Single-beat scenes that hold longer than the schema cap allows.
  *
  * The threshold is the cap's own ceiling rather than OVERLONG_BEAT_SEC: a card
- * written exactly to the 190-char limit lands at 12.2 s, and a gate at 12 s would
+ * written exactly to the character limit lands at 9.6 s, and a gate at 12 s would
  * fire on output that is already obeying the rule.
+ *
+ * **Two corrections, both measured over the 93-script corpus.**
+ *
+ * 1. This doc used to say that in practice the gate catches "a MULTI-beat kind the
+ *    model collapsed to one entry". It does not: of 206 offending scenes, only
+ *    **8 (4%)** are a collapsed multi-beat kind. The other 96% are the genuinely
+ *    single-beat kinds — bigtext/stat/quote/question/terminal — simply written
+ *    long. The disguised-static-card case is real but rare.
+ * 2. It was the only gate with no count knob, firing on `>= 1` offending scene,
+ *    which is why it tripped 73% of the corpus while every sibling sat at 14-27%.
+ *    It now needs `staticCardCount` scenes, or one scene at
+ *    `staticCardHardMultiple` × the cap so a single catastrophic card still fires.
  */
-export function staticCardOverrun(script: SceneScript): { id: string; detail: string } | null {
+export function staticCardOverrun(
+  script: SceneScript,
+  minCount = GATE_THRESHOLDS.staticCardCount,
+  hardMultiple = GATE_THRESHOLDS.staticCardHardMultiple
+): { id: string; count: number; detail: string } | null {
   const report = pacingReport(script);
   const ceiling = singleBeatCapSeconds();
-  const worst = report.sceneSeconds
+  const over = report.sceneSeconds
     .filter((s) => s.isStaticCard && s.seconds > ceiling + 0.1)
-    .sort((a, b) => b.seconds - a.seconds)[0];
+    .sort((a, b) => b.seconds - a.seconds);
+  const worst = over[0];
   if (!worst) return null;
+  if (over.length < minCount && worst.seconds <= ceiling * hardMultiple) return null;
   const collapsed = !INHERENTLY_SINGLE_BEAT_KINDS.has(worst.kind);
+  const others = over.length > 1 ? ` ${over.length - 1} other frozen card(s) in this script.` : "";
   return {
     id: worst.id,
+    count: over.length,
     detail:
       `${worst.kind} scene "${worst.id}" is a single beat of ${worst.words} words ≈ ` +
-      `${worst.seconds.toFixed(0)}s. Nothing on screen can change for that whole time. ` +
+      `${worst.seconds.toFixed(0)}s, against a ${ceiling.toFixed(0)}s ceiling. Nothing on screen can ` +
+      `change for that whole time.${others} ` +
       (collapsed
         ? `${worst.kind} supports several beats — give it at least 3 so the visual advances.`
         : `Cut it to under ${Math.floor(OVERLONG_BEAT_SEC * SPOKEN_WORDS_PER_SEC)} words, or use a multi-beat kind.`),
