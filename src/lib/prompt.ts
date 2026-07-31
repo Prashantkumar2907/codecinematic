@@ -874,6 +874,43 @@ HARD LIMITS — validated mechanically, the script is REJECTED on any violation,
 Return ONLY the JSON object.`;
 }
 
+/**
+ * The compact HARD LIMITS block, rendered into BOTH the regen-scene prompt and
+ * the refine prompt.
+ *
+ * It is one constant because the two copies had already drifted: the refine copy
+ * named 43 scene kinds where the other named 54, silently dropping browserframe,
+ * buckets, chain, cycle, ledger, pipeline, probability, queueflow, storyboard,
+ * terrain and zoomladder. A refined script was therefore held to a SMALLER rule
+ * set than the one that generated it, so a refine round could introduce a
+ * violation the generate round would have rejected.
+ *
+ * (improvement_plan.md Phase 8 predicted 8 dropped kinds and named memgrid among
+ * them; measured, it is 11 and memgrid is not one of them.)
+ *
+ * The bulleted copy inside the main generation prompt is a different
+ * presentation of the same rules and is left as its own text; it currently names
+ * the same 54 kinds, which `scripts/limits-drift.mjs` checks.
+ */
+const HARD_LIMITS_COMPACT = `HARD LIMITS (mechanically validated): code max 22 lines, every line max 46 chars, segments contiguous
+from line 1 covering all lines; terminal lines max 60 chars; say max 320; narration max 150 (terminal 210);
+bigtext.text 80; bullets item 110; node label 28; compare item 70; question.text 180; timeline when
+18/label 52; stat value 14/label 60; steps text 80/detail 90; quiz question 120/option 52, exactly one
+correct; vocab word 28/meaning 90/example 90; chart label 24/unit 8, value plain number; quote text
+200/author 40; mythfact myth 140/fact 160; trace code line 44/cell 8; memgrid addr 6/value 10;
+callstack frame 24 (required on push); lifeline actor 16/message 28; bits value exactly width 0/1
+chars; browserframe url 48; cycle label 22/detail 40; statemachine and decision walks need a real
+edge from the previous position; chain text 60; pipeline labels 16-20; ledger party 16; sankey
+branches never sum above total; gauge readings within min-max; pictogram counts never sum above
+total; race one value per racer per checkpoint; schematic listed shapes only; terrain profile 4-12
+samples 0-10; zoomladder scale 14; dialogue text 110; graphwalk node label 16; matrix cells within
+rows x cols; threads 2-4 lanes; queueflow servers 1-4/arrive+serve 0-6; cipher text UPPERCASE <=12,
+shift required for shift mode; circuit listed parts only; formula 1-6 terms; curves 1-3 listed shapes;
+buckets 2-5; probability spins land on real segments; basket prices length == years; radar 3-6 axes,
+values 0-100 per axis; bodymap listed regions; constellation 4-12 points; dayclock pins HH:MM;
+storyboard 2-6 panels; bracket 4-8 contenders/matches == contenders-1; showdown 2-6 rounds; skyline
+listed buildings h 1-10; calendar months 1-12 from<=to.`;
+
 export function buildRegenScenePrompt(opts: {
   format: "short" | "long";
   subject: string;
@@ -906,24 +943,7 @@ ${NARRATION_RULES}
 ${TTS_RULES}
 ${TEACHING_METHOD}
 
-HARD LIMITS (mechanically validated): code max 22 lines, every line max 46 chars, segments contiguous
-from line 1 covering all lines; terminal lines max 60 chars; say max 320; narration max 150 (terminal 210);
-bigtext.text 80; bullets item 110; node label 28; compare item 70; question.text 180; timeline when
-18/label 52; stat value 14/label 60; steps text 80/detail 90; quiz question 120/option 52, exactly one
-correct; vocab word 28/meaning 90/example 90; chart label 24/unit 8, value plain number; quote text
-200/author 40; mythfact myth 140/fact 160; trace code line 44/cell 8; memgrid addr 6/value 10;
-callstack frame 24 (required on push); lifeline actor 16/message 28; bits value exactly width 0/1
-chars; browserframe url 48; cycle label 22/detail 40; statemachine and decision walks need a real
-edge from the previous position; chain text 60; pipeline labels 16-20; ledger party 16; sankey
-branches never sum above total; gauge readings within min-max; pictogram counts never sum above
-total; race one value per racer per checkpoint; schematic listed shapes only; terrain profile 4-12
-samples 0-10; zoomladder scale 14; dialogue text 110; graphwalk node label 16; matrix cells within
-rows x cols; threads 2-4 lanes; queueflow servers 1-4/arrive+serve 0-6; cipher text UPPERCASE <=12,
-shift required for shift mode; circuit listed parts only; formula 1-6 terms; curves 1-3 listed shapes;
-buckets 2-5; probability spins land on real segments; basket prices length == years; radar 3-6 axes,
-values 0-100 per axis; bodymap listed regions; constellation 4-12 points; dayclock pins HH:MM;
-storyboard 2-6 panels; bracket 4-8 contenders/matches == contenders-1; showdown 2-6 rounds; skyline
-listed buildings h 1-10; calendar months 1-12 from<=to.
+${HARD_LIMITS_COMPACT}
 
 Return ONLY the JSON object of the ONE rewritten scene.`;
 }
@@ -1191,23 +1211,7 @@ ${buildSceneShape(subject.id)}
 ${NARRATION_RULES}
 ${TTS_RULES}
 
-HARD LIMITS (mechanically validated): code max 22 lines, every line max 46 chars, segments contiguous
-from line 1 covering all lines; terminal lines max 60 chars; say max 320; narration max 150 (terminal 210);
-bigtext.text 80; bullets item 110; node label 28; compare item 70; question.text 180; timeline when
-18/label 52; stat value 14/label 60; steps text 80/detail 90; quiz question 120/option 52, exactly one
-correct; vocab word 28/meaning 90/example 90; chart label 24/unit 8, value plain number; quote text
-200/author 40; mythfact myth 140/fact 160; trace code line 44/cell 8; memgrid addr 6/value 10;
-callstack frame 24 (required on push); lifeline actor 16/message 28; bits value exactly width 0/1
-chars; statemachine and decision walks need a real edge from the previous position; sankey branches
-and pictogram counts never sum above their totals; gauge readings within min-max; race one value per
-racer per checkpoint; schematic listed shapes only; dialogue text 110; graphwalk/matrix/threads/
-circuit/constellation steps reference real ids; cipher shift required in shift mode; formula 1-6
-terms; curves 1-3 listed shapes; basket prices length == years; radar values 0-100 per axis, one per
-axis; bodymap listed regions; dayclock pins HH:MM; bracket matches == contenders-1; showdown winner
-left|right|tie; skyline listed buildings; calendar months 1-12 from<=to. Keep the same top-level JSON
-shape including "meta".
-
-Current script:
+${HARD_LIMITS_COMPACT}
 ${scriptJson}
 
 Return ONLY the complete corrected JSON object (no prose, no markdown fences).`;
