@@ -393,6 +393,7 @@ export function singleBeatCapSeconds(): number {
  * Measured firing rates on the historic corpus, at these values:
  *   overlongBeats ≥3        27%   (≥1 would be 59%)
  *   crutchHits ≥3           26%   (≥1 would be 73%)
+ *   unbrokenClause >16w ≥2  25%   (≥1 would be 45%)
  *   runningExample <0.40    16%   (<0.50 would be 44%)
  *   jargon anchored <0.40   14%   (<0.60 would be 26%)
  */
@@ -404,7 +405,26 @@ export const GATE_THRESHOLDS = {
   runningExampleCoverage: 0.4,
   jargonMinTerms: 4,
   jargonAnchoredShare: 0.4,
+  /**
+   * Words a beat may run without offering the voice anywhere to breathe.
+   * Corpus: p50 10, p75 13, p90 16, max 31 over 2,037 beats — and 16 words at
+   * the measured 2.06 w/s is already 7.8 s in one breath.
+   */
+  maxClauseWords: 16,
+  unbrokenClauseCount: 2,
 } as const;
+
+/**
+ * Punctuation a speaker actually breathes on. This is the whole available
+ * instrument: edge-tts rejects SSML (row 12.1), so `<break>` is not an option
+ * and pause length is whatever the engine infers from the mark.
+ */
+const PAUSE_MARK = /[,;:.!?]|—|–| - |\.\.\./;
+
+/** Longest run of words in `text` with no pause opportunity in it. */
+export function longestUnbrokenClause(text: string): number {
+  return text.split(PAUSE_MARK).reduce((max, part) => Math.max(max, countWords(part)), 0);
+}
 
 /* ────────────────────────────── soft gates ──────────────────────────────────
  * These live here rather than in schema.ts's soft-gate zone for one reason: they
@@ -548,6 +568,44 @@ export function crutchPhrases(
     .map(([phrase, beats]) => `"${phrase}" in ${beats.slice(0, 3).join(", ")}${beats.length > 3 ? ` +${beats.length - 3} more` : ""}`)
     .join("; ");
   return { count: crutchHits.length, detail: `Banned filler openers: ${detail}. Rewrite those beats to start on the thing itself.` };
+}
+
+/**
+ * Beats the voice has to read without breathing.
+ *
+ * `prompt.ts` TTS_RULES already asks for `...` and ` — `, and nothing has ever
+ * checked compliance — the same shape of failure as "let's", which the prompt
+ * also banned and the corpus contains 89 times. So this is mechanical.
+ *
+ * It has to be textual rather than measured: the gate runs on the draft, long
+ * before TTS, and edge-tts will not accept an SSML `<break>` anyway (row 12.1),
+ * so punctuation is the only pause control that exists. Worst in the corpus is a
+ * 31-word run — 15 s of speech with nowhere to take a breath.
+ */
+export function unbrokenClause(
+  script: SceneScript,
+  maxWords = GATE_THRESHOLDS.maxClauseWords,
+  minCount = GATE_THRESHOLDS.unbrokenClauseCount
+): { count: number; detail: string } | null {
+  const offenders: { beatId: string; words: number }[] = [];
+  for (const scene of script.scenes) {
+    for (const beat of sceneBeats(scene)) {
+      const words = longestUnbrokenClause(beat.text);
+      if (words > maxWords) offenders.push({ beatId: beat.beatId, words });
+    }
+  }
+  if (offenders.length < minCount) return null;
+  const worst = [...offenders].sort((a, b) => b.words - a.words).slice(0, 4);
+  const list = worst
+    .map((o) => `${o.beatId} (${o.words} words ≈ ${secondsForWords(o.words).toFixed(0)}s unbroken)`)
+    .join(", ");
+  return {
+    count: offenders.length,
+    detail:
+      `${offenders.length} beat(s) run more than ${maxWords} words with no comma, dash or full stop, ` +
+      `so the voice reads them in one breath and they sound robotic. Worst: ${list}. ` +
+      `Rewrite them into shorter sentences, or add a comma or " — " where a person would pause.`,
+  };
 }
 
 /**

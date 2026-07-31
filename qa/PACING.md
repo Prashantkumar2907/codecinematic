@@ -58,7 +58,7 @@ Seconds are ESTIMATES at `SPOKEN_WORDS_PER_SEC = 2.06` (≈124 wpm), speech only
 
 ## Soft-gate firing rate
 
-Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch hits · running-example coverage <0.4 · ≥4 terms with <0.4 anchored. Single-beat schema cap = 12.2s against a 12s target.
+Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch hits · ≥2 beats over 16 words unbroken · running-example coverage <0.4 · ≥4 terms with <0.4 anchored. Single-beat schema cap = 12.2s against a 12s target.
 
 | Gate | Fires on | Share |
 |---|---|---|
@@ -67,6 +67,7 @@ Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch 
 | frozen card | 68 of 88 | 77.3% |
 | beat length | 38 of 88 | 43.2% |
 | filler openers | 23 of 88 | 26.1% |
+| no breathing room | 23 of 88 | 26.1% |
 | no running example | 14 of 88 | 15.9% |
 | unexplained jargon | 10 of 88 | 11.4% |
 | **any gate** | **75 of 88** | **85.2%** |

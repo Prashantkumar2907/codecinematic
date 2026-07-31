@@ -272,6 +272,8 @@ function warningsToDirectives(warnings) {
       return "Every beat is one visual step, so no beat may exceed ~12 seconds of speech (~31 words). Split a long explanation into two beats rather than holding one frame.";
     if (/^filler openers:/.test(w))
       return "Never open a beat with \"Let's\", \"Here is/Here's\", or a sentence-initial \"Now,/Next,/So,\" — start on the thing itself.";
+    if (/^no breathing room:/.test(w))
+      return "Punctuate for the voice, not the page. No stretch longer than ~16 words may run without a comma, a \" — \" or a full stop, because the narrator reads it in one breath and it sounds robotic. Prefer two short sentences to one long one.";
     if (/^no running example:/.test(w))
       return "Choose ONE concrete example in the hook and carry it by name into every following scene; do not switch examples mid-video.";
     if (/^unexplained jargon:/.test(w))

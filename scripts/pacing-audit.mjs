@@ -17,7 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   pacingReport, jargonReport, singleBeatCapSeconds,
-  staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored,
+  staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause,
   OVERLONG_BEAT_SEC, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC, GATE_THRESHOLDS,
 } from "../src/studio/pacing.ts";
 import { narrationWordCount } from "../src/studio/schema.ts";
@@ -264,6 +264,7 @@ const GATES = [
   ["frozen card", staticCardOverrun],
   ["beat length", overlongBeats],
   ["filler openers", crutchPhrases],
+  ["no breathing room", unbrokenClause],
   ["no running example", runningExampleWeak],
   ["unexplained jargon", jargonUnanchored],
 ];
@@ -271,7 +272,9 @@ lines.push("## Soft-gate firing rate");
 lines.push("");
 lines.push(
   `Thresholds (\`GATE_THRESHOLDS\` in pacing.ts): ≥${GATE_THRESHOLDS.overlongBeatCount} overlong beats · ` +
-    `≥${GATE_THRESHOLDS.crutchHits} crutch hits · running-example coverage <${GATE_THRESHOLDS.runningExampleCoverage} · ` +
+    `≥${GATE_THRESHOLDS.crutchHits} crutch hits · ` +
+    `≥${GATE_THRESHOLDS.unbrokenClauseCount} beats over ${GATE_THRESHOLDS.maxClauseWords} words unbroken · ` +
+    `running-example coverage <${GATE_THRESHOLDS.runningExampleCoverage} · ` +
     `≥${GATE_THRESHOLDS.jargonMinTerms} terms with <${GATE_THRESHOLDS.jargonAnchoredShare} anchored. ` +
     `Single-beat schema cap = ${singleBeatCapSeconds().toFixed(1)}s against a ${OVERLONG_BEAT_SEC}s target.`
 );

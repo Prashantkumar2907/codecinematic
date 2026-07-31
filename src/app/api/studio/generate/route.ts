@@ -6,7 +6,7 @@ import { buildScriptPrompt, buildRepairPrompt, buildBlueprintPrompt, buildScript
 import { sanitizeScript } from "@/lib/sanitize";
 import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
-import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored } from "@/studio/pacing";
+import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause } from "@/studio/pacing";
 
 /**
  * Pacing/voice soft gates, in the order a viewer would notice them. Each returns
@@ -21,6 +21,7 @@ const PACING_GATES: { label: string; run: (s: SceneScript) => { detail: string }
   { label: "frozen card", run: staticCardOverrun },
   { label: "beat length", run: overlongBeats },
   { label: "filler openers", run: crutchPhrases },
+  { label: "no breathing room", run: unbrokenClause },
   { label: "no running example", run: runningExampleWeak },
   { label: "unexplained jargon", run: jargonUnanchored },
 ];
