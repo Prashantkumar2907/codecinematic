@@ -16,7 +16,7 @@
  * skipped unless --force. Every attempt appends to content/factory/checkpoint.jsonl.
  */
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -217,10 +217,55 @@ async function resolveSlots(item, slotNames) {
   }));
 }
 
+/**
+ * Gold exemplars, keyed by `<subject>/<module>/<submodule>/<format>` and falling
+ * back to `<subject>/<format>`, all lower-cased.
+ *
+ * `exemplarScript` has been accepted by the generate route and threaded into the
+ * prompt since before this file existed, and was written by NO caller anywhere in
+ * the repo — the most reliable quality lever in the app was built and switched
+ * off (improvement_plan.md Phase 17). This is the caller.
+ */
+const EXEMPLAR_DIR = path.join(ROOT, "content/exemplars");
+let exemplarCache = null;
+
+function loadExemplars() {
+  if (exemplarCache) return exemplarCache;
+  exemplarCache = new Map();
+  let files = [];
+  try {
+    files = readdirSync(EXEMPLAR_DIR).filter((f) => f.endsWith(".json"));
+  } catch {
+    return exemplarCache; // no exemplars authored yet: generation is unchanged
+  }
+  for (const f of files) {
+    try {
+      const raw = readFileSync(path.join(EXEMPLAR_DIR, f), "utf8");
+      const s = JSON.parse(raw);
+      if (!Array.isArray(s?.scenes) || !s.format) continue;
+      const key = (...parts) => parts.join("/").toLowerCase();
+      exemplarCache.set(key(s.subject, s.module, s.submodule, s.format), raw);
+      if (!exemplarCache.has(key(s.subject, s.format))) {
+        exemplarCache.set(key(s.subject, s.format), raw);
+      }
+    } catch {
+      console.log(`      exemplar ${f} is unreadable — skipped`);
+    }
+  }
+  return exemplarCache;
+}
+
+function exemplarFor(item, format) {
+  const all = loadExemplars();
+  const exact = `${item.subject}/${item.module}/${item.submodule}/${format}`.toLowerCase();
+  return all.get(exact) ?? all.get(`${item.subject}/${format}`.toLowerCase()) ?? undefined;
+}
+
 async function generate(item, format, topic, model, directives) {
+  const exemplarScript = exemplarFor(item, format);
   const { ok, text } = await post(
     "generate",
-    { subject: item.subject, module: item.module, submodule: item.submodule, format, topic, model: model ?? opts.model, keyId: opts.keyId, freeOnly: opts.freeOnly, directives },
+    { subject: item.subject, module: item.module, submodule: item.submodule, format, topic, model: model ?? opts.model, keyId: opts.keyId, freeOnly: opts.freeOnly, directives, exemplarScript },
     GENERATE_TIMEOUT_MS
   );
   const lines = text.trim().split("\n").filter(Boolean);
