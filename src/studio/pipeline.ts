@@ -19,6 +19,44 @@ const VOICE_BY_LANG: Record<string, string> = {
   hi: "hi-IN-MadhurNeural",
 };
 
+/**
+ * The India-first English subjects, by the label `script.subject` carries (the
+ * same keys as `SUBJECT_PALETTES`). Derived from each subject's `audience` line
+ * in `content/subjects.json`: these say "India-first", "Indian … in depth", or
+ * name Indian exams and instruments (SSC/UPSC, ₹/SIP/PPF/UPI).
+ *
+ * They get `en-IN-NeerjaExpressiveNeural` — the only *Expressive* voice in
+ * VOICE_OPTIONS, free, previously unused here, and already what the sibling news
+ * app ships on its English channel (`content/channels.json`). An American voice
+ * reading Kesavananda, Rajya Sabha and ₹2Cr was the complaint; the lexicon (row
+ * 12.4) is the other half of the fix.
+ *
+ * One table, and the Output voice picker still overrides per video — so this is
+ * a cheap thing to change your mind about.
+ */
+const INDIA_FIRST_SUBJECTS: ReadonlySet<string> = new Set([
+  "History",
+  "Math & Aptitude",
+  "Money & Finance",
+  "English & Communication",
+  "GK & Amazing Facts",
+  "Mythology & Epics",
+  "Polity & Governance",
+  "Mindset & Self-Growth",
+  "Economy",
+  "Environment & Ecology",
+  "Art & Culture",
+]);
+
+const INDIAN_ENGLISH_VOICE = "en-IN-NeerjaExpressiveNeural";
+
+/** Default voice for a script: language first, then subject. */
+export function defaultVoiceFor(script: Pick<SceneScript, "subject"> & { lang?: string }): string {
+  const lang = script.lang ?? "en";
+  if (lang !== "en") return VOICE_BY_LANG[lang] ?? VOICE_BY_LANG.en;
+  return INDIA_FIRST_SUBJECTS.has(script.subject) ? INDIAN_ENGLISH_VOICE : VOICE_BY_LANG.en;
+}
+
 /** Curated, verified edge-tts voices for the Output voice picker (from
  *  `edge-tts --list-voices`). Only these are offered, so every pick works. */
 export const VOICE_OPTIONS: { id: string; label: string }[] = [
@@ -48,7 +86,7 @@ export async function fetchNarration(
   const baseRatePct = script.format === "short" ? SHORT_TTS_RATE_PCT : 0;
   const rate = baseRatePct === 0 ? undefined : `+${baseRatePct}%`;
   const roles = beatRoles(script);
-  const resolvedVoice = voice ?? VOICE_BY_LANG[(script as { lang?: string }).lang ?? "en"];
+  const resolvedVoice = voice ?? defaultVoiceFor(script);
   onProgress?.(0, beats.length);
 
   const audioCtx = new AudioContext();
