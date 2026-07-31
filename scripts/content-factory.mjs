@@ -56,10 +56,18 @@ function parseArgs(argv) {
   // OFF by default — if a fast model can't reach a section ≥9, Pro won't reliably
   // either, so it's wasted cost; opt in with --escalate-model for a one-off.
   // Acceptance: every section >= bar (8) AND overall >= overallBar (9). Refine keeps
-  // pushing sections toward the stretch target 9, but a slot is "done" once accepted.
+  // pushing sections toward the bar, but a slot is "done" once accepted.
+  //
+  // NOTE — the rubric gained a 7th section (pacing_density) in Phase 6, and `overall`
+  // is an UNWEIGHTED MEAN over the sections, so historical overall scores are not
+  // comparable across that boundary, and `worst` (a min) can only get stricter.
+  // Measured on a gate-passing long script: overall 7.1, worst 6, pacing_density 6.
+  // The bar below (worst >= 8 AND overall >= 9) was already only reached by 14 of 86
+  // slots before the new section existed. Set it from data on the next full run
+  // rather than by feel; do not raise it.
   const args = {
     slots: ["short-1", "short-2", "long"],
-    bar: 8, overallBar: 9, stretch: 9, maxRounds: 3, attempts: 6, escalateAfter: 3, escalateModel: null,
+    bar: 8, overallBar: 9, attempts: 6, escalateAfter: 3, escalateModel: null,
     limit: Infinity, force: false, dry: false,
     // Testing default: never spend a billed key. Every request the factory makes
     // (generate/rate/tune/topics, incl. blueprint/critique sub-calls) is restricted
@@ -74,8 +82,6 @@ function parseArgs(argv) {
     else if (a === "--slots") args.slots = argv[++i].split(",").map((s) => s.trim());
     else if (a === "--bar") args.bar = Number(argv[++i]);
     else if (a === "--overall-bar") args.overallBar = Number(argv[++i]);
-    else if (a === "--stretch") args.stretch = Number(argv[++i]);
-    else if (a === "--max-rounds") args.maxRounds = Number(argv[++i]);
     else if (a === "--attempts") args.attempts = Number(argv[++i]);
     else if (a === "--escalate-after") args.escalateAfter = Number(argv[++i]);
     else if (a === "--escalate-model") args.escalateModel = argv[++i];

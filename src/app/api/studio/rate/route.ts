@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateJson, GeminiError } from "@/lib/gemini";
 import { buildRatingPrompt, normalizeRating } from "@/lib/rate";
+import { sceneScriptSchema } from "@/studio/schema";
 import { resolveTaxonomy } from "@/lib/state";
 
 const requestSchema = z.object({
@@ -25,7 +26,18 @@ export async function POST(req: Request) {
   const { format, topic, lang, freeOnly, script } = parsed.data;
   try {
     const { subject } = await resolveTaxonomy(parsed.data.subject, parsed.data.module, parsed.data.submodule);
-    const prompt = buildRatingPrompt(JSON.stringify(script), { subject, format, topic, lang });
+    // Pass the PARSED script too, so buildRatingPrompt can compute the measured
+    // pacing facts the new `pacing_density` section grades against. Parsing may
+    // legitimately fail on a draft mid-repair; the rubric then simply omits the
+    // facts block rather than failing the whole rating.
+    const validated = sceneScriptSchema.safeParse(script);
+    const prompt = buildRatingPrompt(JSON.stringify(script), {
+      subject,
+      format,
+      topic,
+      lang,
+      ...(validated.success ? { script: validated.data } : {}),
+    });
     for (let attempt = 1; attempt <= RATE_TRIES; attempt++) {
       const raw = await generateJson(prompt, "quality", { temperature: 0.15, ...(freeOnly ? { freeOnly } : {}) });
       const rating = normalizeRating(raw, subject.id);
