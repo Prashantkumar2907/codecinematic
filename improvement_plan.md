@@ -633,18 +633,33 @@ voice/caption split that most TTS work needs **already exists**, which is why "�
 "ten crore rupees" while the screen keeps the symbol. Build on this seam.
 
 **12a. The app uses one of edge-tts's several controls.** `tts/route.ts:28-29` passes
-`--voice --text --write-media` and optionally `--rate`. Nothing else. **Spike first** (half a day) to
-establish exactly what this edge-tts build accepts, because the whole workstream depends on it:
-- Does it accept `--pitch` and `--volume`? (Almost certainly yes.) → per-beat variation kills the
-  monotone "list voice": lift pitch slightly on a question beat, drop it on a payoff.
-- Can it emit **word-boundary timestamps** (`--write-subtitles` / the `SubMaker` API)? **If yes this is the
-  single most valuable finding in the workstream** — it gives real per-word timing, which fixes the broken
-  karaoke captions properly (Phase 2 item 3) *and* lets a diagram node reveal on the exact word that names
-  it, instead of on a linear approximation across the beat.
-- Does it accept SSML (`<break>`, `<emphasis>`, `<phoneme>`, speaking styles)? **Expect no** — the Edge
-  read-aloud endpoint is locked down and edge-tts constructs its own SSML. If confirmed, then real pauses
-  and emphasis are *only* achievable through punctuation and phonetic respelling, which changes what we
-  ask the model for. **Verify before building on it.**
+`--voice --text --write-media` and optionally `--rate`. Nothing else.
+
+> **SPIKE RESULT (row 12.1, measured against the live `.venv`, `edge-tts 7.2.8`).** All three questions
+> answered. The headline: **word timings exist, and the CLI cannot reach them.**
+>
+> - **`--pitch` and `--volume`: YES.** Both are real CLI flags (`edge-tts --help`) and keyword args on
+>   `Communicate`. Verified `--pitch=+40Hz` against `-0Hz` on identical text: same byte length, different
+>   md5, so it re-synthesises rather than being ignored. 12.2 is unblocked.
+> - **Word-boundary timestamps: YES — but only through the Python API.** `Communicate.__init__` takes
+>   `boundary: Literal["WordBoundary","SentenceBoundary"] = "SentenceBoundary"`. The **default is
+>   sentence-level**, which is why this looked unavailable: `--write-subtitles` emits one SRT cue per
+>   *sentence*, and **the CLI exposes no `--boundary` flag at all**. Passing `boundary="WordBoundary"`
+>   yields per-word `offset`/`duration` in 100 ns ticks — 15/15 words on the test sentence, on
+>   `en-US-AndrewMultilingualNeural`, `en-IN-NeerjaExpressiveNeural` **and** `hi-IN-SwaraNeural`. It is not
+>   a voice property; every voice defaults to sentence and every voice honours the override.
+>   **Consequence: the route must stop shelling out to `python -m edge_tts` and call a small in-repo Python
+>   helper instead** (one process, returns mp3 + a word-timing sidecar). That is the enabling change for
+>   real karaoke (Phase 2 item 3), word-anchored reveals, and 12.7's emphasis marker.
+> - **SSML: NO, confirmed.** `<speak><break time="800ms"/>Hello <emphasis level="strong">world</emphasis>.
+>   </speak>` passed as `--text` is **spoken literally, tags and all** — 10.6 s of audio reading the markup
+>   aloud, versus ~1.3 s for the bare words. So 12.2/12.3 must work through punctuation, `--rate`/`--pitch`
+>   /`--volume` per beat, and phonetic respelling (12c) — never SSML.
+>
+> **Bonus measurement, and it belongs to 12b.** With word timings the per-clip silence that Phase 15
+> located by `silencedetect` is now exact: **lead 0.087-0.100 s, trail 0.325-0.462 s.** On a 4.65 s clip
+> the trail is 7% dead air; on a 1.75 s question beat it is **26%**. Word timings make this trimmable
+> precisely rather than by threshold guessing.
 
 **12b. Pausing.** There is no pause control today beyond whatever punctuation the model happens to write.
 `prompt.ts` TTS_RULES asks for `...` and ` — ` and nothing checks compliance. Make it mechanical: a soft

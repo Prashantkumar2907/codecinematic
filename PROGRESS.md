@@ -92,7 +92,7 @@ everything else and links to it.)
 | 15.2 | 15 | integration | Calibrate words/sec per voice **and per language** | done | 15.1 | `SPOKEN_WORDS_PER_SEC` **2.6 → 2.06** (measured, en, default voice). Fit `actual = words/3.5 + overhead`; `silencedetect` shows ~0.15 s lead + 0.34-1.15 s trail per clip. **Hindi still uncalibrated** — re-measure per voice with `drift-check.mjs` | 61d75b9 |
 | 17.1 | 17 | content | Hand-author gold short + long per archetype (~20 scripts) | todo | 5.1 | scripts pass all gates | — |
 | 17.2 | 17 | content | Wire `exemplarScript` — factory never sends it today | todo | 17.1 | present in the prompt | — |
-| 12.1 | 12 | narration | **SPIKE**: does edge-tts accept `--pitch`/`--volume`? word timings? SSML? | todo | — | written into the plan | — |
+| 12.1 | 12 | narration | **SPIKE**: does edge-tts accept `--pitch`/`--volume`? word timings? SSML? | verified | — | answers written into §12a. `--pitch`/`--volume` **yes** (+40Hz vs -0Hz: same length, different md5). Word timings **yes, Python-API only** — `Communicate(boundary="WordBoundary")`, default is `SentenceBoundary` and **the CLI has no `--boundary` flag**; 15/15 word events on en-US, en-IN *and* hi-IN. SSML **no** — `<speak>` tags are read aloud (10.6 s vs 1.3 s). Bonus: lead **0.087-0.100 s**, trail **0.325-0.462 s** (26% of a short beat) | |
 | 12.2 | 12 | narration | Per-beat delivery by beat role (hook/teach/payoff/question) | todo | 12.1 | audibly varied | — |
 | 12.3 | 12 | narration | Enforced pausing (clause length + pause markers) | todo | 12.1 | gate fires | — |
 | 12.4 | 12 | narration | Indian pronunciation lexicon (currently **6 entries**) | todo | — | every proper noun covered in one video | — |
