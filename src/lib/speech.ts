@@ -49,6 +49,7 @@ const UNIT_WORDS: Array<[RegExp, string]> = [
 // scripts/lexicon-check.mjs imports this module directly and relies on Node 22
 // stripping the types. Keep it.
 import { INDIAN_TERMS, TECH_TERMS } from "./lexicon.ts";
+import { EMPHASIS_RE } from "../studio/schema.ts";
 
 /* ─────────────────────────────── Hindi ──────────────────────────────────────
  * Hindi used to get two symbol replacements and an early return, so a Hindi
@@ -125,6 +126,28 @@ function normalizeHindi(text: string): string {
 }
 
 /**
+ * `*word*` → an em-dash pause around the word.
+ *
+ * A pause is the whole emphasis vocabulary edge-tts leaves us: it speaks SSML
+ * `<emphasis>` aloud (row 12.1), and `--pitch`/`--volume` are per-segment, so
+ * they cannot reach a single word inside a beat. " — " is also already the
+ * convention TTS_RULES teaches for "a beat of emphasis", so this reuses it
+ * rather than inventing a second one.
+ *
+ * The tidy-up matters more than it looks: a naive replacement leaves " — ,"
+ * before punctuation and doubled dashes when two emphases are adjacent, and the
+ * voice reads a stray dash as a lurch.
+ */
+function expandEmphasis(text: string): string {
+  return text
+    .replace(EMPHASIS_RE, " — $1 — ")
+    .replace(/\s*—\s*([.,!?;:])/g, "$1")
+    .replace(/(—\s*){2,}/g, "— ")
+    .replace(/^\s*—\s*/, "")
+    .replace(/\s*—\s*$/, "");
+}
+
+/**
  * "₹42000 रुपये" is natural Hindi and expands to "42000 रुपये रुपये". Same in
  * English for "₹500 rupees". Collapse the echo rather than trying to make the
  * currency pattern swallow a word that may or may not follow it.
@@ -160,6 +183,10 @@ export function normalizeSpeech(
 
   // Code punctuation that occasionally leaks into narration (issue #21 backstop).
   s = s.replace(/=>/g, " to ").replace(/`/g, "");
+
+  // Emphasis before anything else, so the marked word is a plain lowercase word
+  // by the time the acronym expander sees it (row 12.7).
+  s = expandEmphasis(s);
 
   // Hindi is voiced by a Hindi speaker, so it needs no phonetic respelling of
   // Indian names — the reason INDIAN_TERMS is skipped for en-IN voices applies

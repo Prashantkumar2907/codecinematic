@@ -1,4 +1,4 @@
-import { sceneBeats, type SceneScript, type SceneTiming } from "./schema";
+import { sceneBeats, stripEmphasis, type SceneScript, type SceneTiming } from "./schema";
 
 function srtTime(ms: number): string {
   const clamped = Math.max(0, Math.round(ms));
@@ -24,7 +24,7 @@ export function buildSrt(script: SceneScript, timings: SceneTiming[], offsetMs =
     if (!timing) continue;
     sceneBeats(scene).forEach(({ text }, k) => {
       const beat = timing.beats[k];
-      const line = text.trim();
+      const line = stripEmphasis(text).trim();
       if (!beat || !line) return;
       const startMs = offsetMs + timing.startMs + beat.startMs;
       const endMs = startMs + beat.durationMs;

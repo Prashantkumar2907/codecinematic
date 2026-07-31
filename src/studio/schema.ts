@@ -4031,6 +4031,26 @@ export type VerifyResult = {
 };
 
 /**
+ * Emphasis marker: `*word*` in a spoken beat.
+ *
+ * It replaces the old ALL-CAPS convention, which had two defects the prompt
+ * acknowledged and did not solve (row 12.7): the capitals survived into the
+ * on-screen caption, so the video shouted; and `normalizeSpeech` spells any
+ * token in its 60-item acronym list letter by letter, so emphasising a short
+ * word that happens to be on that list ("the OS decides") got it spelled out.
+ *
+ * The marker is stripped here for the screen and translated to an em-dash pause
+ * for the voice (`speech.ts`) — pauses being the only emphasis edge-tts affords,
+ * since it speaks SSML `<emphasis>` tags aloud (row 12.1).
+ */
+export const EMPHASIS_RE = /\*([^*\n]{1,60})\*/g;
+
+/** The caption form of a spoken beat: markers removed, word kept. */
+export function stripEmphasis(text: string): string {
+  return text.replace(EMPHASIS_RE, "$1");
+}
+
+/**
  * One spoken word located inside its own beat clip, from edge-tts's
  * `boundary="WordBoundary"` stream. Declared here rather than in `lib/tts.ts`
  * because the engine and the caption renderer read it in the browser, and

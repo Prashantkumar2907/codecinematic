@@ -264,9 +264,11 @@ each spoken beat to be correct on screen — the engine auto-converts it for the
 - AVOID HOMOGRAPHS in the spoken line: a word that changes sound by context (record/record,
   read/read, lead/lead) reads wrong. Swap in an unambiguous synonym ("log the data", not "record the
   data"; "guides", not "leads").
-- EMPHASIS: to make one pivotal contrast land, put the single crucial word in ALL CAPS
-  ("the CLIENT asks, not the server"). One or two per video at most — it also shows capitalised on
-  screen, so never shout whole phrases.
+- EMPHASIS: to make one pivotal contrast land, wrap the single crucial word in asterisks
+  ("the *client* asks, not the server"). The engine strips the asterisks from the caption and turns
+  them into a spoken pause, so the screen never shouts. One or two per video at most, one word each.
+  NEVER use ALL CAPS for emphasis: capitals reach the caption unchanged, and a capitalised short word
+  that is also an acronym ("the OS decides") gets spelled out letter by letter by the voice.
 - BREATHING: TTS runs sentences together. Use "..." for a short pause and " — " for a beat of
   emphasis, and keep clauses short so the voice can breathe.
 - QUESTIONS: start a spoken question with the interrogative word (Why / How / What / When) so the

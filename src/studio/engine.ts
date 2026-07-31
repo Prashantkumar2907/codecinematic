@@ -1,4 +1,4 @@
-import { sceneBeats, type SceneScript, type SceneTiming, type WordTiming } from "./schema";
+import { sceneBeats, stripEmphasis, type SceneScript, type SceneTiming, type WordTiming } from "./schema";
 import { paintScene, type BeatWindow } from "./painters";
 import {
   drawBackground,
@@ -407,7 +407,8 @@ function activeCaption(
   if (idx < 0) return null;
   const b = timing.beats[idx];
   const beat = texts[idx];
-  const text = (beat?.text ?? "").trim();
+  // The `*word*` emphasis marker is for the voice only; it must never appear on screen.
+  const text = stripEmphasis(beat?.text ?? "").trim();
   if (!text) return null;
   const progress = voiceProgress(
     beat ? wordsByBeatId.get(beat.beatId) : undefined,
