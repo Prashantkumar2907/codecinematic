@@ -1,4 +1,4 @@
-import { sceneBeats, type SceneScript, type SceneTiming } from "./schema";
+import { sceneBeats, type SceneScript, type SceneTiming, type WordTiming } from "./schema";
 import { paintScene, type BeatWindow } from "./painters";
 import {
   drawBackground,
@@ -19,7 +19,13 @@ import {
 } from "./painters/common";
 
 /** One narration beat's audio; beatId is `${sceneId}#${index}` (see sceneBeats). */
-export type BeatAudio = { beatId: string; mp3: ArrayBuffer; durationMs: number };
+export type BeatAudio = {
+  beatId: string;
+  mp3: ArrayBuffer;
+  durationMs: number;
+  /** Empty when the vendor reports none; captions then fall back to linear. */
+  words?: WordTiming[];
+};
 
 export type RenderPlan = {
   script: SceneScript;
@@ -357,8 +363,40 @@ export const CAPTION_STYLES: CaptionStyle[] = ["off", "karaoke", "word", "pop", 
 export type CaptionPos = "top" | "center" | "bottom";
 export const CAPTION_POSITIONS: CaptionPos[] = ["top", "center", "bottom"];
 
+/**
+ * Fraction of this beat's words that have been spoken at `beatElapsedMs`, read
+ * off the real per-word timings.
+ *
+ * The linear fallback is what the captions used before word timings existed, and
+ * it is wrong in three ways at once: it charges the caption for edge-tts's ~0.09 s
+ * of leading silence and 0.33-0.46 s of trailing silence, and it assumes "a" and
+ * "surrounding" take the same time (measured: 50 ms vs 637 ms).
+ *
+ * A fraction, deliberately, not a word index — the timings are measured on the
+ * normalized speech copy, which does not tokenize one-to-one with the caption
+ * text (see `WordTiming`).
+ */
+function voiceProgress(words: WordTiming[] | undefined, beatElapsedMs: number, beatDurationMs: number): number {
+  if (!words?.length) return clamp01(beatElapsedMs / Math.max(1, beatDurationMs));
+  let spoken = 0;
+  for (const w of words) {
+    if (beatElapsedMs >= w.startMs + w.durationMs) {
+      spoken += 1;
+      continue;
+    }
+    if (beatElapsedMs > w.startMs) spoken += (beatElapsedMs - w.startMs) / Math.max(1, w.durationMs);
+    break;
+  }
+  return clamp01(spoken / words.length);
+}
+
 /** The line being spoken right now in this scene, plus how far through it we are. */
-function activeCaption(scene: SceneScript["scenes"][number], timing: SceneTiming, sceneElapsedMs: number) {
+function activeCaption(
+  scene: SceneScript["scenes"][number],
+  timing: SceneTiming,
+  sceneElapsedMs: number,
+  wordsByBeatId: Map<string, WordTiming[]>
+) {
   const texts = sceneBeats(scene);
   let idx = -1;
   for (let k = 0; k < timing.beats.length; k++) {
@@ -368,9 +406,15 @@ function activeCaption(scene: SceneScript["scenes"][number], timing: SceneTiming
   }
   if (idx < 0) return null;
   const b = timing.beats[idx];
-  const text = (texts[idx]?.text ?? "").trim();
+  const beat = texts[idx];
+  const text = (beat?.text ?? "").trim();
   if (!text) return null;
-  return { text, progress: clamp01((sceneElapsedMs - b.startMs) / Math.max(1, b.durationMs)) };
+  const progress = voiceProgress(
+    beat ? wordsByBeatId.get(beat.beatId) : undefined,
+    sceneElapsedMs - b.startMs,
+    b.durationMs
+  );
+  return { text, progress };
 }
 
 /**
@@ -412,9 +456,9 @@ type CaptionPage = {
 
 /**
  * The slice of a wrapped beat that is on screen at `progress`. Pages advance in
- * proportion to their word count, so the page turns roughly when the narration
- * reaches it — the same linear assumption karaoke already makes, which is the
- * best available until edge-tts word timings land (see improvement_plan Phase 12a).
+ * proportion to their word count, so the page turns when the narration reaches
+ * it. `progress` now comes from `voiceProgress`, so both the page turn and the
+ * karaoke highlight track measured speech rather than a linear ramp.
  */
 function paginate(allLines: string[], perPage: number, progress: number): CaptionPage {
   const wordsIn = (line: string) => line.split(/\s+/).filter(Boolean).length;
@@ -597,6 +641,9 @@ export function runPlan(
 
   const layout = makeLayout(width, height);
   const palette = paletteForSubject(plan.script.subject);
+  // Built once: `activeCaption` reads it every frame to drive the highlight off
+  // real speech rhythm instead of a linear ramp.
+  const wordsByBeatId = new Map(plan.audio.filter((a) => a.words?.length).map((a) => [a.beatId, a.words!]));
   // One background motif per video, one transition style per scene boundary —
   // both deterministic so a re-render of the same script looks identical.
   const motif = variantOf(`${plan.script.topic}|${plan.script.subject}`, BG_MOTIFS);
@@ -777,7 +824,7 @@ export function runPlan(
       drawOverlay(ctx, width, height, videoElapsed / total, plan.brand, palette);
       if (captionStyle !== "off") {
         const cur = scenesWithTiming[idx];
-        const cap = activeCaption(cur.scene, cur.timing, elapsed - cur.timing.startMs);
+        const cap = activeCaption(cur.scene, cur.timing, elapsed - cur.timing.startMs, wordsByBeatId);
         if (cap) drawCaptions(ctx, width, height, cap.text, cap.progress, captionStyle, captionPos, palette);
       }
       if (introMs > 0 && videoElapsed < introMs) {

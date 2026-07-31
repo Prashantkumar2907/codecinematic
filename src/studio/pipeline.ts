@@ -1,4 +1,4 @@
-import type { SceneScript, VerifyResult } from "./schema";
+import type { SceneScript, VerifyResult, WordTiming } from "./schema";
 import { EXECUTABLE_LANGS, sceneBeats } from "./schema";
 import type { BeatAudio } from "./engine";
 
@@ -70,10 +70,12 @@ export async function fetchNarration(
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `tts failed (${res.status})`);
       const decoded = await Promise.all(
-        (data.segments as { id: string; mp3Base64: string }[]).map(async (seg) => {
+        (data.segments as { id: string; mp3Base64: string; words?: WordTiming[] }[]).map(async (seg) => {
           const mp3 = base64ToArrayBuffer(seg.mp3Base64);
+          // Duration comes from the decoder, not the vendor: edge-tts reports none,
+          // and the engine's whole timing model hangs off this number.
           const audio = await audioCtx.decodeAudioData(mp3.slice(0));
-          return { beatId: seg.id, mp3, durationMs: audio.duration * 1000 };
+          return { beatId: seg.id, mp3, durationMs: audio.duration * 1000, words: seg.words ?? [] };
         })
       );
       out.push(...decoded);

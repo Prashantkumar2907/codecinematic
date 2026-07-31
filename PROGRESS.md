@@ -99,7 +99,7 @@ everything else and links to it.)
 | 12.5 | 12 | narration | Hindi path no longer early-returns (`speech.ts:88-91`) | todo | — | acronyms/units handled in hi | — |
 | 12.6 | 12 | narration | Subject-aware default voice (currently `en-US-Andrew`) | todo | — | — | — |
 | 12.7 | 12 | narration | Emphasis marker that strips from caption, survives to voice | todo | 12.1 | no letter-spelled emphasis | — |
-| 12.8 | 12 | narration | Put synthesis behind a swappable interface | todo | 12.1 | vendor swap is config | — |
+| 12.8 | 12 | narration | Put synthesis behind a swappable interface | verified | 12.1 | new `src/lib/tts.ts` (`SpeechSynthesizer` → `{mp3, words, durationMs?}`) + `scripts/tts_synth.py`. Live route call returns **word timings end-to-end**; also collapses **one Python process per beat → one per batch** (was up to 160 spawns/script). Word timings now drive captions: measured against the linear ramp they replace, linear is off by **2.2 words** at t=1050 ms on a 14-word beat and **36.4% of the caption** on a 5-word beat, and finishes **525 ms after the voice stops** | |
 | 8.1 | 8 | hygiene | **Typecheck 99 → 0** | verified | 0.1 | `npx tsc --noEmit` → **0 errors** (99 at session start, 71 after phases 1-7). `demo.ts` was 66 of them | 6514f41 |
 | 8.2 | 8 | hygiene | `npm run build` green for the first time | verified | 8.1 | build completes and prints the route table; it had failed on `demo.ts` all session | 6514f41 |
 | 8.3 | 8 | hygiene | Delete root cruft + close `.gitignore` | verified | 0.1 | 0 `screenshot_*.png` and 0 `rewrite_*.js` remain; only 1 untracked file left in the repo (the new `CLAUDE.md`). `.venv/`, `audit/`, `graphify-out/`, `src/` (158 files) and `scripts/` (18) all intact | 6514f41 |

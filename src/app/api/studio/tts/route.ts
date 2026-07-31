@@ -1,75 +1,65 @@
 import { NextResponse } from "next/server";
-import { execFile } from "node:child_process";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { promisify } from "node:util";
 import { z } from "zod";
 import { normalizeSpeech } from "@/lib/speech";
+import { activeSynthesizer } from "@/lib/tts";
 
-const execFileAsync = promisify(execFile);
+const prosodyPercent = z.string().regex(/^[+-]\d{1,3}%$/);
+const prosodyHz = z.string().regex(/^[+-]\d{1,3}Hz$/);
 
 const requestSchema = z.object({
-  segments: z.array(z.object({ id: z.string(), text: z.string().min(1).max(520) })).min(1).max(160),
+  segments: z
+    .array(
+      z.object({
+        id: z.string(),
+        text: z.string().min(1).max(520),
+        /** Per-beat delivery (row 12.2) — a question lifts, a payoff drops. */
+        rate: prosodyPercent.optional(),
+        pitch: prosodyHz.optional(),
+        volume: prosodyPercent.optional(),
+      })
+    )
+    .min(1)
+    .max(160),
   voice: z.string().optional(),
-  /** edge-tts prosody rate, e.g. "+5%" — shorts use a slightly brisker pace. */
-  rate: z.string().regex(/^[+-]\d{1,3}%$/).optional(),
+  /** Batch defaults, e.g. shorts run at "+5%". */
+  rate: prosodyPercent.optional(),
+  pitch: prosodyHz.optional(),
+  volume: prosodyPercent.optional(),
 });
 
 const DEFAULT_VOICE = "en-US-AndrewMultilingualNeural";
-const SEGMENT_TIMEOUT_MS = 30_000;
-const CONCURRENCY = 4;
-
-function venvPython(): string {
-  return path.join(process.cwd(), ".venv", "bin", "python");
-}
-
-async function synthesize(text: string, voice: string, outPath: string, rate?: string): Promise<void> {
-  const args = ["-m", "edge_tts", "--voice", voice, "--text", text, "--write-media", outPath];
-  if (rate) args.push(`--rate=${rate}`);
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await execFileAsync(venvPython(), args, { timeout: SEGMENT_TIMEOUT_MS });
-      return;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw new Error(`edge-tts failed for "${text.slice(0, 60)}...": ${String(lastErr).slice(0, 200)}`);
-}
 
 export async function POST(req: Request) {
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "expected {segments:[{id,text}], voice?}" }, { status: 400 });
+    return NextResponse.json(
+      { error: "expected {segments:[{id,text,rate?,pitch?,volume?}], voice?, rate?, pitch?, volume?}" },
+      { status: 400 }
+    );
   }
+  const { segments, rate, pitch, volume } = parsed.data;
   const voice = parsed.data.voice || process.env.VOICE || DEFAULT_VOICE;
-  const rate = parsed.data.rate;
   // The voice prefix encodes the language (hi-IN-… / en-US-…); the speech normalizer
   // needs it to avoid injecting English words into a Hindi voice.
   const lang: "en" | "hi" = voice.toLowerCase().startsWith("hi") ? "hi" : "en";
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "devstudio-tts-"));
 
   try {
-    const segments = parsed.data.segments;
-    const results: { id: string; mp3Base64: string }[] = new Array(segments.length);
-    let cursor = 0;
-    async function worker() {
-      while (cursor < segments.length) {
-        const index = cursor++;
-        const segment = segments[index];
-        const outPath = path.join(tmpDir, `${index}.mp3`);
-        await synthesize(normalizeSpeech(segment.text, lang), voice, outPath, rate);
-        const mp3 = await fs.readFile(outPath);
-        results[index] = { id: segment.id, mp3Base64: mp3.toString("base64") };
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, segments.length) }, worker));
-    return NextResponse.json({ voice, segments: results });
+    const results = await activeSynthesizer().synthesize(
+      segments.map((s) => ({ ...s, text: normalizeSpeech(s.text, lang) })),
+      { voice, rate, pitch, volume }
+    );
+    return NextResponse.json({
+      voice,
+      segments: results.map((r) => ({
+        id: r.id,
+        mp3Base64: r.mp3.toString("base64"),
+        // Timed against the NORMALIZED copy, so the word list will not match the
+        // caption text token-for-token ("API" is spoken as three words). Consumers
+        // must use it as a rhythm curve, not an index — see `activeCaption`.
+        words: r.words,
+      })),
+    });
   } catch (err) {
     return NextResponse.json({ error: String(err).slice(0, 400) }, { status: 502 });
-  } finally {
-    await fs.rm(tmpDir, { recursive: true, force: true });
   }
 }

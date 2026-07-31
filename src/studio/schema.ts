@@ -4030,6 +4030,19 @@ export type VerifyResult = {
   detail?: string;
 };
 
+/**
+ * One spoken word located inside its own beat clip, from edge-tts's
+ * `boundary="WordBoundary"` stream. Declared here rather than in `lib/tts.ts`
+ * because the engine and the caption renderer read it in the browser, and
+ * `lib/tts.ts` imports `node:child_process`.
+ *
+ * These are timed against the NORMALIZED speech copy (`normalizeSpeech`), which
+ * does not tokenize one-to-one with the on-screen caption text — "API" is spoken
+ * as three words. Use it as a rhythm curve over the utterance, never as an index
+ * into the caption.
+ */
+export type WordTiming = { t: string; startMs: number; durationMs: number };
+
 /** Narration timing computed after TTS: scene i plays [startMs, startMs+durationMs). */
 export type SceneTiming = {
   sceneId: string;
