@@ -45,15 +45,10 @@ const UNIT_WORDS: Array<[RegExp, string]> = [
   [/\b(\d[\d.,]*)\s?kg\b/g, "$1 kilograms"],
 ];
 
-/** Indian/regional terms an English voice mangles — spelled phonetically for the ear. */
-const INDIAN_TERMS: Array<[RegExp, string]> = [
-  [/\bLok Sabha\b/gi, "Loke Sub-haa"],
-  [/\bRajya Sabha\b/gi, "Raajya Sub-haa"],
-  [/\bKailasa\b/gi, "Kye-laa-saa"],
-  [/\bKesavananda\b/gi, "Kay-sha-vaa-nanda"],
-  [/\bPanchayat\b/gi, "Pun-chaa-yat"],
-  [/\bLokpal\b/gi, "Loke-paal"],
-];
+// Explicit .ts extension, for the same reason pacing.ts carries one:
+// scripts/lexicon-check.mjs imports this module directly and relies on Node 22
+// stripping the types. Keep it.
+import { INDIAN_TERMS, TECH_TERMS } from "./lexicon.ts";
 
 /** Bare currency/percent for the Hindi voice (minimal — the model writes the rest). */
 const HI_SYMBOLS: Array<[RegExp, string]> = [
@@ -79,7 +74,11 @@ function expandCurrency(text: string): string {
  * treatment; Hindi (Devanagari, numbers already written as words by the model) gets
  * only a minimal symbol pass so we never inject English words into a Hindi voice.
  */
-export function normalizeSpeech(text: string, lang: "en" | "hi" = "en"): string {
+export function normalizeSpeech(
+  text: string,
+  lang: "en" | "hi" = "en",
+  opts: { nativeIndianVoice?: boolean } = {}
+): string {
   let s = text;
 
   // Code punctuation that occasionally leaks into narration (issue #21 backstop).
@@ -90,7 +89,13 @@ export function normalizeSpeech(text: string, lang: "en" | "hi" = "en"): string 
     return s.replace(/\s{2,}/g, " ").trim();
   }
 
-  for (const [re, w] of INDIAN_TERMS) s = s.replace(re, w);
+  // Respellings authored for an American ear would over-correct a voice that
+  // already says these names natively (row 12.4). Technical names are respelled
+  // either way: no voice knows nginx is "engine X".
+  if (!opts.nativeIndianVoice) {
+    for (const [re, w] of INDIAN_TERMS) s = s.replace(re, w);
+  }
+  for (const [re, w] of TECH_TERMS) s = s.replace(re, w);
 
   s = expandCurrency(s);
   s = s.replace(/\$\s?(\d[\d,]*\.?\d*)/g, "$1 dollars");

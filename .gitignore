@@ -20,3 +20,6 @@ audit/
 qa/**/*.png
 # Superseded by the above: filmstrip writes to qa/<kind>/, not the repo root
 screenshot_*.png
+
+# lexicon-check --voice renders listening pairs; regenerable like qa/<kind>/
+qa/lexicon/

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { normalizeSpeech } from "@/lib/speech";
+import { isNativeIndianVoice } from "@/lib/lexicon";
 import { activeSynthesizer } from "@/lib/tts";
 
 const prosodyPercent = z.string().regex(/^[+-]\d{1,3}%$/);
@@ -42,10 +43,11 @@ export async function POST(req: Request) {
   // The voice prefix encodes the language (hi-IN-… / en-US-…); the speech normalizer
   // needs it to avoid injecting English words into a Hindi voice.
   const lang: "en" | "hi" = voice.toLowerCase().startsWith("hi") ? "hi" : "en";
+  const nativeIndianVoice = isNativeIndianVoice(voice);
 
   try {
     const results = await activeSynthesizer().synthesize(
-      segments.map((s) => ({ ...s, text: normalizeSpeech(s.text, lang) })),
+      segments.map((s) => ({ ...s, text: normalizeSpeech(s.text, lang, { nativeIndianVoice }) })),
       { voice, rate, pitch, volume }
     );
     return NextResponse.json({
