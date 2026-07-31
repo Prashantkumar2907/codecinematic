@@ -11,6 +11,7 @@ import {
   roundRect,
   sub,
   easeOutBack,
+  activeBeatIndex
 } from "./common";
 
 export type MoleculeScene = {
@@ -128,7 +129,7 @@ export function paintMolecule(ctx: CanvasRenderingContext2D, scene: MoleculeScen
     const struct = scene.structure;
     const activeStepIdx = Math.min(
       struct.steps.length - 1,
-      Math.floor(env.p * (scene.sayIntro ? struct.steps.length + 0.5 : struct.steps.length))
+      activeBeatIndex(env.beats, (scene.sayIntro ? 1 : 0) + struct.steps.length, env.p) - (scene.sayIntro ? 1 : 0)
     );
     const activeStep = struct.steps[Math.max(0, activeStepIdx)];
     

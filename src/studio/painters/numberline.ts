@@ -11,6 +11,7 @@ import {
   roundRect,
   sub,
   easeOutBack,
+  activeBeatIndex
 } from "./common";
 import { render3D, projectToRect, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 
@@ -69,7 +70,7 @@ export function paintNumberline(ctx: CanvasRenderingContext2D, scene: Numberline
 
   const activeMarkIdx = Math.min(
     scene.marks.length - 1,
-    Math.floor(env.p * (scene.sayIntro ? scene.marks.length + 0.5 : scene.marks.length))
+    activeBeatIndex(env.beats, (scene.sayIntro ? 1 : 0) + scene.marks.length, env.p) - (scene.sayIntro ? 1 : 0)
   );
   const activeMark = scene.marks[Math.max(0, activeMarkIdx)];
 

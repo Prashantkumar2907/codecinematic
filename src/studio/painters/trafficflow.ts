@@ -10,9 +10,10 @@ import {
   glowRing,
   rgba,
   roundRect,
+  activeBeatIndex
 } from "./common";
 import type { PaintEnv } from "./index";
-import type { Scene } from "../schema";
+import { type Scene } from "../schema";
 
 type TrafficflowScene = Extract<Scene, { kind: "trafficflow" }>;
 
@@ -48,7 +49,7 @@ export function paintTrafficflow(ctx: CanvasRenderingContext2D, scene: Trafficfl
   const numServers = scene.servers.length;
   const activeStepIdx = Math.min(
     scene.steps.length - 1,
-    Math.floor(env.p * (scene.sayIntro ? scene.steps.length + 0.5 : scene.steps.length))
+    activeBeatIndex(env.beats, (scene.sayIntro ? 1 : 0) + scene.steps.length, env.p) - (scene.sayIntro ? 1 : 0)
   );
   const activeStep = scene.steps[Math.max(0, activeStepIdx)];
 

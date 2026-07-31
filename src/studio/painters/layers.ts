@@ -10,6 +10,7 @@ import {
   roundRect,
   sub,
   easeOutBack,
+  activeBeatIndex
 } from "./common";
 
 export type LayersScene = {
@@ -56,7 +57,7 @@ export function paintLayers(ctx: CanvasRenderingContext2D, scene: LayersScene, e
   const numLayers = scene.layers.length;
   const activeIdx = Math.min(
     numLayers - 1,
-    Math.floor(env.p * (scene.sayIntro ? numLayers + 0.5 : numLayers))
+    activeBeatIndex(env.beats, (scene.sayIntro ? 1 : 0) + numLayers, env.p) - (scene.sayIntro ? 1 : 0)
   );
   const activeLayer = scene.layers[Math.max(0, activeIdx)];
   const shapeMode = scene.shape ?? "stack";
