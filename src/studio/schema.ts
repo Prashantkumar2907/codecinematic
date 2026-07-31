@@ -7,6 +7,27 @@ export type CodeLang = (typeof CODE_LANGS)[number];
 export const EXECUTABLE_LANGS: CodeLang[] = ["js", "python", "sql"];
 
 const MAX_BEAT_CHARS = 320;
+/**
+ * A single-beat scene cannot advance while its narration plays, so its narration
+ * length IS how long the frame is frozen. 190 chars ≈ 32 words ≈ 12 s at the
+ * corpus-measured 5.98 chars/word — i.e. exactly `pacing.OVERLONG_BEAT_SEC`,
+ * which is where a card stops being read and starts being stared at.
+ *
+ * Was 400, and 400 was the ONLY number the prompt ever attached to `narration`
+ * (transcribed three times as a hard limit), so the model anchored on it: the
+ * corpus maximum is 397. Measured effect of dropping to 190, simulated over all
+ * 88 scripts: 139 of the 354 overlong beats disappear, long-format median falls
+ * 1028 → 962 words, and 4 more long scripts land under the 850-word floor —
+ * which is why Phase 5's scene-count raise is a hard dependency, not a nicety.
+ */
+const MAX_SINGLE_BEAT_CHARS = 190;
+/**
+ * `terminal` earns more: its typewriter is the one painter that paces itself to
+ * the beat's real duration (`painters/terminal.ts:144` budgets 62% of
+ * `env.durationMs`), so the card is genuinely animating rather than held.
+ */
+const MAX_TERMINAL_NARRATION_CHARS = 260;
+/** Kept only for the three HARD LIMITS blocks in prompt.ts that still quote it. */
 const MAX_NARRATION_CHARS = 400;
 const MAX_CODE_LINES = 22;
 /** Prompt asks for 46; renderer shrinks the font up to this hard ceiling. */
@@ -14,8 +35,25 @@ const MAX_CODE_COLS = 60;
 const GRID = 12;
 
 const say = z.string().min(6).max(MAX_BEAT_CHARS);
-const narration = z.string().min(6).max(MAX_NARRATION_CHARS);
+/** Only the five inherently single-beat kinds use this field, so capping it here
+ *  caps exactly the scenes that freeze: bigtext, terminal, question, stat, quote. */
+const narration = z.string().min(6).max(MAX_SINGLE_BEAT_CHARS);
+const terminalNarration = z.string().min(6).max(MAX_TERMINAL_NARRATION_CHARS);
 const id = z.string().min(1).max(40);
+
+/**
+ * Per-kind ceilings on spoken text, exported so `sanitize.ts` trims to the same
+ * numbers the validator enforces and `pacing.ts` can assert they still match its
+ * OVERLONG_BEAT_SEC. Before this, sanitize re-declared its own literal copies and
+ * the two could drift apart silently.
+ */
+export const SPOKEN_LIMITS = {
+  beat: MAX_BEAT_CHARS,
+  narration: MAX_SINGLE_BEAT_CHARS,
+  terminalNarration: MAX_TERMINAL_NARRATION_CHARS,
+  /** The old blanket cap, still quoted by prompt.ts's HARD LIMITS blocks. */
+  legacyNarration: MAX_NARRATION_CHARS,
+} as const;
 
 /** One emoji (possibly multi-codepoint) used as a visual icon. */
 const icon = z.string().min(1).max(16).optional();
@@ -66,7 +104,7 @@ const codeScene = z.object({
 const terminalScene = z.object({
   kind: z.literal("terminal"),
   id,
-  narration,
+  narration: terminalNarration,
   lines: z.array(z.string().max(60)).min(1).max(10),
 });
 

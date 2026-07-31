@@ -504,11 +504,38 @@ Every item is a confirmed defect with a file:line, not a preference.
 
 Prompt rules the corpus already violates are proof that prompting alone fails here.
 
-- **Per-kind narration caps** replacing the blanket 400 (`schema.ts:9-17, 26, 69, 194, 215, 276`):
-  `bigtext` **150**, `stat` **150**, `quote` **170**, `question` **200**, `terminal` **260** (terminal
-  earns more — its typewriter is the one duration-aware painter, `painters/terminal.ts:139-145`).
-  150 chars ≈ 24 words ≈ **9 s**; entrances finish by ~1-2.4 s, so this is the shortest cap that still
-  allows a real thought.
+- **Per-kind narration caps** replacing the blanket 400 (`schema.ts:9-17, 26, 69, 194, 215, 276`).
+  **Implemented as one cap of 190, not five caps of 150-260** — and it turns out only the 5 single-beat
+  kinds use the shared `narration` field at all, so a single change reaches exactly the scenes that
+  freeze. `terminal` keeps a larger 260, and that exception is earned: `painters/terminal.ts:144`
+  budgets its typewriter at `min(rawTotal, env.durationMs * 0.62)`, so it really is animating.
+  **Why 190 rather than the specified 150**, simulated over all 88 scripts:
+
+  | cap | long median words | below 850 floor | below prompt's 950 | overlong beats fixed |
+  |---|---|---|---|---|
+  | 150 (as specified) | 1028 → 937 | 3 → 7 | 8 → 13 | 354 → 245 |
+  | **190 (12 s-derived)** | 1028 → **962** | 3 → 7 | 8 → **11** | 354 → **245** |
+
+  Identical benefit, 25 more words kept and two fewer scripts pushed under the floor — 150 is strictly
+  worse. 190 is not a magic number either: it is `OVERLONG_BEAT_SEC × SPOKEN_WORDS_PER_SEC ×` the
+  corpus-measured 5.98 chars/word = 187, i.e. the char cap that expresses the 12 s target zod can enforce.
+
+> **⚠️ Two corrections this phase forced, both measured.**
+>
+> **1. The caps reach less than half the problem.** Of the 354 beats over 12 s, **215 (61%) sit inside
+> MULTI-beat scenes** — bullets 34, code 25, diagram 25, trace 24, mythfact 21, compare 20, table 15 —
+> where no per-kind narration cap can touch them (a `say` is capped at 320 chars, so a one-item scene can
+> hold ~21 s). §"Root cause 2" concluded from medians that the animated kinds were "already fine"; the
+> medians are fine and the tail is not (these 215 run median 15.0 s, p90 18.5 s, max 21.9 s). So a
+> **kind-agnostic `overlongBeats` gate** was added, which the spec does not contain. It is soft, so the
+> model rewrites rather than truncates and the word budget is unaffected.
+>
+> **2. The prompt and the gate disagree on the word budget, and always have.** `schema.ts:3447-3450`
+> accepts short 110-240 / long 850-1900; `prompt.ts:696` demands 130-220 and `:712` demands 950-1700.
+> The prompt is the stricter of the two, and 8 of 25 long scripts already fail its 950 floor before any
+> cap is applied. `prompt.ts` also implies two different speech rates it never names (220 words / 90 s ≈
+> 2.44 w/s at `:696`; 1700 / 540 s ≈ 3.15 w/s at `:712`). Phase 8's "single-source the limits" now has a
+> concrete first customer.
 - **Mirror the caps in `src/lib/sanitize.ts:91-92, 109-114`** so an over-long card is *deterministically
   trimmed at a sentence boundary* by the existing `clampSpeech`, never bounced into a repair round. This
   is what defuses the deadlock the verifier proved: caps cost words, and the word-floor gate would
@@ -517,13 +544,16 @@ Prompt rules the corpus already violates are proof that prompting alone fails he
   flags any single-beat scene over its cap, and any long-format single beat over ~12 s. Wire in **three**
   places or the factory degrades to a generic message: `generate/route.ts:136-174` (repair text),
   `:183-204` (warning), `content-factory.mjs:228-244` (`warningsToDirectives`).
-- ~~**New soft gate `definitionOpener(script)`**~~ — **DOWNGRADED, see the correction in §1.** The
-  pattern this specified reproduces the "30%" figure but measures any `X is Y` sentence, so 21 of its 25
-  matches are the good second-person cold-opens the plan asks for. Measured with a pattern that actually
-  requires a definition shape, the corpus fails **3 of 88** — there is no problem here worth a gate, and
-  a gate on the loose pattern would actively degrade the writing. `pacing.ts` exports both predicates and
-  the audit reports both; if this is ever revisited, extend `firstBeatFormulaic`
-  (`schema.ts:3513-3519`) rather than duplicating it, and validate against real first beats first.
+- **New soft gate `definitionOpener(script)`** — **reinstated, with the strict pattern only.** Phase 3
+  wrote this off after measuring 3 of 88 on the corpus (see §1's correction: the plan's own loose pattern
+  flags good `Your…` cold-opens). But a **fresh generation from the raw prompt**, run to verify this
+  phase, opened with *"A closure is a function bundled together with references to its surrounding lexical
+  environment…"* — a textbook definition. The corpus reads well because its slots accumulated learned
+  directives over many attempts, not because the prompt is sound. The strict predicate is exactly the
+  right gate: it caught that beat and flags none of the 21 good hooks. Note the existing
+  `firstBeatFormulaic` (`schema.ts:3513-3519`) cannot see this shape — it only knows "Have you
+  ever/Did you know/Imagine". **Never gate on `isDefinitionOpenerLoose`**; it exists only to keep the
+  old number reproducible.
 - **New soft gate `crutchPhrases(script)`** — counts banned openers (`let's`, `here is/here's`,
   sentence-initial `Now,/Next,/So,`) and names offending beats. 101 + 61 uses prove the prompt ban isn't enough.
 - **New soft gate `runningExampleCoverage(script)`** — the prompt demands one threaded example in **four**

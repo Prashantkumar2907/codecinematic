@@ -32,7 +32,7 @@ Seconds are ESTIMATES at `SPOKEN_WORDS_PER_SEC = 2.6` (≈156 wpm), speech only 
 | Videos opening on a definition (strict) | **3** of 88 | 0 |
 | …with the plan's own loose pattern | 25 of 88 | see note |
 | Definition-shaped beats | **78** of 1814 (4.3%) | — |
-| Crutch-phrase hits | **167** | 0 |
+| Crutch-phrase hits | **174** | 0 |
 | Running-example coverage (proxy) | median **0.50** | > 0.8 |
 | Distinct scene kinds used | **36** of 110 | ≥ 8 per long |
 
@@ -49,12 +49,38 @@ Seconds are ESTIMATES at `SPOKEN_WORDS_PER_SEC = 2.6` (≈156 wpm), speech only 
 
 | Phrase | Hits | Scripts |
 |---|---|---|
-| let's | 89 | 37 |
+| let's / let us | 96 | 38 |
 | here is / here's | 53 | 42 |
 | sentence-initial Next, | 14 | 12 |
 | sentence-initial Now, | 6 | 5 |
 | sentence-initial So, | 4 | 4 |
 | in this video | 1 | 1 |
+
+## Soft-gate firing rate
+
+Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch hits · running-example coverage <0.4 · ≥4 terms with <0.4 anchored. Single-beat schema cap = 12.2s against a 12s target.
+
+| Gate | Fires on | Share |
+|---|---|---|
+| frozen card | 40 of 88 | 45.5% |
+| beat length | 24 of 88 | 27.3% |
+| filler openers | 23 of 88 | 26.1% |
+| no running example | 14 of 88 | 15.9% |
+| unexplained jargon | 9 of 88 | 10.2% |
+| **any gate** | **53 of 88** | **60.2%** |
+
+### Jargon anchoring
+
+| | |
+|---|---|
+| Technical terms introduced | 290 (median 3 per script) |
+| Terms per 100 narration words | median 0.9 |
+| Glossed at first use | median **0.50** of terms |
+
+> Anchoring is a proxy: "technical" is detected by shape (acronym, CamelCase, snake_case,
+> letter+digit, backticked code) and a gloss by cue (apposition, dash, "which means", "think of
+> it as"). Both halves under-count, so a low share is a real signal and a high one only means
+> "no obvious violation".
 
 ## Worst scripts by static-card share
 

@@ -6,6 +6,23 @@ import { buildScriptPrompt, buildRepairPrompt, buildBlueprintPrompt, buildScript
 import { sanitizeScript } from "@/lib/sanitize";
 import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
+import { staticCardOverrun, overlongBeats, definitionOpener, crutchPhrases, runningExampleWeak, jargonUnanchored } from "@/studio/pacing";
+
+/**
+ * Pacing/voice soft gates, in the order a viewer would notice them. Each returns
+ * null when clean and a repair-ready `detail` otherwise; thresholds are tuned in
+ * `pacing.ts` so each fires on roughly the worst quartile rather than on any
+ * violation — five gates at their natural settings tripped 81 of 88 historic
+ * scripts, and the factory already exhausts its attempts on 72 of 86 slots.
+ */
+const PACING_GATES: { label: string; run: (s: SceneScript) => { detail: string } | null }[] = [
+  { label: "definition opener", run: definitionOpener },
+  { label: "frozen card", run: staticCardOverrun },
+  { label: "beat length", run: overlongBeats },
+  { label: "filler openers", run: crutchPhrases },
+  { label: "no running example", run: runningExampleWeak },
+  { label: "unexplained jargon", run: jargonUnanchored },
+];
 
 const requestSchema = z.object({
   subject: z.string().min(1),
@@ -18,7 +35,12 @@ const requestSchema = z.object({
   model: z.string().max(60).optional(),
   keyId: z.string().max(40).optional(),
   freeOnly: z.boolean().optional(),
-  directives: z.array(z.string().max(400)).max(12).optional(),
+  // 24, not 12: content-factory.mjs posts the whole persisted list for a slot, and
+  // 16 of the 27 keys in content/factory/directives.json already hold 14-15 entries.
+  // Every request for those slots was rejected with a 400 before reaching Gemini,
+  // so each remaining attempt failed identically — a live contributor to the 72 of
+  // 86 slots sitting below bar. The factory now also slices to this ceiling.
+  directives: z.array(z.string().max(400)).max(24).optional(),
   exemplarScript: z.string().max(60000).optional(),
 });
 
@@ -172,6 +194,12 @@ export async function POST(req: Request) {
                 `scene "${dense.id}" is too dense for a 9:16 short — ${dense.detail}. The YouTube UI covers the bottom quarter and right edge, so split it into two scenes or drop the least important items`
               );
             }
+            // Pacing/voice gates from studio/pacing.ts. Their `detail` strings are
+            // already written as repair instructions, so they are pushed verbatim.
+            for (const gate of PACING_GATES) {
+              const hit = gate.run(validated.data);
+              if (hit) issues.push(hit.detail);
+            }
             if (issues.length === 0) {
               accepted = validated.data;
               break;
@@ -201,6 +229,10 @@ export async function POST(req: Request) {
               const dense = shortSceneOverdense(validated.data);
               if (dense) {
                 warnings.push(`scene "${dense.id}" may crowd behind the YouTube UI (${dense.detail})`);
+              }
+              for (const gate of PACING_GATES) {
+                const hit = gate.run(validated.data);
+                if (hit) warnings.push(`${gate.label}: ${hit.detail}`);
               }
               accepted = validated.data;
               break;

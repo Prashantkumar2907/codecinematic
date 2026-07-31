@@ -15,7 +15,11 @@
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { pacingReport, OVERLONG_BEAT_SEC, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC } from "../src/studio/pacing.ts";
+import {
+  pacingReport, jargonReport, singleBeatCapSeconds,
+  staticCardOverrun, overlongBeats, crutchPhrases, runningExampleWeak, jargonUnanchored,
+  OVERLONG_BEAT_SEC, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC, GATE_THRESHOLDS,
+} from "../src/studio/pacing.ts";
 import { narrationWordCount } from "../src/studio/schema.ts";
 import * as DEMO from "../src/studio/demo.ts";
 
@@ -250,6 +254,50 @@ if (totals.crutchBy.size) {
   }
   lines.push("");
 }
+
+// How often each Phase 4 gate would demand a repair. A gate that fires on almost
+// everything costs throughput without improving anything, and the factory already
+// exhausts its attempts on 72 of 86 slots.
+const GATES = [
+  ["frozen card", staticCardOverrun],
+  ["beat length", overlongBeats],
+  ["filler openers", crutchPhrases],
+  ["no running example", runningExampleWeak],
+  ["unexplained jargon", jargonUnanchored],
+];
+lines.push("## Soft-gate firing rate");
+lines.push("");
+lines.push(
+  `Thresholds (\`GATE_THRESHOLDS\` in pacing.ts): ≥${GATE_THRESHOLDS.overlongBeatCount} overlong beats · ` +
+    `≥${GATE_THRESHOLDS.crutchHits} crutch hits · running-example coverage <${GATE_THRESHOLDS.runningExampleCoverage} · ` +
+    `≥${GATE_THRESHOLDS.jargonMinTerms} terms with <${GATE_THRESHOLDS.jargonAnchoredShare} anchored. ` +
+    `Single-beat schema cap = ${singleBeatCapSeconds().toFixed(1)}s against a ${OVERLONG_BEAT_SEC}s target.`
+);
+lines.push("");
+lines.push("| Gate | Fires on | Share |");
+lines.push("|---|---|---|");
+for (const [label, fn] of GATES) {
+  const n = rows.filter((r) => fn(r.script) !== null).length;
+  lines.push(`| ${label} | ${n} of ${rows.length} | ${pct(rows.length ? n / rows.length : 0)} |`);
+}
+const anyGate = rows.filter((r) => GATES.some(([, fn]) => fn(r.script) !== null)).length;
+lines.push(`| **any gate** | **${anyGate} of ${rows.length}** | **${pct(rows.length ? anyGate / rows.length : 0)}** |`);
+lines.push("");
+
+const jargon = rows.map((r) => jargonReport(r.script));
+lines.push("### Jargon anchoring");
+lines.push("");
+lines.push("| | |");
+lines.push("|---|---|");
+lines.push(`| Technical terms introduced | ${jargon.reduce((a, j) => a + j.terms, 0)} (median ${median(jargon.map((j) => j.terms))} per script) |`);
+lines.push(`| Terms per 100 narration words | median ${median(jargon.map((j) => j.perHundredWords)).toFixed(1)} |`);
+lines.push(`| Glossed at first use | median **${median(jargon.map((j) => j.anchoredShare)).toFixed(2)}** of terms |`);
+lines.push("");
+lines.push("> Anchoring is a proxy: \"technical\" is detected by shape (acronym, CamelCase, snake_case,");
+lines.push("> letter+digit, backticked code) and a gloss by cue (apposition, dash, \"which means\", \"think of");
+lines.push("> it as\"). Both halves under-count, so a low share is a real signal and a high one only means");
+lines.push("> \"no obvious violation\".");
+lines.push("");
 
 lines.push("## Worst scripts by static-card share");
 lines.push("");

@@ -4,6 +4,7 @@
  * fix meaning-critical failures (code shape, narration length, structure).
  * Code and narration are never touched here.
  */
+import { SPOKEN_LIMITS } from "@/studio/schema";
 
 const ELLIPSIS = "…";
 
@@ -88,8 +89,12 @@ export function sanitizeScript(raw: unknown): unknown {
   return script;
 }
 
-const MAX_NARRATION = 400;
-const MAX_BEAT = 320;
+// Imported rather than re-declared: these used to be literal copies of the
+// schema's numbers, so lowering a cap in one place silently left the other behind
+// and an over-long card bounced into a repair round instead of being trimmed.
+const MAX_NARRATION = SPOKEN_LIMITS.narration;
+const MAX_TERMINAL_NARRATION = SPOKEN_LIMITS.terminalNarration;
+const MAX_BEAT = SPOKEN_LIMITS.beat;
 
 /** Clamp a spoken "say" on an item/panel object in place (used for arrays). */
 function clampItemSay(item: unknown): unknown {
@@ -106,8 +111,11 @@ function sanitizeScene(raw: unknown): unknown {
   // Spoken fields are voiced by TTS and drive beat timing; over-limit ones used
   // to force a model-repair round that could fail the whole video. Clamp them
   // deterministically at a sentence/word boundary across every kind.
-  for (const key of ["narration"]) {
-    if (typeof scene[key] === "string") scene[key] = clampSpeech(scene[key], MAX_NARRATION);
+  // `narration` only exists on the five single-beat kinds, and terminal's cap is
+  // higher because its typewriter animates for most of the beat.
+  if (typeof scene.narration === "string") {
+    const cap = scene.kind === "terminal" ? MAX_TERMINAL_NARRATION : MAX_NARRATION;
+    scene.narration = clampSpeech(scene.narration, cap);
   }
   for (const key of ["sayIntro", "sayMyth", "sayFact", "sayQuestion", "sayReveal", "sayVerdict"]) {
     if (typeof scene[key] === "string") scene[key] = clampSpeech(scene[key], MAX_BEAT);

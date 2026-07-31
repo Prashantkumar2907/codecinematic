@@ -224,9 +224,50 @@ async function generate(item, format, topic, model, directives) {
   return { script: last.script, warnings: last.warnings ?? [] };
 }
 
+/** The generate route rejects more than this many directives with a 400. */
+const MAX_DIRECTIVES = 24;
+
+/**
+ * Two directives are "the same" if they normalise to the same text, or share the
+ * same first eight words. Exact-string comparison was why the store visibly
+ * accumulated paraphrases of one instruction until the list blew past the route's
+ * limit and every request 400'd.
+ */
+function directiveKey(d) {
+  const norm = String(d).toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  return norm.split(" ").slice(0, 8).join(" ");
+}
+function dedupeDirectives(list) {
+  const seen = new Set();
+  const out = [];
+  // Keep the NEWEST wording of a repeated instruction: it reflects the latest failure.
+  for (const d of [...list].reverse()) {
+    const k = directiveKey(d);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.unshift(d);
+  }
+  return out.slice(-MAX_DIRECTIVES);
+}
+
 /* Deterministic soft-gate warnings → reusable generation directives (no LLM needed). */
 function warningsToDirectives(warnings) {
   return warnings.map((w) => {
+    // Pacing gates from studio/pacing.ts, wired in the generate route. Without
+    // these arms every one degrades to the generic `Fix: ${w}` below, which hands
+    // the model back its own diagnostic instead of an instruction.
+    if (/^definition opener:/.test(w))
+      return "Never open by defining the topic. The first beat is a concrete moment — the thing going wrong, a number that stings, or the exact line of code that betrays the reader. The definition arrives later, once it is needed.";
+    if (/^frozen card:/.test(w))
+      return "No single-beat scene may run past ~12 seconds of speech: keep bigtext/stat/quote/question narration under 31 words, and give any multi-beat kind at least 3 beats so the visual advances.";
+    if (/^beat length:/.test(w))
+      return "Every beat is one visual step, so no beat may exceed ~12 seconds of speech (~31 words). Split a long explanation into two beats rather than holding one frame.";
+    if (/^filler openers:/.test(w))
+      return "Never open a beat with \"Let's\", \"Here is/Here's\", or a sentence-initial \"Now,/Next,/So,\" — start on the thing itself.";
+    if (/^no running example:/.test(w))
+      return "Choose ONE concrete example in the hook and carry it by name into every following scene; do not switch examples mid-video.";
+    if (/^unexplained jargon:/.test(w))
+      return "Every technical term gets a six-word everyday translation the first time it is spoken, in the same beat or the next one.";
     if (/narration is \d+ words/.test(w) && /short/.test(w))
       return "Write more depth: reach the word budget — every teaching beat is 3-5 full sentences explaining the mechanism and the why, not a caption.";
     if (/narration is \d+ words/.test(w) && /long/.test(w))
@@ -313,7 +354,9 @@ async function runSlot(item, slot, format, topic, opts) {
   const dir = path.join(OUT_ROOT, item.subject, item.module, item.submodule);
   const outFile = path.join(dir, `${slot}.json`);
   const dirKey = `${item.subject}/${item.module}/${item.submodule}/${slot}`;
-  let directives = directivesStore[dirKey] ?? [];
+  // Dedupe+cap on the way IN as well: 16 of the 27 keys already on disk hold 14-15
+  // entries, so a stored list would 400 the very first request for those slots.
+  let directives = dedupeDirectives(directivesStore[dirKey] ?? []);
   let best = null;
   let attemptsDone = 0;
   if (!opts.force && (await exists(outFile))) {
@@ -349,11 +392,13 @@ async function runSlot(item, slot, format, topic, opts) {
       if (accepted(cand)) break;
       // Warnings remain → build directives (mechanical warnings + rating weak-sections) and regenerate fresh.
       if (attempt < opts.attempts) {
-        let fresh = warningsToDirectives(warnings).filter((d) => !directives.includes(d));
+        const known = new Set(directives.map(directiveKey));
+        let fresh = warningsToDirectives(warnings).filter((d) => !known.has(directiveKey(d)));
         if (rating) {
           try {
+            const freshKeys = new Set(fresh.map(directiveKey));
             const tuned = (await tune(item, format, topic, rating, [...directives, ...fresh])).filter(
-              (d) => !directives.includes(d) && !fresh.includes(d)
+              (d) => !known.has(directiveKey(d)) && !freshKeys.has(directiveKey(d))
             );
             fresh = [...fresh, ...tuned];
           } catch (e) {
@@ -361,7 +406,7 @@ async function runSlot(item, slot, format, topic, opts) {
           }
         }
         if (fresh.length) {
-          directives = [...directives, ...fresh];
+          directives = dedupeDirectives([...directives, ...fresh]);
           saveDirectives(dirKey, directives);
           fresh.forEach((d) => console.log(`      + ${d.slice(0, 90)}`));
         }
