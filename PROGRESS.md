@@ -87,8 +87,8 @@ everything else and links to it.)
 | 6.1 | 6 | loop | 7th rubric section `pacing_density`, fed computed facts (5 edits) | todo | 3.1, 15.1 | ratings still parse | — |
 | 7.1 | 7 | render | Re-lock 7 desynced painters to beat windows | todo | 0.1 | visuals track audio | — |
 | 7.2 | 7 | render | Progressive reveal for the 5 single-beat painters | todo | 4.1 | no dead frame at cap | — |
-| 15.1 | 15 | integration | **Estimate↔actual drift**: compare gate estimate to measured TTS | verified | 3.1 | `scripts/drift-check.mjs` voices a real script and times every clip with ffmpeg. 85-beat script: estimated 408.5 s, **measured 515 s, ratio 1.26** — every threshold was 26% too lenient. 50 of 85 beats off by >25% | 13c8391 |
-| 15.2 | 15 | integration | Calibrate words/sec per voice **and per language** | done | 15.1 | `SPOKEN_WORDS_PER_SEC` **2.6 → 2.06** (measured, en, default voice). Fit `actual = words/3.5 + overhead`; `silencedetect` shows ~0.15 s lead + 0.34-1.15 s trail per clip. **Hindi still uncalibrated** — re-measure per voice with `drift-check.mjs` | 13c8391 |
+| 15.1 | 15 | integration | **Estimate↔actual drift**: compare gate estimate to measured TTS | verified | 3.1 | `scripts/drift-check.mjs` voices a real script and times every clip with ffmpeg. 85-beat script: estimated 408.5 s, **measured 515 s, ratio 1.26** — every threshold was 26% too lenient. 50 of 85 beats off by >25% | 61d75b9 |
+| 15.2 | 15 | integration | Calibrate words/sec per voice **and per language** | done | 15.1 | `SPOKEN_WORDS_PER_SEC` **2.6 → 2.06** (measured, en, default voice). Fit `actual = words/3.5 + overhead`; `silencedetect` shows ~0.15 s lead + 0.34-1.15 s trail per clip. **Hindi still uncalibrated** — re-measure per voice with `drift-check.mjs` | 61d75b9 |
 | 17.1 | 17 | content | Hand-author gold short + long per archetype (~20 scripts) | todo | 5.1 | scripts pass all gates | — |
 | 17.2 | 17 | content | Wire `exemplarScript` — factory never sends it today | todo | 17.1 | present in the prompt | — |
 | 12.1 | 12 | narration | **SPIKE**: does edge-tts accept `--pitch`/`--volume`? word timings? SSML? | todo | — | written into the plan | — |
