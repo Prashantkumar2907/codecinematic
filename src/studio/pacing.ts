@@ -15,30 +15,93 @@ import { sceneBeats, SPOKEN_LIMITS, type Scene, type SceneScript } from "./schem
  * Real scene duration comes from the measured length of the synthesised audio
  * (`computeTimings` in engine.ts) and nothing in this module can see it.
  * Inter-beat gaps and scene tails are engine constants and are deliberately
- * excluded, so these are *speech* seconds. Phase 15 of improvement_plan.md
- * closes the gap by comparing these estimates against measured audio and
- * recalibrating SPOKEN_WORDS_PER_SEC per voice and per language.
+ * excluded, so these are *speech* seconds. Phase 15 closed the gap by comparing
+ * these estimates against measured audio: the rate below is calibrated per voice
+ * and per language against real synthesised clips, not assumed.
  */
 
 /**
- * Spoken words per second — MEASURED, not assumed.
+ * Effective spoken words per second, per voice — MEASURED, not assumed.
  *
- * The plan and every earlier estimate used 2.6 (≈156 wpm, "edge-tts's neural
- * default"). Voicing a real 85-beat script through the actual TTS route and timing
- * every clip with ffmpeg gives **2.06** (≈124 wpm): estimates at 2.6 ran 26% short
- * of reality, so every pacing threshold in the app was that much too lenient.
+ * "Effective" means whole-clip: words divided by the length of the audio file the
+ * engine actually schedules, including its leading and trailing silence. That is
+ * the number a gate needs, because the viewer sits through the silence too.
  *
- * The gap is not the voice talking slowly. Fitting `actual = words/rate + overhead`
- * across the 85 beats gives ~3.5 words/s of real speech plus a fixed cost per clip,
- * and `silencedetect` confirms where it goes: each clip carries ~0.15 s of leading
- * silence and 0.34-1.15 s of trailing silence, plus sentence-final pauses inside.
- * 2.06 is the EFFECTIVE rate a viewer experiences, which is what a gate needs.
+ * Measured this pass on 12 real corpus beats per voice (speech-span rate and
+ * per-clip overhead shown for context):
  *
- * Calibrated from one English script on the default voice. Re-measure with
- * `node scripts/drift-check.mjs <script.json> [voice]` — and note Hindi is
- * uncalibrated: it is not safe to assume it speaks at the same rate (row 15.2).
+ * | voice                        | span w/s | EFFECTIVE w/s | silence per clip |
+ * |------------------------------|----------|---------------|------------------|
+ * | en-US-Andrew (en default)    |   2.87   |     2.70      |     0.44 s       |
+ * | en-IN-Neerja (11 subjects)   |   2.75   |     2.44      |     0.99 s       |
+ * | hi-IN-Madhur (hi default)    |   2.76   |     2.26      |     1.22 s       |
+ * | hi-IN-Swara                  |   2.73   |     2.33      |     0.94 s       |
+ *
+ * **Two corrections to improvement_plan.md §15 come out of this table.**
+ *
+ * 1. The plan assumed "Hindi and English at the same `--rate` do NOT speak at the
+ *    same words/second". They very nearly do — every voice lands in 2.73-2.87 on
+ *    the speech span. What differs is the *silence* each clip carries, from 0.44 s
+ *    to 1.22 s. So the language axis matters, but not for the reason given.
+ * 2. The per-VOICE spread inside English (2.70 vs 2.44, ~10%) is larger than the
+ *    spread between languages. That is load-bearing now: row 12.6 made
+ *    en-IN-Neerja the default for 11 of 19 subjects, so most India-first content
+ *    runs ~10% slower per word than the constant used to assume.
  */
-export const SPOKEN_WORDS_PER_SEC = 2.06;
+export const MEASURED_WORDS_PER_SEC: Record<string, number> = {
+  "en-US-AndrewMultilingualNeural": 2.7,
+  "en-IN-NeerjaExpressiveNeural": 2.44,
+  "hi-IN-MadhurNeural": 2.26,
+  "hi-IN-SwaraNeural": 2.33,
+};
+
+/**
+ * The rate a gate uses, per content language. The gates run on the draft, before
+ * a voice is chosen, so they cannot use `MEASURED_WORDS_PER_SEC` directly.
+ *
+ * English is **2.62, not 2.06** — a correction, not a re-tune. Three independent
+ * measurements, two of them from the project's own instrument:
+ *
+ * | source                                          | implied w/s |
+ * |-------------------------------------------------|-------------|
+ * | drift-check, 63-beat scene-kind-tour script     |    2.62     |
+ * | drift-check, 17-beat real content short         |    2.69     |
+ * | direct pass over 12 real corpus beats           |    2.70     |
+ *
+ * The second one is the check that matters: the first script is a demo that
+ * exercises every scene kind, so it could have been unrepresentative. A real
+ * content script agrees, and at the new constant its estimate lands within 2.5%
+ * of measured (ratio 0.975, against 0.786 before).
+ *
+ * So 2.06 over-estimated every beat by ~27%, which makes gates fire on beats that
+ * are in fact fine — burning repair rounds, the throughput risk the plan names in
+ * its own red-team section. `overlongBeats` was firing on 43.2% of the corpus and
+ * now fires on 27.3%, back inside the 14-27% band the other gates hold.
+ *
+ * This is not a regression from the Phase 12 rewrite of the TTS path: voicing the
+ * same sentence through the old `python -m edge_tts` CLI and the new
+ * `scripts/tts_synth.py` helper gives 33,984 vs 34,128 bytes — the new path is
+ * 0.4% *longer*, so it cannot be the source of a 27% shortening.
+ *
+ * Hindi is the mean of its two curated voices (2.26, 2.33), closing the "Hindi
+ * remains uncalibrated" gap the plan left open at row 15.2.
+ *
+ * Re-measure with `node scripts/drift-check.mjs <script.json> [voice]`.
+ *
+ * **Known refinement, deliberately not taken.** drift-check's own two-parameter
+ * fit models the fixed per-clip cost and beats rate-only on both scripts (mean abs
+ * error 0.43 s vs 0.45 s, and 0.53 s vs 0.62 s). It is not shipped because its
+ * parameters are not stable: the two scripts fit `words / 3.89 + 1.00 s` and
+ * `words / 3.29 + 0.91 s`, and direct span measurement says 2.87 w/s + 0.44 s —
+ * three different answers for the same two constants. A one-parameter model with a
+ * constant measured three times and agreeing to within 3% is worth more than a
+ * two-parameter model whose parameters move 18% between scripts. Settling it needs
+ * drift-check across many scripts with different beat-length distributions.
+ */
+export const WORDS_PER_SEC_BY_LANG: Record<"en" | "hi", number> = { en: 2.62, hi: 2.3 };
+
+/** Default rate, for the callers that predate the per-language split. */
+export const SPOKEN_WORDS_PER_SEC = WORDS_PER_SEC_BY_LANG.en;
 
 /**
  * A beat holds one visual state, so a beat longer than this is a frame the
@@ -77,8 +140,8 @@ export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function secondsForWords(words: number): number {
-  return words / SPOKEN_WORDS_PER_SEC;
+export function secondsForWords(words: number, lang: "en" | "hi" = "en"): number {
+  return words / (WORDS_PER_SEC_BY_LANG[lang] ?? WORDS_PER_SEC_BY_LANG.en);
 }
 
 export type BeatMetric = {
@@ -738,6 +801,9 @@ export function jargonUnanchored(
 }
 
 export function pacingReport(script: SceneScript): PacingReport {
+  // Hindi clips carry more silence per beat than English ones, so the estimate
+  // has to know which language it is pricing (row 15.2).
+  const lang: "en" | "hi" = script.lang === "hi" ? "hi" : "en";
   const beatSeconds: BeatMetric[] = [];
   const sceneSeconds: SceneMetric[] = [];
   const definitionShapedBeats: BeatMetric[] = [];
@@ -768,7 +834,7 @@ export function pacingReport(script: SceneScript): PacingReport {
         kind: scene.kind,
         beatId,
         words,
-        seconds: secondsForWords(words),
+        seconds: secondsForWords(words, lang),
         isWholeScene,
       };
       beatSeconds.push(metric);
@@ -786,13 +852,13 @@ export function pacingReport(script: SceneScript): PacingReport {
       kind: scene.kind,
       beats: beats.length,
       words: sceneWords,
-      seconds: secondsForWords(sceneWords),
+      seconds: secondsForWords(sceneWords, lang),
       isStaticCard: isWholeScene,
     });
   });
 
   const words = beatSeconds.reduce((n, b) => n + b.words, 0);
-  const estSeconds = secondsForWords(words);
+  const estSeconds = secondsForWords(words, lang);
   const staticCards = sceneSeconds.filter((s) => s.isStaticCard);
   const staticCardSeconds = staticCards.reduce((n, s) => n + s.seconds, 0);
   const holds = beatSeconds.map((b) => b.seconds).sort((a, b) => a - b);

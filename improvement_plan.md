@@ -765,6 +765,52 @@ anything) and Phase 9 (toolkit + house style).
 > - The per-clip silence is itself a finding for Phase 12: ~0.5-1.3 s of dead air per beat, on top of the
 >   engine's own `INTER_BEAT_GAP_MS`, is a real contributor to the video feeling slow.
 
+> **SUPERSEDED — re-measured at rows 15.2/15.3. `2.06` was wrong; the rate is `2.62`.**
+> Everything above stands as the record of how the constant was set; the numbers it produced do not.
+>
+> Re-running the same instrument on two scripts, plus a direct pass over 12 corpus beats, gives three
+> answers that agree to within 3% — and none of them is 2.06:
+>
+> | source | implied w/s | ratio vs estimate |
+> |---|---|---|
+> | drift-check, 63-beat scene-kind-tour | **2.62** | 0.786 |
+> | drift-check, 17-beat real content short | **2.69** | 0.975 *(at the new constant)* |
+> | direct pass, 12 real corpus beats | **2.70** | — |
+>
+> The second row is the one that matters: the first script is a demo exercising every scene kind, so it
+> could have been unrepresentative. Real content agrees. **This is not a Phase 12 regression** — the same
+> sentence through the old `python -m edge_tts` CLI and the new `scripts/tts_synth.py` helper gives
+> 33,984 vs 34,128 bytes, so the new path is 0.4% *longer*.
+>
+> Consequences, which reverse most of the block above:
+> - Corpus runtime back to **249.9 min**, beats over 12 s **571 → 354**, mean hold **10.4 → 8.2 s**.
+>   The §1 diagnosis is what it originally said; the 15.1 revision overstated it.
+> - `overlongBeats` was firing on **43.2%** of the corpus at the wrong constant and now fires on
+>   **27.3%**, back inside the 14-27% band every other gate holds. At 2.06 it was spending repair rounds
+>   on beats that were already fine — the throughput risk this plan red-teams, caused by its own constant.
+> - The single-beat schema cap is **9.6 s**, not 12.2 s, against the same 12 s target.
+>
+> **Hindi is now calibrated, and the plan's stated reason for expecting a difference was wrong.**
+> Measured across both curated Hindi voices and both English ones, on the same basis:
+>
+> | voice | speech-span w/s | effective w/s | silence per clip |
+> |---|---|---|---|
+> | en-US-Andrew (en default) | 2.87 | **2.70** | 0.44 s |
+> | en-IN-Neerja (11 subjects after row 12.6) | 2.75 | **2.44** | 0.99 s |
+> | hi-IN-Madhur (hi default) | 2.76 | **2.26** | 1.22 s |
+> | hi-IN-Swara | 2.73 | **2.33** | 0.94 s |
+>
+> Every voice *speaks* at 2.73-2.87 w/s. The languages do **not** differ in speaking rate, contrary to
+> this section's assumption — they differ in how much **silence** each clip carries, 0.44 s to 1.22 s.
+> And the per-voice spread inside English (2.70 vs 2.44) is wider than the gap between languages, which
+> now matters because row 12.6 made `en-IN-Neerja` the default for 11 of 19 subjects.
+>
+> **The two-parameter model stays unshipped, on evidence.** `actual ≈ words/rate + overhead` beats
+> rate-only on both scripts, but its parameters are not stable across them: `words/3.89 + 1.00 s`,
+> `words/3.29 + 0.91 s`, and 2.87 w/s + 0.44 s from direct measurement — 18% apart on the rate term. A
+> one-parameter constant measured three times and agreeing to 3% is worth more. Settling the two-parameter
+> form needs drift-check across many scripts with different beat-length distributions.
+
 
 **This is the integration hole.** Every pacing threshold in this plan is enforced against an *estimate*
 (`SPOKEN_WORDS_PER_SEC = 2.6`, computed pre-TTS), while the video's real timing comes from *measured*
