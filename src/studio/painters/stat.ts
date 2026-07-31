@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle, isoCamera } from "./three3d";
 import type { Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, wrapText, rgba, shade, variantOf } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, wrapText, rgba, shade, variantOf ,
+  revealT,
+} from "./common";
 import type { PaintEnv } from "./index";
 
 type StatScene = Extract<Scene, { kind: "stat" }>;
@@ -227,7 +229,9 @@ export function paintStat(ctx: CanvasRenderingContext2D, scene: StatScene, env: 
   // Context: below in centered layout, to the right in wide left layout.
   if (scene.context) {
     ctx.save();
-    ctx.globalAlpha = easeOutCubic(enterT(env, 380, odoSettleMs + 120));
+    // Duration-aware: on a long card the context line arrives mid-beat rather
+    // than 1.5s in, so the frame is still changing when the viewer looks back.
+    ctx.globalAlpha = easeOutCubic(Math.max(revealT(env, 0.42, 0.62), enterT(env, 380, odoSettleMs + 120) * 0.35));
     ctx.font = `500 ${unit * 0.95}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     if (leftLayout && !vertical) {

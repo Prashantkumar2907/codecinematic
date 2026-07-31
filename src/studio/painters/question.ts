@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import type { Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, sub, clamp01, wrapText, roundRect, rgba, variantOf, shade } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, sub, clamp01, wrapText, roundRect, rgba, variantOf, shade ,
+  revealT,
+} from "./common";
 import type { PaintEnv } from "./index";
 
 /** How far the 2D layer may follow the projected 3D panel, in layout units. */
@@ -216,7 +218,8 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
   let cursor = startY + lines.length * lineH + unit * (variant === 1 ? 1.3 : 0.6);
   if (scene.hint) {
     ctx.save();
-    ctx.globalAlpha = easeOutCubic(enterT(env, 350, 700));
+    // Duration-aware: the hint should land after the question has been read.
+    ctx.globalAlpha = easeOutCubic(Math.max(revealT(env, 0.4, 0.58), enterT(env, 350, 700) * 0.3));
     ctx.font = `500 ${unit * 0.95}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";

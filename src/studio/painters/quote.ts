@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { render3D, projectToRect, studioLights, makeBlock, frustumHalfExtent, type ThreeBundle } from "./three3d";
 import type { Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, clamp01, wrapText, rgba, variantOf, shade } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, clamp01, wrapText, rgba, variantOf, shade ,
+  revealT,
+} from "./common";
 import type { PaintEnv } from "./index";
 
 /** Fraction of the camera frustum the glass block may span. */
@@ -159,7 +161,8 @@ export function paintQuote(ctx: CanvasRenderingContext2D, scene: QuoteScene, env
     ctx.fillRect(contentX, barTop, unit * 0.28, (barBottom - barTop) * barGrow);
     ctx.shadowBlur = 0;
     if (scene.author) {
-      ctx.globalAlpha = easeOutCubic(enterT(env, 380, wordsDoneMs + 150));
+      // Duration-aware: attribution lands once the quotation has been read.
+      ctx.globalAlpha = easeOutCubic(Math.max(revealT(env, 0.5, 0.68), enterT(env, 380, wordsDoneMs + 150) * 0.3));
       ctx.font = `700 ${unit * 0.95}px ${FONT_SANS}`;
       ctx.fillStyle = THEME.textDim;
       ctx.textAlign = "left";

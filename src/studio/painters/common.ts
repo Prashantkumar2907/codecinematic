@@ -211,6 +211,33 @@ export function enterT(env: { elapsedMs: number }, durMs = 380, delayMs = 0): nu
   return clamp01((env.elapsedMs - delayMs) / Math.max(1, durMs));
 }
 
+/**
+ * Duration-AWARE reveal: 0→1 across the window `[from, to]` expressed as fractions
+ * of the scene's own length.
+ *
+ * `enterT` is absolute by design, so content lands within a few hundred ms however
+ * long the scene runs — right for a panel frame, and exactly why a single-beat card
+ * is finished animating 400 ms in and then holds for another eleven seconds. Stage
+ * the *secondary* parts of a card with this instead, so a 12 s card still has
+ * something arriving at second six.
+ *
+ * Falls back to `enterT` when the painter has no duration (the QA probe drives some
+ * kinds without one), so a missing duration degrades to the old behaviour rather
+ * than dividing by zero.
+ */
+export function revealT(
+  env: { elapsedMs: number; durationMs?: number },
+  from: number,
+  to: number,
+  minMs = 260
+): number {
+  const dur = env.durationMs ?? 0;
+  if (!(dur > 0)) return enterT(env, Math.max(minMs, (to - from) * 1000));
+  const startMs = from * dur;
+  const spanMs = Math.max(minMs, (to - from) * dur);
+  return clamp01((env.elapsedMs - startMs) / spanMs);
+}
+
 /** Gentle deterministic 0-1 oscillator for idle "life" after reveal (breathing
  *  glow, soft bob). Same elapsedMs → same value, so re-renders are identical. */
 export function idle(env: { elapsedMs: number }, periodMs = 2400, phase = 0): number {
