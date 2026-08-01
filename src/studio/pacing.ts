@@ -511,6 +511,25 @@ export const GATE_THRESHOLDS = {
   maxClauseWords: 16,
   unbrokenClauseCount: 2,
   /**
+   * Words the FIRST beat of the FIRST scene may run — the hook, and the only
+   * beat with its own budget (§13b).
+   *
+   * This one is deliberately NOT calibrated to the 14-27% corpus band, and that
+   * is the point. The corpus opening beat is p50 25 words / p90 36 for a short
+   * and p50 36 / p90 53 for a long, so it is *uniformly* over any defensible
+   * hook length — calibrating to the corpus would just ratify the defect. The
+   * number comes from the viewer instead: 50-60% of the people who abandon a
+   * Short do so within three seconds, and 12 words at 2.62 w/s is 4.6 s, which
+   * is already generous against that. Long form gets 25 words (9.5 s) because
+   * half its audience is still there at 10-15 s.
+   *
+   * Precedent for setting a gate from the standard rather than the corpus is
+   * 4.3: `definitionOpener` was reinstated on a live generation after the corpus
+   * said 3/88, because the corpus reads well from accumulated per-slot
+   * directives rather than from the prompt.
+   */
+  hookWordsByFormat: { short: 12, long: 25 } as Record<SceneScript["format"], number>,
+  /**
    * `staticCardOverrun` had no count knob at all — it fired on the single worst
    * scene, i.e. `>= 1`, which is why it tripped 73-77% of the corpus while every
    * sibling sat at 14-27%. Measured by count: >=1 73.1%, >=2 45.2%, **>=3 28.0%**,
@@ -604,6 +623,39 @@ export function staticCardOverrun(
  * Soft on purpose: a repair rewrites the offending beats, where a hard cap would
  * truncate them and cost the word budget.
  */
+/**
+ * The opening beat, against its own budget.
+ *
+ * A Short is decided on in about three seconds and 50-60% of the viewers who
+ * leave are gone inside that window, so a 25-word hook -- the corpus median --
+ * is still being spoken when the audience has already made the call. This is
+ * the same defect the corpus records as "64 of 88 videos open on a static
+ * card", measured from the retention side rather than the layout side.
+ *
+ * Soft like every sibling: it asks for a rewrite of one beat, which is the
+ * cheapest possible repair and the highest-leverage one in the script.
+ */
+export function hookTooLong(script: SceneScript): { words: number; detail: string } | null {
+  const first = script.scenes[0];
+  if (!first) return null;
+  const beats = sceneBeats(first);
+  const hook = beats[0];
+  if (!hook) return null;
+  const words = countWords(hook.text);
+  const cap = GATE_THRESHOLDS.hookWordsByFormat[script.format];
+  if (words <= cap) return null;
+  return {
+    words,
+    detail:
+      `The opening beat is ${words} words \u2248 ${(words / SPOKEN_WORDS_PER_SEC).toFixed(1)}s, against a ` +
+      `${cap}-word hook budget for a ${script.format}. ` +
+      (script.format === "short"
+        ? "A Short is swiped away in about three seconds, so this hook is unfinished when the viewer decides. "
+        : "Half the audience leaves in the first 10-15s, so the hook has to land before then. ") +
+      `Cut it to one sentence that names the viewer's situation \u2014 not a definition of the topic.`,
+  };
+}
+
 export function overlongBeats(
   script: SceneScript,
   minCount = GATE_THRESHOLDS.overlongBeatCount,

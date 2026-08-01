@@ -6,7 +6,7 @@ import { buildScriptPrompt, buildRepairPrompt, buildBlueprintPrompt, buildScript
 import { sanitizeScript } from "@/lib/sanitize";
 import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
-import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause } from "@/studio/pacing";
+import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause, hookTooLong } from "@/studio/pacing";
 
 /**
  * Pacing/voice soft gates, in the order a viewer would notice them. Each returns
@@ -16,6 +16,7 @@ import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, cru
  * scripts, and the factory already exhausts its attempts on 72 of 86 slots.
  */
 const PACING_GATES: { label: string; run: (s: SceneScript) => { detail: string } | null }[] = [
+  { label: "hook too long", run: hookTooLong },
   { label: "definition opener", run: definitionOpener },
   { label: "too many title cards", run: tooManyBigtext },
   { label: "frozen card", run: staticCardOverrun },

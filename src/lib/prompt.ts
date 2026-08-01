@@ -708,9 +708,19 @@ ${exemplarScript}
     format === "short"
       ? `Structure for a SHORT (45-90s, 9:16 vertical, 4-8 scenes):
 1. a hook that fits this subject — a bold "bigtext" claim, a "stat" wow-number, or a sharp question
+   HOOK BUDGET — the tightest rule in this prompt: the FIRST beat is at most 12 SPOKEN WORDS.
+   A Short is decided on in about three seconds. More than half the viewers who leave are gone
+   inside that window, so a hook still being spoken at second nine has already lost them. One short
+   sentence that names the VIEWER'S SITUATION — the thing going wrong, the number that stings, the
+   moment they recognise. Never a definition of the topic, never a preamble, never a greeting.
 2-3. the core idea told visually, using 2+ of the scene kinds your playbook recommends
 4. a concrete example or proof${isCoding ? " (code -> terminal output)" : ""}, or a quick "quiz"
-5. a "question" scene — a challenge worth arguing about in the comments
+5. a "question" scene — a challenge worth arguing about in the comments, phrased so it sends the
+   viewer back to the hook's framing (a Short that loops is a Short that gets rewatched)
+CADENCE (9:16): a Short is watched on a swipe, so the picture must change every 2-4 seconds — that
+is 5-10 spoken words per beat, NOT one long beat per scene. Prefer more beats over longer ones:
+72% of our existing Shorts hold a single picture longer than 4s, and that is the main reason they
+feel slow. No beat may exceed ~23 words (~9s), and that is a ceiling, not a target.
 DENSITY BUDGET (9:16): the YouTube UI covers the bottom quarter and right edge of a Short, so keep
 every scene sparse — a diagram, table or chart at most 5 items/nodes, a tree or mindmap at most 6.
 If you have more to show, split it across two scenes; a crowded Short is unreadable behind the UI.

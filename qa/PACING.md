@@ -69,9 +69,10 @@ Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch 
 | beat length | 40 of 88 | 45.5% |
 | filler openers | 23 of 88 | 26.1% |
 | no breathing room | 23 of 88 | 26.1% |
+| hook too long | 80 of 88 | 90.9% |
 | no running example | 14 of 88 | 15.9% |
 | unexplained jargon | 10 of 88 | 11.4% |
-| **any gate** | **56 of 88** | **63.6%** |
+| **any gate** | **87 of 88** | **98.9%** |
 
 ### Jargon anchoring
 

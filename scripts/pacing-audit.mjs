@@ -17,7 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   pacingReport, jargonReport, singleBeatCapSeconds,
-  staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause,
+  staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause, hookTooLong,
   OVERLONG_BEAT_SEC, OVERLONG_BEAT_SEC_BY_FORMAT, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC, GATE_THRESHOLDS,
 } from "../src/studio/pacing.ts";
 import { narrationWordCount } from "../src/studio/schema.ts";
@@ -271,6 +271,7 @@ const GATES = [
   ["beat length", overlongBeats],
   ["filler openers", crutchPhrases],
   ["no breathing room", unbrokenClause],
+  ["hook too long", hookTooLong],
   ["no running example", runningExampleWeak],
   ["unexplained jargon", jargonUnanchored],
 ];

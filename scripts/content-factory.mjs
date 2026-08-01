@@ -309,6 +309,8 @@ function warningsToDirectives(warnings) {
     // the model back its own diagnostic instead of an instruction.
     if (/^too many title cards:/.test(w))
       return "A long video contains exactly TWO bigtext scenes: the opening hook and the closing recap. Sections are announced by the title of their first teaching scene plus a forward-hook line closing the previous section, and listed in the \"sections\" array for chapters — never by a title card.";
+    if (/^hook too long:/.test(w))
+      return "The first beat of the first scene is the hook and gets its own budget: 12 words for a Short, 25 for a long. A Short is swiped away in about three seconds, so a hook still being spoken at second nine has already lost the viewer. One short sentence naming the viewer's situation \u2014 not a definition, not a preamble.";
     if (/^definition opener:/.test(w))
       return "Never open by defining the topic. The first beat is a concrete moment — the thing going wrong, a number that stings, or the exact line of code that betrays the reader. The definition arrives later, once it is needed.";
     if (/^frozen card:/.test(w))
