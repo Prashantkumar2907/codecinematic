@@ -17,8 +17,16 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  shade,
+  lerpColor,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
+
+const SLAB_DEPTH = 0.12;
+const GRID_WORLD = 26;
+const IDLE_FACE_LIFT = 0.09;
+const SET_TINT = 0.24;
 
 type BitsScene = Extract<Scene, { kind: "bits" }>;
 
@@ -81,7 +89,7 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;
-  const ah = contentH - band;
+  const ah = Math.max(unit * 4, layout.safeBottom - ay);
 
   const step = activeStep >= 0 ? scene.steps[activeStep] : null;
   const prev = regAt(scene, activeStep - 1);
@@ -95,30 +103,51 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
 
   const rect = { x: ax, y: ay, w: aw, h: ah };
   
-  const spreadX = 8.5;
-  const blockW = (spreadX * 2.0) / Math.max(width, 1) * 0.6;
-  const blockD = blockW * 1.5;
-  
-  const worldPos = (i: number) => {
-    const x = width === 1 ? 0 : (i / (width - 1) - 0.5) * spreadX * 2;
-    return new THREE.Vector3(x, 0, 0);
+  /**
+   * Cells are a PIXEL row and the slabs are mapped onto it. They used to be spread over
+   * 17 world units and viewed from (0, 12, 10): at 9:16 that put four of the eight bits
+   * of a byte off the right edge, rendered the near cells wider than the far ones, and
+   * left every place-value label sliding away from the cell it belongs to.
+   * `qa/ledger.json` → systemic `2d-layout-round-tripped-through-camera`.
+   */
+  const cellPitch = aw / Math.max(width, 1);
+  const cellW = cellPitch - Math.min(unit * 0.3, cellPitch * 0.14);
+  const cellH = Math.min(cellW * 1.45, ah * 0.42);
+  const rowCY = ay + ah * 0.46;
+  const cellRect = (i: number) => ({
+    x: ax + i * cellPitch + (cellPitch - cellW) / 2,
+    y: rowCY - cellH / 2,
+    w: cellW,
+    h: cellH,
+    cx: ax + (i + 0.5) * cellPitch,
+    cy: rowCY,
+  });
+
+  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
   };
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 12 : 10, vertical ? 10 : 8);
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, 12);
     camera.lookAt(0, 0, 0);
+    const m = mappingAt(camera, SLAB_DEPTH / 2);
+    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(GRID_WORLD, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.5;
     s.add(grid);
 
     const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadX * 4),
+      new THREE.PlaneGeometry(GRID_WORLD, GRID_WORLD),
       new THREE.ShadowMaterial({ opacity: 0.4 })
     );
     shadowPlane.rotation.x = -Math.PI / 2;
@@ -128,8 +157,7 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
 
     const models: { mesh: THREE.Group, i: number }[] = [];
     for (let i = 0; i < width; i++) {
-        const g = makeBlock(blockW, 0.4, blockD, "#1e293b", "#31435a");
-        g.position.copy(worldPos(i));
+        const g = makeBlock(1, 1, SLAB_DEPTH, shade(THEME.panel, IDLE_FACE_LIFT), THEME.textDim);
         s.add(g);
         models.push({ mesh: g, i });
     }
@@ -143,8 +171,9 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
         let bit = 0;
         let scale = 1;
         let flash = 0;
-        let pY = worldPos(i).y;
-        let pX = worldPos(i).x;
+        let flipAmount = 1;
+        const cellPx = cellRect(i);
+        const cellWorld = toWorld(cellPx.cx, cellPx.cy);
         
         const shimmerAt = (i: number) => {
             const w = Math.sin(elapsedMs / 1200 - i * 0.55);
@@ -170,8 +199,7 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
             const f = clamp01((t - flipStart) / (isLogic ? 0.16 : 0.25));
             bit = f < 0.5 ? prev[i] : next[i];
             const changed = prev[i] !== next[i];
-            const flipX = Math.abs(Math.cos(Math.PI * f));
-            mesh.scale.set(Math.max(0.01, flipX), 1, 1);
+            flipAmount = Math.abs(Math.cos(Math.PI * f));
             if (changed && f >= 0.5) flash = 1.0 - clamp01((f - 0.5) / 0.5);
             if (f <= 0) flash = shimmerAt(i) * 0.5;
         } else if (isShift) {
@@ -192,16 +220,13 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
             flash = shimmerAt(i) * 0.5;
         }
         
-        if (!isLogic && op !== "not") {
-             mesh.scale.set(scale * gIn, scale * gIn, scale * gIn);
-        } else {
-            mesh.scale.y = scale * gIn;
-            mesh.scale.z = scale * gIn;
-            mesh.scale.x *= gIn;
-        }
-        
-        const bob = Math.sin(elapsedMs / 1200 + i) * 0.05;
-        mesh.position.set(pX, pY + bob + flash * 0.2, worldPos(i).z);
+        // Scaled FROM the pixel cell, and never moved afterwards: the old per-frame bob
+        // slid each slab out from under the digit drawn on it.
+        const sw = (cellPx.w / m.sx) * scale * gIn;
+        const sh = (cellPx.h / m.sy) * scale * gIn;
+        const flipX = flipAmount;
+        mesh.scale.set(Math.max(0.001, sw * flipX), Math.max(0.001, sh), 1);
+        mesh.position.set(cellWorld.x, cellWorld.y, 0);
 
         mesh.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
@@ -209,11 +234,17 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
                 mat.transparent = true;
                 mat.opacity = gIn * (ghost ? 0.4 : 0.9);
                 if (flash > 0) {
-                    mat.color.setStyle(THEME.warn);
-                    mat.emissive.setStyle(THEME.warn);
+                    // The idle shimmer used THEME.warn, so three cells at a time rendered
+                    // caution-yellow — the rubric reserves warn for caution, and a byte
+                    // sitting still looked like an error state.
+                    const lit = lerpColor(THEME.panel, accent, SET_TINT + 0.3 * flash);
+                    mat.color.setStyle(lit);
+                    mat.emissive.setStyle(lit);
                     mat.emissiveIntensity = 0.5 * flash;
                 } else {
-                    const c = ghost ? "#0e1520" : bit ? accentSoft : "#1e293b";
+                    // accentSoft is an rgba string; THREE.Color drops the alpha, so a set bit rendered
+                    // at FULL accent instead of the intended tint.
+                    const c = ghost ? shade(THEME.panel, -0.2) : bit ? lerpColor(THEME.panel, accent, SET_TINT) : shade(THEME.panel, IDLE_FACE_LIFT);
                     mat.color.setStyle(c);
                     mat.emissive.setStyle(c);
                     mat.emissiveIntensity = 0.1;
@@ -230,7 +261,7 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
   const cam = render3D(ctx, key, rect, build, env.elapsedMs, ctxData);
   if (!cam) return;
 
-  const get2D = (i: number) => projectToRect(cam, worldPos(i), rect);
+  const get2D = (i: number) => ({ x: cellRect(i).cx, y: cellRect(i).cy });
   
   const showPow = width <= 8;
   const opSide = unit * 1.5;
@@ -238,8 +269,9 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
   // 2D Overlays
   for (let i = 0; i < width; i++) {
     const p = get2D(i);
-    const bob = Math.sin(env.elapsedMs / 1200 + i) * unit * 1.5;
-    const cy = p.y - bob;
+    // No bob: the 2D digit used a pixel sine while the slab used a world one, so the
+    // two drifted apart every frame.
+    const cy = p.y;
     
     // Draw Bit Values
     let bit = next[i];
@@ -370,7 +402,7 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
         ctx.fillStyle = accent;
         ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = "#06121a";
+        ctx.fillStyle = shade(THEME.panel, -0.35);
         ctx.textAlign = "center";
         ctx.fillText(label, chipCx, chipCy + unit * 0.22);
         ctx.textAlign = "start";
@@ -390,16 +422,16 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
     const cx = ax + aw / 2;
     const cy = decChipY + unit * 0.65 + dy;
     roundRect(ctx, cx - tw / 2 - unit * 0.55, cy - unit * 0.65, tw + unit * 1.1, unit * 1.3, unit * 0.35);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = THEME.bgBottom;
     ctx.fill();
     roundRect(ctx, cx - tw / 2 - unit * 0.55, cy - unit * 0.65, tw + unit * 1.1, unit * 1.3, unit * 0.35);
     ctx.strokeStyle = THEME.panelBorder;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.stroke();
     if (!ghost) {
       roundRect(ctx, cx - tw / 2 - unit * 0.55, cy - unit * 0.65, tw + unit * 1.1, unit * 1.3, unit * 0.35);
       ctx.strokeStyle = rgba(accent, 0.14 + 0.12 * idle(env, 2000));
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = unit * STROKE.thin;
       ctx.stroke();
     }
     ctx.fillStyle = ghost ? THEME.textDim : THEME.text;
@@ -428,11 +460,11 @@ export function paintBits(ctx: CanvasRenderingContext2D, scene: BitsScene, env: 
       const tw = ctx.measureText(step.note).width;
       const cx = ax + aw / 2;
       roundRect(ctx, cx - tw / 2 - unit * 0.4, ny - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.3);
-      ctx.fillStyle = "#0a0e13";
+      ctx.fillStyle = THEME.bgBottom;
       ctx.fill();
       roundRect(ctx, cx - tw / 2 - unit * 0.4, ny - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.3);
       ctx.strokeStyle = THEME.panelBorder;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = unit * STROKE.hair;
       ctx.stroke();
       ctx.fillStyle = THEME.textDim;
       ctx.textAlign = "center";

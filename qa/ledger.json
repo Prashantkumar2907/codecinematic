@@ -268,18 +268,18 @@
     "bits": {
       "wave": 1,
       "group": "Code",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "1/2/3/2/2 -> 4/4/4/4/5. Cells were spread over 17 world units and viewed from (0,12,10), so at 9:16 four of the eight bits of a byte were off the right edge, the near cells rendered wider than the far ones, and every place-value label slid away from the cell it belongs to (the \"8\" sat under the gap between two cells). Cells are now a pixel row \u2014 equal pitch, equal size \u2014 with unit slabs mapped onto them and the camera on-axis: the 16th painter on the systemic 2d-layout-round-tripped-through-camera pattern. Two different bobs were running, a world-space one on the slab and a pixel-space one on the digit, so the digit drifted off its own cell every frame; both gone. The not/logic flip scale is folded into the same per-frame scale so the flip no longer fights the cell size. contentH -> layout.safeBottom. The idle shimmer was THEME.warn, so three cells at a time rendered caution-yellow and a byte sitting still looked like an error state \u2014 it is an accent tint now, and accentSoft (an rgba string) handed to THREE.Color had its alpha dropped, rendering a set bit at full accent rather than the intended tint. 3 absolute-px strokes -> STROKE; 8 colour literals -> 0. edge-check 0.0% both aspects, console.log empty.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "browserframe": {
       "wave": 1,
