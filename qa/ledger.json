@@ -918,7 +918,7 @@
         "palette": 5
       },
       "summary": "2/4/3/2/2 -> 4/4/4/4/5. All three layout variants verified for the first time: both fixtures used the id sqlnosql (variantOf -> 0), so 2 of 3 layouts had never been rendered. New DEMO_COMPARE_VARIANTS (restgrpc, tcpudp) reaches them via --scene=. Variant 2 (stacked at 16:9) proved unusable - ~180px per panel, less than the header needs before one item draws, so every item in both panels was dropped; variantOf(id,3) -> variantOf(id,2), 16:9 always side-by-side with divider as the variety. Panels were placed by two unrelated systems (pixel rect vs world literals spreadX*1.5), putting the chrome ~85px off its own slab; slabs now sized and placed FROM the panel rects via mappingAt (12th painter on the systemic pattern) and the forbidden per-frame bob is gone. Verdict was drawn at 86% (9:16) / 90% (16:9) of frame height, inside the caption band -> layout.safeBottom, and verdictBand 3.2u -> 4.0u since a two-line box needs 3.84u. Side-by-side took the whole band whatever it held (~40% empty) -> height from content, pair centred; the right panel's y read panelsTop where the left read blockTop. Item block now scales to fit (floor 0.72 ~ 31px) so the schema's max of 4 items fits a stacked 9:16 panel. The isCurrent glow was dead code - shadowBlur set then zeroed on the next line - so the active side had no distinction. Verdict tick was prefixed to every wrapped line. 4 colour literals -> 0 plus two rgba() strings handed to THREE.Color which drops alpha (console.log 2 warnings/frame -> empty). Dead get2D and the tilted-camera floor grid removed. edge-check 0.0% both aspects.",
-      "commit": "",
+      "commit": "6b7d206",
       "date": "2026-08-01"
     },
     "bracket": {
