@@ -29,6 +29,13 @@ type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number
 const GRID = 12;
 const SKELETON_FILL = rgba(THEME.textDim, 0.06);
 const CARET_MS = 530;
+/**
+ * Rows the page's blocks actually occupy drive the vertical mapping, not the full 12.
+ * Every block y/h was divided by GRID, so a page ending at row 6 — which the demo does,
+ * and which is typical — left the bottom HALF of the browser window empty below its own
+ * content. Horizontal still divides by GRID: a page is as wide as the window.
+ */
+const MIN_ROWS = 5;
 /** Fraction of the visible frustum the browser window occupies. */
 const WINDOW_FILL = 0.92;
 const SHIMMER_MS = 900;
@@ -232,6 +239,7 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
    * room for both, so the chips printed over the URL. `frustumHalfExtent`
    * (`three3d.ts:139`) is the documented fix for exactly this and had three callers.
    */
+  const usedRows = Math.max(MIN_ROWS, ...scene.blocks.map((b) => b.y + b.h));
   const CAM_DIST = vertical ? 15 : 12;
   const camFov = vertical ? 45 : 36;
   const halfH = Math.tan((camFov * Math.PI) / 360) * CAM_DIST;
@@ -246,24 +254,12 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
     
-    // Grid floor
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadY) * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -1.0;
-    // Rotate grid for vertical so it matches the stack
-    if (vertical) grid.rotation.x = Math.PI / 2;
-    s.add(grid);
-    
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadY * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    if (vertical) shadowPlane.rotation.x = 0;
-    shadowPlane.position.y = -1.0;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
+    /**
+     * No ground grid and no shadow plane. Both are horizontal, the camera is on-axis, so
+     * they render EDGE-ON: a couple of faint horizontal bands running out past the left
+     * and right of the browser window and nothing else. They cost two draws and one
+     * shadow-map pass to produce an artifact.
+     */
 
     // Browser back window
     const browserGroup = makeBlock(spreadX * 2.0, spreadY * 2.0, 0.3, shade(THEME.panel, -0.35), shade(THEME.panel, 0.22));
@@ -274,9 +270,9 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     for (const b of scene.blocks) {
         // Grid is 12x12 inside the browser block
         const bw = (b.w / GRID) * (spreadX * 2.0 * 0.95);
-        const bh = (b.h / GRID) * (spreadY * 2.0 * 0.85); // leaves room for header
+        const bh = (b.h / usedRows) * (spreadY * 2.0 * 0.85); // leaves room for header
         const cx = (b.x / GRID - 0.5) * (spreadX * 2.0 * 0.95) + bw / 2;
-        const cy = (0.5 - b.y / GRID) * (spreadY * 2.0 * 0.85) - bh / 2 - (spreadY * 2.0 * 0.05); // shift down
+        const cy = (0.5 - b.y / usedRows) * (spreadY * 2.0 * 0.85) - bh / 2 - (spreadY * 2.0 * 0.05); // shift down
         
         const g = makeBlock(bw, bh, 0.15, THEME.panel, accent);
         g.position.set(cx, cy, 0.2); // stick out slightly from browser
@@ -311,9 +307,9 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
         }
 
         const bw = (block.w / GRID) * (spreadX * 2.0 * 0.95);
-        const bh = (block.h / GRID) * (spreadY * 2.0 * 0.85);
+        const bh = (block.h / usedRows) * (spreadY * 2.0 * 0.85);
         const cx = (block.x / GRID - 0.5) * (spreadX * 2.0 * 0.95) + bw / 2;
-        const cy = (0.5 - gy / GRID) * (spreadY * 2.0 * 0.85) - bh / 2 - (spreadY * 2.0 * 0.05);
+        const cy = (0.5 - gy / usedRows) * (spreadY * 2.0 * 0.85) - bh / 2 - (spreadY * 2.0 * 0.05);
 
         mesh.visible = ts > 0 || gIn > 0; // if skeleton, it's visible but faint
         const pop = ts > 0 ? easeOutBack(clamp01(ts / 0.3)) : 0;
@@ -488,9 +484,9 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     }
 
     const bw3 = (b.w / GRID) * (spreadX * 2.0 * 0.95);
-    const bh3 = (b.h / GRID) * (spreadY * 2.0 * 0.85);
+    const bh3 = (b.h / usedRows) * (spreadY * 2.0 * 0.85);
     const cx3 = (b.x / GRID - 0.5) * (spreadX * 2.0 * 0.95) + bw3 / 2;
-    const cy3 = (0.5 - gy / GRID) * (spreadY * 2.0 * 0.85) - bh3 / 2 - (spreadY * 2.0 * 0.05);
+    const cy3 = (0.5 - gy / usedRows) * (spreadY * 2.0 * 0.85) - bh3 / 2 - (spreadY * 2.0 * 0.05);
 
     const tl = get2D(cx3 - bw3 / 2, cy3 + bh3 / 2, 0.2);
     const br = get2D(cx3 + bw3 / 2, cy3 - bh3 / 2, 0.2);

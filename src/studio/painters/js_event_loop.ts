@@ -20,6 +20,7 @@ import {
   fitFontSize,
   beatT,
   activeBeatIndex,
+  stagger,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -109,7 +110,14 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 420));
+  /**
+   * The four regions enter on a cascade, not all on one tick. `stagger` is the shared
+   * helper row 9.0 added for exactly this and that no painter had used yet; the rubric's
+   * motion axis asks for siblings on a small offset rather than simultaneous.
+   */
+  const REGION_COUNT = 4;
+  const regionIn = (i: number) => easeOutCubic(enterT(env, 420, stagger(i, REGION_COUNT)));
+  const introIn = regionIn(REGION_COUNT - 1);
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const top = contentY + band;
@@ -211,9 +219,9 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
   const frameFace = lerpColor(THEME.panel, accent, FRAME_TINT);
   const idleFace = shade(THEME.panel, IDLE_FACE_LIFT);
 
-  const drawRegion = (r: Rect, title: string, tone: string, sub?: string) => {
+  const drawRegion = (r: Rect, title: string, tone: string, appear: number, sub?: string) => {
     ctx.save();
-    ctx.globalAlpha = introIn;
+    ctx.globalAlpha = appear;
     roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.md);
     ctx.fillStyle = rgba(tone, LANE_A);
     ctx.fill();
@@ -233,15 +241,15 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
     ctx.restore();
   };
 
-  drawRegion(stackR, "call stack", accent, "LIFO");
-  drawRegion(apiR, "web APIs / timers", THEME.textDim);
-  drawRegion(microR, "microtask queue", accent, "promises");
-  drawRegion(macroR, "macrotask queue", secondary, "timers, events");
+  drawRegion(stackR, "call stack", accent, regionIn(0), "LIFO");
+  drawRegion(apiR, "web APIs / timers", THEME.textDim, regionIn(1));
+  drawRegion(microR, "microtask queue", accent, regionIn(2), "promises");
+  drawRegion(macroR, "macrotask queue", secondary, regionIn(3), "timers, events");
 
   /** Empty slot outlines, so the shape of each lane is readable from frame one. */
-  const drawSlots = (lane: ReturnType<typeof laneOf>, n: number, tone: string) => {
+  const drawSlots = (lane: ReturnType<typeof laneOf>, n: number, tone: string, appear: number) => {
     ctx.save();
-    ctx.globalAlpha = introIn * 0.25;
+    ctx.globalAlpha = appear * 0.25;
     ctx.strokeStyle = rgba(tone, 0.5);
     ctx.lineWidth = unit * STROKE.hair;
     ctx.setLineDash([unit * 0.22, unit * 0.2]);
@@ -253,11 +261,11 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
     ctx.setLineDash([]);
     ctx.restore();
   };
-  drawSlots(microLane, maxMicro, accent);
-  drawSlots(macroLane, maxMacro, secondary);
+  drawSlots(microLane, maxMicro, accent, regionIn(2));
+  drawSlots(macroLane, maxMacro, secondary, regionIn(3));
 
   ctx.save();
-  ctx.globalAlpha = introIn * GHOST_A;
+  ctx.globalAlpha = regionIn(0) * GHOST_A;
   ctx.strokeStyle = rgba(THEME.textDim, 0.4);
   ctx.lineWidth = unit * STROKE.hair;
   ctx.setLineDash([unit * 0.2, unit * 0.2]);
@@ -269,9 +277,9 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
   ctx.setLineDash([]);
   ctx.restore();
 
-  const drawChip = (r: Rect, chip: Chip, face: string, edge: string, hot: boolean, alpha = 1) => {
+  const drawChip = (r: Rect, chip: Chip, face: string, edge: string, hot: boolean, alpha = 1, appear = introIn) => {
     ctx.save();
-    ctx.globalAlpha = introIn * alpha;
+    ctx.globalAlpha = appear * alpha;
     if (hot) {
       ctx.shadowColor = edge === accent ? accentGlow : secondaryGlow;
       ctx.shadowBlur = unit * GLOW.base * (0.7 + 0.3 * idle(env, PULSE_MS));
@@ -321,9 +329,9 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
       // Drops in from above rather than appearing: the eye should see it arrive.
       const e = easeOutBack(clamp01(t / 0.5));
       const from = rect(f.x, f.y - frameH * 1.6, f.w, f.h);
-      drawChip(lerpRect(from, f, e), frame, frameFace, accent, true, clamp01(t * 3));
+      drawChip(lerpRect(from, f, e), frame, frameFace, accent, true, clamp01(t * 3), regionIn(0));
     } else {
-      drawChip(f, frame, isTop ? frameFace : idleFace, isTop ? accent : THEME.textDim, isTop && !popping);
+      drawChip(f, frame, isTop ? frameFace : idleFace, isTop ? accent : THEME.textDim, isTop && !popping, 1, regionIn(0));
     }
   });
   if (popping && prev.stack.length > now.stack.length) {
@@ -332,7 +340,7 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
     const e = easeOutCubic(clamp01(t / 0.55));
     const f = frameRect(prev.stack.length - 1);
     const to = rect(f.x, f.y - frameH * 1.8, f.w, f.h);
-    drawChip(lerpRect(f, to, e), prev.stack[prev.stack.length - 1], frameFace, accent, false, 1 - e);
+    drawChip(lerpRect(f, to, e), prev.stack[prev.stack.length - 1], frameFace, accent, false, 1 - e, regionIn(0));
   }
 
   // ── the arriving callback, from the web-API lane into its queue ────────────
@@ -350,11 +358,12 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
     chips.forEach((chip, i) => {
       const target = slotRect(lane, i);
       const isNewest = enqueuing && i === chips.length - 1 && (step?.queue === "macro") !== isMicro;
+      const appear = regionIn(isMicro ? 2 : 3);
       if (isNewest) {
         const e = easeInOutCubic(clamp01(t / 0.6));
-        drawChip(lerpRect(apiSlot, target, e), chip, face, edge, true, clamp01(t * 3));
+        drawChip(lerpRect(apiSlot, target, e), chip, face, edge, true, clamp01(t * 3), appear);
       } else {
-        drawChip(target, chip, face, edge, false);
+        drawChip(target, chip, face, edge, false, 1, appear);
       }
     });
   };
@@ -370,15 +379,15 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
       const to = frameRect(now.stack.length);
       const startF = i / n;
       const e = easeInOutCubic(clamp01((t - startF) / (1 / n)));
-      if (e <= 0) drawChip(from, chip, microFace, accent, i === 0);
-      else if (e < 1) drawChip(lerpRect(from, to, e), chip, microFace, accent, true, 1 - e * 0.25);
+      if (e <= 0) drawChip(from, chip, microFace, accent, i === 0, 1, regionIn(2));
+      else if (e < 1) drawChip(lerpRect(from, to, e), chip, microFace, accent, true, 1 - e * 0.25, regionIn(2));
     });
   }
   if (step?.op === "takeMacro" && !now.refused && prev.macro.length > now.macro.length) {
     const e = easeInOutCubic(clamp01(t / 0.65));
     const from = slotRect(macroLane, 0);
     const to = frameRect(now.stack.length);
-    drawChip(lerpRect(from, to, e), prev.macro[0], macroFace, secondary, true, 1 - e * 0.2);
+    drawChip(lerpRect(from, to, e), prev.macro[0], macroFace, secondary, true, 1 - e * 0.2, regionIn(3));
   }
 
   // ── the loop's own verdict ────────────────────────────────────────────────
