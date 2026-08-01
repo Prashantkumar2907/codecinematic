@@ -582,7 +582,7 @@
         "palette": 5
       },
       "summary": "2/3/3/1/2 -> 4/4/4/4/5. Pixel layout made authoritative (11th painter on the systemic 2d-layout-round-tripped-through-camera pattern): rects were recovered by projecting a world box through a tilted camera, so every node drew a second misregistered copy and adjacent grid rows collapsed into overlaps that hid the arrows. The correct pixel grid (gridMap/nodeRect) was already in the file as dead code; revived it, camera on-axis at (0,0,12), slabs placed from the pixel rect via mappingAt. Bottom clamp layout.h*0.86 (duplicated in two places) -> caption-aware layout.safeBottom; 9:16 lowest row was at 87% of frame height. Accent-node entrance flash removed (slab face was full accent under a fading 2D card; now one shared opacity ramp and a 0.22 tint). Per-node state moved from closure capture to render3D context - positions and highlights were frozen at frame 0. Slab bob/lift removed per the systemic rule. Arrow labels search along and across the route (writes was painted over the word Database). 9:16 transpose no longer mirrors reading order. 11 colour literals -> 0, two of which were rgba() passed to THREE.Color which drops alpha, so the dimming silently never happened; console.log went from 18 warnings to empty. Absolute-px lineWidth=1 and shadowOffsetY=4 gone. ~60 lines of dead code removed. edge-check 0.0% both aspects. Not covered by any demo fixture: scenes with step.move.",
-      "commit": "105d40b",
+      "commit": "9a2c2d1",
       "date": "2026-08-01"
     },
     "tree": {
