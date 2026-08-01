@@ -45,7 +45,15 @@ const say = z.string().min(6).max(MAX_BEAT_CHARS);
  *  caps exactly the scenes that freeze: bigtext, terminal, question, stat, quote. */
 const narration = z.string().min(6).max(MAX_SINGLE_BEAT_CHARS);
 const terminalNarration = z.string().min(6).max(MAX_TERMINAL_NARRATION_CHARS);
-const id = z.string().min(1).max(40);
+/**
+ * Every scene id AND every cross-reference to one (`arrows.from`, `steps.reveal`,
+ * `sections.atSceneId`, …) is this exact schema *instance*, which is what lets
+ * `limits.ts` recognise a reference by identity rather than by guessing from the
+ * field name. 293 fields share it against 11 unrelated display fields that also
+ * happen to cap at 40, so name- or value-based detection would silently truncate
+ * an id and break the reference it points at. Keep it a single shared const.
+ */
+export const id = z.string().min(1).max(40);
 
 /**
  * Per-kind ceilings on spoken text, exported so `sanitize.ts` trims to the same

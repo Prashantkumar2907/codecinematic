@@ -4,9 +4,22 @@
  * fix meaning-critical failures (code shape, narration length, structure).
  * Code and narration are never touched here.
  */
-import { SPOKEN_LIMITS } from "@/studio/schema";
+// Explicit `.ts` and relative, like `speech.ts`: `scripts/limits-check.mjs`
+// imports this module directly and cannot resolve the `@/` alias.
+import { META_LIMITS, SCENE_LIMITS, type FieldLimit } from "../studio/limits.ts";
 
 const ELLIPSIS = "…";
+
+/**
+ * Below this cap a field is a symbol, code or number-as-string (`molecule.el` ≤2,
+ * `turing_tape.blank` ≤2, `steps.write` ≤4, `trace…pointers.label` ≤6), not prose.
+ * An ellipsis there spends one of very few characters to signal "there is more",
+ * which is not information anyone can use — "Carbon" wants to become "Ca", not
+ * "C…". Those fields are still trimmed, just plainly. 8 is the smallest cap the
+ * previous hand-written clamps used (`chart.items.unit`), so every field they
+ * covered keeps its exact old behaviour.
+ */
+const ELLIPSIS_MIN = 8;
 
 /** Strip leaked markdown emphasis (*word*, **word**, _word_) the model sometimes
  *  emits despite the "no markdown" rule — it renders literally on canvas and is
@@ -22,6 +35,7 @@ function clamp(value: unknown, max: number): unknown {
   if (typeof value !== "string") return value;
   const cleaned = stripEmphasis(value);
   if (cleaned.length <= max) return cleaned;
+  if (max < ELLIPSIS_MIN) return cleaned.slice(0, max).trimEnd();
   return cleaned.slice(0, max - 1).trimEnd() + ELLIPSIS;
 }
 
@@ -42,9 +56,34 @@ function clampSpeech(value: unknown, max: number): unknown {
   return (wordEnd > 0 ? window.slice(0, wordEnd) : window).trimEnd();
 }
 
-function clampArray(value: unknown, maxItems: number, maxLen: number): unknown {
-  if (!Array.isArray(value)) return value;
-  return value.slice(0, maxItems).map((v) => clamp(v, maxLen));
+/**
+ * Trim one value against its derived limit. Every per-kind number this used to
+ * hardcode now arrives in `limit`, so the 16 hand-written `case` arms are gone
+ * and all 110 kinds are covered — including the four spoken fields (`sayLeft`,
+ * `sayRight`, `sayReact`, `sayResult`) the old explicit key list never listed.
+ */
+function applyLimit(value: unknown, limit: FieldLimit): unknown {
+  if (value == null) return value;
+  if (limit.t === "string") {
+    return limit.spoken ? clampSpeech(value, limit.max) : clamp(value, limit.max);
+  }
+  if (limit.t === "array") {
+    if (!Array.isArray(value)) return value;
+    const sliced = limit.maxItems == null ? value : value.slice(0, limit.maxItems);
+    return limit.el ? sliced.map((v) => applyLimit(v, limit.el!)) : sliced;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return value;
+  const out = { ...(value as Record<string, unknown>) };
+  for (const [key, field] of Object.entries(limit.fields)) {
+    if (key in out) out[key] = applyLimit(out[key], field);
+  }
+  return out;
+}
+
+function applyFields(target: Record<string, unknown>, fields: Record<string, FieldLimit>) {
+  for (const [key, limit] of Object.entries(fields)) {
+    if (key in target) target[key] = applyLimit(target[key], limit);
+  }
 }
 
 /**
@@ -81,203 +120,63 @@ export function sanitizeScript(raw: unknown): unknown {
     script.scenes = script.scenes.map((s) => sanitizeScene(s));
   }
   const meta = script.meta as Record<string, unknown> | undefined;
-  if (meta && typeof meta === "object") {
-    meta.title = clamp(meta.title, 95);
-    meta.description = clamp(meta.description, 3500);
-    meta.tags = clampArray(meta.tags, 15, 30);
-  }
+  if (meta && typeof meta === "object") applyFields(meta, META_LIMITS);
   return script;
 }
 
-// Imported rather than re-declared: these used to be literal copies of the
-// schema's numbers, so lowering a cap in one place silently left the other behind
-// and an over-long card bounced into a repair round instead of being trimmed.
-const MAX_NARRATION = SPOKEN_LIMITS.narration;
-const MAX_TERMINAL_NARRATION = SPOKEN_LIMITS.terminalNarration;
-const MAX_BEAT = SPOKEN_LIMITS.beat;
+/**
+ * Fixups that are semantic, not dimensional — no table of maxima can express
+ * them, so they stay hand-written while every length/count limit is derived.
+ * Run BEFORE the generic clamp: chart lifts a unit out of `value` into `unit`,
+ * which then needs clamping like any other string.
+ */
+function preFixups(scene: Record<string, unknown>) {
+  if (scene.kind === "code") normalizeSegments(scene);
+  if (scene.kind === "chart" && Array.isArray(scene.items)) {
+    scene.items = scene.items.map((it) => {
+      if (typeof it !== "object" || it === null) return it;
+      const item = it as Record<string, unknown>;
+      // Models often write value as a string with the unit baked in
+      // ("100x", "200 ms", "1,000"). Coerce to a plain number and lift a
+      // trailing unit into `unit` so the bar chart renders instead of failing.
+      if (typeof item.value !== "string") return item;
+      const raw = item.value.replace(/,/g, "");
+      const match = raw.match(/-?\d+\.?\d*/);
+      if (!match) return item;
+      const num = parseFloat(match[0]);
+      if (Number.isNaN(num)) return item;
+      const suffix = raw.replace(match[0], "").trim();
+      return { ...item, value: num, unit: item.unit || suffix || undefined };
+    });
+  }
+}
 
-/** Clamp a spoken "say" on an item/panel object in place (used for arrays). */
-function clampItemSay(item: unknown): unknown {
-  if (typeof item !== "object" || item === null) return item;
-  const rec = item as Record<string, unknown>;
-  if (typeof rec.say === "string") return { ...rec, say: clampSpeech(rec.say, MAX_BEAT) };
-  return item;
+/**
+ * Run AFTER the clamp, because it counts columns that the clamp may have sliced:
+ * each row is padded or truncated to the column count so the grid is rectangular.
+ */
+function postFixups(scene: Record<string, unknown>) {
+  if (scene.kind !== "table") return;
+  const cols = Array.isArray(scene.columns) ? scene.columns : [];
+  if (!Array.isArray(scene.rows)) return;
+  scene.rows = scene.rows.map((r) => {
+    if (typeof r !== "object" || r === null) return r;
+    const row = r as Record<string, unknown>;
+    const cells = Array.isArray(row.cells) ? [...row.cells] : [];
+    while (cells.length < cols.length) cells.push("");
+    return { ...row, cells: cells.slice(0, cols.length) };
+  });
 }
 
 function sanitizeScene(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null) return raw;
   const scene = { ...(raw as Record<string, unknown>) };
-
-  // Spoken fields are voiced by TTS and drive beat timing; over-limit ones used
-  // to force a model-repair round that could fail the whole video. Clamp them
-  // deterministically at a sentence/word boundary across every kind.
-  // `narration` only exists on the five single-beat kinds, and terminal's cap is
-  // higher because its typewriter animates for most of the beat.
-  if (typeof scene.narration === "string") {
-    const cap = scene.kind === "terminal" ? MAX_TERMINAL_NARRATION : MAX_NARRATION;
-    scene.narration = clampSpeech(scene.narration, cap);
-  }
-  for (const key of ["sayIntro", "sayMyth", "sayFact", "sayQuestion", "sayReveal", "sayVerdict"]) {
-    if (typeof scene[key] === "string") scene[key] = clampSpeech(scene[key], MAX_BEAT);
-  }
-  for (const key of ["items", "steps", "events", "examples", "segments", "rows"]) {
-    if (Array.isArray(scene[key])) scene[key] = (scene[key] as unknown[]).map(clampItemSay);
-  }
-  for (const side of ["left", "right"]) {
-    const panel = scene[side];
-    if (panel && typeof panel === "object" && typeof (panel as Record<string, unknown>).say === "string") {
-      scene[side] = clampItemSay(panel);
-    }
-  }
-
-  switch (scene.kind) {
-    case "bigtext":
-      scene.text = clamp(scene.text, 80);
-      scene.sub = clamp(scene.sub, 110);
-      break;
-    case "bullets":
-      scene.title = clamp(scene.title, 60);
-      if (Array.isArray(scene.items)) {
-        scene.items = scene.items.slice(0, 5).map((item) =>
-          typeof item === "object" && item !== null
-            ? { ...item, text: clamp((item as Record<string, unknown>).text, 110) }
-            : item
-        );
-      }
-      break;
-    case "code":
-      scene.title = clamp(scene.title, 40);
-      normalizeSegments(scene);
-      break;
-    case "terminal":
-      scene.lines = clampArray(scene.lines, 10, 60);
-      break;
-    case "diagram": {
-      scene.title = clamp(scene.title, 60);
-      if (Array.isArray(scene.nodes)) {
-        scene.nodes = scene.nodes.map((n) =>
-          typeof n === "object" && n !== null ? { ...n, label: clamp((n as Record<string, unknown>).label, 28) } : n
-        );
-      }
-      if (Array.isArray(scene.arrows)) {
-        scene.arrows = scene.arrows.map((a) =>
-          typeof a === "object" && a !== null ? { ...a, label: clamp((a as Record<string, unknown>).label, 24) } : a
-        );
-      }
-      break;
-    }
-    case "compare": {
-      scene.title = clamp(scene.title, 60);
-      scene.verdict = clamp(scene.verdict, 110);
-      for (const side of ["left", "right"]) {
-        const panel = scene[side] as Record<string, unknown> | undefined;
-        if (panel && typeof panel === "object") {
-          panel.title = clamp(panel.title, 30);
-          panel.items = clampArray(panel.items, 4, 70);
-        }
-      }
-      break;
-    }
-    case "question":
-      scene.text = clamp(scene.text, 180);
-      scene.hint = clamp(scene.hint, 110);
-      break;
-    case "timeline":
-      scene.title = clamp(scene.title, 60);
-      if (Array.isArray(scene.events)) {
-        scene.events = scene.events.slice(0, 6).map((e) =>
-          typeof e === "object" && e !== null
-            ? { ...e, when: clamp((e as Record<string, unknown>).when, 18), label: clamp((e as Record<string, unknown>).label, 52) }
-            : e
-        );
-      }
-      break;
-    case "stat":
-      scene.value = clamp(scene.value, 14);
-      scene.label = clamp(scene.label, 60);
-      scene.context = clamp(scene.context, 100);
-      break;
-    case "steps":
-      scene.title = clamp(scene.title, 60);
-      if (Array.isArray(scene.steps)) {
-        scene.steps = scene.steps.slice(0, 5).map((s) =>
-          typeof s === "object" && s !== null
-            ? { ...s, text: clamp((s as Record<string, unknown>).text, 80), detail: clamp((s as Record<string, unknown>).detail, 90) }
-            : s
-        );
-      }
-      break;
-    case "quiz":
-      scene.question = clamp(scene.question, 120);
-      if (Array.isArray(scene.options)) {
-        scene.options = scene.options.slice(0, 4).map((o) =>
-          typeof o === "object" && o !== null ? { ...o, text: clamp((o as Record<string, unknown>).text, 52) } : o
-        );
-      }
-      break;
-    case "vocab":
-      scene.word = clamp(scene.word, 28);
-      scene.pron = clamp(scene.pron, 32);
-      scene.pos = clamp(scene.pos, 16);
-      scene.meaning = clamp(scene.meaning, 90);
-      scene.synonym = clamp(scene.synonym, 48);
-      if (Array.isArray(scene.examples)) {
-        scene.examples = scene.examples.slice(0, 3).map((e) =>
-          typeof e === "object" && e !== null ? { ...e, text: clamp((e as Record<string, unknown>).text, 90) } : e
-        );
-      }
-      break;
-    case "chart":
-      scene.title = clamp(scene.title, 60);
-      if (Array.isArray(scene.items)) {
-        scene.items = scene.items.slice(0, 6).map((it) => {
-          if (typeof it !== "object" || it === null) return it;
-          const item = it as Record<string, unknown>;
-          // Models often write value as a string with the unit baked in
-          // ("100x", "200 ms", "1,000"). Coerce to a plain number and lift a
-          // trailing unit into `unit` so the bar chart renders instead of failing.
-          let value = item.value;
-          let unit = item.unit;
-          if (typeof value === "string") {
-            const match = value.replace(/,/g, "").match(/-?\d+\.?\d*/);
-            if (match) {
-              const num = parseFloat(match[0]);
-              const suffix = value.replace(/,/g, "").replace(match[0], "").trim();
-              if (!Number.isNaN(num)) {
-                value = num;
-                if (!unit && suffix) unit = suffix;
-              }
-            }
-          }
-          return { ...item, value, unit: clamp(unit, 8), label: clamp(item.label, 24) };
-        });
-      }
-      break;
-    case "quote":
-      scene.text = clamp(scene.text, 200);
-      scene.author = clamp(scene.author, 40);
-      break;
-    case "mythfact":
-      scene.myth = clamp(scene.myth, 140);
-      scene.fact = clamp(scene.fact, 160);
-      break;
-    case "table": {
-      scene.title = clamp(scene.title, 60);
-      scene.caption = clamp(scene.caption, 90);
-      const cols = Array.isArray(scene.columns) ? scene.columns.slice(0, 5).map((c) => clamp(c, 18)) : [];
-      scene.columns = cols;
-      if (Array.isArray(scene.rows)) {
-        scene.rows = scene.rows.slice(0, 6).map((r) => {
-          if (typeof r !== "object" || r === null) return r;
-          const row = r as Record<string, unknown>;
-          const cells = Array.isArray(row.cells) ? row.cells.map((c) => clamp(c, 24)) : [];
-          // Pad/truncate each row to match the column count so the grid is rectangular.
-          while (cells.length < cols.length) cells.push("");
-          return { ...row, cells: cells.slice(0, cols.length) };
-        });
-      }
-      break;
-    }
-  }
+  preFixups(scene);
+  // One derived pass replaces 16 hand-written `case` arms and their 37 literal
+  // copies of schema.ts's numbers. Unknown kinds fall through untouched rather
+  // than throwing, exactly as the old `switch` did.
+  const fields = typeof scene.kind === "string" ? SCENE_LIMITS[scene.kind] : undefined;
+  if (fields) applyFields(scene, fields);
+  postFixups(scene);
   return scene;
 }
