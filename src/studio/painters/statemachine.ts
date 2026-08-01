@@ -20,10 +20,20 @@ import {
   variantOf,
   rgba,
   type Layout,
+  shade,
+  RADIUS,
+  lerpColor,
 } from "./common";
 import type { PaintEnv } from "./index";
 
 type StatemachineScene = Extract<Scene, { kind: "statemachine" }>;
+const SLAB_DEPTH = 0.12;
+const CELL_MAX_UNITS = 7.0;
+const CELL_ASPECT_MAX = 1.35;
+const STATE_PAD = 0.1;
+const ACCENT_TINT = 0.22;
+const IDLE_FACE_LIFT = 0.09;
+
 type StateNode = StatemachineScene["states"][number];
 type Pt = { x: number; y: number };
 type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number };
@@ -54,8 +64,9 @@ function gridMap(states: StateNode[], layout: Layout, titleBand: number, rot: bo
   const areaX = layout.contentX;
   const areaY = layout.contentY + titleBand;
   const areaW = layout.contentW;
-  // Vertical: shave the foot so bottom states clear the caption band.
-  const areaH = layout.contentH - titleBand - (layout.vertical ? layout.unit : 0);
+  // The caption band, not a one-unit shave: the bottom state used to run to 90% of
+  // frame height in 9:16, well under the burned-in caption.
+  const areaH = Math.max(layout.unit * 4, layout.safeBottom - areaY);
   const cellW = areaW / GRID;
   const cellH = areaH / GRID;
   const maxYo = Math.max(...states.map((s) => s.y + 1));
@@ -66,9 +77,15 @@ function gridMap(states: StateNode[], layout: Layout, titleBand: number, rot: bo
   const maxY = Math.max(...d.map((p) => p.y + 1));
   const usedW = Math.max(maxX - minX, 1);
   const usedH = Math.max(maxY - minY, 1);
-  const f = Math.min(GRID / usedW, GRID / usedH, 1.3);
-  const cw = cellW * f;
-  const ch = cellH * f;
+  // Fit the used extent to the area, then let the roomier axis stretch a little. The
+  // old `min(GRID/usedW, GRID/usedH, 1.3)` cap sized cells from the 12x12 grid rather
+  // than from the states actually present, so a three-state chain rendered as pills
+  // ~74px wide with their labels spilling out of them.
+  void cellW;
+  void cellH;
+  const fit = Math.min(areaW / usedW, areaH / usedH, layout.unit * CELL_MAX_UNITS);
+  const cw = Math.min(areaW / usedW, fit * CELL_ASPECT_MAX);
+  const ch = Math.min(areaH / usedH, fit * CELL_ASPECT_MAX);
   return {
     cw,
     ch,
@@ -130,6 +147,31 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   const rot = shouldRotate(scene.states, layout.vertical);
   const map = gridMap(scene.states, layout, titleBand, rot);
 
+  /**
+   * Pixel rect of a state. The rects used to be the bounding box of two corners
+   * projected through a camera at (0, 13, 9): under that perspective a state near the
+   * bottom of the chart rendered visibly LARGER than one at the top, in a diagram where
+   * every state is equal, and the 2D pill never matched the slab behind it.
+   * `qa/ledger.json` -> systemic `2d-layout-round-tripped-through-camera`.
+   */
+  const stateRect = (st: StateNode) => {
+    const d = dispXY(st, map.rot, map.maxYo);
+    const pad = Math.min(map.cw, map.ch) * STATE_PAD;
+    const x = map.ox + d.x * map.cw + pad;
+    const y = map.oy + d.y * map.ch + pad;
+    const w = map.cw - pad * 2;
+    const h = map.ch - pad * 2;
+    return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+  };
+
+  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
+  };
+
   const minX = Math.min(...scene.states.map((n) => n.x));
   const maxX = Math.max(...scene.states.map((n) => n.x + 1));
   const minY = Math.min(...scene.states.map((n) => n.y));
@@ -140,7 +182,7 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   const areaX = layout.contentX;
   const areaY = layout.contentY + titleBand;
   const areaW = layout.contentW;
-  const areaH = layout.contentH - titleBand - (layout.vertical ? layout.unit : 0);
+  const areaH = Math.max(layout.unit * 4, layout.safeBottom - areaY);
   const rect = { x: areaX, y: areaY, w: areaW, h: areaH };
 
   const spreadX = vertical ? 3.5 : 5.5;
@@ -169,12 +211,14 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 13 : 10, vertical ? 9 : 7);
+    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, 12);
     camera.lookAt(0, 0, 0);
-    studioLights(s, accent, "rgba(148,163,184,0.5)");
+    studioLights(s, accent, THEME.textDim);
+    const m = mappingAt(camera, SLAB_DEPTH / 2);
+    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
     
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.5;
@@ -190,9 +234,11 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     s.add(shadowPlane);
 
     const models = scene.states.map((st) => {
-      const blockColor = st.accent ? accent : "#1e293b";
-      const edgeColor = st.accent ? accentGlow : accent;
-      const g = makeBlock(3.0, 0.6, 2.0, blockColor, edgeColor);
+      // `accentGlow` is an rgba string; THREE.Color drops the alpha, so the "accent"
+      // state's edge rendered at full strength and the console warned every frame.
+      const blockColor = st.accent ? lerpColor(THEME.panel, accent, ACCENT_TINT) : shade(THEME.panel, IDLE_FACE_LIFT);
+      const edgeColor = st.accent ? accent : THEME.textDim;
+      const g = makeBlock(1, 1, SLAB_DEPTH, blockColor, edgeColor);
       s.add(g);
       return { id: st.id, mesh: g, state: st };
     });
@@ -213,12 +259,18 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
         });
 
         const pulse = isCurrent ? 1 + 0.018 * idle(env, 1600) : 1;
-        mesh.scale.setScalar(Math.max(0.001, scale * pulse));
         mesh.visible = introIn > 0;
         
-        const wp = worldPos(state.x + 0.5, state.y + 0.5);
-        mesh.position.copy(wp);
-        mesh.position.y = (introIn <= 0 ? -0.4 : 0) + (isCurrent ? 0.2 : 0) + Math.sin(elapsedMs / 1500 + state.x) * 0.05;
+        // Placed FROM the pixel rect, and never moved afterwards: the old bob and the
+        // +0.2 lift for the current state slid the slab out from under its own pill.
+        const pr = stateRect(state);
+        const c = toWorld(pr.cx, pr.cy);
+        mesh.position.set(c.x, c.y, 0);
+        mesh.scale.set(
+          (pr.w / m.sx) * Math.max(0.001, scale * pulse),
+          (pr.h / m.sy) * Math.max(0.001, scale * pulse),
+          1
+        );
         
         mesh.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
@@ -238,20 +290,13 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   const pillH = unit * 1.5;
   const rects = new Map<string, { rect: Rect; fontPx: number }>();
   for (const s of scene.states) {
-    const maxW = Math.min(map.cw * 2.2, contentW * 0.42);
-    const fontPx = fitFontSize(ctx, s.label, { maxW: maxW - unit, startPx: unit * 0.7, minPx: unit * 0.42, weight: 700 });
+    // Bounded by the pill, not by the grid cell times 2.2: the label was fitted to a
+    // width the state does not have and ran outside its own outline.
+    const pillW = stateRect(s).w;
+    const fontPx = fitFontSize(ctx, s.label, { maxW: pillW - unit * 0.6, startPx: unit * 0.7, minPx: unit * 0.34, weight: 700 });
     ctx.font = `700 \${fontPx}px \${FONT_SANS}`;
     
-    const centerWorld = worldPos(s.x + 0.5, s.y + 0.5);
-    const p0 = projectToRect(cam, centerWorld.clone().add(new THREE.Vector3(-1.5, 0, -1.0)), rect);
-    const p1 = projectToRect(cam, centerWorld.clone().add(new THREE.Vector3(1.5, 0, 1.0)), rect);
-    
-    const rw = Math.abs(p1.x - p0.x);
-    const rh = Math.abs(p1.y - p0.y);
-    const cx = (p0.x + p1.x) / 2;
-    const cy = (p0.y + p1.y) / 2;
-    
-    rects.set(s.id, { rect: { x: cx - rw / 2, y: cy - rh / 2, w: rw, h: rh, cx, cy }, fontPx });
+    rects.set(s.id, { rect: stateRect(s), fontPx });
   }
 
   const edgePts = new Map<string, Pt[]>();
@@ -291,8 +336,8 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     if (!pts) continue;
     ctx.save();
     ctx.globalAlpha = 0.22 * introIn;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
-    ctx.fillStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
+    ctx.fillStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.07;
     ctx.lineCap = "round";
     strokePolylineProgress(ctx, pts, 1);
@@ -331,7 +376,7 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     ctx.font = `600 \${unit * (vertical ? 0.62 : 0.55)}px \${FONT_SANS}`;
     const tw = ctx.measureText(e.label).width;
     roundRect(ctx, mid.x - tw / 2 - unit * 0.32, mid.y - unit * 0.48, tw + unit * 0.64, unit * 0.96, unit * 0.26);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = THEME.bgBottom;
     ctx.fill();
     ctx.strokeStyle = taken ? rgba(accent, 0.6) : THEME.panelBorder;
     ctx.lineWidth = 1;
@@ -366,7 +411,7 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
       ctx.globalAlpha = 0.4 * (1 - ringF) * introIn;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.07;
-      roundRect(ctx, rect.x - g, rect.y - g, rect.w + g * 2, rect.h + g * 2, (rect.h + g * 2) / 2);
+      roundRect(ctx, rect.x - g, rect.y - g, rect.w + g * 2, rect.h + g * 2, unit * RADIUS.md);
       ctx.stroke();
       ctx.restore();
     }
@@ -381,17 +426,17 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 1.0;
     }
-    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.h / 2);
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * RADIUS.md);
     ctx.fillStyle = THEME.panel;
     ctx.fill();
     ctx.shadowBlur = 0;
     if (isVisited) {
-      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.h / 2);
+      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * RADIUS.md);
       ctx.fillStyle = accentSoft;
       ctx.fill();
     }
-    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, rect.h / 2);
-    ctx.strokeStyle = isCurrent ? accent : isVisited ? rgba(accent, 0.75) : s.accent ? accentGlow : "rgba(148,163,184,0.4)";
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, unit * RADIUS.md);
+    ctx.strokeStyle = isCurrent ? accent : isVisited ? rgba(accent, 0.75) : s.accent ? rgba(accent, 0.55) : rgba(THEME.textDim, 0.4);
     ctx.lineWidth = isCurrent ? unit * 0.13 : isVisited || s.accent ? unit * 0.09 : unit * 0.06;
     ctx.stroke();
 
@@ -419,18 +464,27 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     }
   }
 
+  /** True when a travelling dot has entered a state box — it belongs behind the label,
+   *  not on top of it. "CLOSED" was rendering as "CL(o)ED" and "SYN-SENT" as "SYN(o)ENT". */
+  const insideAnyState = (px: number, py: number) =>
+    [...rects.values()].some(
+      ({ rect: r }) => Math.abs(px - r.cx) < r.w / 2 - unit * 0.2 && Math.abs(py - r.cy) < r.h / 2 - unit * 0.2
+    );
+
   if (!inTransit && lastArrived >= 0) {
     const f = (env.elapsedMs % 1600) / 1600;
     const dot = pointAlongPolyline(walk[lastArrived].pts, f);
+    if (!insideAnyState(dot.x, dot.y)) {
     ctx.save();
     ctx.globalAlpha = 0.9 * Math.sin(Math.PI * f) * introIn;
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.9;
-    ctx.fillStyle = "#eaf6ff";
+    ctx.fillStyle = THEME.text;
     ctx.beginPath();
     ctx.arc(dot.x, dot.y, unit * 0.18, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+    }
   }
 
   if (inTransit && transitPts) {
@@ -438,9 +492,10 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
       const f = transitGlide - j * 0.06;
       if (f <= 0) continue;
       const d = pointAlongPolyline(transitPts, f);
+      if (insideAnyState(d.x, d.y)) continue;
       ctx.save();
       ctx.globalAlpha = (0.45 - j * 0.12) * introIn;
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = THEME.text;
       ctx.beginPath();
       ctx.arc(d.x, d.y, unit * (0.24 - j * 0.05), 0, Math.PI * 2);
       ctx.fill();
@@ -448,11 +503,14 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     }
   }
 
+  // The token is absorbed by the state it has arrived at. Drawn unconditionally it sat
+  // on top of the state's own label — "CLOSED" rendered as "CL(o)ED".
+  if (!insideAnyState(tokenPos.x, tokenPos.y)) {
   ctx.save();
   ctx.globalAlpha = introIn;
   ctx.shadowColor = accentGlow;
   ctx.shadowBlur = unit * (inTransit ? 1.0 : 0.7 + 0.6 * idle(env, 2000));
-  ctx.fillStyle = "#eaf6ff";
+  ctx.fillStyle = THEME.text;
   ctx.beginPath();
   ctx.arc(tokenPos.x, tokenPos.y, unit * 0.34, 0, Math.PI * 2);
   ctx.fill();
@@ -463,4 +521,5 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   ctx.arc(tokenPos.x, tokenPos.y, unit * 0.44, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
+  }
 }
