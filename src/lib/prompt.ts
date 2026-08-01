@@ -1035,6 +1035,84 @@ see it. Then place it: the dynasty, the century, the patron, in one plain senten
 object — the 2-3 defining features visible ON it, what each one means, and the contrast with the
 sibling style people confuse it with. Payoff: where it survives today and what to look for when you
 stand in front of it. End: a question comparing two styles or asking what the viewer would preserve.`,
+  // The 11 below close the 8-of-19 gap (plan §13c). Each is written from its cluster's
+  // job-to-be-done — what the viewer is asked to follow: a mechanism, a procedure, or a story.
+  science: `Episode arc (think Veritasium / a patient lab demonstrator): open on the RESULT that
+should not happen — the thing that falls faster, the water that freezes hot, the everyday effect
+nobody can explain. Then the phenomenon in one plain sentence. Middle: the mechanism as it actually
+operates, one causal link per act, each anchored to a real quantity with its unit (a temperature, a
+wavelength, a force) and to an experiment someone actually ran. Name the misconception the viewer
+probably holds and kill it with the mechanism, not with authority. Payoff: what this predicts
+elsewhere — the same law showing up somewhere unexpected. End: a question that asks them to predict
+a case not covered in the video.`,
+  health: `Episode arc (think a straight-talking clinician): open on a SENSATION the viewer has
+actually had — the 3 p.m. crash, the knee that clicks, the second cup that stops working. Then the
+system in one plain sentence: what organ or loop is doing what. Middle: the mechanism step by step
+with real physiology and real numbers (hours, milligrams, beats), then the popular advice that is
+half-right and exactly which half. Evidence-based, no diagnosis, no scare copy, no supplement pitch.
+Payoff: the one thing that measurably changes the outcome. End: a question about their own routine
+they can answer from the mechanism.`,
+  math: `Episode arc (think 3Blue1Brown with an exam clock): open on the MOMENT the method is needed
+— the question that looks impossible, the number that is too big to brute-force, the shortcut a
+topper used while everyone else multiplied. Then the idea in one plain sentence, no notation. Middle:
+build the method on ONE worked example carried the whole way through, one step per act, showing the
+work as it would actually be written; then the trap — the case where the shortcut breaks. Payoff: why
+the method works, in one sentence a viewer could repeat. End: a second problem they can solve with it
+in under a minute.`,
+  finance: `Episode arc (think a blunt, numerate friend): open on a REAL rupee amount and a decision —
+the SIP that grew, the EMI that did not shrink, the fee nobody reads. Then the instrument in one plain
+sentence. Middle: the mechanism as arithmetic the viewer can follow — the actual rate, the actual
+years, the actual compounding, one act per link — then the cost that is hidden by design (expense
+ratio, lock-in, tax slab). No stock tips, no returns promised. Payoff: the counterintuitive number —
+what the fee or the delay really costs over a decade. End: a question that makes them run the number
+on their own situation.`,
+  business: `Episode arc (think a sharp business-breakdown channel): open on the NUMBER that does not
+add up — the free product that prints money, the loss-making unit that is the whole strategy, the
+price that makes no sense. Then the model in one plain sentence: who pays, for what, and who actually
+profits. Middle: follow the money through the business one act at a time — the unit economics, the
+moat, the distribution — each with a real company, a real figure and a real year. Payoff: the
+structural reason a competitor cannot simply copy it. End: a question asking whether the model
+survives a named change.`,
+  psychology: `Episode arc (think a warm researcher who refuses to flatter you): open on a BEHAVIOUR
+the viewer will recognise in themselves within two seconds — the reason they reread the same line, the
+argument they replay at 1 a.m., the tab they will not close. Then the effect named in one plain
+sentence. Middle: the mechanism — what the mind is actually doing and why it was useful — one act per
+step, grounded in a real named study with its year and what it actually found (including the limits;
+say so if replication is contested). Payoff: the one lever the viewer can actually pull. End: a
+question about when the effect helped them rather than hurt.`,
+  mindset: `Episode arc (think a coach with evidence, not slogans): open on the GAP — what the viewer
+does when it matters versus what they meant to do: the message left unsent, the question not asked in
+the meeting, the practice skipped on day four. Then the skill in one plain sentence. Middle: the
+mechanism of the change — what actually moves, in what order, with the real timescale (days, reps,
+sessions), one act per step, and the specific script or drill for each. Name the advice that sounds
+good and does nothing. No hustle copy, no guarantees. Payoff: the smallest action that compounds. End:
+a question asking what they will do before this time tomorrow.`,
+  lifeskills: `Episode arc (think a calm expert walking you through it once): open on the SITUATION
+where not knowing this costs you — the form filled wrong, the deposit not returned, the negotiation
+conceded in the first minute. Then the skill in one plain sentence. Middle: the procedure as it is
+actually performed, one act per step, with the exact words to say, the exact field to check, the exact
+order — plus the step everyone skips and what it costs. Payoff: the pro move that separates a
+confident performance from a nervous one. End: a question that makes them rehearse the first step.`,
+  mythology: `Episode arc (think a master storyteller who also knows the sources): open INSIDE the
+scene — one figure, one choice, one moment, told so the viewer is there before they know the name.
+Then place it: which epic or tradition, which recension, in one plain sentence. Middle: the story with
+its real turning points, act by act, keeping the names, places and relationships exact; then what the
+story meant to the people who told it, and how a regional or rival telling differs. Treat the
+tradition with respect and never present a telling as the only one. Payoff: the idea the story exists
+to carry, and where it still shows up. End: a question about the choice the figure made.`,
+  philosophy: `Episode arc (think a patient teacher who makes you argue): open on a CLAIM the viewer
+already believes and a case that makes it wobble — the promise it would be right to break, the
+identity that survives replacing every part. Then the question in one plain sentence, no -isms.
+Middle: the strongest version of each position in turn, one act each, named to the philosopher and
+the work, steelmanned before it is answered; then the thought experiment that separates them. Never
+resolve it by asserting a winner the argument did not earn. Payoff: what actually turns on the answer
+in an ordinary life. End: a question that forces the viewer to commit and give a reason.`,
+  gk: `Episode arc (think a did-you-know channel with a fact-checker): open on the FACT itself, stated
+flat and startling, with its number — no wind-up. Then why it is true in one plain sentence. Middle:
+the explanation behind it, one act per layer, each with a verifiable figure, place and date; then the
+widely-repeated version that is wrong and what the record actually says. Prefer one fact explained
+properly over five listed. Payoff: the connection to something the viewer already knows. End: a
+question whose answer is guessable from the mechanism just taught.`,
 };
 
 const BLUEPRINT_SHAPE = `Return STRICT JSON only (no markdown fences):

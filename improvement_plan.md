@@ -719,22 +719,119 @@ construction.
 
 ### Phase 13 — Short & long-form craft templates
 
-**Research still outstanding.** The dedicated research pass on this failed (see *Evidence base*), so this
-phase begins with the research, not the implementation.
+**Research DONE (row 13.1).** The dedicated pass had failed entirely — all seven agents hit a session
+limit and returned nothing — so this section used to be a brief rather than an answer. It is now the
+answer, with the external craft numbers converted into this app's own units using the measured
+`WORDS_PER_SEC_BY_LANG.en = 2.62` (`pacing.ts:101`) and checked against the 94-script corpus.
 
-- **Shorts**: derive a beat-by-beat template for 45-60 s and 60-90 s educational Shorts — what occupies
-  0-2 s, how the middle sustains attention, how the last 2-3 s lands or loops. Express it as a sequence of
-  this app's scene kinds with target seconds and words per beat, then encode it in the short structure
-  block and check it with a gate. The specific brief: make the intro **relatable, not informative** —
-  which is precisely what the 30%-open-with-a-definition finding says it currently is not.
-- **Long form**: cluster the 19 subjects into the smallest set of genuinely distinct episode formats
-  (the working hypothesis is ~10: technical how-it-works, algorithmic, narrative history, spatial,
-  mechanism science, money, rules-and-institutions, language, self/behaviour, culture) rather than
-  researching 373 submodules individually. Per cluster: benchmark channels, act structure with minutes
-  per act, how they signpost without a title card, where the payoff sits. Feed these into `CHANNEL_ARCS`,
-  which today covers only 8 of 19 subjects.
-- **Exam vs curiosity audiences** need different treatments and the app serves both; decide this
-  explicitly per subject rather than letting the prompt average them.
+Confidence is marked per claim. External craft advice is **secondary-source** — practitioner guides, not
+controlled studies — so it is treated as a prior to be reconciled against our own corpus, never as fact.
+Where a source declined to give a number, that is recorded rather than filled in.
+
+#### 13a. The measured gap (this is the finding)
+
+Corpus, 66 shorts / 862 beats and 28 longs / 1,190 beats, priced at 2.62 w/s:
+
+| | corpus | craft guidance | verdict |
+|---|---|---|---|
+| Short runtime | p50 **74 s**, p90 89 s, max 122 s | 25-40 s, up to 45 s with a clear payoff | **1.6-3× too long** |
+| Short opening beat | p50 **25 words ≈ 9.5 s** | hook 8-12 words, swipe decision at 2-3 s | **hook cannot land in time** |
+| Short beats over 4 s | **72.6%** (37.8% over 6 s) | one visual change every 2-4 s | **~3 in 4 beats too slow** |
+| Long opening beat | p50 **36 words ≈ 13.7 s** | 15-25 words; half the audience is gone by 10-15 s | **~1.5× too long** |
+| Long runtime | p50 **385 s** (6.4 min) | 6-12 min | **already right** |
+| Long beats over 12 s | 27.1% | segment checkpoints every 3-5 min | see `overlongBeats` |
+
+**The single sharpest number:** 50-60% of the viewers who abandon a Short do so inside the first three
+seconds, and our median Short spends **9.5 seconds** on its opening beat. The hook is not merely weak,
+it is *unfinished* at the moment the audience decides. This is the same defect the corpus already
+records as "64 of 88 videos open on a static card", seen from the retention side, and it makes that row
+the highest-value content fix in the plan.
+
+**Consequence for the gates, and it is a real bug:** `OVERLONG_BEAT_SEC = 12` and
+`VISUAL_CHANGE_TARGET_SEC = {min:4,max:6}` (`pacing.ts:110,113`) are **format-blind** — the only place
+`pacing.ts` branches on format is line 604. So a 12-second beat is legal inside a 45-second Short, where
+it is **27% of the entire video on one frozen picture**, and the 4-6 s visual-change target is 2-3× the
+2-4 s cadence Shorts actually need. Measured: the worst beat in a corpus Short is p50 **15.3%** and max
+**29.7%** of that Short's runtime, against p50 4.8% for longs. **Thresholds must become per-format.**
+
+#### 13b. Short template, in this app's scene kinds
+
+Two bands. Note the plan's original bands (45-60 s and 60-90 s) both sit **above** the evidence-backed
+range, so they are re-based here; 60-90 s is retained only as the outer limit for genuinely multi-step
+exam topics, not as a target. Words are `seconds × 2.62`.
+
+**Band A — 30-45 s (79-118 words), 4-5 scenes.** The default.
+
+| window | job | scene kinds | budget |
+|---|---|---|---|
+| 0-3 s | hook: name the viewer's *situation*, never the definition | `stat` (wow-number), `bigtext` (claim), `question` | **≤12 words, ONE beat** |
+| 3-8 s | the one idea in plain words | first teaching scene's own title | 10-14 words |
+| 8-35 s | mechanism in 2-3 visual steps, one step per 2-4 s | `steps`, `diagram`, `compare`, `chart`, `code`→`terminal` | **5-10 words per beat** |
+| last 3 s | payoff, then a `question` phrased to send the viewer back to the hook's framing (loop) | `question` | ≤14 words |
+
+**Band B — 45-60 s (118-157 words), 5-6 scenes.** One extra mechanism step, optionally a `quiz`
+before the closing `question`. Same per-beat budget — the extra time buys *more* steps, never longer ones.
+
+Two rules that fall straight out of the numbers and are not currently enforced anywhere:
+- **A Short beat may not exceed ~10 spoken words** (≈4 s). The global cap is `MAX_BEAT_CHARS = 320`
+  (`schema.ts:9`) ≈ 53 words ≈ 20 s, which is five times the Short cadence.
+- **The opening beat is its own budget** (≤12 words), separate from every other beat.
+
+#### 13c. Long-form: 10 clusters over the 19 subjects
+
+Clustered by *what the viewer is being asked to do* — follow a mechanism, follow a procedure, follow a
+story — because that is what changes the act structure, not the department name.
+
+| # | cluster | subjects | opens on | payoff sits at |
+|---|---|---|---|---|
+| 1 | Mechanism — how a built system really runs | `coding` | the pain/outage | the production trade-off |
+| 2 | Mechanism — how a natural system really runs | `science`, `health`, `environment` | one real scene or number | what measurably changes |
+| 3 | Procedure — how to solve or do it | `math`, `lifeskills` | the moment the method is needed | the shortcut an expert uses |
+| 4 | Language — how to say it | `english` | the sentence that failed or won | the upgraded natural version |
+| 5 | Narrative — what happened | `history`, `mythology` | a specific dawn, person, decision | the trace still visible today |
+| 6 | Place — why it is like that there | `geography` | the anomaly | who lives differently because of it |
+| 7 | Money — who pays and what it costs | `finance`, `economy`, `business` | the viewer's own pocket | the counterintuitive consequence |
+| 8 | Institution — the rules and who they bind | `polity` | the clash where it got tested | the design logic; what it prevents |
+| 9 | Self — why you do that | `psychology`, `mindset` | a behaviour the viewer recognises in themselves | the one lever they can actually pull |
+| 10 | Object & fact — what this thing is | `artculture`, `gk`, `philosophy` | one object, or one claim worth disbelieving | what to look for / how to think next time |
+
+Act structure, common to all ten (the retention beat sheet, corroborated across sources):
+**cold open → promise → stakes → roadmap → 4-6 teaching sections → mistakes → payoff → question.**
+Sections carry their own checkpoint every **3-5 minutes**, which for a 6-11 minute video means the
+existing 4-6 sections is already correct — the gap is the *forward hook* at each boundary (5.3), which
+is what turns a ski-slope retention curve (35-45%) into one that flattens or rises (50-65%).
+
+**Minutes per act are deliberately NOT specified.** The best source consulted explicitly declines to give
+them — "retention is not about how fast the video moves, it is about whether the viewer feels forward
+motion" — and inventing a number here would be exactly the kind of unverified figure this plan refuses
+elsewhere. The checkable constraints are the 3-5 minute checkpoint and the per-beat word budget.
+
+#### 13d. Exam vs curiosity, decided per subject
+
+From each subject's own `audience` string in `subjects.json`, not from a guess:
+
+- **Exam-first (9)** — `polity`, `economy`, `environment`, `artculture`, `gk`, `math`, `geography`,
+  `history`, `english`. These name UPSC/SSC/PSC/banking or "aspirants" explicitly. Treatment: the
+  payoff must be an **exam-grade distinction** (the confusion that gets marked wrong), endings are
+  mains-style questions, and exact Articles/years/figures are mandatory.
+- **Curiosity-first (10)** — `coding`, `science`, `finance`, `psychology`, `business`, `health`,
+  `philosophy`, `lifeskills`, `mythology`, `mindset`. Treatment: the payoff is a **consequence or
+  trade-off**, endings are argue-worthy rather than answerable, and one practitioner detail per act
+  matters more than exhaustive coverage.
+
+This splits 9/10 and cuts across the 10 clusters, so it is a second axis on the prompt, not a
+re-clustering. Note it does **not** align with `defaultVoiceFor`'s 11 India-first subjects (12.6) —
+`coding` and `science` are worldwide but exam-adjacent in India, and conflating the two axes is what
+produced the averaged treatment this row exists to fix.
+
+#### 13e. What was NOT established
+
+- **No controlled study** underlies any external number here; all of it is practitioner guidance.
+  The corpus comparisons are ours and are solid; the targets they are compared *against* are priors.
+- **Per-cluster benchmark channels** were only firmly established for the 8 subjects that already had
+  arcs. The 11 new arcs are written from the cluster's job-to-be-done, not from a named channel.
+- **Hindi**: every figure above is English. `WORDS_PER_SEC_BY_LANG.hi = 2.3` exists, but no Hindi
+  retention guidance was found, and Hindi Shorts may need a different word budget for the same seconds.
 
 ### Phase 14 — New scene kinds (only after the toolkit lands)
 
