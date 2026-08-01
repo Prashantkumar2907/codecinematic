@@ -15,6 +15,7 @@ import {
   beatT,
   beatWindow,
   activeBeatIndex,
+  lerpColor,
   rgba,
 } from "./common";
 import type { PaintEnv } from "./index";
@@ -22,11 +23,13 @@ import type { PaintEnv } from "./index";
 type PipelineScene = Extract<Scene, { kind: "pipeline" }>;
 type Pt = { x: number; y: number };
 
+const ACTIVE_TINT = 0.18;
+
 const lerp = (a: Pt, b: Pt, f: number): Pt => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
 
 export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const n = scene.stations.length;
@@ -37,8 +40,9 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   // Vertical: keep the last station above the caption band (bottom ~14%).
-  let availH = contentH - titleBand;
-  if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + titleBand));
+  // `h * 0.86` put the last station and its output chip under the burned-in caption;
+  // safeBottom is 0.69 at 9:16 and 0.80 at 16:9.
+  const availH = Math.max(unit * 4, safeBottom - (contentY + titleBand));
 
   let trackA: Pt, trackB: Pt, startPos: Pt, axis: Pt, spacing: number;
   const stationPos: Pt[] = [];
@@ -68,7 +72,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
   // Conveyor: solid rail + dashes that crawl in the travel direction.
   ctx.save();
   ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(148,163,184,0.18)";
+  ctx.strokeStyle = rgba(THEME.textDim, 0.18);
   ctx.lineWidth = unit * 0.12;
   ctx.beginPath();
   ctx.moveTo(trackA.x, trackA.y);
@@ -115,7 +119,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    const border = isActive ? accent : "rgba(148,163,184,0.5)";
+    const border = isActive ? accent : rgba(THEME.textDim, 0.5);
 
     let roofX: number, roofY: number, roofW: number, roofH: number;
     let legBottom: number;
@@ -148,7 +152,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
       ctx.shadowBlur = unit * (0.7 + 0.25 * Math.sin(env.elapsedMs / 300));
     }
     roundRect(ctx, roofX, roofY, roofW, roofH, unit * 0.35);
-    ctx.fillStyle = isActive ? "#0e2433" : THEME.panel;
+    ctx.fillStyle = isActive ? lerpColor(THEME.panel, accent, ACTIVE_TINT) : THEME.panel;
     ctx.fill();
     ctx.shadowBlur = 0;
     roundRect(ctx, roofX, roofY, roofW, roofH, unit * 0.35);
@@ -223,7 +227,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
   ctx.shadowColor = accentGlow;
   ctx.shadowBlur = unit * 0.6;
   roundRect(ctx, -pillW / 2, -pillH / 2, pillW, pillH, pillH / 2);
-  ctx.fillStyle = "#0a0e13";
+  ctx.fillStyle = THEME.bgBottom;
   ctx.fill();
   ctx.shadowBlur = 0;
   roundRect(ctx, -pillW / 2, -pillH / 2, pillW, pillH, pillH / 2);
@@ -250,7 +254,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
       ctx.globalAlpha = 0.9 * win;
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.7;
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = THEME.text;
       ctx.beginPath();
       ctx.arc(pos.x + Math.cos(a) * unit * 0.9, pos.y + Math.sin(a) * unit * 0.9, unit * 0.14, 0, Math.PI * 2);
       ctx.fill();

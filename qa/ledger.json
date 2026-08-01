@@ -1004,18 +1004,18 @@
     "pipeline": {
       "wave": 2,
       "group": "Wave 2",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "2/4/4/4/2 -> 4/4/4/4/5. Pure 2D, no camera round-trip. layout.h * 0.86 put the last station and its output chip under the burned-in caption in 9:16 \u2014 the chip carrying the pipeline's result was the part that got covered \u2014 now layout.safeBottom (0.69 / 0.80), and the whole conveyor sits inside the band. 5 colour literals -> 0 (#0e2433 active fill -> a 0.18 accent tint of the panel, #0a0e13 -> THEME.bgBottom, #eaf6ff -> THEME.text, two rgba(148,163,184,\u2026) -> rgba(THEME.textDim, \u2026)). NOT FIXED, recorded instead: the demo's stations carry emoji icons (tree, gear, page) which render full-colour against the palette and read as clip-art next to the line-art icons.ts set \u2014 that is scene data the schema permits, and preferring a vector icon over an emoji is a product decision, not a painter fix. The gantry \"legs\" under each station end in mid-air by design. edge-check 0.0% both aspects.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "graphwalk": {
       "wave": 2,

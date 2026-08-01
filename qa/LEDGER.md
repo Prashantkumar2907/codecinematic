@@ -85,7 +85,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | skyline | 1 | Compare | todo | 0 | – | – | – | – | – |  |  |  |
 | iso3d | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | decision | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| pipeline | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| pipeline | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 5 | 2/4/4/4/2 -> 4/4/4/4/5. Pure 2D, no camera round-trip. **`layout.h * 0.86` put the last station and its output chip under the burned-in caption** in 9:16 — the chip carrying the pipeline's result was the part that got covered — now `layout.safeBottom` (0.69 / 0.80), and the whole conveyor sits inside the band. 5 colour literals -> 0 (`#0e2433` active fill -> a 0.18 accent tint of the panel, `#0a0e13` -> `THEME.bgBottom`, `#eaf6ff` -> `THEME.text`, two `rgba(148,163,184,…)` -> `rgba(THEME.textDim, …)`). NOT FIXED, recorded instead: the demo's stations carry **emoji icons** (tree, gear, page) which render full-colour against the palette and read as clip-art next to the line-art `icons.ts` set — that is scene data the schema permits, and preferring a vector icon over an emoji is a product decision, not a painter fix. The gantry "legs" under each station end in mid-air by design. `edge-check` 0.0% both aspects. |  | 2026-08-01 |
 | graphwalk | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | matrix | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | queueflow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
