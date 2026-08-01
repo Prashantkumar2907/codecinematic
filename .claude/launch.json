@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 4321
+    },
+    {
+      "name": "devstudio-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "-p", "4331"],
+      "port": 4331
     }
   ]
 }

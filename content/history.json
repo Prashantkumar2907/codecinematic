@@ -101,6 +101,22 @@
             "format": "short",
             "slug": "2026-07-28-05-05-short-the-prototype-chain-how-objects-find-their-methods",
             "status": "draft"
+          },
+          {
+            "date": "2026-08-01",
+            "topic": "How the event loop decides what runs next",
+            "title": "JavaScript Event Loop: How Priority Actually Works #Shorts",
+            "format": "short",
+            "slug": "2026-08-01-07-01-short-how-the-event-loop-decides-what-runs-next",
+            "status": "draft"
+          },
+          {
+            "date": "2026-08-01",
+            "topic": "How the event loop decides what runs next",
+            "title": "JavaScript Event Loop: How it actually decides execution #Shorts",
+            "format": "short",
+            "slug": "2026-08-01-07-03-short-how-the-event-loop-decides-what-runs-next",
+            "status": "draft"
           }
         ]
       },

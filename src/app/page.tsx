@@ -941,6 +941,12 @@ export default function Studio() {
                     <button className="btn" onClick={() => loadDemo()} disabled={busy}>
                       Load demo
                     </button>
+                    {/* The JSON editor existed only as a recovery path behind a failed
+                        generation, so a script you already had on disk could not be
+                        rendered at all. `scripts/render-script.mjs` drives this. */}
+                    <button className="btn" onClick={() => setShowJson((s) => !s)} disabled={busy}>
+                      {showJson ? "Hide JSON" : "Paste JSON"}
+                    </button>
                   </div>
 
                   {stage === "topics" ? (

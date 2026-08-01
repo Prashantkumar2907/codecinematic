@@ -1,0 +1,161 @@
+{
+  "format": "short",
+  "lang": "en",
+  "subject": "Coding",
+  "module": "Frontend",
+  "submodule": "JavaScript",
+  "topic": "How the event loop decides what runs next",
+  "scenes": [
+    {
+      "kind": "mythfact",
+      "id": "event-loop-myth",
+      "myth": "JavaScript executes asynchronous callbacks in the order they are scheduled.",
+      "fact": "Microtasks like Promises jump ahead of Macrotasks like setTimeout every single time.",
+      "sayMyth": "Your Promise logged before your timer and broke your code.",
+      "sayFact": "The event loop is the engine's traffic controller that decides whether your code or the browser's UI updates get to run next."
+    },
+    {
+      "kind": "cycle",
+      "id": "priority-loop-trace",
+      "title": "The Task Priority Loop",
+      "nodes": [
+        {
+          "label": "Call Stack",
+          "icon": "🥞",
+          "say": "When code runs on the Call Stack, synchronous execution takes full control."
+        },
+        {
+          "label": "Microtask Queue",
+          "icon": "⚡",
+          "say": "Before taking any new task, the loop drains the Microtask Queue where Promises wait."
+        },
+        {
+          "label": "Macrotask Queue",
+          "icon": "⏱️",
+          "say": "Only after microtasks are empty does the loop check the Macrotask Queue for timers."
+        }
+      ]
+    },
+    {
+      "kind": "compare",
+      "id": "queue-comparison",
+      "title": "Queue Execution Hierarchy",
+      "left": {
+        "title": "Microtasks",
+        "items": [
+          "Promises",
+          "queueMicrotask",
+          "Emptied completely"
+        ],
+        "say": "Microtasks — like promise resolutions — run immediately when the current code finishes.",
+        "icon": "⚡"
+      },
+      "right": {
+        "title": "Macrotasks",
+        "items": [
+          "setTimeout",
+          "UI Events",
+          "Runs 1 per tick"
+        ],
+        "say": "Macrotasks — like timers and click events — wait in line behind every microtask.",
+        "icon": "⏱️"
+      },
+      "verdict": "Microtasks always jump the line",
+      "sayVerdict": "The event loop drains every single microtask before running the next macrotask."
+    },
+    {
+      "kind": "browserframe",
+      "id": "frame-freeze-demo",
+      "url": "https://app.dev/dashboard",
+      "blocks": [
+        {
+          "id": "header",
+          "role": "header",
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 2
+        },
+        {
+          "id": "card1",
+          "role": "card",
+          "x": 0,
+          "y": 3,
+          "w": 5,
+          "h": 5
+        },
+        {
+          "id": "card2",
+          "role": "card",
+          "x": 6,
+          "y": 3,
+          "w": 5,
+          "h": 5
+        }
+      ],
+      "steps": [
+        {
+          "show": [
+            "header",
+            "card1",
+            "card2"
+          ],
+          "paint": [],
+          "badge": "Frame 0ms",
+          "say": "As recursive promises clog the microtask queue, the browser tries to render the next frame."
+        },
+        {
+          "show": [],
+          "paint": [
+            "header"
+          ],
+          "badge": "Frame 16ms FREEZE",
+          "say": "At the 16 millisecond mark, the UI frame paint is blocked because microtasks never yield."
+        },
+        {
+          "show": [],
+          "paint": [
+            "card1",
+            "card2"
+          ],
+          "badge": "UI Frozen 50ms+",
+          "say": "The loading spinner freezes completely as microtasks stack up and monopolize the main thread."
+        }
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "ending-challenge",
+      "narration": "If you need to process 10,000 items without dropping frames, do you chain Promises or use setTimeout?",
+      "text": "If you need to process 10,000 items without dropping frames, do you chain Promises or use setTimeout? One will kill your UI, the other lets the browser breathe.",
+      "hint": "Think about which queue yields back to screen painting."
+    }
+  ],
+  "meta": {
+    "title": "JavaScript Event Loop: How Priority Actually Works #Shorts",
+    "description": "Understand how the JavaScript event loop manages task priority. We bust the myth that asynchronous callbacks run in the order they are scheduled by comparing microtasks and macrotasks.\n\nLearn why recursive promise chains can block browser repaints.\nSee how setTimeout lets the browser breathe during heavy tasks.\nDiscover which method prevents UI freezes when processing 10,000 items.\n\nWhich strategy would you use to process 10,000 items without dropping frames?\n\nMastering the event loop is essential for writing high-performance web applications, understanding asynchronous programming, and debugging common browser rendering issues.",
+    "tags": [
+      "javascript event loop",
+      "javascript",
+      "microtask vs macrotask",
+      "async javascript",
+      "promises vs settimeout",
+      "frontend development",
+      "javascript tutorial",
+      "learn javascript",
+      "web performance",
+      "browser rendering",
+      "javascript interview",
+      "coding concepts",
+      "javascript async",
+      "event loop priority"
+    ],
+    "hashtags": [
+      "#Shorts",
+      "#JavaScript",
+      "#Coding",
+      "#LearnToCode",
+      "#WebDev"
+    ]
+  }
+}

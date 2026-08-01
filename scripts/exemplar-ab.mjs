@@ -13,8 +13,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sceneScriptSchema, narrationWordCount, NARRATION_BUDGET, sceneBeats } from "../src/studio/schema.ts";
 import {
-  pacingReport, staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext,
-  crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause,
+  pacingReport, countWords, staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext,
+  crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause, hookTooLong,
 } from "../src/studio/pacing.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -96,6 +96,10 @@ function score(raw) {
     staticShare: r.staticCardSeconds / r.estSeconds,
     overlong: r.overlongBeats.length,
     crutch: r.crutchHits.length,
+    // 13.1c set the hook budget from the viewer rather than the corpus, so the
+    // only honest test is whether a FRESH draft complies on the first pass.
+    hookWords: sceneBeats(s.scenes[0])[0] ? countWords(sceneBeats(s.scenes[0])[0].text) : 0,
+    hookOver: !!hookTooLong(s),
     gates: failing,
   };
 }
@@ -112,6 +116,13 @@ for (let i = 0; i < RUNS; i++) {
       const g = await generate(arm === "with" ? exemplar : undefined);
       const sc = score(g.script);
       sc.repairs = g.repairs;
+      // The first A/B saved metrics only, so 17.1 could not be unblocked the way
+      // its own row says to unblock it -- by watching one video per arm. Keep the
+      // scripts so they can be rendered.
+      const scriptPath = path.join(ROOT, "qa/exemplar-ab", `${arm}-${i + 1}.json`);
+      await mkdir(path.join(ROOT, "qa/exemplar-ab"), { recursive: true });
+      await writeFile(scriptPath, JSON.stringify(g.script, null, 2));
+      sc.scriptPath = path.relative(ROOT, scriptPath);
       results[arm].push(sc);
       console.log(`ok — ${sc.gates.length} gate(s) failing, ${g.repairs} repair round(s)`);
     } catch (err) {
@@ -131,6 +142,8 @@ const ROWS = [
   ["static-card share", (x) => x.staticShare * 100, 0, "lower"],
   ["beats over 12s", (x) => x.overlong, 1, "lower"],
   ["crutch hits", (x) => x.crutch, 1, "lower"],
+  ["hook words", (x) => x.hookWords, 1, "lower"],
+  ["hook over budget", (x) => (x.hookOver ? 1 : 0), 1, "lower"],
   ["narration words", (x) => x.words, 0, "—"],
 ];
 
@@ -147,5 +160,11 @@ for (const arm of ["without", "with"]) {
 }
 
 await mkdir(path.join(ROOT, "qa"), { recursive: true });
-await writeFile(path.join(ROOT, "qa/exemplar-ab.json"), JSON.stringify(results, null, 2));
-console.log("\nwrote qa/exemplar-ab.json");
+// Only overwrite on a run that produced something. A patch bug once made every
+// generation throw, and the empty result set replaced a good A/B on disk.
+if (results.with.length || results.without.length) {
+  await writeFile(path.join(ROOT, "qa/exemplar-ab.json"), JSON.stringify(results, null, 2));
+  console.log("\nwrote qa/exemplar-ab.json");
+} else {
+  console.log("\nevery run failed — leaving qa/exemplar-ab.json untouched");
+}

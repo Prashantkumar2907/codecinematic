@@ -1,0 +1,114 @@
+{
+  "format": "short",
+  "lang": "en",
+  "subject": "Coding",
+  "module": "Frontend",
+  "submodule": "JavaScript",
+  "topic": "How the event loop decides what runs next",
+  "scenes": [
+    {
+      "kind": "bigtext",
+      "id": "hook",
+      "narration": "Your browser finished your code, but your UI is completely frozen.",
+      "text": "JS code doesn't run in order",
+      "sub": "The event loop decides what runs next.",
+      "icon": "⚡"
+    },
+    {
+      "kind": "compare",
+      "id": "task-types",
+      "sayIntro": "The event loop is the traffic controller of your browser, and knowing its priority rules is the only way to stop your UI from locking up.",
+      "title": "Event Loop Queue Priorities",
+      "left": {
+        "title": "Macrotasks",
+        "items": [
+          "setTimeout & DOM events",
+          "Runs exactly 1 per loop turn",
+          "Yields to UI rendering"
+        ],
+        "say": "Macrotasks like setTimeout run just one callback per turn of the loop.",
+        "icon": "⏱️"
+      },
+      "right": {
+        "title": "Microtasks",
+        "items": [
+          "Promise.then & queueMicrotask",
+          "Drains queue COMPLETELY",
+          "Blocks rendering until empty"
+        ],
+        "say": "Microtasks from resolved Promises drain completely before updating our StockPrice UI.",
+        "icon": "🚀"
+      },
+      "verdict": "Microtasks always jump the queue.",
+      "sayVerdict": "That means Promise callbacks jump ahead of timers and screen paints every single time."
+    },
+    {
+      "kind": "cycle",
+      "id": "starvation-demo",
+      "sayIntro": "Watch what happens on a live StockPrice trading dashboard.",
+      "title": "StockPrice Dashboard Freeze",
+      "nodes": [
+        {
+          "label": "Macrotask Runs",
+          "icon": "📡",
+          "detail": "WebSocket price update",
+          "say": "When a WebSocket update lands, it queues a single macrotask to process price data."
+        },
+        {
+          "label": "Microtasks Overflow",
+          "icon": "🔄",
+          "detail": "Infinite Promise chain",
+          "say": "If that handler recursively chains Promises, the microtask queue overflows continuous work."
+        },
+        {
+          "label": "Paint Starved",
+          "icon": "🖥️",
+          "detail": "Browser render blocked",
+          "say": "Because microtasks never clear, the event loop starves the Paint process, freezing the display."
+        }
+      ]
+    },
+    {
+      "kind": "mythfact",
+      "id": "timer-myth",
+      "myth": "A zero-millisecond setTimeout fires instantly before other async tasks.",
+      "fact": "Microtasks from Promises always execute before any timer callback.",
+      "sayMyth": "A 0ms setTimeout isn't instant. It's a macrotask that sits at the back of the line behind every pending Promise.",
+      "sayFact": "In truth, microtasks hijack execution, forcing the browser to wait before running that timer."
+    },
+    {
+      "kind": "question",
+      "id": "ending-challenge",
+      "narration": "If the event loop must clear all microtasks before painting, why does moving heavy work to a setTimeout fix a frozen UI?",
+      "text": "If the event loop must clear all microtasks before painting, why does moving heavy work to a setTimeout fix a frozen UI?",
+      "hint": "Think about when the browser gets to paint."
+    }
+  ],
+  "meta": {
+    "title": "JavaScript Event Loop: How it actually decides execution #Shorts",
+    "description": "Understand how the JavaScript event loop prioritizes tasks and why code doesn't always run in order. Learn the mechanics of microtasks versus macrotasks and why your UI might freeze. Discover why setTimeout isn't always instant and how promise callbacks jump ahead. See why moving heavy work to a timer can unblock your main thread. Answer the final question in the comments to test your knowledge. Mastering these concepts is essential for improving web performance and debugging common asynchronous javascript issues effectively.",
+    "tags": [
+      "javascript event loop",
+      "javascript",
+      "event loop",
+      "microtasks",
+      "macrotasks",
+      "promises",
+      "settimeout",
+      "async javascript",
+      "frontend engineering",
+      "js runtime",
+      "v8 engine",
+      "javascript tutorial",
+      "learn javascript"
+    ],
+    "hashtags": [
+      "#Shorts",
+      "#JavaScript",
+      "#Coding",
+      "#WebDev",
+      "#LearnToCode",
+      "#Programming"
+    ]
+  }
+}

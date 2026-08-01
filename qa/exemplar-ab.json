@@ -2,65 +2,41 @@
   "with": [
     {
       "valid": true,
-      "words": 141,
+      "words": 179,
       "inBudget": true,
       "scenes": 5,
-      "beats": 9,
+      "beats": 12,
       "kinds": 5,
       "bigtext": 1,
-      "meanHold": 5.979643765903308,
-      "staticShare": 0.326241134751773,
-      "overlong": 0,
+      "meanHold": 5.693384223918574,
+      "staticShare": 0.18435754189944137,
+      "overlong": 1,
       "crutch": 0,
+      "hookWords": 11,
+      "hookOver": false,
       "gates": [],
-      "repairs": 0
-    },
-    {
-      "valid": true,
-      "words": 189,
-      "inBudget": true,
-      "scenes": 6,
-      "beats": 14,
-      "kinds": 6,
-      "bigtext": 1,
-      "meanHold": 5.15267175572519,
-      "staticShare": 0.21164021164021166,
-      "overlong": 0,
-      "crutch": 1,
-      "gates": [],
-      "repairs": 1
+      "repairs": 1,
+      "scriptPath": "qa/exemplar-ab/with-1.json"
     }
   ],
   "without": [
     {
       "valid": true,
-      "words": 184,
-      "inBudget": true,
-      "scenes": 7,
-      "beats": 15,
-      "kinds": 7,
-      "bigtext": 1,
-      "meanHold": 4.681933842239186,
-      "staticShare": 0.3913043478260869,
-      "overlong": 0,
-      "crutch": 0,
-      "gates": [],
-      "repairs": 3
-    },
-    {
-      "valid": true,
-      "words": 162,
+      "words": 172,
       "inBudget": true,
       "scenes": 5,
-      "beats": 13,
+      "beats": 12,
       "kinds": 5,
       "bigtext": 0,
-      "meanHold": 4.756312389900176,
-      "staticShare": 0.10493827160493828,
+      "meanHold": 5.470737913486005,
+      "staticShare": 0.09883720930232559,
       "overlong": 0,
-      "crutch": 1,
+      "crutch": 0,
+      "hookWords": 10,
+      "hookOver": false,
       "gates": [],
-      "repairs": 1
+      "repairs": 1,
+      "scriptPath": "qa/exemplar-ab/without-1.json"
     }
   ]
 }
