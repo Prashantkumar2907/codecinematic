@@ -10,6 +10,10 @@ content/news/
 *.tsbuildinfo
 .DS_Store
 content/factory/
+# Local state, EXCEPT four files that are force-tracked (`git add -f`) because
+# they are not regenerable for free: channels/history/quota/subjects, and
+# briefs.json — 373 one-time Gemini calls (row 13.2). A negation rule cannot
+# re-include them, since git will not descend into an excluded directory.
 content/
 graphify-out/
 playwright-report/
