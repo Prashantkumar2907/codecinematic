@@ -5,6 +5,7 @@ import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
   FONT_SANS,
+  STROKE,
   easeOutBack,
   easeOutCubic,
   enterT,
@@ -24,8 +25,15 @@ import type { PaintEnv } from "./index";
 type ChartScene = Extract<Scene, { kind: "chart" }>;
 
 const CURRENCY_RE = /^[₹$€£]$/;
-// Captions sit in the bottom ~14% of vertical frames; keep bars/values above.
-const CAPTION_SAFE_Y = 0.86;
+/**
+ * Ghost strength before a series' beat plays. The chart used to open on nothing but
+ * the title for a full 500 ms — its own round-1 finding C2 — because the ghost sat at
+ * 0.35 of an already-faint colour. The shape of the chart should be readable from the
+ * first frame; only the values arrive on their beats.
+ */
+const GHOST_A = 0.55;
+const GHOST_TRACK_A = 0.12;
+const TRACK_A = 0.16;
 
 /** Count-up value: integers stay integers, fractional values keep one decimal. */
 function fmtValue(target: number, t: number, locale: string): string {
@@ -55,7 +63,7 @@ export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env
 /** Horizontal bar chart: one bar grows (with a counting value) per beat. */
 function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.items.length;
@@ -71,17 +79,23 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
     if (item.value > scene.items[maxIdx].value) maxIdx = i;
   });
   const n = scene.items.length;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
   const availH = safeBottom - (contentY + band);
   const rowGap = Math.min(availH / n, unit * (vertical ? 4.0 : 3.1));
   // Center the bar block vertically so sparse charts don't bunch at the top.
   const listTop = contentY + band + Math.max(0, (availH - n * rowGap) / 2);
   const barH = Math.min(rowGap * 0.42, unit * 1.35);
 
-  const trackX = contentX;
-  const trackW = contentW;
   const labelPx = unit * (vertical ? 0.88 : 0.85);
   const valuePx = unit * (vertical ? 0.95 : 0.85);
+  const trackX = contentX;
+  // Values live in a reserved gutter, never on top of the bar. Inside-the-bar text was
+  // drawn in shade(accent, -0.9) — near-black, which only reads against a full-bright
+  // bar. Every bar except the current one is dimmed to 0.62, so on a real chart five of
+  // six values were dark-on-dark.
+  ctx.font = `800 ${valuePx}px ${FONT_SANS}`;
+  const valueGutter =
+    Math.max(...scene.items.map((it) => ctx.measureText(valueLabel(it.value, it.unit, 1)).width)) + unit * 0.9;
+  const trackW = Math.max(unit * 4, contentW - valueGutter);
   const ghostIn = easeOutCubic(enterT(env, 420));
   const settledAll = env.p >= lastEnd;
 
@@ -94,12 +108,12 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
         const rowY = listTop + i * rowGap;
         const barY = rowY + unit * 1.15;
         ctx.save();
-        ctx.globalAlpha = 0.35 * ghostIn;
+        ctx.globalAlpha = GHOST_A * ghostIn;
         ctx.font = `600 ${labelPx}px ${FONT_SANS}`;
-        ctx.fillStyle = THEME.textFaint;
+        ctx.fillStyle = THEME.textDim;
         ctx.fillText(item.label, trackX, rowY + unit * 0.75);
         roundRect(ctx, trackX, barY, trackW, barH, barH / 2);
-        ctx.fillStyle = "rgba(148,163,184,0.07)";
+        ctx.fillStyle = rgba(THEME.textDim, GHOST_TRACK_A);
         ctx.fill();
         ctx.restore();
       }
@@ -120,7 +134,7 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
     ctx.fillText(item.label, trackX, rowY + unit * 0.75);
 
     roundRect(ctx, trackX, barY, trackW, barH, barH / 2);
-    ctx.fillStyle = "rgba(148,163,184,0.10)";
+    ctx.fillStyle = rgba(THEME.textDim, TRACK_A);
     ctx.fill();
 
     const frac = item.value / maxVal;
@@ -142,10 +156,8 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
 
     const valueText = valueLabel(item.value, item.unit, grow);
     ctx.font = `800 ${valuePx}px ${FONT_SANS}`;
-    const vw = ctx.measureText(valueText).width;
-    const inside = barW > vw + unit * 1.2;
-    ctx.fillStyle = inside ? shade(accent, -0.9) : THEME.text;
-    ctx.fillText(valueText, inside ? trackX + barW - vw - unit * 0.5 : trackX + barW + unit * 0.45, barY + barH * 0.72);
+    ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
+    ctx.fillText(valueText, trackX + barW + unit * 0.45, barY + barH * 0.72);
     ctx.restore();
   });
 }
@@ -153,40 +165,58 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
 /** Vertical columns: one bar grows up per beat, value chip riding its top. */
 function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
-  const { accent, secondary, accentGlow } = env.palette;
+  const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
+  const { accent, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.items.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const lastEnd = beatWindow(env.beats, totalBeats - 1, totalBeats).end;
-  const settledAll = env.p >= lastEnd;
   const key = scene.id + "-col3d";
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const n = scene.items.length;
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
-  let maxIdx = 0;
-  scene.items.forEach((item, i) => {
-    if (item.value > scene.items[maxIdx].value) maxIdx = i;
-  });
 
   const plotTop = contentY + band;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
-  const rect = { x: contentX, y: plotTop, w: contentW, h: safeBottom - plotTop };
+  const rect = { x: contentX, y: plotTop, w: contentW, h: Math.max(unit * 4, safeBottom - plotTop) };
   const spread = vertical ? 2.8 : 4.0;
-  const maxBarH3D = 3.5;
+  // Taller bars in 9:16: an orthographic frustum has to match the rect aspect, so in a
+  // portrait plot the width is the binding constraint and a 3.5-tall block left the
+  // lower half of the band empty.
+  const maxBarH3D = vertical ? 4.6 : 3.5;
   const ghostIn = easeOutCubic(enterT(env, 420));
-  
-  const colX = (i: number) => n === 1 ? 0 : -spread + (i / (n - 1)) * spread * 2;
 
-  const build = (): ThreeBundle => {
+  const colX = (i: number) => (n === 1 ? 0 : -spread + (i / (n - 1)) * spread * 2);
+
+  /** Per-bar height in world units, eased. Travels through context — see below. */
+  const heights = scene.items.map((item, i) => {
+    const t = beatT(env.beats, offset + i, totalBeats, env.p);
+    if (t <= 0) return 0;
+    return Math.max(0.01, maxBarH3D * (item.value / maxVal) * easeOutBack(clamp01(t * 1.6)));
+  });
+
+  const build = (): ThreeBundle<{ heights: number[] }> => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 32, 1, 0.1, 100);
-    camera.position.set(0, 4.0, vertical ? 14 : 11);
-    camera.lookAt(0, 1.5, 0);
+    /**
+     * Orthographic, not perspective. A chart may not distort the thing it measures:
+     * under the old perspective camera at (0, 4, 11) the near column rendered visibly
+     * wider than the far one, so two equal values did not look equal. Parallel
+     * projection also makes `projectToRect` affine, so the 2D value chips and x-axis
+     * labels land exactly on their columns instead of near them.
+     */
+    const worldHalfW = spread + 0.7;
+    const worldHalfH = (maxBarH3D + 0.9) / 2;
+    const worldCY = maxBarH3D / 2;
+    const rectAspect = rect.w / rect.h;
+    const halfW = Math.max(worldHalfW, worldHalfH * rectAspect);
+    const halfH = Math.max(worldHalfH, worldHalfW / rectAspect);
+    const camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 100);
+    // The tilt keeps the tops and side faces visible. Under parallel projection it costs
+    // no width accuracy, and it foreshortens every bar by the same cos(θ), so relative
+    // heights stay honest too.
+    camera.position.set(0, worldCY + 3.2, 10);
+    camera.lookAt(0, worldCY, 0);
     studioLights(s, accent, secondary);
-    
-    // Add grid/baseline
+
     const grid = new THREE.GridHelper(spread * 3.5, 10, new THREE.Color(accent), new THREE.Color(shade(accent, -0.62)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.3;
@@ -199,31 +229,29 @@ function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pain
     shadowPlane.receiveShadow = true;
     s.add(shadowPlane);
 
-    const models = scene.items.map((item, i) => {
+    const models = scene.items.map((_item, i) => {
       const g = makeBlock(0.85, 1.0, 0.85, accent, shade(accent, 0.86));
       g.position.set(colX(i), 0, 0);
       s.add(g);
       return g;
     });
 
-    const update = () => {
+    // Heights arrive as data. Read from the enclosing scope they were frame-0 values
+    // for the life of the scene — `build` runs once per key and `liveEnv` only
+    // refreshes `env` (`qa/ledger.json` → systemic `frozen-painter-local-output-array`).
+    const update = (_elapsedMs: number, data?: { heights: number[] }) => {
       models.forEach((m, i) => {
-        const t = beatT(env.beats, offset + i, totalBeats, env.p);
-        const growBar = easeOutBack(clamp01(t * 1.6));
-        const targetH = Math.max(0.01, maxBarH3D * (scene.items[i].value / maxVal) * growBar);
-        m.scale.y = targetH;
-        m.position.y = targetH / 2;
-        m.visible = ghostIn > 0 || targetH > 0.05;
-        if (t <= 0) {
-            m.scale.y = 0.01;
-            m.position.y = 0.005;
-        }
+        const h = data?.heights[i] ?? 0;
+        m.visible = h > 0;
+        if (!m.visible) return;
+        m.scale.y = h;
+        m.position.y = h / 2;
       });
     };
     return { scene: s, camera, update };
   };
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { heights }, env);
   if (!cam) return; // Fallback could be added, but we assume WebGL works for devstudio
 
   // Draw 2D labels projected from 3D coords
@@ -233,28 +261,25 @@ function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pain
   scene.items.forEach((item, i) => {
     const t = beatT(env.beats, offset + i, totalBeats, env.p);
     const grow = easeOutCubic(clamp01(t * 1.6));
-    const growBar = easeOutBack(clamp01(t * 1.6));
     const isCurrent = active === offset + i;
 
     // Label at bottom
     const baseWorld = new THREE.Vector3(colX(i), 0, 0);
     const baseP = projectToRect(cam, baseWorld, rect);
-    
+
     ctx.save();
-    ctx.globalAlpha = t <= 0 ? 0.3 * ghostIn : easeOutCubic(Math.min(1, t * 3));
+    ctx.globalAlpha = t <= 0 ? GHOST_A * ghostIn : easeOutCubic(Math.min(1, t * 3));
     ctx.font = `${isCurrent ? 700 : 600} ${labelPx}px ${FONT_SANS}`;
-    ctx.fillStyle = (t <= 0) ? THEME.textFaint : (isCurrent ? THEME.text : THEME.textDim);
+    ctx.fillStyle = t <= 0 ? THEME.textDim : isCurrent ? THEME.text : THEME.textDim;
     ctx.textAlign = "center";
     ctx.fillText(item.label, baseP.x, baseP.y + unit * 1.5);
 
     if (t > 0) {
-        // Value chip at top of column
-        const topWorld = new THREE.Vector3(colX(i), maxBarH3D * (item.value / maxVal) * growBar, 0);
-        const topP = projectToRect(cam, topWorld, rect);
-        
-        ctx.font = `800 ${valuePx}px ${FONT_SANS}`;
-        ctx.fillStyle = THEME.text;
-        ctx.fillText(valueLabel(item.value, item.unit, grow), topP.x, topP.y - unit * 0.7);
+      // Chip rides the same height the slab was given, so the two cannot disagree.
+      const topP = projectToRect(cam, new THREE.Vector3(colX(i), heights[i], 0), rect);
+      ctx.font = `800 ${valuePx}px ${FONT_SANS}`;
+      ctx.fillStyle = THEME.text;
+      ctx.fillText(valueLabel(item.value, item.unit, grow), topP.x, topP.y - unit * 0.7);
     }
     ctx.restore();
   });
@@ -263,7 +288,7 @@ function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pain
 /** Line / area chart: a point plots per beat, segments draw on, tip carries a value chip. */
 function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv, area: boolean) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.items.length;
@@ -274,7 +299,6 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
 
   const plotTop = contentY + band + unit * 0.9; // value chips ride above the highest point
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
   const labelH = unit * 1.4;
   const baseY = safeBottom - labelH;
   const maxH = Math.max(unit, baseY - plotTop);
@@ -288,7 +312,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
   ctx.save();
   ctx.globalAlpha = ghostIn;
   ctx.strokeStyle = THEME.panelBorder;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = unit * STROKE.thin;
   ctx.beginPath();
   ctx.moveTo(contentX, baseY);
   ctx.lineTo(contentX + contentW, baseY);
@@ -387,7 +411,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
     ctx.fillStyle = shade(accent, -0.92);
     ctx.fill();
     ctx.strokeStyle = accent;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = unit * STROKE.thin;
     ctx.stroke();
     ctx.fillStyle = THEME.text;
     ctx.fillText(text, chipX, chipY + unit * 0.78);
@@ -398,7 +422,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
 /** Pie / donut: each slice sweeps its arc on its beat; active slice pulls out. */
 function paintPie(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv, donut: boolean) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
   const { accent, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.items.length;
@@ -406,11 +430,16 @@ function paintPie(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEn
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const plotTop = contentY + band;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
-  const plotH = safeBottom - plotTop;
+  const plotH = Math.max(unit * 4, safeBottom - plotTop);
   const cx = contentX + contentW / 2;
   const cy = plotTop + plotH / 2;
-  const R = Math.min(contentW * 0.4, plotH * 0.42);
+  // Labels sit at 1.16R with textAlign left/right, so the radius has to leave room for
+  // the widest of them — at 0.4 of the content width both end labels ran off the frame
+  // ("Dependencies" cut to "Dependen", "Your code" to "r code").
+  ctx.font = `700 ${unit * (vertical ? 0.68 : 0.6)}px ${FONT_SANS}`;
+  const widestLabel = Math.max(...scene.items.map((it) => ctx.measureText(it.label).width));
+  const labelRoom = Math.min(widestLabel + unit * 0.6, contentW * 0.22);
+  const R = Math.min((contentW - labelRoom * 2) * 0.46, plotH * 0.42);
   const rInner = donut ? R * 0.56 : 0;
   const total = scene.items.reduce((acc, it) => acc + it.value, 0) || 1;
 
@@ -487,13 +516,20 @@ function paintPie(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEn
   for (const l of labels) {
     if (!l.on) continue;
     ctx.save();
-    ctx.textAlign = l.x < cx ? "end" : "start";
+    const toLeft = l.x < cx;
+    ctx.textAlign = toLeft ? "end" : "start";
     ctx.font = `700 ${unit * (vertical ? 0.68 : 0.6)}px ${FONT_SANS}`;
+    // Clamp the anchor so a long label cannot run past the content edge, whichever
+    // side of the pie it is on.
+    const wLabel = ctx.measureText(l.text).width;
+    const left = toLeft ? l.x - wLabel : l.x;
+    const clamped = Math.min(Math.max(left, contentX), contentX + contentW - wLabel);
+    const ax = toLeft ? clamped + wLabel : clamped;
     ctx.fillStyle = THEME.text;
-    ctx.fillText(l.text, l.x, l.y);
+    ctx.fillText(l.text, ax, l.y);
     ctx.font = `600 ${unit * (vertical ? 0.6 : 0.54)}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
-    ctx.fillText(`${l.pct}%`, l.x, l.y + unit * 0.75);
+    ctx.fillText(`${l.pct}%`, ax, l.y + unit * 0.75);
     ctx.textAlign = "start";
     ctx.restore();
   }

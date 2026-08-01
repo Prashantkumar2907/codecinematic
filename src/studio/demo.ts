@@ -4302,3 +4302,96 @@ export const DEMO_COMPARE_VARIANTS: SceneScript = {
     hashtags: ["#DevStudio", "#Probe", "#RenderTest"],
   },
 };
+
+/**
+ * The five `chart` modes no fixture reached. `paintChart` dispatches on
+ * `scene.mode`, the only chart fixture sets `mode: "column"` — and **every one of
+ * the 33 chart scenes in `content/` omits `mode` entirely**, so the `bars` path
+ * that 100% of real output renders had never been captured, while the only path
+ * ever scored has no traffic at all.
+ *
+ * `cht-bars` runs the schema maximum of six items and so outranks the five-item
+ * column fixture in the probe's richness order, making plain `--kind=chart` resolve
+ * to the mode that actually ships. Reach the rest with
+ * `npm run filmstrip -- --kind=chart --scene=cht-pie`.
+ */
+export const DEMO_CHART_MODES: SceneScript = {
+  format: "long",
+  lang: "en",
+  subject: "Coding",
+  module: "backend",
+  submodule: "performance",
+  topic: "Reading a chart",
+  scenes: [
+    {
+      kind: "chart",
+      id: "cht-bars",
+      title: "Where the request time goes",
+      items: [
+        { label: "TLS handshake", value: 42, unit: "ms", say: "The TLS handshake costs us forty-two milliseconds before a byte of data moves." },
+        { label: "DNS lookup", value: 28, unit: "ms", say: "DNS adds another twenty-eight." },
+        { label: "Server render", value: 210, unit: "ms", say: "Server render is the giant here — two hundred and ten milliseconds." },
+        { label: "Database", value: 95, unit: "ms", say: "Ninety-five of that is the database alone." },
+        { label: "Transfer", value: 36, unit: "ms", say: "Pushing the bytes down the wire is thirty-six." },
+        { label: "Parse & paint", value: 64, unit: "ms", say: "And the browser needs sixty-four more to parse and paint it." },
+      ],
+    },
+    {
+      kind: "chart",
+      id: "cht-line",
+      title: "P99 latency, six releases",
+      mode: "line",
+      items: [
+        { label: "v1.0", value: 480, unit: "ms", say: "Version one shipped at four hundred and eighty milliseconds at the ninety-ninth percentile." },
+        { label: "v1.1", value: 410, unit: "ms", say: "The first caching pass took seventy off." },
+        { label: "v1.2", value: 430, unit: "ms", say: "Then a regression put some of it back." },
+        { label: "v1.3", value: 260, unit: "ms", say: "Connection pooling was the big one." },
+        { label: "v1.4", value: 180, unit: "ms", say: "And the query rewrite got us under two hundred." },
+      ],
+    },
+    {
+      kind: "chart",
+      id: "cht-area",
+      title: "Storage used per month",
+      mode: "area",
+      items: [
+        { label: "Jan", value: 1.2, unit: "TB", say: "January opens at one point two terabytes." },
+        { label: "Feb", value: 1.9, unit: "TB", say: "February climbs to nearly two." },
+        { label: "Mar", value: 3.4, unit: "TB", say: "March is when the logging change lands." },
+        { label: "Apr", value: 4.1, unit: "TB", say: "April keeps the same slope." },
+        { label: "May", value: 6.8, unit: "TB", say: "By May we are paying for almost seven." },
+      ],
+    },
+    {
+      kind: "chart",
+      id: "cht-pie",
+      title: "What the bundle is made of",
+      mode: "pie",
+      items: [
+        { label: "Dependencies", value: 612, unit: "KB", say: "Third-party dependencies are six hundred and twelve kilobytes of it." },
+        { label: "Your code", value: 184, unit: "KB", say: "Your own code is a hundred and eighty-four." },
+        { label: "Polyfills", value: 96, unit: "KB", say: "Polyfills, ninety-six." },
+        { label: "CSS", value: 48, unit: "KB", say: "And the styles are the smallest slice at forty-eight." },
+      ],
+    },
+    {
+      kind: "chart",
+      id: "cht-donut",
+      title: "Where the cloud bill goes",
+      mode: "donut",
+      items: [
+        { label: "Compute", value: 1840, unit: "₹", say: "Compute is the biggest line on the bill." },
+        { label: "Storage", value: 720, unit: "₹", say: "Storage is a distant second." },
+        { label: "Egress", value: 540, unit: "₹", say: "Egress is the one people forget." },
+        { label: "Managed DB", value: 400, unit: "₹", say: "And the managed database rounds it out." },
+      ],
+    },
+  ],
+  meta: {
+    title: "Chart modes — probe fixture",
+    description:
+      "One scene per paintChart mode. The only other chart fixture is mode:column, which no real script uses; every generated chart omits mode and renders as bars. Not for publishing.",
+    tags: ["devstudio", "probe", "fixture", "chart"],
+    hashtags: ["#DevStudio", "#Probe", "#RenderTest"],
+  },
+};
