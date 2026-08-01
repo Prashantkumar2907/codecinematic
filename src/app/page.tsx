@@ -9,181 +9,25 @@ import { fetchNarration, verifyScript, VOICE_OPTIONS } from "@/studio/pipeline";
 import { renderThumbnail } from "@/studio/thumbnail";
 import { DEMO_SCRIPT, DEMO_KINDS_LONG, DEMO_KINDS_SHORT, DEMO_KINDS2_LONG, DEMO_KINDS2_SHORT, DEMO_WAVE1, DEMO_WAVE2 } from "@/studio/demo";
 import NewsView from "@/components/NewsView";
-
-type Format = "short" | "long";
-type View = "create" | "library" | "news";
-type Stage = "idle" | "topics" | "generating" | "scripted" | "voicing" | "rendering" | "rendered" | "saving" | "uploading" | "uploaded";
-type GenStage = "planning" | "writing" | "reviewing" | "refining" | "validating" | "repairing" | "optimizing";
-
-type Submodule = { id: string; label: string };
-type Module = { id: string; label: string; submodules: Submodule[] };
-type Subject = { id: string; label: string; audience: string; style: string; modules: Module[] };
-type TopicSuggestion = { title: string; angle?: string };
-type GenerateFailure = { message: string; details?: string[]; raw?: string };
-type Quota = { used: number; limit: number; perModel: { model: string; used: number; limit: number }[]; byKey?: Record<string, number> };
-type KeyProbe = {
-  id: string;
-  label: string;
-  billed: boolean;
-  exhausted: boolean;
-  models: { model: string; status: "ok" | "exhausted" | "unavailable" }[];
-};
-type DraftInfo = {
-  slug: string;
-  hasVideo: boolean;
-  hasThumbnail: boolean;
-  hasCaptions: boolean;
-  videoBytes: number;
-  savedAt: string;
-  format: string;
-  subject: string;
-  module: string;
-  submodule: string;
-  topic: string;
-  title: string;
-  description: string;
-  tags: string[];
-  hashtags: string[];
-  videoId?: string;
-};
+import LibraryView from "@/components/LibraryView";
+import { descriptionWithChapters, describeScene, fileUrl, fmtTime, parseRetrySeconds } from "@/components/studio-format";
+import type {
+  DraftInfo,
+  Format,
+  GenerateFailure,
+  GenStage,
+  KeyProbe,
+  Module,
+  Quota,
+  Stage,
+  Subject,
+  Submodule,
+  TopicSuggestion,
+  View,
+} from "@/components/studio-types";
 
 const BRAND = process.env.NEXT_PUBLIC_BRAND || "DevStudio";
-const MIN_CHAPTER_GAP_S = 10;
-const MIN_CHAPTERS = 3;
 const TOAST_MS = 4000;
-
-function descriptionWithChapters(script: SceneScript, timings: SceneTiming[]): string {
-  const base = script.meta.description.split("\n\nChapters:")[0].trimEnd();
-  const { introMs } = introOutroMs(script.format);
-  const marks: { atS: number; label: string }[] = [];
-  const atS = (i: number) => Math.floor((introMs + timings[i].startMs) / 1000);
-  if (script.sections?.length) {
-    // Declared sections win: a chapter can now start on a real teaching scene, so
-    // the video no longer needs a title card in front of every chapter just to get
-    // one. See the `sections` field in schema.ts.
-    for (const section of script.sections) {
-      const i = script.scenes.findIndex((s) => s.id === section.atSceneId);
-      if (i >= 0 && timings[i]) marks.push({ atS: atS(i), label: section.title.slice(0, 50) });
-    }
-    marks.sort((a, b) => a.atS - b.atS);
-  } else {
-    // Fallback for scripts written before `sections` existed.
-    script.scenes.forEach((scene, i) => {
-      if (scene.kind === "bigtext" && timings[i]) {
-        marks.push({ atS: atS(i), label: scene.text.slice(0, 50) });
-      }
-    });
-  }
-  const chapters: { atS: number; label: string }[] = [];
-  for (const mark of marks) {
-    const last = chapters[chapters.length - 1];
-    if (!last || mark.atS - last.atS >= MIN_CHAPTER_GAP_S) chapters.push(mark);
-  }
-  if (chapters.length === 0 || chapters[0].atS !== 0) chapters.unshift({ atS: 0, label: "Intro" });
-  if (chapters.length < MIN_CHAPTERS) return base;
-  return `${base}\n\nChapters:\n${chapters.map((c) => `${fmtTime(c.atS)} ${c.label}`).join("\n")}`;
-}
-
-function fmtTime(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-function describeScene(scene: Scene): string {
-  switch (scene.kind) {
-    case "bigtext":
-      return scene.text;
-    case "bullets":
-    case "diagram":
-    case "tree":
-    case "mindmap":
-    case "iso3d":
-    case "orbit":
-    case "compare":
-    case "timeline":
-    case "steps":
-    case "chart":
-    case "table":
-      return scene.title;
-    case "code":
-      return `${scene.title} (${scene.lang})`;
-    case "terminal":
-      return scene.lines[0] ?? "";
-    case "question":
-    case "quote":
-      return scene.text;
-    case "stat":
-      return `${scene.value} — ${scene.label}`;
-    case "quiz":
-      return scene.question;
-    case "vocab":
-      return scene.word;
-    case "mythfact":
-      return scene.myth;
-    case "trace":
-    case "memgrid":
-    case "callstack":
-    case "lifeline":
-    case "bits":
-    case "cycle":
-    case "statemachine":
-    case "decision":
-    case "chain":
-    case "pipeline":
-    case "ledger":
-    case "sankey":
-    case "gauge":
-    case "pictogram":
-    case "race":
-    case "schematic":
-    case "terrain":
-    case "graphwalk":
-    case "matrix":
-    case "threads":
-    case "queueflow":
-    case "cipher":
-    case "circuit":
-    case "formula":
-    case "curves":
-    case "buckets":
-    case "probability":
-    case "basket":
-    case "radar":
-    case "bodymap":
-    case "constellation":
-    case "dayclock":
-    case "storyboard":
-    case "bracket":
-    case "showdown":
-    case "skyline":
-    case "calendar":
-    case "geomap":
-    case "numberline":
-    case "geometry":
-    case "molecule":
-    case "layers":
-    case "trafficflow":
-    case "eventbus":
-      return scene.title;
-    case "browserframe":
-      return scene.url;
-    case "zoomladder":
-      return scene.title ?? scene.rungs[0]?.label ?? "zoom";
-    case "dialogue":
-      return scene.title ?? `${scene.left.name} ↔ ${scene.right.name}`;
-  }
-  return (scene as { title?: string }).title ?? "scene";
-}
-
-function fileUrl(slug: string, name: string) {
-  return `/api/studio/file?slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}`;
-}
-
-/** Gemini 429 bodies carry a retryDelay ("retry in 38s" / `"retryDelay": "38s"`). */
-function parseRetrySeconds(message: string): number | null {
-  const m = message.match(/retry(?:Delay|\s+in)[^0-9]*(\d+)/i);
-  return m ? Number(m[1]) : null;
-}
 
 export default function Studio() {
   const [view, setView] = useState<View>("create");
@@ -1436,150 +1280,23 @@ export default function Studio() {
           </div>
         </div>
       ) : view === "library" ? (
-        <div className="bod library">
-          <div className="lib-list">
-            {drafts.length === 0 ? (
-              <div className="empty">
-                <span>No videos yet</span>
-                <button className="btn btn-primary btn-sm" onClick={() => setView("create")}>
-                  Go to Create
-                </button>
-              </div>
-            ) : (
-              drafts.map((d) => (
-                <button key={d.slug} className="lrow" aria-pressed={selectedSlug === d.slug} onClick={() => setSelectedSlug(d.slug)}>
-                  {d.hasThumbnail ? (
-                    <img className="lthumb" src={fileUrl(d.slug, "thumbnail.png")} alt="" loading="lazy" />
-                  ) : (
-                    <span className="lthumb lthumb-fallback">{d.format}</span>
-                  )}
-                  <span className="lbody">
-                    <span className="tt">{d.title}</span>
-                    <span className="lmeta">
-                      <span className="pill">{d.format}</span>
-                      {d.subject ? <span className="pill">{d.subject}</span> : null}
-                      <span className="smut">{(d.videoBytes / 1e6).toFixed(1)} MB</span>
-                      {d.videoId ? (
-                        <>
-                          <span className="dot" aria-hidden />
-                          <span className="smut">uploaded</span>
-                        </>
-                      ) : null}
-                    </span>
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-
-          <div className="detail">
-            {stageError ? (
-              <div className="err" role="alert">
-                {stageError}
-              </div>
-            ) : null}
-            {selectedDraft ? (
-              <>
-                {selectedDraft.hasVideo ? (
-                  <video key={selectedDraft.slug} src={fileUrl(selectedDraft.slug, "video.webm")} controls />
-                ) : null}
-
-                <div className="row detail-copy-row">
-                  <div className="copy-field grow">
-                    <div className="cf-head">
-                      <span className="cf-label">Title</span>
-                      <button className={`btn btn-sm${copied === "title" ? " copied" : ""}`} onClick={() => copyText("title", selectedDraft.title)}>
-                        {copied === "title" ? "✓ Copied" : "⧉ Copy"}
-                      </button>
-                    </div>
-                    <div className="cf-value">{selectedDraft.title}</div>
-                  </div>
-                  <div className="copy-field tags">
-                    <div className="cf-head">
-                      <span className="cf-label">Tags</span>
-                      <button className={`btn btn-sm${copied === "tags" ? " copied" : ""}`} onClick={() => copyText("tags", selectedDraft.tags.join(", "))}>
-                        {copied === "tags" ? "✓ Copied" : "⧉ Copy"}
-                      </button>
-                    </div>
-                    <div className="cf-value">{selectedDraft.tags.join(", ")}</div>
-                  </div>
-                </div>
-
-                <div className="copy-field">
-                  <div className="cf-head">
-                    <span className="cf-label">Description</span>
-                    <button
-                      className={`btn btn-sm${copied === "desc" ? " copied" : ""}`}
-                      onClick={() => copyText("desc", `${selectedDraft.description}\n\n${selectedDraft.hashtags.join(" ")}`)}
-                    >
-                      {copied === "desc" ? "✓ Copied" : "⧉ Copy with hashtags"}
-                    </button>
-                  </div>
-                  <div className="cf-value">{selectedDraft.description}</div>
-                </div>
-
-                <div className="detail-actions">
-                  {selectedDraft.hasThumbnail ? (
-                    <img className="thumb-preview" src={fileUrl(selectedDraft.slug, "thumbnail.png")} alt="thumbnail" />
-                  ) : null}
-                  <div className="detail-actions-col">
-                    <div className="row">
-                      {selectedDraft.hasVideo ? (
-                        <a className="btn btn-sm" href={fileUrl(selectedDraft.slug, "video.webm")} download={`${selectedDraft.slug}.webm`}>
-                          ⬇ Download video (.webm)
-                        </a>
-                      ) : null}
-                      {selectedDraft.hasThumbnail ? (
-                        <a className="btn btn-sm" href={fileUrl(selectedDraft.slug, "thumbnail.png")} download={`${selectedDraft.slug}.png`}>
-                          ⬇ Download thumbnail (.png)
-                        </a>
-                      ) : null}
-                      {selectedDraft.hasCaptions ? (
-                        <a className="btn btn-sm" href={fileUrl(selectedDraft.slug, "captions.srt")} download={`${selectedDraft.slug}.srt`}>
-                          ⬇ Download captions (.srt)
-                        </a>
-                      ) : null}
-                      {privacySelect}
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => void upload(selectedDraft.slug)}
-                        disabled={busy || !!selectedDraft.videoId}
-                      >
-                        {stage === "uploading" ? <span className="spinner" aria-hidden /> : null}
-                        {stage === "uploading" ? "Uploading…" : selectedDraft.videoId ? "Already uploaded" : "Upload to YouTube"}
-                      </button>
-                      {uploadChannels[selectedDraft.subject] ? (
-                        <span className="smut">→ {uploadChannels[selectedDraft.subject]}</span>
-                      ) : null}
-                      <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(selectedDraft)} disabled={busy}>
-                        Delete
-                      </button>
-                    </div>
-                    {selectedDraft.videoId ? (
-                      <div className="okb">
-                        On YouTube —{" "}
-                        <a href={`https://youtu.be/${selectedDraft.videoId}`} target="_blank" rel="noreferrer">
-                          youtu.be/{selectedDraft.videoId}
-                        </a>{" "}
-                        · review in Studio, then publish
-                      </div>
-                    ) : uploadUrl && stage === "uploaded" ? (
-                      <div className="okb">
-                        <strong>Uploaded.</strong>{" "}
-                        <a href={uploadUrl} target="_blank" rel="noreferrer">
-                          {uploadUrl.replace("https://", "")}
-                        </a>{" "}
-                        — review in YouTube Studio, then publish.
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="empty">Select a video on the left to see details, downloads and upload options.</div>
-            )}
-          </div>
-        </div>
+        <LibraryView
+          drafts={drafts}
+          selectedSlug={selectedSlug}
+          selectedDraft={selectedDraft}
+          setSelectedSlug={setSelectedSlug}
+          setView={setView}
+          stageError={stageError}
+          copied={copied}
+          copyText={copyText}
+          privacySelect={privacySelect}
+          upload={upload}
+          busy={busy}
+          stage={stage}
+          uploadChannels={uploadChannels}
+          uploadUrl={uploadUrl}
+          setConfirmDelete={setConfirmDelete}
+        />
       ) : null}
 
       {view === "news" ? <NewsView onToast={setToast} /> : null}
