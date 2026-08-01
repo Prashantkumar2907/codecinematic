@@ -4236,3 +4236,69 @@ export const DEMO_VOCAB: SceneScript = {
     hashtags: ["#Vocabulary", "#English", "#DevStudio"],
   },
 };
+
+/**
+ * The `compare` layout no fixture could reach. `paintCompare` seeds its layout from
+ * `variantOf(scene.id, …)` and every other compare fixture uses the id `sqlnosql`,
+ * which hashes to variant 0 — so the dashed-spine layout had never been rendered.
+ * `restgrpc` hashes to 1. Reach it with
+ * `npm run filmstrip -- --kind=compare --scene=restgrpc`.
+ *
+ * Neither scene carries `sayVerdict`, so both score 2 beats against `sqlnosql`'s 3 and
+ * the kind index still resolves plain `--kind=compare` to the richer scene. `tcpudp`
+ * runs the schema's maximum of four items to stress the fit pass, which is what
+ * exposed that the old third variant dropped every item.
+ */
+export const DEMO_COMPARE_VARIANTS: SceneScript = {
+  format: "long",
+  lang: "en",
+  subject: "Coding",
+  module: "backend",
+  submodule: "apis",
+  topic: "Protocol trade-offs",
+  scenes: [
+    {
+      kind: "compare",
+      id: "restgrpc",
+      title: "REST vs gRPC",
+      left: {
+        title: "REST",
+        items: ["Human-readable JSON", "Cacheable by default", "Any client, no codegen"],
+        say: "REST speaks JSON over HTTP, so anything can call it without generated code.",
+        icon: "server",
+      },
+      right: {
+        title: "gRPC",
+        items: ["Binary protobuf", "Streaming both ways", "Contract-first stubs"],
+        say: "gRPC trades readability for a binary contract and real bidirectional streaming.",
+        icon: "queue",
+      },
+      verdict: "Public edge: REST. Service-to-service: gRPC.",
+    },
+    {
+      kind: "compare",
+      id: "tcpudp",
+      title: "TCP vs UDP",
+      left: {
+        title: "TCP",
+        items: ["Ordered delivery", "Retries lost packets", "Flow control", "Connection setup cost"],
+        say: "TCP guarantees every byte arrives in order, and pays for it in round trips.",
+        icon: "client",
+      },
+      right: {
+        title: "UDP",
+        items: ["Fire and forget", "No head-of-line blocking", "Lowest latency", "You handle loss"],
+        say: "UDP just sends, which is why live video and games are built on it.",
+        icon: "loadbalancer",
+      },
+      verdict: "Correctness by default, or latency by default.",
+    },
+  ],
+  meta: {
+    title: "Compare layout variants — probe fixture",
+    description:
+      "Two compare scenes whose ids reach the divider and stacked layouts of paintCompare, which variantOf() otherwise hides from QA. Not for publishing.",
+    tags: ["devstudio", "probe", "fixture", "compare"],
+    hashtags: ["#DevStudio", "#Probe", "#RenderTest"],
+  },
+};
