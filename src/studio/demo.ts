@@ -4395,3 +4395,60 @@ export const DEMO_CHART_MODES: SceneScript = {
     hashtags: ["#DevStudio", "#Probe", "#RenderTest"],
   },
 };
+
+/**
+ * The `js_event_loop` fixture: the canonical ordering lesson. `setTimeout(…, 0)` is
+ * registered BEFORE the promise, and still runs after it, because the loop must drain
+ * every microtask before it touches the macrotask queue. Step 7 is a `takeMacro` the
+ * painter refuses on purpose — that refusal is the lesson.
+ */
+export const DEMO_JS_EVENT_LOOP: SceneScript = {
+  format: "long",
+  lang: "en",
+  subject: "Coding",
+  module: "frontend",
+  submodule: "javascript",
+  topic: "The event loop",
+  scenes: [
+    {
+      kind: "js_event_loop",
+      id: "jsloop",
+      title: "Why setTimeout(0) runs last",
+      sayIntro: "Four lines of code, and the order they run in surprises almost everyone. Watch the machine instead of guessing.",
+      steps: [
+        { op: "push", label: "main()", note: "the script is a frame too", say: "Your script itself is the first frame on the call stack." },
+        { op: "push", label: "log('A')", say: "Line one is a plain function call, so it goes straight on the stack and runs." },
+        { op: "pop", say: "It prints A and pops off." },
+        { op: "enqueue", queue: "macro", label: "log('D')", via: "setTimeout", note: "the timer holds it, not the stack", say: "setTimeout does not run anything. It hands the callback to the timer, which parks it in the macrotask queue." },
+        { op: "enqueue", queue: "micro", label: "log('C')", via: "Promise", note: "already resolved", say: "The promise is already resolved, so its then-callback goes into the microtask queue." },
+        { op: "push", label: "log('B')", say: "Line four is synchronous again, so it runs right now." },
+        { op: "pop", say: "B prints. So far the output is A, B — and nothing queued has run at all." },
+        { op: "pop", label: "main()", note: "stack empty — loop gets a turn", say: "Now main returns and the stack is finally empty. Only now does the event loop get to do anything." },
+        { op: "takeMacro", note: "refused — the rule", say: "Here is the part everyone gets wrong. The timer callback was queued first, but the loop will not touch it." },
+        { op: "drainMicro", note: "ALL of them, not one", say: "Because the rule is absolute: every microtask runs first, and it drains the whole queue, not just one." },
+        { op: "takeMacro", note: "now it is allowed", say: "Only with the microtask queue empty does the loop pick up exactly one macrotask." },
+        { op: "pop", say: "D prints last. A, B, C, D — the promise beat the zero-millisecond timer, and now you can see why." },
+        { op: "render", note: "paint happens between macrotasks", say: "And the browser only gets to paint here, between macrotasks, which is why a long callback freezes the page." },
+      ],
+    },
+    {
+      kind: "js_event_loop",
+      id: "jsloop-starve",
+      title: "A microtask that never lets go",
+      steps: [
+        { op: "enqueue", queue: "macro", label: "render frame", via: "rAF", say: "There is a frame waiting to be drawn in the macrotask queue." },
+        { op: "enqueue", queue: "micro", label: "then #1", via: "Promise", say: "And one microtask ahead of it." },
+        { op: "enqueue", queue: "micro", label: "then #2", via: "then #1", note: "queued BY a microtask", say: "But that microtask queues another microtask while it runs." },
+        { op: "takeMacro", note: "still refused", say: "The loop checks the macrotask queue and is turned away again, because the microtask queue refilled itself." },
+        { op: "drainMicro", note: "drains, then refills", say: "Drain the queue and it fills right back up. This is how you starve the event loop and hang a tab with no infinite loop anywhere in your code." },
+      ],
+    },
+  ],
+  meta: {
+    title: "The JavaScript event loop — probe fixture",
+    description:
+      "Two js_event_loop scenes: the canonical setTimeout-vs-Promise ordering lesson, and microtask starvation. The refused takeMacro in scene one is deliberate. Not for publishing.",
+    tags: ["devstudio", "probe", "fixture", "event-loop", "javascript"],
+    hashtags: ["#JavaScript", "#EventLoop", "#DevStudio"],
+  },
+};

@@ -373,6 +373,10 @@ case "event_loop": {
       const texts = [...(scene.sayIntro ? [scene.sayIntro] : []), ...scene.steps.map((s) => s.say)];
       return texts.map((t, k) => beat(k, t));
     }
+case "js_event_loop": {
+      const texts = [...(scene.sayIntro ? [scene.sayIntro] : []), ...scene.steps.map((s) => s.say)];
+      return texts.map((t, k) => beat(k, t));
+    }
 case "dom_event_flow": {
       const texts = [...(scene.sayIntro ? [scene.sayIntro] : []), ...scene.steps.map((s) => s.say)];
       return texts.map((t, k) => beat(k, t));
@@ -469,6 +473,7 @@ export function introBeatCount(scene: Scene): number {
     case "vdom_diff":
     case "flamegraph":
     case "event_loop":
+    case "js_event_loop":
     case "dom_event_flow":
     case "commit_dag":
     case "partitioned_log":

@@ -2384,6 +2384,48 @@ const flamegraphScene = z.object({
     .min(1)
     .max(14),
 });
+/**
+ * The JavaScript/browser event loop, as a machine you can watch run.
+ *
+ * Distinct from `event_loop`, which is the asyncio model: one thread of control
+ * handing off between coroutines on a ready ring, with no queues in it at all.
+ * This kind is about the thing that model cannot show — that there are TWO
+ * queues with different priorities, and that the loop's rule is "drain every
+ * microtask before touching the next macrotask". That rule is why
+ * `Promise.then` beats `setTimeout(…, 0)`.
+ *
+ * `takeMacro` while the microtask queue is non-empty is a script error; the
+ * painter refuses the move and shows why, so the rule is enforced by the
+ * animation rather than only narrated over it.
+ */
+const jsEventLoopScene = z.object({
+  kind: z.literal("js_event_loop"),
+  id,
+  sayIntro: say.optional(),
+  title: z.string().min(2).max(60),
+  steps: z
+    .array(
+      z.object({
+        /**
+         * `push`/`pop` move a call-stack frame. `enqueue` puts a callback in one of
+         * the two queues. `drainMicro` empties the WHOLE microtask queue in one beat,
+         * one chip at a time. `takeMacro` moves exactly ONE macrotask to the stack.
+         * `render` is the paint step that can only happen between macrotasks.
+         */
+        op: z.enum(["push", "pop", "enqueue", "drainMicro", "takeMacro", "render"]),
+        /** Frame or callback label, e.g. "main()", "then #1", "timer cb". */
+        label: z.string().min(1).max(22).optional(),
+        /** Required for `enqueue`: which queue the callback lands in. */
+        queue: z.enum(["micro", "macro"]).optional(),
+        /** What parked it, shown on the chip: "setTimeout", "fetch", "Promise". */
+        via: z.string().max(16).optional(),
+        note: z.string().max(44).optional(),
+        say,
+      })
+    )
+    .min(2)
+    .max(16),
+});
 const eventLoopScene = z.object({
   kind: z.literal("event_loop"),
   id,
@@ -2950,6 +2992,7 @@ export const sceneSchema = z.discriminatedUnion("kind", [
   vdomDiffScene,
   flamegraphScene,
   eventLoopScene,
+  jsEventLoopScene,
   domEventFlowScene,
   commitDagScene,
   partitionedLogScene,

@@ -1768,6 +1768,22 @@
       "summary": "",
       "commit": "",
       "date": ""
+    },
+    "js_event_loop": {
+      "wave": 1,
+      "group": "Code",
+      "status": "passed",
+      "rounds": 2,
+      "scores": {
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
+      },
+      "summary": "New kind, built and QA'd in one pass. The JS event loop as a machine: call stack, microtask queue and macrotask queue side by side, and the rule that connects them \u2014 the stack empties, then EVERY microtask runs, then exactly ONE macrotask is picked up. A takeMacro issued while the microtask queue is non-empty is refused on screen with a warn badge, so the ordering rule is enforced by the painter rather than only narrated over it; the demo authors that refusal deliberately at step 9. Deliberately 2D with no camera at all, so none of the 2d-layout-round-tripped-through-camera failure modes its 14 predecessors were fixed for can apply. Region heights come from their content and the scale factor is solved exactly (fixed + scalable * fit = availH) rather than approximated, so the group centres in the band without overrunning safeBottom. Slot counts are computed over the WHOLE scene so no lane resizes between beats. Every departure is animated leaving \u2014 microtasks drain one chip at a time within a single beat, which is what makes 'all of them, not one' visible. 0 colour literals, 0 absolute-px strokes, console.log empty, edge-check 0.0% both aspects. Two fixtures: jsloop (the canonical setTimeout-vs-Promise ordering lesson, 13 steps) and jsloop-starve (a microtask that queues a microtask).",
+      "commit": "",
+      "date": "2026-08-01"
     }
   },
   "systemic": [

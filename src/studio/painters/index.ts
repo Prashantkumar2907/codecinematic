@@ -98,6 +98,7 @@ import { paintLsmCompaction } from "./lsm_compaction";
 import { paintVdomDiff } from "./vdom_diff";
 import { paintFlamegraph } from "./flamegraph";
 import { paintEventLoop } from "./event_loop";
+import { paintJsEventLoop } from "./js_event_loop";
 import { paintDomEventFlow } from "./dom_event_flow";
 import { paintCommitDag } from "./commit_dag";
 import { paintPartitionedLog } from "./partitioned_log";
@@ -229,6 +230,7 @@ const painters: Record<SceneKind, Painter> = {
   vdom_diff: paintVdomDiff as Painter,
   flamegraph: paintFlamegraph as Painter,
   event_loop: paintEventLoop as Painter,
+  js_event_loop: paintJsEventLoop as Painter,
   dom_event_flow: paintDomEventFlow as Painter,
   commit_dag: paintCommitDag as Painter,
   partitioned_log: paintPartitionedLog as Painter,

@@ -145,7 +145,7 @@ score, with the pacing facts computed rather than guessed — `src/lib/rate.ts`)
 
 ## Animation QA
 
-110 painters is more surface than a human can eyeball, so the visual quality of
+111 painters is more surface than a human can eyeball, so the visual quality of
 the scene kinds has its own subsystem. **`qa/LEDGER.md` is the source of truth
 for polish progress — not the conversation**, which gets summarised and lost;
 update a kind's row in the same commit that polishes it.

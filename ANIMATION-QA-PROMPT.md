@@ -14,7 +14,7 @@ This file has three parts:
 
 | Fact | Value | Source |
 |---|---|---|
-| Registered painters | **110** | `src/studio/painters/index.ts:133-244` |
+| Registered painters | **111** | `src/studio/painters/index.ts:133-244` |
 | Painter files | 114 = 110 painter modules + `index.ts` + `common.ts` + `three3d.ts` + `icons.ts`. The `.ts.bak` files are gone. One filename differs from its kind: `sliding_window.ts` registers as `slidingwindow` | `src/studio/painters/` |
 | Isolated preview | `/probe?demo=&scene=&p=&ms=&aspect=` — one scene, one frame, no TTS/recorder | `src/app/probe/page.tsx` |
 | Probe done-signal | `window.__PROBE_DONE = true` | `probe/page.tsx:308` |
@@ -24,8 +24,8 @@ This file has three parts:
 | Available checks | `npm run typecheck` only — **no test, no lint script exists** | `package.json` |
 | Typecheck | **clean — 0 errors.** It was 71 at the start of this cleanup (66 in `src/studio/demo.ts`, whose fixtures predated the required `meta` field, plus geometry 3, timeline 1, geomap 1); all were fixed on 2026-07-31. Re-measure, do not trust this cell: `npx tsc --noEmit 2>&1 \| grep -c "error TS"` | `npx tsc --noEmit` |
 | ⚠️ Stale baseline | `qa/ledger.json` → `typecheckBaseline` still reads **99**. Typecheck now passes, so the rule is the stronger "**tsc must stay clean**", not "must not exceed the baseline" | `qa/ledger.json` |
-| Demo coverage | all 110 kinds have a scene in `demo.ts` — `DEMO_VOCAB` closed the last gap | `demo.ts:4104` |
-| Probe `DEMOS` map | 61 named keys; `KIND_INDEX` reaches all 110 regardless, so `--kind=` never needs a `scene=` id | `probe/page.tsx:17-80`, `:271` |
+| Demo coverage | all 111 kinds have a scene in `demo.ts` — `DEMO_VOCAB` closed the last gap | `demo.ts:4104` |
+| Probe `DEMOS` map | 61 named keys; `KIND_INDEX` reaches all 111 regardless, so `--kind=` never needs a `scene=` id | `probe/page.tsx:17-80`, `:271` |
 
 **Two facts that change everything:**
 

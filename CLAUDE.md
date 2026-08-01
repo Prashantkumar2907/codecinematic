@@ -61,7 +61,7 @@ of `content/videos/`.
 | Layer | File | Owns |
 |---|---|---|
 | schema | `src/studio/schema.ts` (4,045 lines) | the `Scene` union, `sceneScriptSchema`, `sceneBeats()`, `NARRATION_BUDGET`, `ASPECTS` |
-| painters | `src/studio/painters/*` (110 modules) | drawing one scene at one progress `p` into a 2D context |
+| painters | `src/studio/painters/*` (111 modules) | drawing one scene at one progress `p` into a 2D context |
 | engine | `src/studio/engine.ts` | timings from measured audio, transitions, captions, WebAudio, MediaRecorder |
 
 The rules that keep them apart:
@@ -138,7 +138,7 @@ that much too lenient). Real scene duration comes from measured audio in `comput
 
 ## Animation QA
 
-110 painters is more than anyone can eyeball. The subsystem:
+111 painters is more than anyone can eyeball. The subsystem:
 
 - **`qa/LEDGER.md` is the source of truth for polish progress — not the conversation**, which gets
   summarised and lost. One row per kind with per-section scores; update the row in the same commit
@@ -146,7 +146,7 @@ that much too lenient). Real scene duration comes from measured audio in `comput
 - **`/probe`** (`src/app/probe/page.tsx`) renders one scene at one fixed `p`, deterministically, no
   TTS and no recorder. It builds `KIND_INDEX` over every `DEMO_*` fixture in `src/studio/demo.ts`
   and picks the *richest* scene per kind — a two-item demo hides layout bugs a six-item demo
-  exposes — so all 110 kinds are reachable by name. Window hooks `__PROBE_RENDER`,
+  exposes — so all 111 kinds are reachable by name. Window hooks `__PROBE_RENDER`,
   `__PROBE_FILMSTRIP` and `__PROBE_EDGEBLEED` (`probe/page.tsx:271-380`) let one browser launch
   drive the whole registry.
 - **`npm run filmstrip -- --kind=<kind>`** writes a contact sheet plus full-res p50/p90 frames and
