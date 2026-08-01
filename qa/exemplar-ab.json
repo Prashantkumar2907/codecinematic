@@ -1,0 +1,66 @@
+{
+  "with": [
+    {
+      "valid": true,
+      "words": 141,
+      "inBudget": true,
+      "scenes": 5,
+      "beats": 9,
+      "kinds": 5,
+      "bigtext": 1,
+      "meanHold": 5.979643765903308,
+      "staticShare": 0.326241134751773,
+      "overlong": 0,
+      "crutch": 0,
+      "gates": [],
+      "repairs": 0
+    },
+    {
+      "valid": true,
+      "words": 189,
+      "inBudget": true,
+      "scenes": 6,
+      "beats": 14,
+      "kinds": 6,
+      "bigtext": 1,
+      "meanHold": 5.15267175572519,
+      "staticShare": 0.21164021164021166,
+      "overlong": 0,
+      "crutch": 1,
+      "gates": [],
+      "repairs": 1
+    }
+  ],
+  "without": [
+    {
+      "valid": true,
+      "words": 184,
+      "inBudget": true,
+      "scenes": 7,
+      "beats": 15,
+      "kinds": 7,
+      "bigtext": 1,
+      "meanHold": 4.681933842239186,
+      "staticShare": 0.3913043478260869,
+      "overlong": 0,
+      "crutch": 0,
+      "gates": [],
+      "repairs": 3
+    },
+    {
+      "valid": true,
+      "words": 162,
+      "inBudget": true,
+      "scenes": 5,
+      "beats": 13,
+      "kinds": 5,
+      "bigtext": 0,
+      "meanHold": 4.756312389900176,
+      "staticShare": 0.10493827160493828,
+      "overlong": 0,
+      "crutch": 1,
+      "gates": [],
+      "repairs": 1
+    }
+  ]
+}
