@@ -6,6 +6,7 @@ import { buildScriptPrompt, buildRepairPrompt, buildBlueprintPrompt, buildScript
 import { sanitizeScript } from "@/lib/sanitize";
 import { enhanceVideoMeta } from "@/lib/videoMeta";
 import { coveredTopics, resolveTaxonomy } from "@/lib/state";
+import { briefFor } from "@/lib/briefs";
 import { staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause, hookTooLong } from "@/studio/pacing";
 
 /**
@@ -106,8 +107,13 @@ export async function POST(req: Request) {
           let blueprint: unknown = null;
           emit({ stage: "planning" });
           try {
+            // Cached per-submodule research (13.2). Absent until the backfill has
+            // run, and generation must work without it, so this never throws.
+            const creatorBrief = await briefFor(parsed.data.subject, parsed.data.module, parsed.data.submodule).catch(
+              () => undefined
+            );
             blueprint = await generateJson(
-              buildBlueprintPrompt({ ...promptOpts, exemplar: module_.exemplars?.[format] }),
+              buildBlueprintPrompt({ ...promptOpts, exemplar: module_.exemplars?.[format], creatorBrief }),
               "fast",
               fastOpts
             );

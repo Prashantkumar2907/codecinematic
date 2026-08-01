@@ -1137,6 +1137,57 @@ const BLUEPRINT_SHAPE = `Return STRICT JSON only (no markdown fences):
  "ending": {"recap": "one sentence takeaway worth remembering", "question": "the comment-bait challenge — answerable from the video, genuinely argue-worthy", "hint": "optional nudge, or null"}
 }`;
 
+/**
+ * One research pass per SUBMODULE, cached forever (improvement_plan.md §0b,
+ * row 13.2). 373 calls once, not one per video.
+ *
+ * The honest limitation, stated because the plan's wording invites the wrong
+ * reading: the model cannot browse. "How do the highest-viewed videos on this
+ * topic structure themselves" is answered from its recall of that corpus, not
+ * from a live look at YouTube. That is still worth caching -- it is a far
+ * better prior than nothing, and it is the same kind of knowledge CHANNEL_ARCS
+ * encodes by hand -- but it is recall, not research, and must not be quoted as
+ * evidence about what is currently ranking.
+ */
+export const CREATOR_BRIEF_SHAPE = `Return STRICT JSON only (no markdown fences):
+{
+ "hookAngles": ["2-3 openings that name the VIEWER'S SITUATION for this exact topic — the thing going wrong, the number that stings, the moment they recognise. Never a definition. Each <=12 spoken words."],
+ "runningExamples": ["2-3 concrete named examples (a real product, place, person, figure, case) strong enough to thread an ENTIRE video without switching"],
+ "misconception": {"myth": "the false belief a large share of viewers actually hold about this topic", "fact": "the correction, in one plain sentence"},
+ "payoff": "the one insight that makes a practitioner or examiner nod — a consequence, trade-off or 'that is why'",
+ "anchors": ["3-5 exact specifics that buy credibility on this topic: figures with units, dates, names, Article/section numbers, commands, latencies"],
+ "avoid": ["2-3 things videos on this topic reliably get wrong, or adjacent ground this submodule must NOT drift into"]
+}`;
+
+export function buildCreatorBriefPrompt(opts: {
+  subject: Subject;
+  moduleLabel: string;
+  submoduleLabel: string;
+  moduleStyle?: string;
+  submoduleStyle?: string;
+  siblingLabels?: string[];
+}): string {
+  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, siblingLabels } = opts;
+  const arc = CHANNEL_ARCS[subject.id] ?? "";
+  const siblings = siblingLabels?.length
+    ? `\nSibling sub-modules on this track (stay out of their lane): ${siblingLabels.join(", ")}`
+    : "";
+  return `You are a channel researcher. Produce the reusable brief for ONE sub-module — the things that
+stay true for EVERY episode about it, so no future episode has to rediscover them.
+
+Sub-module: ${submoduleLabel} (part of ${subject.label} → ${moduleLabel}).
+Audience: ${subject.audience}.
+Channel voice: ${subject.style}.${moduleStyle ? `\nTrack brief: ${moduleStyle}` : ""}${submoduleStyle ? `\nSub-module brief: ${submoduleStyle}` : ""}${siblings}
+${arc}
+
+Think about how the highest-viewed videos on this exact sub-module are built: what they open on, what
+single example they carry through, what they get right that textbooks do not. Then answer for THIS
+sub-module specifically — a brief that would fit any topic in this lane is useless. Prefer specifics
+you are confident are TRUE; a wrong figure is worse than a missing one.
+
+${CREATOR_BRIEF_SHAPE}`;
+}
+
 export function buildBlueprintPrompt(opts: {
   subject: Subject;
   moduleLabel: string;
@@ -1144,13 +1195,14 @@ export function buildBlueprintPrompt(opts: {
   moduleStyle?: string;
   submoduleStyle?: string;
   exemplar?: string;
+  creatorBrief?: string;
   format: "short" | "long";
   topic: string;
   angle?: string;
   recentTopics: string[];
   lang?: "en" | "hi";
 }): string {
-  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, exemplar, format, topic, angle, recentTopics, lang } = opts;
+  const { subject, moduleLabel, submoduleLabel, moduleStyle, submoduleStyle, exemplar, creatorBrief, format, topic, angle, recentTopics, lang } = opts;
   const arc = CHANNEL_ARCS[subject.id] ?? "";
   const actBudget = format === "short" ? "1-2 acts (this is a 60-90 second Short — one idea, told perfectly)" : "3-5 acts";
   const avoid = recentTopics.length
@@ -1170,6 +1222,9 @@ Audience: ${subject.audience}.
 Channel voice: ${subject.style}.${moduleStyle ? `\nTrack brief: ${moduleStyle}` : ""}${submoduleStyle ? `\nChannel brief: ${submoduleStyle}` : ""}
 ${arc}
 
+${creatorBrief ? `\nSUB-MODULE BRIEF — researched once for this lane and cached. Treat it as the ground you
+build on, not as content to copy: pick ONE running example from it, respect what it says to avoid,
+and beat its hook angles if you can.\n${creatorBrief}\n` : ""}
 Episode topic: ${topic}${angle ? `\nAngle: ${angle}` : ""}
 Format: ${format} — plan ${actBudget}.${lang === "hi" ? "\nThe episode will be narrated in Hindi for an Indian audience — choose examples and facts that land in that context (the blueprint itself stays in English)." : ""}
 ${northStar}
