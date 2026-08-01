@@ -284,16 +284,16 @@
     "browserframe": {
       "wave": 1,
       "group": "Code",
-      "status": "in-progress",
-      "rounds": 1,
+      "status": "passed",
+      "rounds": 2,
       "scores": {
         "containment": 4,
         "typography": 4,
         "motion": 4,
-        "cleanliness": 3,
+        "cleanliness": 4,
         "palette": 5
       },
-      "summary": "2/4/4/3/2 -> 4/4/4/3/5 \u2014 NOT a pass: cleanliness is still 3. Fixed: the window frame ran to ~90% of frame height in 9:16, so the bottom of the browser chrome sat under the burned-in caption while ~45% of the window was empty below its own content (contentH -> layout.safeBottom). That clamp then exposed a second bug: the window's world size was the literals spreadX/spreadY = 3.5/5.5, which only filled the rect at the aspect they were tuned for, so a shorter viewport projected the window ~35% narrower and the chrome bar \u2014 whose URL and phase chips are laid out in pixels from the projected window \u2014 no longer had room for both, printing the chips over the URL. World size now comes from the frustum (frustumHalfExtent's arithmetic, the documented fix with three callers), and the URL's width bound and clip reserve the measured badge run, which nothing did before. roleFill returns rgba tints that were handed to THREE.Color: alpha dropped, so every hero, card, image and button block rendered at FULL accent or secondary in 3D and warned every frame \u2014 new roleFace gives the 3D layer opaque equivalents (console.log 6.9KB -> empty). 11 colour literals -> 0; #f87171 kept for the macOS traffic light, which is a real-world reference, not palette semantics. STILL OPEN: the hero block renders with a diagonal right edge \u2014 a large triangular wedge from the top-centre of the page card to its lower right. Present in the very first capture, before any edit in this sweep, so it is not a regression; it is a stray fill/clip path that needs its own round. edge-check 0.0% both aspects.",
+      "summary": "2/4/4/3/2 -> 4/4/4/4/5 (2 rounds). The diagonal wedge across the hero block was the browser group being ROTATED: rotation.x/.y of +/-0.04 rad plus a 0.15-unit bob on browserGroup, while the block meshes are added to the scene rather than to that group and every piece of 2D chrome is projected from unrotated coordinates \u2014 so the panel skewed behind content that could not follow it. That is the systemic rule verbatim: never scale, rotate or bob the 3D group afterwards. Removed, along with the +0.1 z push on the painted block (it moved toward the camera while its 2D glyphs were drawn from get2D(..., 0.2)). Round 1 fixed: the window ran to ~90% of frame height with ~45% of it empty below its own content (contentH -> layout.safeBottom); that clamp then exposed the window's world size being the literals 3.5/5.5, which only fill the rect at the aspect they were tuned for, so a shorter viewport projected it ~35% narrower and the chrome chips printed over the URL \u2014 size now comes from the frustum, and the URL's width bound and clip reserve the measured badge run, which nothing did before. roleFill returns rgba tints that were handed to THREE.Color: alpha dropped, so every hero/card/image/button block rendered at FULL accent or secondary in 3D and warned every frame \u2014 new roleFace gives the 3D layer opaque equivalents (console.log 6.9KB -> empty). 11 colour literals -> 0; #f87171 kept for the macOS traffic light, a real-world reference rather than palette semantics. edge-check 0.0% both aspects.",
       "commit": "d8cc229",
       "date": "2026-08-01"
     },

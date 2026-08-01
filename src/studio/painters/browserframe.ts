@@ -287,15 +287,15 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     const update = (elapsedMs: number) => {
       const gIn = easeOutCubic(enterT(env, 600));
       
-      // Floating animation for the whole browser
-      const bBob = Math.sin(elapsedMs / 2000) * 0.15;
-      const bRotX = Math.sin(elapsedMs / 2500) * 0.04;
-      const bRotY = Math.cos(elapsedMs / 2200) * 0.04;
-      
-      browserGroup.position.y = bBob;
-      browserGroup.rotation.x = bRotX;
-      browserGroup.rotation.y = bRotY;
-      
+      // The browser panel is NOT rotated, bobbed or tilted. It carried rotation.x/.y of
+      // +/-0.04 rad and a 0.15-unit bob, while the block meshes (added to the scene, not
+      // to this group) and every piece of 2D chrome stayed axis-aligned — so the panel
+      // slid and skewed behind content that could not follow it. `qa/ledger.json` →
+      // systemic `2d-layout-round-tripped-through-camera`: never scale, rotate or bob the
+      // 3D group afterwards, because the pixel chrome cannot follow it.
+      browserGroup.position.set(0, 0, 0);
+      browserGroup.rotation.set(0, 0, 0);
+
       browserGroup.scale.setScalar(Math.max(0.001, easeOutBack(enterT(env, 500))));
       
       models.forEach(({ mesh, block }) => {
@@ -323,8 +323,10 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
         const hydrate = easeOutCubic(clamp01(tp / 0.4));
         const isActivePaint = a.paint !== null && active === a.paint;
         
-        // Follow browser parent transforms roughly
-        mesh.position.set(cx, cy + bBob, 0.2 + (isActivePaint ? 0.1 : 0));
+        // No "roughly following the parent" any more — the parent no longer moves. z is
+        // fixed at 0.2 too: pushing the painted block to 0.3 moved it toward the camera,
+        // which scales its projection while the 2D glyphs are drawn from get2D(…, 0.2).
+        mesh.position.set(cx, cy, 0.2);
         
         // Convert to local scale of the block
         mesh.scale.setScalar(Math.max(0.001, ts > 0 ? (0.9 + 0.1 * pop) : 0.9 * gIn));
