@@ -604,18 +604,18 @@
     "mindmap": {
       "wave": 1,
       "group": "Diagrams",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "2/3/4/2/3 -> 4/4/4/4/5. No 3D layer here, so no camera round-trip \u2014 the failures were layout and house style. A depth-1 pill was drawn on top of the root (\"Caching\" over \"Scalability\") because d3 hands back r=1/maxDepth for the first ring and nothing checked it against the root's own box; and a leaf sat on top of its own parent (\"Async work\" over \"Queues\") because two rings needing ~300px of clearance only get the ~128px the ellipse has to give. Fixed with a first-ring clearance derived from the measured boxes plus a deterministic overlap-relaxation pass (12 iterations, separate along the cheaper axis, then clamp every box into the content band). Leaf boxes also step down in size, which is both the hierarchy and headroom for the relaxer. Branches were drawn centre-to-centre, so every one emerged from under its parent's pill and ran across the child's; both ends are now trimmed to the box boundary and the arc is a bow between them. h * 0.9 safe area let the lowest branch cross the caption band -> layout.safeBottom. Filled nodes were solid accent/secondary with near-black #0b0f14 text, which read as a different product from every other kind in the same video; now one family of tinted panels with THEME.text. Dead void accentGlow removed. edge-check 0.0% both aspects.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "statemachine": {
       "wave": 1,
