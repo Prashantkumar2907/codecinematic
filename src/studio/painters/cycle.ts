@@ -20,17 +20,21 @@ import {
   roundRect,
   strokePolylineProgress,
   pointAlongPolyline,
+  shade,
+  rgba,
 } from "./common";
 import type { PaintEnv } from "./index";
 
 type CycleScene = Extract<Scene, { kind: "cycle" }>;
+
+const IDLE_FACE_LIFT = 0.09;
 type Pt = { x: number; y: number };
 
 const ARC_GAP = (14 * Math.PI) / 180;
 
 export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical, w } = layout;
+  const { unit, contentX, contentY, contentW, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const n = scene.nodes.length;
@@ -39,8 +43,8 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
-  let availH = contentH - titleBand;
-  if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + titleBand));
+  // `h * 0.86` let the bottom node's label chip cross the caption band.
+  const availH = Math.max(unit * 4, layout.safeBottom - (contentY + titleBand));
   const cx = contentX + contentW / 2;
   const cy = contentY + titleBand + availH / 2;
   const nodeR = unit * 1.05;
@@ -67,9 +71,9 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, 1, 0.1, 100);
     camera.position.set(0, vertical ? 14 : 11, vertical ? 11 : 8.5);
     camera.lookAt(0, 0, 0);
-    studioLights(s, accent, "rgba(148,163,184,0.5)");
+    studioLights(s, accent, THEME.textDim);
     
-    const grid = new THREE.GridHelper(worldRadius * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(worldRadius * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.5;
@@ -85,7 +89,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     s.add(shadowPlane);
 
     const models = scene.nodes.map((node, k) => {
-      const g = makeCylinder(1.2, 0.5, "#1e293b", accent);
+      const g = makeCylinder(1.2, 0.5, shade(THEME.panel, IDLE_FACE_LIFT), accent);
       s.add(g);
       return { id: k, mesh: g, node };
     });
@@ -149,7 +153,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     ctx.globalAlpha = alpha;
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.9;
-    ctx.fillStyle = "#eaf6ff";
+    ctx.fillStyle = THEME.text;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -240,7 +244,10 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const finalY = projectedPos.y + rawS * dist2D;
     
     const side: -1 | 0 | 1 = Math.abs(rawC) < 0.35 ? 0 : rawC > 0 ? 1 : -1;
-    const maxW = side === 0 ? unit * 9 : Math.max(unit * 2.2, (side > 0 ? w - finalX : finalX) - unit * 0.5);
+    // Bounded by the CONTENT box, not the frame: measuring against `w` let the chip
+    // grow into the margin, and "Log" / "Route" were cut off at both edges.
+    const room = side > 0 ? contentX + contentW - finalX : finalX - contentX;
+    const maxW = side === 0 ? Math.min(unit * 9, contentW * 0.6) : Math.max(unit * 2.2, room - unit * 0.5);
     const px = fitFontSize(ctx, node.label, { maxW, startPx: unit * (vertical ? 0.8 : 0.72), minPx: unit * 0.56, weight: 700 });
     ctx.font = `700 \${px}px \${FONT_SANS}`;
     let lines = [node.label];
@@ -249,15 +256,16 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const chipW = tw + unit * 0.7;
     const lineH = px * 1.2;
     const chipH = lines.length * lineH + unit * 0.45;
-    const chipX = side === 1 ? finalX : side === -1 ? finalX - chipW : finalX - chipW / 2;
-    const chipY = finalY - chipH / 2;
+    const rawChipX = side === 1 ? finalX : side === -1 ? finalX - chipW : finalX - chipW / 2;
+    const chipX = Math.min(Math.max(rawChipX, contentX), contentX + contentW - chipW);
+    const chipY = Math.min(Math.max(finalY - chipH / 2, contentY), layout.safeBottom - chipH);
     
     ctx.save();
     ctx.globalAlpha = alpha;
     roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.3);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = THEME.bgBottom;
     ctx.fill();
-    ctx.strokeStyle = ghost ? "rgba(148,163,184,0.35)" : THEME.panelBorder;
+    ctx.strokeStyle = ghost ? rgba(THEME.textDim, 0.35) : THEME.panelBorder;
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = ghost ? THEME.textDim : THEME.text;
@@ -279,7 +287,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
       ctx.globalAlpha = 0.14 * ghostIn;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(148,163,184,0.7)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.7);
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.3, unit * 0.3]);
       ctx.stroke();
@@ -306,7 +314,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = isActive ? accent : "rgba(148,163,184,0.5)";
+    ctx.strokeStyle = isActive ? accent : rgba(THEME.textDim, 0.5);
     ctx.lineWidth = isActive ? unit * 0.12 : unit * 0.07;
     ctx.stroke();
     

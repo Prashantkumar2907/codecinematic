@@ -636,18 +636,18 @@
     "cycle": {
       "wave": 1,
       "group": "Diagrams",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "2/3/4/4/2 -> 4/4/4/4/5. Both side labels were cut off by the frame (\"Log\" and \"Route\") because the chip's width bound was measured against w, the FRAME width, so it grew into the margin and past the edge; bounds now come from the content box and the chip's x is clamped into it. The bottom node's chip also crossed the caption band \u2014 h * 0.86 -> layout.safeBottom, and chip y is clamped to it too. 8 colour literals -> 0, including rgba(148,163,184,0.5) passed to studioLights (three.js drops the alpha, so the rim light was rendering at full strength). Recorded, not fixed: the demo's nodes carry emoji icons, which render full-colour clip-art against the palette \u2014 scene data the schema permits, same note as pipeline. edge-check 0.0% both aspects.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "chain": {
       "wave": 1,
