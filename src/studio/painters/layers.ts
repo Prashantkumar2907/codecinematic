@@ -13,7 +13,7 @@ import {
   activeBeatIndex
 } from "./common";
 
-export type LayersScene = {
+type LayersScene = {
   kind: "layers";
   id: string;
   sayIntro?: string;

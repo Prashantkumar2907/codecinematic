@@ -2,7 +2,7 @@ import type { CodeLang } from "./schema";
 
 export type Token = { text: string; color: string };
 
-export const CODE_COLORS = {
+const CODE_COLORS = {
   comment: "#7dd3a8",
   string: "#fda4af",
   keyword: "#c084fc",

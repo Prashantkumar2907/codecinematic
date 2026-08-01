@@ -14,7 +14,7 @@ import {
   activeBeatIndex
 } from "./common";
 
-export type MoleculeScene = {
+type MoleculeScene = {
   kind: "molecule";
   id: string;
   sayIntro?: string;

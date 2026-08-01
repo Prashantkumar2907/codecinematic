@@ -15,7 +15,7 @@ import {
 } from "./common";
 import { render3D, projectToRect, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 
-export type NumberlineScene = {
+type NumberlineScene = {
   kind: "numberline";
   id: string;
   sayIntro?: string;

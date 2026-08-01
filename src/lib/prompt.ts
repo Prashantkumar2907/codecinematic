@@ -635,7 +635,7 @@ Return STRICT JSON only:
 
 /** Directives learned from prior low ratings of THIS submodule — injected so each
  *  regeneration is a smarter fresh attempt, not a blind re-roll. */
-export function buildDirectivesBlock(directives?: string[]): string {
+function buildDirectivesBlock(directives?: string[]): string {
   if (!directives?.length) return "";
   return `
 LEARNED DIRECTIVES FOR THIS SUB-MODULE (a previous draft scored below bar; these are the fixes —

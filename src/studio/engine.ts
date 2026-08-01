@@ -27,7 +27,7 @@ export type BeatAudio = {
   words?: WordTiming[];
 };
 
-export type RenderPlan = {
+type RenderPlan = {
   script: SceneScript;
   timings: SceneTiming[];
   audio: BeatAudio[];
@@ -45,7 +45,7 @@ const MIN_SCENE_MS = 2800;
 const INTER_BEAT_GAP_MS = 180;
 /** Thinking time between a quiz question and its answer reveal — the painter
  *  shows a countdown ring over this window so viewers actually get to guess. */
-export const QUIZ_THINK_MS = 3200;
+const QUIZ_THINK_MS = 3200;
 const SCENE_TAIL_MS = 750;
 /* Shorts live or die on pace — trim the pauses between beats and scenes. */
 const SHORT_INTER_BEAT_GAP_MS = 140;
@@ -95,7 +95,7 @@ export function computeTimings(script: SceneScript, audio: BeatAudio[]): SceneTi
   return timings;
 }
 
-export function totalDurationMs(timings: SceneTiming[]): number {
+function totalDurationMs(timings: SceneTiming[]): number {
   const last = timings[timings.length - 1];
   return last ? last.startMs + last.durationMs + END_HOLD_MS : 0;
 }
