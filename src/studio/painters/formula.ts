@@ -16,12 +16,21 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  shade,
+  lerpColor,
+  STROKE,
+  RADIUS,
 } from "./common";
 import type { PaintEnv } from "./index";
 
+const SLAB_DEPTH = 0.12;
+const GRID_WORLD = 26;
+const IDLE_FACE_LIFT = 0.09;
+const ACTIVE_TINT = 0.24;
+
 type FormulaScene = Extract<Scene, { kind: "formula" }>;
 
-const INK_PANEL = "#0a0e13";
+const INK_PANEL = THEME.bgBottom;
 
 /** Count-up of a numeric result; keeps a trailing non-numeric suffix intact. */
 function fmtCount(target: string, t: number): string {
@@ -48,7 +57,8 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
-  const areaH = contentH - band;
+  // `contentH` put the result line at ~85% of frame height, under the burned-in caption.
+  const areaH = Math.max(unit * 4, layout.safeBottom - areaY);
 
   // Full equation as a token list: lhs symbol, "=", then op+symbol per term.
   const tokens: { text: string; kind: "lhs" | "eq" | "op" | "term"; termIndex?: number }[] = [
@@ -67,99 +77,42 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
 
   const nBlocks = tokens.filter(tk => tk.kind === "lhs" || tk.kind === "term").length;
   const rect = { x: contentX, y: areaY, w: contentW, h: areaH * 0.7 };
-  const spreadX = vertical ? 2.5 * nBlocks : 3.0 * nBlocks;
+  /**
+   * Tiles are a PIXEL row and the slabs are mapped onto it. They used to be spread in
+   * world space and viewed from (0, 12, 10), so each tile rendered a different size and
+   * every symbol — placed at the projected centre plus a pixel offset — floated above
+   * the tile it names instead of sitting on it.
+   * `qa/ledger.json` → systemic `2d-layout-round-tripped-through-camera`.
+   */
+  const tilePitch = contentW / Math.max(nBlocks, 1);
+  const tileW = Math.min(tilePitch - unit * 0.4, unit * 5.2);
+  const tileH = Math.min(tileW * 0.9, areaH * 0.3);
+  const rowCY = areaY + areaH * 0.42;
+  const tileRect = (i: number) => ({
+    x: contentX + i * tilePitch + (tilePitch - tileW) / 2,
+    y: rowCY - tileH / 2,
+    w: tileW,
+    h: tileH,
+    cx: contentX + (i + 0.5) * tilePitch,
+    cy: rowCY,
+  });
 
-  const worldPos = (idx: number) => {
-    const x = nBlocks === 1 ? 0 : (idx / (nBlocks - 1) - 0.5) * spreadX;
-    return new THREE.Vector3(x, 0, 0);
+  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
   };
 
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 12 : 10, vertical ? 10 : 8);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const grid = new THREE.GridHelper(Math.max(spreadX * 1.5, 10), 10, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
-
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 2, 10),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const blockW = Math.min((spreadX) / nBlocks * 0.8, 2.5);
-    const blockD = blockW;
-
-    const models: { mesh: THREE.Group, kind: string, idx: number, termIndex?: number }[] = [];
-    let bIdx = 0;
-    tokens.forEach((tk) => {
-      if (tk.kind === "lhs" || tk.kind === "term") {
-        const g = makeBlock(blockW, 0.4, blockD, "#1e293b", "#31435a");
-        g.position.copy(worldPos(bIdx));
-        s.add(g);
-        models.push({ mesh: g, kind: tk.kind, idx: bIdx, termIndex: tk.termIndex });
-        bIdx++;
-      }
-    });
-
-    const update = (elapsedMs: number, ctxData: { gIn: number, activeIdx: number, p: number }) => {
-      const { gIn, activeIdx, p } = ctxData;
-      
-      models.forEach(({ mesh, kind, idx, termIndex }) => {
-        mesh.visible = gIn > 0;
-        
-        let t = 1;
-        let isActive = false;
-        if (kind === "term" && termIndex !== undefined) {
-           const win = beatWindow(env.beats, offset + termIndex, totalBeats);
-           t = p >= win.start ? clamp01((p - win.start) / Math.max(win.end - win.start, 0.001)) : 0;
-           isActive = activeIdx === offset + termIndex;
-        } else if (kind === "lhs") {
-           t = 1;
-           isActive = activeIdx >= (resultBeat >= 0 ? resultBeat : -1);
-        }
-        
-        const scale = kind === "lhs" ? 1 : easeOutBack(clamp01(t / 0.42));
-        mesh.scale.setScalar(Math.max(0.001, scale * gIn));
-        
-        const baseP = worldPos(idx);
-        const bob = Math.sin(elapsedMs / 1200 + idx) * 0.05;
-        const pop = isActive ? 0.3 : 0;
-        mesh.position.y = baseP.y + bob + pop;
-
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.MeshPhysicalMaterial;
-                mat.transparent = true;
-                mat.opacity = gIn * 0.9;
-                if (isActive) {
-                    mat.color.setStyle(accent);
-                    mat.emissive.setStyle(accent);
-                    mat.emissiveIntensity = 0.5;
-                } else {
-                    mat.color.setStyle("#1e293b");
-                    mat.emissive.setStyle("#1e293b");
-                    mat.emissiveIntensity = 0.1;
-                }
-            }
-        });
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: frameIn, activeIdx: active, p: env.p }, env);
-  if (!cam) return;
+  /**
+   * No 3D layer. Each term's tile was a slab placed from a pixel rect on an even pitch,
+   * but the symbols are laid out by TEXT FLOW (measured glyph widths, operators
+   * interpolated between terms), so the two were never the same row: the tiles sat about
+   * half a tile to the right of the symbols they belong to. The tile is decorative — a
+   * panel behind a glyph — so it is drawn in 2D at the glyph's own position, where it
+   * cannot drift.
+   */
 
   const eqText = tokens.map((tk) => tk.text).join(" ");
   const eqPx = fitFontSize(ctx, eqText, {
@@ -178,47 +131,47 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
   
   tokens.forEach((tk) => {
     if (tk.kind === "lhs" || tk.kind === "term") {
-        const wp = worldPos(bIdx);
-        // Add same bob to 2D
-        const bob = Math.sin(env.elapsedMs / 1200 + bIdx) * unit * 1.5;
+        const tr = tileRect(bIdx);
         let isActive = false;
         if (tk.kind === "term" && tk.termIndex !== undefined) {
            isActive = active === offset + tk.termIndex;
         } else if (tk.kind === "lhs") {
            isActive = resultBeat >= 0 && active >= resultBeat;
         }
-        const pop = isActive ? unit * 4.0 : 0;
-        const p2d = projectToRect(cam, wp, rect);
-        p2d.y = p2d.y - bob - pop;
-        blockPositions.push({ ...p2d, kind: tk.kind, termIndex: tk.termIndex });
+        // On the tile, not above it: the old offset lifted the symbol a full 1.5u off a
+        // projected centre that was already in the wrong place.
+        const pop = isActive ? unit * 0.35 : 0;
+        blockPositions.push({ x: tr.cx, y: tr.cy - pop, kind: tk.kind, termIndex: tk.termIndex });
         bIdx++;
     }
   });
 
-  const xs: number[] = [];
-  const widths: number[] = [];
-  let blockIter = 0;
-  
+  // Widths first, positions second. An operator has to be placed in the GAP between the
+  // two panels beside it, and the panel is as wide as its glyph — interpolating between
+  // panel CENTRES put the "x" inside the much wider (1+r)^n panel.
+  ctx.font = `800 ${eqPx}px ${FONT_SANS}`;
+  const widths: number[] = tokens.map((tk) => ctx.measureText(tk.text).width);
+  const blockTokenIdx: number[] = [];
   tokens.forEach((tk, ti) => {
-    ctx.font = `800 ${eqPx}px ${FONT_SANS}`;
-    const w = ctx.measureText(tk.text).width;
-    widths.push(w);
-    
+    if (tk.kind === "lhs" || tk.kind === "term") blockTokenIdx.push(ti);
+  });
+  const panelPadX = unit * 0.55;
+  const xs: number[] = [];
+  let blockIter = 0;
+
+  tokens.forEach((tk, ti) => {
+    const w = widths[ti];
     if (tk.kind === "lhs" || tk.kind === "term") {
-      const pos = blockPositions[blockIter];
-      xs.push(pos.x - w/2);
+      xs.push(blockPositions[blockIter].x - w / 2);
       blockIter++;
+    } else if (blockIter > 0 && blockIter < blockPositions.length) {
+      const leftTi = blockTokenIdx[blockIter - 1];
+      const rightTi = blockTokenIdx[blockIter];
+      const leftEdge = blockPositions[blockIter - 1].x + widths[leftTi] / 2 + panelPadX;
+      const rightEdge = blockPositions[blockIter].x - widths[rightTi] / 2 - panelPadX;
+      xs.push((leftEdge + rightEdge) / 2 - w / 2);
     } else {
-      // interpolate for ops and eq
-      if (blockIter > 0 && blockIter < blockPositions.length) {
-         const p1 = blockPositions[blockIter - 1];
-         const p2 = blockPositions[blockIter];
-         // center between p1 and p2
-         const cx = (p1.x + p2.x) / 2;
-         xs.push(cx - w/2);
-      } else {
-         xs.push(contentX + contentW/2);
-      }
+      xs.push(contentX + contentW / 2);
     }
   });
 
@@ -246,6 +199,28 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
                  cy = (p1.y + p2.y) / 2 - unit * 1.0;
              }
         }
+    }
+
+    if (tk.kind === "lhs" || tk.kind === "term") {
+      // The panel, drawn where the glyph actually is.
+      const isActive =
+        tk.kind === "term" && tk.termIndex !== undefined
+          ? active === offset + tk.termIndex
+          : resultBeat >= 0 && active >= resultBeat;
+      const padX = panelPadX;
+      const padY = unit * 0.45;
+      const pw = w + padX * 2;
+      const ph = eqPx * 1.25 + padY * 2;
+      ctx.save();
+      ctx.globalAlpha = frameIn;
+      roundRect(ctx, cx - pw / 2, cy - ph / 2, pw, ph, unit * RADIUS.sm);
+      ctx.fillStyle = isActive ? lerpColor(THEME.panel, accent, ACTIVE_TINT) : shade(THEME.panel, IDLE_FACE_LIFT);
+      ctx.fill();
+      roundRect(ctx, cx - pw / 2, cy - ph / 2, pw, ph, unit * RADIUS.sm);
+      ctx.strokeStyle = rgba(isActive ? accent : THEME.textDim, isActive ? 0.9 : 0.35);
+      ctx.lineWidth = unit * (isActive ? STROKE.base : STROKE.thin);
+      ctx.stroke();
+      ctx.restore();
     }
 
     if (tk.kind === "lhs" || tk.kind === "eq") {
@@ -299,7 +274,7 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
       ctx.font = `800 ${eqPx}px ${FONT_SANS}`;
       ctx.fillStyle = THEME.textFaint;
       ctx.fillText(tk.text, cx, cy + eqPx * 0.35);
-      ctx.strokeStyle = "rgba(148,163,184,0.35)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.35);
       ctx.lineWidth = unit * 0.06;
       ctx.setLineDash([unit * 0.3, unit * 0.25]);
       ctx.beginPath();
@@ -437,7 +412,7 @@ function drawGloss(
   ctx.shadowBlur = 0;
   roundRect(ctx, chX, chY, cw, chH, unit * 0.32);
   ctx.strokeStyle = rgba(colors.accent, 0.6);
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = unit * STROKE.thin;
   ctx.stroke();
   ctx.fillStyle = THEME.text;
   ctx.textAlign = "center";

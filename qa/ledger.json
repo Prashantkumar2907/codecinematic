@@ -876,18 +876,18 @@
     "formula": {
       "wave": 1,
       "group": "STEM",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "2/3/3/2/2 -> 4/4/4/4/5. Every term symbol floated above the tile it names. Tiles were slabs spread in world space and viewed from (0,12,10), while the symbols are laid out by TEXT FLOW \u2014 measured glyph widths, operators interpolated between terms \u2014 so the two were never the same row; the symbol also carried a deliberate unit * 1.5 lift off an already-wrong projected centre. The 3D layer is gone: the tile is decorative, a panel behind a glyph, so it is drawn in 2D at the glyph's own position where it cannot drift. The active term is a tinted panel with an accent border (it used to be a full-accent slab). Operators were placed between panel CENTRES, which put the \"\u00d7\" inside the much wider (1+r)\u207f panel \u2014 widths are now measured in their own pass first and each operator sits in the gap between the two panels' edges. contentH -> layout.safeBottom: the result line \"1000 \u00d7 1.61 = 1,610\" was drawn at ~85% of frame height, under the caption. 1 absolute-px stroke -> STROKE; 7 colour literals -> 0. edge-check 0.0% both aspects, console.log empty.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "curves": {
       "wave": 1,
