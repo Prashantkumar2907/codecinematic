@@ -1,10 +1,12 @@
 import * as THREE from "three";
 import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutCubic, enterT, wrapText, drawSceneTitle, beatT, activeBeatIndex, shade, DUR, GLOW } from "./common";
+import { THEME, FONT_SANS, easeOutCubic, enterT, wrapText, drawSceneTitle, beatT, activeBeatIndex, lerpColor, shade, DUR, GLOW } from "./common";
 import type { PaintEnv } from "./index";
 
 type TimelineScene = Extract<Scene, { kind: "timeline" }>;
+
+const CURRENT_TINT = 0.22;
 
 export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScene, env: PaintEnv) {
   const isHorizontal = (scene.orient ?? "vertical") === "horizontal" && !env.layout.vertical;
@@ -126,8 +128,11 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
         mesh.scale.setScalar(pop);
         mesh.visible = appear > 0.01;
         
+        // z stays at 0. Pushing the current card to 0.5 moved it toward a perspective
+        // camera, which scales and shifts its projection while the 2D label is drawn
+        // from the z=0 position — the one thing the shared bob above exists to prevent.
         const at = bobbedPos(idx, elapsedMs);
-        mesh.position.set(at.x, at.y, isCurrent ? 0.5 : 0);
+        mesh.position.set(at.x, at.y, 0);
 
         mesh.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
@@ -135,13 +140,11 @@ export function paintTimeline(ctx: CanvasRenderingContext2D, scene: TimelineScen
                 mat.transparent = true;
                 mat.opacity = appear * 0.9;
                 
-                if (isCurrent) {
-                    mat.color.setStyle(accent);
-                    mat.emissive.setStyle(accent);
-                } else {
-                    mat.color.setStyle(panelFill);
-                    mat.emissive.setStyle(panelFill);
-                }
+                // A tinted panel, not solid accent: THEME.text on full #38bdf8 measures
+                // about 1.9:1, so the current card was the least readable one on screen.
+                const face = isCurrent ? lerpColor(panelFill, accent, CURRENT_TINT) : panelFill;
+                mat.color.setStyle(face);
+                mat.emissive.setStyle(face);
             }
         });
       });

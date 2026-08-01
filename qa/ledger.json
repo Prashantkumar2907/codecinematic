@@ -412,18 +412,18 @@
     "timeline": {
       "wave": 1,
       "group": "Charts",
-      "status": "todo",
-      "rounds": 0,
+      "status": "passed",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 4,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "4/4/4/3/4 -> 4/4/4/4/5. The best-shape painter of this sweep before it started: the caption-safe clamp, one shared world-space bob used by BOTH the slab and its 2D label, per-block projected half-width for the text bound, and a context arg were all already in place from the Phase 1-2 work, and there were no colour literals. Two things left. The current card was pushed to z=0.5, which moves it toward a perspective camera \u2014 scaling and shifting its projection while the 2D label is still drawn from the z=0 position, i.e. exactly the drift the shared bob exists to prevent; z now stays 0 and \"current\" is carried by tint plus glow. The current card was filled solid accent with THEME.text on it, about 1.9:1 \u2014 the least readable card on screen was the one being talked about; now a 0.22 tint of the panel. edge-check 0.0% both aspects.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "ledger": {
       "wave": 1,
