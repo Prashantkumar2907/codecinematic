@@ -284,18 +284,18 @@
     "browserframe": {
       "wave": 1,
       "group": "Code",
-      "status": "todo",
-      "rounds": 0,
+      "status": "in-progress",
+      "rounds": 1,
       "scores": {
-        "containment": null,
-        "typography": null,
-        "motion": null,
-        "cleanliness": null,
-        "palette": null
+        "containment": 4,
+        "typography": 4,
+        "motion": 4,
+        "cleanliness": 3,
+        "palette": 5
       },
-      "summary": "",
+      "summary": "2/4/4/3/2 -> 4/4/4/3/5 \u2014 NOT a pass: cleanliness is still 3. Fixed: the window frame ran to ~90% of frame height in 9:16, so the bottom of the browser chrome sat under the burned-in caption while ~45% of the window was empty below its own content (contentH -> layout.safeBottom). That clamp then exposed a second bug: the window's world size was the literals spreadX/spreadY = 3.5/5.5, which only filled the rect at the aspect they were tuned for, so a shorter viewport projected the window ~35% narrower and the chrome bar \u2014 whose URL and phase chips are laid out in pixels from the projected window \u2014 no longer had room for both, printing the chips over the URL. World size now comes from the frustum (frustumHalfExtent's arithmetic, the documented fix with three callers), and the URL's width bound and clip reserve the measured badge run, which nothing did before. roleFill returns rgba tints that were handed to THREE.Color: alpha dropped, so every hero, card, image and button block rendered at FULL accent or secondary in 3D and warned every frame \u2014 new roleFace gives the 3D layer opaque equivalents (console.log 6.9KB -> empty). 11 colour literals -> 0; #f87171 kept for the macOS traffic light, which is a real-world reference, not palette semantics. STILL OPEN: the hero block renders with a diagonal right edge \u2014 a large triangular wedge from the top-centre of the page card to its lower right. Present in the very first capture, before any edit in this sweep, so it is not a regression; it is a stray fill/clip path that needs its own round. edge-check 0.0% both aspects.",
       "commit": "",
-      "date": ""
+      "date": "2026-08-01"
     },
     "threads": {
       "wave": 1,

@@ -16,6 +16,9 @@ import {
   activeBeatIndex,
   rgba,
   type Palette,
+  shade,
+  STROKE,
+  lerpColor,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -24,8 +27,10 @@ type BlockRole = BrowserframeScene["blocks"][number]["role"];
 type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number };
 
 const GRID = 12;
-const SKELETON_FILL = "rgba(148,163,184,0.06)";
+const SKELETON_FILL = rgba(THEME.textDim, 0.06);
 const CARET_MS = 530;
+/** Fraction of the visible frustum the browser window occupies. */
+const WINDOW_FILL = 0.92;
 const SHIMMER_MS = 900;
 
 function roleFill(role: BlockRole, palette: Palette): string | null {
@@ -43,12 +48,33 @@ function roleFill(role: BlockRole, palette: Palette): string | null {
   }
 }
 
+/**
+ * Opaque equivalent of `roleFill` for the 3D layer. `roleFill` returns rgba tints, which
+ * are correct for a canvas fill but are handed to `THREE.Color`, and three.js DROPS the
+ * alpha — so every hero, card, image and button block rendered at FULL accent or
+ * secondary in 3D instead of the intended tint, and warned about it every frame.
+ */
+function roleFace(role: BlockRole, palette: Palette): string {
+  switch (role) {
+    case "hero":
+    case "card":
+      return lerpColor(THEME.panel, palette.accent, 0.14);
+    case "image":
+      return lerpColor(THEME.panel, palette.secondary, 0.14);
+    case "header":
+    case "button":
+      return lerpColor(THEME.panel, palette.accent, 0.2);
+    case "text":
+      return shade(THEME.panel, 0.09);
+  }
+}
+
 function roleBorder(role: BlockRole, palette: Palette): string {
   switch (role) {
     case "image":
       return rgba(palette.secondary, 0.55);
     case "text":
-      return "rgba(148,163,184,0.55)";
+      return rgba(THEME.textDim, 0.55);
     default:
       return rgba(palette.accent, 0.55);
   }
@@ -143,7 +169,7 @@ function drawGlyphs(
       if (painted) {
         ctx.fillStyle = palette.accent;
         ctx.fill();
-        ctx.fillStyle = "#06121a";
+        ctx.fillStyle = shade(THEME.panel, -0.35);
       } else {
         ctx.stroke();
       }
@@ -153,7 +179,7 @@ function drawGlyphs(
     case "card": {
       const pad = Math.min(unit * 0.2, r.w * 0.06);
       ctx.save();
-      ctx.fillStyle = painted ? rgba(palette.secondary, 0.16) : "rgba(148,163,184,0.08)";
+      ctx.fillStyle = painted ? rgba(palette.secondary, 0.16) : rgba(THEME.textDim, 0.08);
       roundRect(ctx, r.x + pad, r.y + pad, r.w - pad * 2, r.h * 0.42, unit * 0.15);
       ctx.fill();
       ctx.restore();
@@ -178,7 +204,10 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
   const base = easeOutCubic(enterT(env, 380));
   if (base <= 0) return;
 
-  const rect = { x: contentX, y: contentY, w: contentW, h: contentH };
+  // `contentH` ran the window frame to ~90% of frame height in 9:16, so the bottom of
+  // the browser chrome sat under the burned-in caption while ~45% of the window was
+  // empty below its own content.
+  const rect = { x: contentX, y: contentY, w: contentW, h: Math.max(unit * 6, layout.safeBottom - contentY) };
   
   type Anim = { show: number | null; paint: number | null; shifts: { beat: number; y: number }[] };
   const anims = new Map<string, Anim>(scene.blocks.map((b) => [b.id, { show: null, paint: null, shifts: [] }]));
@@ -195,18 +224,30 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     if (st.shift) anims.get(st.shift.block)?.shifts.push({ beat, y: st.shift.y });
   });
 
-  const spreadX = vertical ? 3.5 : 5.5;
-  const spreadY = vertical ? 5.5 : 3.5;
+  /**
+   * World size comes from the FRUSTUM, not from literals. `spreadX/spreadY` of 3.5/5.5
+   * only filled the rect at the aspect they were tuned for: once the viewport was clamped
+   * to the caption band the same block projected ~35% narrower, and the chrome bar — whose
+   * URL and phase chips are laid out in pixels from the projected window — no longer had
+   * room for both, so the chips printed over the URL. `frustumHalfExtent`
+   * (`three3d.ts:139`) is the documented fix for exactly this and had three callers.
+   */
+  const CAM_DIST = vertical ? 15 : 12;
+  const camFov = vertical ? 45 : 36;
+  const halfH = Math.tan((camFov * Math.PI) / 360) * CAM_DIST;
+  const halfW = halfH * (rect.w / rect.h);
+  const spreadX = halfW * WINDOW_FILL;
+  const spreadY = halfH * WINDOW_FILL;
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, 0, vertical ? 15 : 12);
+    const camera = new THREE.PerspectiveCamera(camFov, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, CAM_DIST);
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
     
     // Grid floor
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadY) * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(Math.max(spreadX, spreadY) * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -1.0;
@@ -225,7 +266,7 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     s.add(shadowPlane);
 
     // Browser back window
-    const browserGroup = makeBlock(spreadX * 2.0, spreadY * 2.0, 0.3, "#06121a", "#31435a");
+    const browserGroup = makeBlock(spreadX * 2.0, spreadY * 2.0, 0.3, shade(THEME.panel, -0.35), shade(THEME.panel, 0.22));
     s.add(browserGroup);
 
     const models: { mesh: THREE.Group, block: typeof scene.blocks[0] }[] = [];
@@ -294,8 +335,9 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
                 mat.transparent = true;
                 if (!painted && ts <= 0) {
                     mat.opacity = 0.1 * gIn;
-                    mat.color.setStyle("#1e293b");
-                    mat.emissive.setStyle("#1e293b");
+                    const idleFace = shade(THEME.panel, 0.09);
+                    mat.color.setStyle(idleFace);
+                    mat.emissive.setStyle(idleFace);
                 } else if (!painted && ts > 0) {
                     mat.opacity = 0.4 * gIn;
                     mat.color.setStyle(THEME.panel);
@@ -304,8 +346,9 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
                     mat.opacity = 0.95 * gIn;
                     const fill = roleFill(block.role, palette);
                     if (fill) {
-                        mat.color.setStyle(fill);
-                        mat.emissive.setStyle(fill);
+                        const face = roleFace(block.role, palette);
+                        mat.color.setStyle(face);
+                        mat.emissive.setStyle(face);
                     } else {
                         mat.color.setStyle(THEME.panel);
                         mat.emissive.setStyle(THEME.panel);
@@ -336,6 +379,8 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
   const py0 = barBotR.y;
   const barH = barBotR.y - barTopL.y;
 
+  // macOS traffic lights are a real-world reference, not palette semantics: red/amber/green
+  // is what a browser window looks like. `#f87171` has no palette equivalent.
   const lights = ["#f87171", THEME.warn, THEME.good] as const;
   lights.forEach((c, i) => {
     ctx.fillStyle = rgba(c, 0.5);
@@ -350,17 +395,28 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
   const fy = py0 - Math.abs(barH) / 2 - fh / 2;
   
   roundRect(ctx, fx, fy, fw, fh, fh / 2);
-  ctx.fillStyle = "rgba(10,14,19,0.7)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.7);
   ctx.fill();
   roundRect(ctx, fx, fy, fw, fh, fh / 2);
-  ctx.strokeStyle = "rgba(148,163,184,0.3)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = rgba(THEME.textDim, 0.3);
+  ctx.lineWidth = unit * STROKE.thin;
   ctx.stroke();
+
+  // Badges are laid out right-to-left from the end of the bar, the URL left-to-right from
+  // its start, and nothing reserved space between them: on a narrower window the phase
+  // chips printed straight over the URL ("HTMLapdrsedcopaint").
+  const badgeDefs: { text: string; beat: number }[] = [];
+  scene.steps.forEach((st, k) => {
+    if (st.badge) badgeDefs.push({ text: st.badge, beat: offset + k });
+  });
+  const visibleBadges = badgeDefs.filter((b) => beatT(env.beats, b.beat, totalBeats, env.p) > 0);
+  ctx.font = `600 ${unit * 0.5}px ${FONT_MONO}`;
+  const badgesW = visibleBadges.reduce((acc, b) => acc + ctx.measureText(b.text).width + unit * 0.55 + unit * 0.2, 0);
 
   const t0 = beatT(env.beats, 0, totalBeats, env.p);
   const typed = Math.round(clamp01(t0 / 0.85) * scene.url.length);
   const urlPx = fitFontSize(ctx, scene.url, {
-    maxW: fw - unit * 2.0,
+    maxW: Math.max(unit * 3, fw - unit * 2.0 - badgesW),
     startPx: unit * 0.6,
     minPx: unit * 0.36,
     weight: 500,
@@ -370,7 +426,12 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
   const shown = scene.url.slice(0, typed);
   const textX = fx + unit * 1.05;
   ctx.fillStyle = THEME.textDim;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(textX - unit * 0.1, fy, Math.max(unit, fx + fw - badgesW - unit * 0.4 - textX), fh);
+  ctx.clip();
   ctx.fillText(shown, textX, fy + fh / 2 + urlPx * 0.35);
+  ctx.restore();
   if (Math.floor(env.elapsedMs / CARET_MS) % 2 === 0) {
     const cw2 = ctx.measureText(shown).width;
     ctx.fillStyle = accent;
@@ -378,11 +439,7 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
   }
 
   // Badges
-  const badges: { text: string; beat: number }[] = [];
-  scene.steps.forEach((st, k) => {
-    if (st.badge) badges.push({ text: st.badge, beat: offset + k });
-  });
-  const shownBadges = badges.filter((b) => beatT(env.beats, b.beat, totalBeats, env.p) > 0);
+  const shownBadges = visibleBadges;
   let bx = fx + fw - unit * 0.25;
   for (let i = shownBadges.length - 1; i >= 0; i--) {
     const b = shownBadges[i];
