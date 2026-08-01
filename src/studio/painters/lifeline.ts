@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeServerRack, makeDatabaseStack, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -18,6 +16,7 @@ import {
   beatWindow,
   beatT,
   activeBeatIndex,
+  lerpColor,
   rgba,
 } from "./common";
 import type { PaintEnv } from "./index";
@@ -27,10 +26,11 @@ type LifelineScene = Extract<Scene, { kind: "lifeline" }>;
 const PAST_ALPHA = 0.55;
 const MIN_SLOTS = 4;
 const CROSS = 0.45;
+const HOT_TINT = 0.2;
 
 export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, vertical } = layout;
   const { accent, accentGlow, secondary, secondaryGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.messages.length;
@@ -48,7 +48,8 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
   const chipW = Math.min(colW - unit * 0.5, unit * 7);
   const chipY = contentY + titleBand + unit * 1.0; // shifted down slightly for 3D room
   const lifelinesTop = chipY + chipH + unit * 0.35;
-  const lifelinesBottom = vertical ? Math.min(contentY + contentH, layout.h * 0.86) : contentY + contentH;
+  // `h * 0.86` ran the lifelines and their last message under the caption band.
+  const lifelinesBottom = layout.safeBottom;
   const lifelinesH = lifelinesBottom - lifelinesTop;
   const slotY = (k: number) => lifelinesTop + (k + 0.5) * (lifelinesH / Math.max(scene.messages.length, MIN_SLOTS));
 
@@ -56,79 +57,23 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
   const hot = activeStep >= 0 ? scene.messages[activeStep] : null;
   const hotT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
 
-  const spreadX = vertical ? 4.5 : 6;
-  const spreadZ = vertical ? 6 : 4.5;
-  const worldPos = (px: number, py: number) => {
-    const nx = (px - (contentX + contentW / 2)) / contentW;
-    const ny = (py - (contentY + titleBand + lifelinesH / 2)) / lifelinesH;
-    return new THREE.Vector3(nx * spreadX * 2, 0, ny * spreadZ * 2);
-  };
+  /**
+   * No 3D layer. The server racks and database stacks behind this diagram were placed
+   * by mapping pixel coordinates into world space and viewing them through a camera at
+   * (0, 15, 12), so they could not line up with a pixel-true lifeline: they sat between
+   * the lanes, overlapped the message rows, and one of them projected a bar off the
+   * left edge of the frame. They carried nothing the actor chips do not already say —
+   * each chip has the actor's icon — so a sequence diagram is clearer without them.
+   */
 
-  const key = scene.id + "-ll3d";
-  const rect3d = { x: contentX, y: contentY + titleBand, w: contentW, h: contentH - titleBand };
-
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 44 : 38, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 15 : 12, vertical ? 12 : 9);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, "rgba(148,163,184,0.5)");
-
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
-
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models = scene.actors.map((actor, i) => {
-      const isDB = actor.icon === "🗄️" || actor.icon === "💾" || actor.id.toLowerCase().includes("db");
-      const g = isDB ? makeDatabaseStack(1.2, 2.8, "#1e293b", accent) : makeServerRack(2.2, 2.8, 1.5, "#1e293b", accent);
-      s.add(g);
-      return { id: actor.id, index: i, mesh: g, actor };
-    });
-
-    const update = (elapsedMs: number) => {
-      models.forEach(({ id, index, mesh }) => {
-        const isHot = !!hot && (hot.from === id || hot.to === id);
-        
-        const chipIn = easeOutCubic(enterT(env, 320, 40 + index * 70));
-        const pop = easeOutBack(chipIn);
-        const pulse = isHot ? 1 + 0.015 * Math.sin(elapsedMs / 220) : 1;
-        
-        mesh.scale.setScalar(Math.max(0.001, pop * pulse));
-        mesh.visible = chipIn > 0;
-        
-        const wp = worldPos(xById.get(id) ?? contentX, chipY);
-        mesh.position.set(wp.x, (chipIn <= 0 ? -0.5 : 0) + (isHot ? 0.2 : 0) + Math.sin(elapsedMs / 1500 + index) * 0.05, wp.z);
-        
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.Material;
-                mat.transparent = true;
-                mat.opacity = chipIn;
-            }
-        });
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect3d, build, env.elapsedMs, null, env);
-  if (!cam) return;
-
-  const getProjPos = (px: number, py: number) => {
-    return projectToRect(cam, worldPos(px, py), rect3d);
-  };
+  /**
+   * The 2D layer is pixel-true. Round-tripping every point through the tilted camera
+   * made the lifelines splay outward as they descended, so each one drifted away from
+   * the chip that names it and the message arrows landed short of their own lifeline.
+   * The 3D racks behind stay as ambient scenery; they carry no information the 2D
+   * layer does not.
+   */
+  const getProjPos = (px: number, py: number) => ({ x: px, y: py });
 
   for (let i = 0; i < n; i++) {
     const actor = scene.actors[i];
@@ -165,18 +110,16 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
       const x = xById.get(actorId);
       if (x === undefined) continue;
       
-      const topProj = getProjPos(x, slotY(firstIdx) - unit * 0.5);
-      const botProj = getProjPos(x, slotY(activeStep) + unit * 0.5);
-      
-      const angle = Math.atan2(botProj.y - topProj.y, botProj.x - topProj.x);
-      const dist = Math.hypot(botProj.y - topProj.y, botProj.x - topProj.x);
-      
+      // A plain vertical bar on the lane. It used to be drawn by rotating to
+      // atan2(dy, dx): when an actor's first message came AFTER the current step dy went
+      // negative, the bar rotated to -90 degrees and was drawn horizontally off the left
+      // edge of the frame.
+      const y0 = Math.min(slotY(firstIdx), slotY(activeStep)) - unit * 0.5;
+      const y1 = Math.max(slotY(firstIdx), slotY(activeStep)) + unit * 0.5;
       ctx.save();
       ctx.globalAlpha = 0.25 * barIn;
       ctx.fillStyle = accent;
-      ctx.translate(topProj.x, topProj.y);
-      ctx.rotate(angle);
-      roundRect(ctx, -unit * 0.13, 0, unit * 0.26, dist, unit * 0.13);
+      roundRect(ctx, x - unit * 0.13, y0, unit * 0.26, y1 - y0, unit * 0.13);
       ctx.fill();
       ctx.restore();
     }
@@ -218,7 +161,7 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
       const trailY = fromProj.y + (toProj.y - fromProj.y) * Math.max(prog - 0.07, 0);
       
       ctx.globalAlpha = (isCurrent ? 1 : PAST_ALPHA) * 0.35;
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = THEME.text;
       ctx.beginPath();
       ctx.arc(trailX, trailY, unit * 0.12, 0, Math.PI * 2);
       ctx.fill();
@@ -227,13 +170,13 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.9;
       if (msg.style === "return") {
-        ctx.strokeStyle = "#eaf6ff";
+        ctx.strokeStyle = THEME.text;
         ctx.lineWidth = unit * 0.08;
         ctx.beginPath();
         ctx.arc(tip.x, tip.y, unit * 0.2, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        ctx.fillStyle = "#eaf6ff";
+        ctx.fillStyle = THEME.text;
         ctx.beginPath();
         ctx.arc(tip.x, tip.y, unit * 0.22, 0, Math.PI * 2);
         ctx.fill();
@@ -264,7 +207,7 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
         ctx.globalAlpha = 0.85 * Math.sin(Math.PI * f);
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.7;
-        ctx.fillStyle = "#eaf6ff";
+        ctx.fillStyle = THEME.text;
         ctx.beginPath();
         ctx.arc(dx - dir * unit * 0.1, dy, unit * 0.15, 0, Math.PI * 2);
         ctx.fill();
@@ -281,13 +224,12 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
     const isHot = !!hot && (hot.from === actor.id || hot.to === actor.id);
     const pop = easeOutBack(chipIn) * (isHot ? 1 + 0.012 * Math.sin(env.elapsedMs / 220) : 1);
     
-    // Project the 3D block's front-top position to anchor the label chip
-    const wp = worldPos(cx, chipY);
-    const frontTop = new THREE.Vector3(wp.x, 1.4, wp.z + 1.0);
-    const projChip = projectToRect(cam, frontTop, rect3d);
-    
-    const chipX = projChip.x;
-    const cyMid = projChip.y;
+    // The chip sits where its LIFELINE is, in pixels. Anchoring it to the projected
+    // front-top of the 3D prop pulled the three chips toward the vanishing point until
+    // they overlapped each other ("Auth server" was covered by "API"), and detached
+    // every chip from the dashed lifeline that belongs to it.
+    const chipX = cx;
+    const cyMid = chipY + chipH / 2;
 
     ctx.save();
     ctx.globalAlpha = chipIn;
@@ -304,13 +246,13 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
       ctx.shadowOffsetY = 3;
     }
     roundRect(ctx, chipX - chipW / 2, cyMid - chipH / 2, chipW, chipH, chipH / 2);
-    ctx.fillStyle = isHot ? "#0e2433" : THEME.panel;
+    ctx.fillStyle = isHot ? lerpColor(THEME.panel, accent, HOT_TINT) : THEME.panel;
     ctx.fill();
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
     roundRect(ctx, chipX - chipW / 2, cyMid - chipH / 2, chipW, chipH, chipH / 2);
-    ctx.strokeStyle = isHot ? accent : "rgba(148,163,184,0.55)";
+    ctx.strokeStyle = isHot ? accent : rgba(THEME.textDim, 0.55);
     ctx.lineWidth = isHot ? unit * 0.1 : unit * 0.06;
     ctx.stroke();
 
@@ -355,7 +297,7 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
     ctx.font = `600 \${unit * 0.62}px \${FONT_SANS}`;
     const tw = ctx.measureText(msg.label).width;
     roundRect(ctx, projMid.x - tw / 2 - unit * 0.4, projMid.y - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.3);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = THEME.bgBottom;
     ctx.fill();
     ctx.strokeStyle = THEME.panelBorder;
     ctx.lineWidth = 1;
