@@ -294,7 +294,7 @@
         "palette": 5
       },
       "summary": "2/4/4/3/2 -> 4/4/4/4/5 (2 rounds). The diagonal wedge across the hero block was the browser group being ROTATED: rotation.x/.y of +/-0.04 rad plus a 0.15-unit bob on browserGroup, while the block meshes are added to the scene rather than to that group and every piece of 2D chrome is projected from unrotated coordinates \u2014 so the panel skewed behind content that could not follow it. That is the systemic rule verbatim: never scale, rotate or bob the 3D group afterwards. Removed, along with the +0.1 z push on the painted block (it moved toward the camera while its 2D glyphs were drawn from get2D(..., 0.2)). Round 1 fixed: the window ran to ~90% of frame height with ~45% of it empty below its own content (contentH -> layout.safeBottom); that clamp then exposed the window's world size being the literals 3.5/5.5, which only fill the rect at the aspect they were tuned for, so a shorter viewport projected it ~35% narrower and the chrome chips printed over the URL \u2014 size now comes from the frustum, and the URL's width bound and clip reserve the measured badge run, which nothing did before. roleFill returns rgba tints that were handed to THREE.Color: alpha dropped, so every hero/card/image/button block rendered at FULL accent or secondary in 3D and warned every frame \u2014 new roleFace gives the 3D layer opaque equivalents (console.log 6.9KB -> empty). 11 colour literals -> 0; #f87171 kept for the macOS traffic light, a real-world reference rather than palette semantics. edge-check 0.0% both aspects.",
-      "commit": "d8cc229",
+      "commit": "409cc2d",
       "date": "2026-08-01"
     },
     "threads": {
