@@ -24,7 +24,8 @@ Seconds are ESTIMATES at `SPOKEN_WORDS_PER_SEC = 2.62` (≈157 wpm), speech only
 | Audio over single-beat static cards | **27.8%** (68.9 of 248.0 min) | < 10.0% |
 | Long videos: static-card scenes | **40.2%** (170 of 423), 25.9% of runtime | — |
 | Seconds per visual change (mean beat) | **8.2 s** | 4-8 s |
-| Beats over 12 s | **354** of 1814 | 0 |
+| Beats over 12 s (baseline metric) | **354** of 1814 | 0 |
+| Beats over the per-format gate (9 s short / 12 s long) | **427** of 1814 | 0 |
 | Worst single beat | **26.7 s** (terminal) | ≤ 12 s |
 | `bigtext` share of all scenes | **18.8%** (154 scenes) | — |
 | `bigtext` seconds per card (long) | **15.3 s** median, 26.3 s worst | — |
@@ -65,12 +66,12 @@ Thresholds (`GATE_THRESHOLDS` in pacing.ts): ≥3 overlong beats · ≥3 crutch 
 | definition opener | 3 of 88 | 3.4% |
 | too many title cards | 24 of 88 | 27.3% |
 | frozen card | 28 of 88 | 31.8% |
-| beat length | 24 of 88 | 27.3% |
+| beat length | 40 of 88 | 45.5% |
 | filler openers | 23 of 88 | 26.1% |
 | no breathing room | 23 of 88 | 26.1% |
 | no running example | 14 of 88 | 15.9% |
 | unexplained jargon | 10 of 88 | 11.4% |
-| **any gate** | **48 of 88** | **54.5%** |
+| **any gate** | **56 of 88** | **63.6%** |
 
 ### Jargon anchoring
 

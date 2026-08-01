@@ -4,10 +4,10 @@ import type { SceneScript } from "@/studio/schema";
 import {
   pacingReport,
   jargonReport,
-  OVERLONG_BEAT_SEC,
+  overlongBeatSec,
   SPOKEN_WORDS_PER_SEC,
   STATIC_CARD_SHARE_TARGET,
-  VISUAL_CHANGE_TARGET_SEC,
+  VISUAL_CHANGE_TARGET_BY_FORMAT,
 } from "@/studio/pacing";
 
 /** Sections a script is graded on, benchmarked against the best channels in the niche. */
@@ -125,9 +125,9 @@ function measuredFactsBlock(script: SceneScript): string {
 MEASURED FACTS (computed from the beat structure at ${SPOKEN_WORDS_PER_SEC} spoken words/sec, itself
 measured against real TTS output — treat these as ground truth, do NOT re-estimate them):
 - runtime ≈ ${s1(p.estSeconds / 60)} min across ${p.scenes} scenes / ${p.beats} beats / ${p.words} words
-- mean hold between visual changes: ${s1(p.secondsPerVisualChange)}s   (target ${VISUAL_CHANGE_TARGET_SEC.min}-${VISUAL_CHANGE_TARGET_SEC.max}s)
+- mean hold between visual changes: ${s1(p.secondsPerVisualChange)}s   (target ${VISUAL_CHANGE_TARGET_BY_FORMAT[script.format].min}-${VISUAL_CHANGE_TARGET_BY_FORMAT[script.format].max}s for a ${script.format})
 - p90 hold ${s1(p.visualHoldP90)}s, worst single hold ${s1(p.worstVisualHoldSeconds)}s
-- beats over ${OVERLONG_BEAT_SEC}s: ${p.overlongBeats.length} of ${p.beats}${worst.length ? ` — worst: ${worst.map((b) => `${b.beatId} (${b.kind}, ${s1(b.seconds)}s)`).join(", ")}` : ""}
+- beats over ${overlongBeatSec(script.format)}s: ${p.overlongBeats.length} of ${p.beats}${worst.length ? ` — worst: ${worst.map((b) => `${b.beatId} (${b.kind}, ${s1(b.seconds)}s)`).join(", ")}` : ""}
 - audio playing over a single-beat static card: ${(p.staticCardShare * 100).toFixed(1)}% (target < ${STATIC_CARD_SHARE_TARGET * 100}%), ${p.staticCardScenes} of ${p.scenes} scenes
 - "bigtext" cards: ${bigtext}${script.format === "long" ? " (a long video is allowed 2: hook + recap)" : ""}
 - distinct scene kinds: ${p.distinctKinds}

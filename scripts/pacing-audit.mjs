@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   pacingReport, jargonReport, singleBeatCapSeconds,
   staticCardOverrun, overlongBeats, definitionOpener, tooManyBigtext, crutchPhrases, runningExampleWeak, jargonUnanchored, unbrokenClause,
-  OVERLONG_BEAT_SEC, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC, GATE_THRESHOLDS,
+  OVERLONG_BEAT_SEC, OVERLONG_BEAT_SEC_BY_FORMAT, SPOKEN_WORDS_PER_SEC, STATIC_CARD_SHARE_TARGET, VISUAL_CHANGE_ACCEPT_SEC, GATE_THRESHOLDS,
 } from "../src/studio/pacing.ts";
 import { narrationWordCount } from "../src/studio/schema.ts";
 import * as DEMO from "../src/studio/demo.ts";
@@ -137,6 +137,11 @@ const totals = rows.reduce(
     a.staticSeconds += p.staticCardSeconds;
     a.staticScenes += p.staticCardScenes;
     a.overlong += p.overlongBeats.length;
+    // Kept at a FIXED 12 s: PROGRESS.md tracks "Beats over 12 s" as a baseline
+    // metric, and `p.overlongBeats` became per-format in 13.1, so the two are no
+    // longer the same number. Reporting only the gate tally would silently
+    // redefine a recorded baseline.
+    a.over12 += p.beatSeconds.filter((b) => b.seconds > OVERLONG_BEAT_SEC).length;
     a.crutch += p.crutchHits.length;
     if (p.opensWithStaticCard) a.opensStatic += 1;
     if (p.opensWithInherentCard) a.opensInherentCard += 1;
@@ -157,7 +162,7 @@ const totals = rows.reduce(
   },
   {
     scripts: 0, scenes: 0, beats: 0, words: 0, seconds: 0, staticSeconds: 0, staticScenes: 0,
-    overlong: 0, crutch: 0, opensStatic: 0, opensInherentCard: 0, opensDefinition: 0,
+    overlong: 0, over12: 0, crutch: 0, opensStatic: 0, opensInherentCard: 0, opensDefinition: 0,
     opensDefinitionLoose: 0, definitionBeats: 0,
     long: 0, short: 0, longScenes: 0, longStaticScenes: 0, longSeconds: 0, longStaticSeconds: 0,
     coverage: [], kinds: new Map(), crutchBy: new Map(),
@@ -220,7 +225,8 @@ lines.push(
   `| Long videos: static-card scenes | **${pct(totals.longScenes ? totals.longStaticScenes / totals.longScenes : 0)}** (${totals.longStaticScenes} of ${totals.longScenes}), ${pct(totals.longSeconds ? totals.longStaticSeconds / totals.longSeconds : 0)} of runtime | — |`
 );
 lines.push(`| Seconds per visual change (mean beat) | **${s1(totals.beats ? totals.seconds / totals.beats : 0)} s** | ${VISUAL_CHANGE_ACCEPT_SEC.min}-${VISUAL_CHANGE_ACCEPT_SEC.max} s |`);
-lines.push(`| Beats over ${OVERLONG_BEAT_SEC} s | **${totals.overlong}** of ${totals.beats} | 0 |`);
+lines.push(`| Beats over ${OVERLONG_BEAT_SEC} s (baseline metric) | **${totals.over12}** of ${totals.beats} | 0 |`);
+lines.push(`| Beats over the per-format gate (${OVERLONG_BEAT_SEC_BY_FORMAT.short} s short / ${OVERLONG_BEAT_SEC_BY_FORMAT.long} s long) | **${totals.overlong}** of ${totals.beats} | 0 |`);
 lines.push(`| Worst single beat | **${s1(worstBeats[0]?.seconds ?? 0)} s** (${worstBeats[0]?.kind ?? "—"}) | ≤ ${OVERLONG_BEAT_SEC} s |`);
 lines.push(`| \`bigtext\` share of all scenes | **${pct(totals.scenes ? (totals.kinds.get("bigtext") ?? 0) / totals.scenes : 0)}** (${totals.kinds.get("bigtext") ?? 0} scenes) | — |`);
 lines.push(`| \`bigtext\` seconds per card (long) | **${s1(median(bigtextLong.map((b) => b.seconds)))} s** median, ${s1(Math.max(0, ...bigtextLong.map((b) => b.seconds)))} s worst | — |`);
@@ -360,7 +366,7 @@ if (OUT === "-") {
   console.log(`wrote ${OUT} — ${totals.scripts} scripts, ${totals.beats} beats, ${s1(totals.seconds / 60)} min est`);
   console.log(
     `static-card audio ${pct(totals.seconds ? totals.staticSeconds / totals.seconds : 0)} | ` +
-      `${totals.overlong} beats > ${OVERLONG_BEAT_SEC}s | ${totals.opensDefinition} definition openers | ${totals.crutch} crutch hits`
+      `${totals.over12} beats > ${OVERLONG_BEAT_SEC}s | ${totals.opensDefinition} definition openers | ${totals.crutch} crutch hits`
   );
   if (disagreements.length) console.error(`WARNING: ${disagreements.length} word-count disagreements — see ${OUT}`);
 }

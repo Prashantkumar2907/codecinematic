@@ -106,12 +106,43 @@ export const SPOKEN_WORDS_PER_SEC = WORDS_PER_SEC_BY_LANG.en;
 /**
  * A beat holds one visual state, so a beat longer than this is a frame the
  * viewer finished reading seconds ago. improvement_plan.md §7b: "no beat > 12 s".
+ *
+ * This is the LONG-form number and remains the default for prose that quotes a
+ * single figure. Prefer `overlongBeatSec(format)` anywhere a format is in scope.
  */
 export const OVERLONG_BEAT_SEC = 12;
+
+/**
+ * Per format, because 12 s means something completely different in each (§13a).
+ * The threshold was format-blind, and measured against the corpus that made it
+ * nearly dead on Shorts: at 12 s the gate fired on **1.5% of the 66 shorts**,
+ * while a 12-second beat inside a 45-second Short is 27% of the whole video on
+ * one frozen picture. The worst beat in a corpus Short is p50 15.3% and max
+ * 29.7% of its runtime, against p50 4.8% for a long.
+ *
+ * 9 s for shorts is picked the way every other gate here was — by firing rate
+ * against the corpus, into the 14-27% band the siblings hold: at >=3 beats, 8 s
+ * fires 42.4%, **9 s fires 25.8%**, 10 s fires 9.1%. It also lands beside the
+ * principled value: long's 12 s is 2x the top of its 4-6 s visual-change target,
+ * and 2x the researched 2-4 s Short cadence is 8 s.
+ */
+export const OVERLONG_BEAT_SEC_BY_FORMAT = { short: 9, long: OVERLONG_BEAT_SEC } as const;
+export function overlongBeatSec(format: SceneScript["format"]): number {
+  return OVERLONG_BEAT_SEC_BY_FORMAT[format];
+}
 
 /** Seconds between visual changes: §2 targets 4-6 s, §7b accepts 4-8 s. */
 export const VISUAL_CHANGE_TARGET_SEC = { min: 4, max: 6 } as const;
 export const VISUAL_CHANGE_ACCEPT_SEC = { min: 4, max: 8 } as const;
+
+/**
+ * A Short is watched on a swipe, so its cadence is the researched 2-4 s, not the
+ * 4-6 s a long earns (§13b). 72.6% of corpus Short beats already run over 4 s.
+ */
+export const VISUAL_CHANGE_TARGET_BY_FORMAT = {
+  short: { min: 2, max: 4 },
+  long: VISUAL_CHANGE_TARGET_SEC,
+} as const;
 
 /** Share of total audio allowed to play over a single-beat card (§7b: < 10%). */
 export const STATIC_CARD_SHARE_TARGET = 0.1;
@@ -558,7 +589,7 @@ export function staticCardOverrun(
       `change for that whole time.${others} ` +
       (collapsed
         ? `${worst.kind} supports several beats — give it at least 3 so the visual advances.`
-        : `Cut it to under ${Math.floor(OVERLONG_BEAT_SEC * SPOKEN_WORDS_PER_SEC)} words, or use a multi-beat kind.`),
+        : `Cut it to under ${Math.floor(overlongBeatSec(script.format) * SPOKEN_WORDS_PER_SEC)} words, or use a multi-beat kind.`),
   };
 }
 
@@ -585,7 +616,7 @@ export function overlongBeats(
   return {
     count: report.overlongBeats.length,
     detail:
-      `${report.overlongBeats.length} beat(s) run over ${OVERLONG_BEAT_SEC}s, so the visual holds ` +
+      `${report.overlongBeats.length} beat(s) run over ${overlongBeatSec(report.format)}s, so the visual holds ` +
       `while the voice keeps going. Worst: ${list}. Split each into two beats, or shorten it.`,
   };
 }
@@ -909,7 +940,7 @@ export function pacingReport(script: SceneScript): PacingReport {
 
     beatSeconds,
     sceneSeconds,
-    overlongBeats: beatSeconds.filter((b) => b.seconds > OVERLONG_BEAT_SEC),
+    overlongBeats: beatSeconds.filter((b) => b.seconds > overlongBeatSec(script.format)),
 
     staticCardScenes: staticCards.length,
     staticCardSeconds,
