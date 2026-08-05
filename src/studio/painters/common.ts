@@ -16,6 +16,14 @@ export const THEME = {
   textFaint: "rgba(148,163,184,0.76)",
   good: "#4ade80",
   warn: "#facc15",
+  /**
+   * The third semantic state. `good` and `warn` existed and this did not, so 17
+   * painters hardcoded a red of their own and 12 of them re-typed this exact
+   * value — the palette gap was the cause, not carelessness. The one in this
+   * file's `SUBJECT_PALETTES` is a Business & Startups accent, not a semantic
+   * token, so it could not be reused.
+   */
+  danger: "#f87171",
 } as const;
 
 export const FONT_SANS = "'Plus Jakarta Sans', -apple-system, 'SF Pro Display', 'Segoe UI', Roboto, ui-sans-serif, sans-serif";

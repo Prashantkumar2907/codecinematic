@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
+import { render3D, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -8,6 +8,7 @@ import {
   easeOutBack,
   easeOutCubic,
   enterT,
+  idle,
   clamp01,
   roundRect,
   fitFontSize,
@@ -20,36 +21,115 @@ import type { PaintEnv } from "./index";
 
 type GaugeScene = Extract<Scene, { kind: "gauge" }>;
 
+/** Dial sweep, as maths angles (CCW from +X, +y up) — 220° opening downward. */
 const A_START = 200;
 const A_END = -20;
 const OVERSHOOT_PAD = 4;
 const MINOR_TICKS = 9;
-// Captions sit in the bottom ~14% of vertical frames; keep the legend above.
-const CAPTION_SAFE_Y = 0.86;
-const DANGER = "#f87171";
 const TONE_COLORS: Record<GaugeScene["zones"][number]["tone"], string> = {
   good: THEME.good,
   warn: THEME.warn,
-  danger: DANGER,
+  danger: THEME.danger,
 };
+
+// 3D dial, authored at radius 1 and scaled to the pixel radius R by update().
+const CAM_FOV = 32;
+const CAM_HALF_H = 5;
+const TRACK_TUBE = 0.085;
+/** The unfilled track shares the zones' radius, so it must be thinner AND set
+ *  back in z — coincident toruses z-fight into a dense radial stipple. */
+const TRACK_TUBE_SCALE = 0.7;
+const HUB_R = 0.15;
+const HUB_D = 0.11;
+const NEEDLE_LEN = 0.86;
+const NEEDLE_W = 0.055;
+const NEEDLE_D = 0.06;
+const TICK_LEN = 0.11;
+const TICK_W = 0.03;
+const TICK_R = 0.845;
+const TRACK_OPACITY = 0.24;
+const ZONE_OPACITY = 0.86;
+const ZONE_PULSE_GAIN = 0.13;
+
+// Pixel dial geometry, as multiples of the dial radius R. The PIXEL layout is
+// authoritative: the 3D dial is built at radius 1 and scaled to R, so 2D chrome
+// and 3D never disagree. Nothing here may be animated for the same reason.
+const READOUT_R = 0.44;
+const CHIP_R = 0.74;
+const MARKER_IN_R = 0.9;
+const MARKER_OUT_R = 1.14;
+/** Outer silhouette of the arc tube; every annotation is anchored beyond it. */
+const ARC_OUTER_R = 1 + TRACK_TUBE;
+const LABEL_PAD_U = 0.7;
+const DIAL_TOP_PAD_U = LABEL_PAD_U + 0.35;
+const DIAL_BOT_PAD_U = 0.7;
+/** |cos| above which a radial label reads better flush-left/right than centred. */
+const SIDE_ALIGN_COS = 0.4;
+
+// Entrance staging: everything arrives inside ~800ms, cascaded so no two tiers
+// land on the same tick, and nothing starts from zero scale.
+const TRACK_IN_MS = 300;
+const ZONE_IN_MS = 300;
+const ZONE_STAGGER_MS = 90;
+const TICK_IN_MS = 220;
+const TICK_STAGGER_MS = 18;
+const NEEDLE_IN_MS = 320;
+const NEEDLE_DELAY_MS = 190;
+const CHROME_IN_MS = 260;
+const ZONE_LABEL_DELAY_MS = 200;
+const MINMAX_DELAY_MS = 300;
+const READOUT_DELAY_MS = 340;
+const LEGEND_DELAY_MS = 400;
+const LEGEND_STAGGER_MS = 90;
+/** Idle life that outlasts the last reading, so long beats never freeze. */
+const PULSE_MS = 1800;
+const TREMOR_MS = 900;
+const TREMOR_DEG = 0.45;
+/** Needle reaches its target at 80% of the beat rather than 67% — less hold. */
+const SETTLE_SPEED = 1.25;
+
+const LEGEND_ROW_H_U = 2;
+const LEGEND_MAX_W_U = 14;
+const LEGEND_COL_W_U = 9;
+
+type GaugeCtx = {
+  scale: number;
+  posX: number;
+  posY: number;
+  trackIn: number;
+  zoneIn: number[];
+  tickIn: number[];
+  needleIn: number;
+  needleRad: number;
+  liveZone: number;
+  pulse: number;
+};
+
+function setGroupAlpha(group: THREE.Group, alpha: number) {
+  group.traverse((o) => {
+    const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
+    if (mat && !Array.isArray(mat)) {
+      mat.transparent = true;
+      mat.opacity = alpha;
+    }
+  });
+}
 
 export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, vertical } = layout;
   const { accent, accentGlow, secondary } = env.palette;
   const offset = introBeatCount(scene);
-  const totalBeats = offset + scene.readings.length;
+  const n = scene.readings.length;
+  const totalBeats = offset + n;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
-  const ah = safeBottom - ay;
+  const ah = layout.safeBottom - ay;
 
-  const r3D = vertical ? 3.5 : 4.5;
-  
   const range = Math.max(scene.max - scene.min, 1e-9);
   const v2a = (v: number) => A_START + (A_END - A_START) * clamp01((v - scene.min) / range);
   const rad = (deg: number) => (deg * Math.PI) / 180;
@@ -68,197 +148,276 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
     return u ? `${sign}${text}${u.startsWith("%") ? u : ` ${u}`}` : `${sign}${text}`;
   };
 
-  const k = Math.min(active - offset, scene.readings.length - 1);
+  const k = Math.min(active - offset, n - 1);
   const t = k >= 0 ? beatT(env.beats, offset + k, totalBeats, env.p) : 0;
   let needleVal = scene.min;
   if (k >= 0) {
     const fromV = k === 0 ? scene.min : scene.readings[k - 1].value;
-    needleVal = fromV + (scene.readings[k].value - fromV) * easeOutBack(clamp01(t * 1.5));
+    needleVal = fromV + (scene.readings[k].value - fromV) * easeOutBack(clamp01(t * SETTLE_SPEED));
   }
-  const rawAngle = A_START + ((A_END - A_START) * (needleVal - scene.min)) / range;
-  const tremor = 0.25 * Math.sin(env.elapsedMs / 450);
+  const rawAngle = v2a(scene.min) + ((A_END - A_START) * (needleVal - scene.min)) / range;
+  const tremor = TREMOR_DEG * (idle(env, TREMOR_MS) * 2 - 1);
   const needleAngle = Math.min(A_START + OVERSHOOT_PAD, Math.max(A_END - OVERSHOOT_PAD, rawAngle)) + tremor;
 
-  const zoneOf = (v: number): GaugeScene["zones"][number] | null => {
+  const zoneIndexOf = (v: number): number => {
     let prev = scene.min;
-    for (const zn of scene.zones) {
-      if (v <= zn.upTo && v >= prev) return zn;
-      prev = zn.upTo;
+    for (let i = 0; i < scene.zones.length; i++) {
+      if (v <= scene.zones[i].upTo && v >= prev) return i;
+      prev = scene.zones[i].upTo;
     }
-    return null;
+    return -1;
   };
-  const settled = k < 0 || t > 0.7;
-  const restZone = settled ? zoneOf(k >= 0 ? scene.readings[k].value : scene.min) : null;
+  const liveZone = zoneIndexOf(needleVal);
+  const pulse = idle(env, PULSE_MS);
 
-  const faceIn = easeOutCubic(enterT(env, 400));
-  const key = scene.id + "-gauge3d";
-  
-  const rect = { x: ax, y: ay, w: aw, h: ah };
+  // ---- pixel layout: legend box first, dial takes what is left ----------------
+  const legendRowH = Math.min(vertical ? unit * LEGEND_ROW_H_U : unit * 3, ah / Math.max(n, 1));
+  const legendBlockH = n * legendRowH + unit * 0.5;
+  const legW = vertical ? Math.min(aw, unit * LEGEND_MAX_W_U) : Math.min(aw * 0.34, unit * LEGEND_COL_W_U);
+  const legGutter = unit;
+  const regionW = vertical ? aw : aw - legW - legGutter;
+  const regionH = vertical ? ah - legendBlockH : ah;
 
-  const build = (): ThreeBundle => {
+  const zonePx = unit * 0.66;
+  const minmaxPx = unit * 0.62;
+  // Annotations are anchored radially OUTSIDE the arc, so the dial's horizontal
+  // reach is the arc plus one whole label — measure it, do not guess.
+  ctx.font = `700 ${zonePx}px ${FONT_SANS}`;
+  let labelW = 0;
+  for (const zn of scene.zones) if (zn.label) labelW = Math.max(labelW, ctx.measureText(zn.label).width);
+  ctx.font = `600 ${minmaxPx}px ${FONT_MONO}`;
+  labelW = Math.max(labelW, ctx.measureText(fmt(scene.min)).width, ctx.measureText(fmt(scene.max)).width);
+
+  const rByW = (regionW / 2 - unit * LABEL_PAD_U - labelW) / ARC_OUTER_R;
+  const rByH = (regionH - unit * (DIAL_TOP_PAD_U + DIAL_BOT_PAD_U)) / (ARC_OUTER_R + CHIP_R);
+  const R = Math.max(unit * 2, Math.min(rByW, rByH));
+  const dialHalfW = ARC_OUTER_R * R + unit * LABEL_PAD_U + labelW;
+  const dialTop = ARC_OUTER_R * R + unit * DIAL_TOP_PAD_U;
+  const usedH = dialTop + CHIP_R * R + unit * DIAL_BOT_PAD_U;
+
+  // 16:9 keeps dial and legend adjacent and centres the pair, so neither the
+  // gap between them nor the outer margins reads as a void.
+  const blockW = vertical ? 2 * dialHalfW : 2 * dialHalfW + legGutter + legW;
+  const blockX = ax + Math.max(0, (aw - blockW) / 2);
+  const cx = blockX + dialHalfW;
+  const cy = ay + Math.max(0, (regionH - usedH) / 2) + dialTop;
+  const legX = vertical ? ax + (aw - legW) / 2 : blockX + 2 * dialHalfW + legGutter;
+  const legTop = vertical ? ay + ah - legendBlockH : ay + (ah - n * legendRowH) / 2;
+  const at = (rf: number, deg: number) => ({ x: cx + Math.cos(rad(deg)) * R * rf, y: cy - Math.sin(rad(deg)) * R * rf });
+  /** Anchor for a label sitting just outside the arc at `deg`, aligned away from it. */
+  const radialLabel = (deg: number) => {
+    const c = Math.cos(rad(deg));
+    const p = at(ARC_OUTER_R + (unit * LABEL_PAD_U) / R, deg);
+    return { x: p.x, y: p.y, align: (c > SIDE_ALIGN_COS ? "left" : c < -SIDE_ALIGN_COS ? "right" : "center") as CanvasTextAlign };
+  };
+
+  // ---- 3D dial ---------------------------------------------------------------
+  const rect = { x: cx - dialHalfW, y: cy - dialTop, w: 2 * dialHalfW, h: usedH };
+  const pxPerWorld = rect.h / (2 * CAM_HALF_H);
+
+  const build = (): ThreeBundle<GaugeCtx> => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    // Gauge is round, place it near center
-    const gCx = vertical ? 0 : -2;
-    const gCz = 0;
-    camera.position.set(0, vertical ? 14 : 12, vertical ? 12 : 10);
+    const camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 0.1, 100);
+    camera.position.set(0, 0, CAM_HALF_H / Math.tan(rad(CAM_FOV / 2)));
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(14, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
+    const root = new THREE.Group();
+    s.add(root);
 
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(14, 14),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    // Track zones
-    const trackTube = 0.3;
-    let zoneStart = scene.min;
-    
-    const zoneMeshes: { mesh: THREE.Group, zn: any }[] = [];
-    
-    scene.zones.forEach((zn) => {
-      const tone = TONE_COLORS[zn.tone];
-      const aStart = v2a(zoneStart);
-      const aEnd = v2a(zn.upTo);
-      const arcLen = rad(aStart - aEnd);
-      
-      const geo = new THREE.TorusGeometry(r3D, trackTube, 16, 48, arcLen);
+    const arcMesh = (from: number, to: number, hex: string, emissive: number, tube: number) => {
+      const geo = new THREE.TorusGeometry(1, tube, 20, 96, rad(from - to));
       const mat = new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(tone),
-        emissive: new THREE.Color(tone),
-        emissiveIntensity: 0.2,
+        color: new THREE.Color(hex),
+        emissive: new THREE.Color(hex),
+        emissiveIntensity: emissive,
         metalness: 0.3,
-        roughness: 0.2,
+        roughness: 0.22,
         transparent: true,
-        opacity: 0.8
       });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.rotation.z = rad(aEnd);
-      
-      const group = new THREE.Group();
-      group.add(mesh);
-      group.rotation.x = -Math.PI / 2;
-      group.position.set(gCx, 0, gCz);
-      s.add(group);
-      
-      zoneMeshes.push({ mesh: group, zn });
+      mesh.rotation.z = rad(to);
+      return mesh;
+    };
+
+    const track = arcMesh(A_START, A_END, THEME.textDim, 0.05, TRACK_TUBE * TRACK_TUBE_SCALE);
+    (track.material as THREE.MeshPhysicalMaterial).depthWrite = false;
+    track.position.z = -TRACK_TUBE;
+    root.add(track);
+
+    const zoneMeshes: THREE.Mesh[] = [];
+    let zoneStart = scene.min;
+    scene.zones.forEach((zn) => {
+      const mesh = arcMesh(v2a(zoneStart), v2a(zn.upTo), TONE_COLORS[zn.tone], 0.2, TRACK_TUBE);
+      root.add(mesh);
+      zoneMeshes.push(mesh);
       zoneStart = zn.upTo;
     });
-    
-    // Hub
-    const hub = makeCylinder(0.6, 0.8, THEME.panel, "#31435a");
-    hub.position.set(gCx, 0.1, gCz);
-    s.add(hub);
 
-    // Needle
-    const needleGroup = new THREE.Group();
-    const needleLen = r3D * 0.9;
-    const needle = makeBlock(needleLen, 0.2, 0.4, accent, "#ffffff");
-    needle.position.set(needleLen / 2, 0.6, 0);
-    needleGroup.add(needle);
-    needleGroup.position.set(gCx, 0, gCz);
-    s.add(needleGroup);
-    
-    // Ticks
+    const ticks: THREE.Group[] = [];
     for (let i = 0; i < MINOR_TICKS; i++) {
-        const deg = A_START + ((A_END - A_START) * i) / (MINOR_TICKS - 1);
-        const tick = makeBlock(0.4, 0.1, 0.1, "#94a3b8", "#94a3b8");
-        const a = rad(deg);
-        tick.position.set(gCx + Math.cos(a) * (r3D - 0.6), 0.1, gCz - Math.sin(a) * (r3D - 0.6));
-        tick.rotation.y = a;
-        s.add(tick);
+      const a = rad(A_START + ((A_END - A_START) * i) / (MINOR_TICKS - 1));
+      const tick = makeBlock(TICK_LEN, TICK_W, TICK_W, THEME.textDim, THEME.textDim);
+      tick.position.set(Math.cos(a) * TICK_R, Math.sin(a) * TICK_R, TRACK_TUBE * 0.5);
+      tick.rotation.z = a;
+      root.add(tick);
+      ticks.push(tick);
     }
 
-    const update = (elapsedMs: number, ctxData: { gIn: number, needleAngleRad: number, pulsingZone: any, flash: number }) => {
-      const { gIn, needleAngleRad, pulsingZone, flash } = ctxData;
-      
-      s.scale.setScalar(Math.max(0.001, 0.9 * gIn + 0.1));
-      
-      needleGroup.rotation.y = needleAngleRad;
-      
-      zoneMeshes.forEach(({ mesh, zn }) => {
-          const child = mesh.children[0] as THREE.Mesh;
-          const mat = child.material as THREE.MeshPhysicalMaterial;
-          if (zn === pulsingZone) {
-              const alpha = 0.35 + 0.15 * (0.5 + 0.5 * Math.sin(elapsedMs / 300));
-              mat.opacity = 0.6 + alpha;
-              mat.emissiveIntensity = 0.5;
-          } else {
-              mat.opacity = 0.7;
-              mat.emissiveIntensity = 0.2;
-          }
+    const needleGroup = new THREE.Group();
+    const needle = makeBlock(NEEDLE_LEN, NEEDLE_W, NEEDLE_D, accent, THEME.text);
+    needle.position.set(NEEDLE_LEN / 2, 0, 0);
+    needleGroup.add(needle);
+    needleGroup.position.z = TRACK_TUBE * 1.3;
+    root.add(needleGroup);
+
+    const hub = makeCylinder(HUB_R, HUB_D, THEME.panel, accent);
+    hub.rotation.x = Math.PI / 2;
+    hub.position.z = TRACK_TUBE * 1.9;
+    root.add(hub);
+
+    const update = (_elapsedMs: number, c?: GaugeCtx) => {
+      if (!c) return;
+      root.position.set(c.posX, c.posY, 0);
+      root.scale.setScalar(c.scale);
+      (track.material as THREE.MeshPhysicalMaterial).opacity = TRACK_OPACITY * c.trackIn;
+      zoneMeshes.forEach((mesh, i) => {
+        const mat = mesh.material as THREE.MeshPhysicalMaterial;
+        const live = i === c.liveZone;
+        mat.opacity = ZONE_OPACITY * (c.zoneIn[i] ?? 0) * (live ? 1 - ZONE_PULSE_GAIN + ZONE_PULSE_GAIN * c.pulse : 0.78);
+        mat.emissiveIntensity = live ? 0.28 + 0.22 * c.pulse : 0.16;
       });
-      
-      const needleMat = (needle.children[0] as THREE.Mesh).material as THREE.MeshPhysicalMaterial;
-      if (flash > 0) {
-          needleMat.emissiveIntensity = 0.8;
-      } else {
-          needleMat.emissiveIntensity = 0.2;
-      }
+      ticks.forEach((tick, i) => setGroupAlpha(tick, 0.7 * (c.tickIn[i] ?? 0)));
+      needleGroup.rotation.z = c.needleRad;
+      needleGroup.scale.set(Math.max(0.001, c.needleIn), 1, 1);
+      setGroupAlpha(needle, c.needleIn);
+      setGroupAlpha(hub, c.trackIn);
     };
 
     return { scene: s, camera, update };
   };
 
-  const activeBeatLive = k >= 0 && active === offset + k && t < 1;
-  const pulsingZone = (restZone?.tone === "danger") ? restZone : null;
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { 
-      gIn: faceIn, 
-      needleAngleRad: rad(needleAngle),
-      pulsingZone,
-      flash: activeBeatLive ? 1 : 0
+  const trackIn = easeOutCubic(enterT(env, TRACK_IN_MS));
+  const zoneIn = scene.zones.map((_, i) => easeOutCubic(enterT(env, ZONE_IN_MS, i * ZONE_STAGGER_MS)));
+  const tickIn = Array.from({ length: MINOR_TICKS }, (_, i) =>
+    easeOutCubic(enterT(env, TICK_IN_MS, TRACK_IN_MS * 0.5 + i * TICK_STAGGER_MS))
+  );
+  const needleIn = easeOutCubic(enterT(env, NEEDLE_IN_MS, NEEDLE_DELAY_MS));
+
+  const cam = render3D<GaugeCtx>(
+    ctx,
+    scene.id + "-gauge3d",
+    rect,
+    build,
+    env.elapsedMs,
+    {
+      scale: R / pxPerWorld,
+      posX: (cx - (rect.x + rect.w / 2)) / pxPerWorld,
+      posY: -(cy - (rect.y + rect.h / 2)) / pxPerWorld,
+      trackIn,
+      zoneIn,
+      tickIn,
+      needleIn,
+      needleRad: rad(needleAngle),
+      liveZone,
+      pulse,
+    },
+    env
+  );
+
+  if (!cam) {
+    // WebGL-less fallback: the same dial, flat. Pixel geometry already decided it.
+    ctx.save();
+    ctx.lineWidth = R * TRACK_TUBE * 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, rad(-A_START), rad(-A_END));
+    ctx.strokeStyle = rgba(THEME.textDim, TRACK_OPACITY * trackIn);
+    ctx.stroke();
+    let flatStart = scene.min;
+    scene.zones.forEach((zn, i) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, rad(-v2a(flatStart)), rad(-v2a(zn.upTo)));
+      ctx.strokeStyle = rgba(TONE_COLORS[zn.tone], ZONE_OPACITY * (zoneIn[i] ?? 0));
+      ctx.stroke();
+      flatStart = zn.upTo;
+    });
+    const tip = at(NEEDLE_LEN * needleIn, needleAngle);
+    ctx.lineWidth = R * NEEDLE_W;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.strokeStyle = rgba(accent, needleIn);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * HUB_R, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(THEME.panel, trackIn);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- reading markers on the arc --------------------------------------------
+  scene.readings.forEach((rd, i) => {
+    const markerIn = i < k ? 1 : i === k ? easeOutCubic(clamp01(t * 1.2)) : 0;
+    if (markerIn <= 0) return;
+    const a = v2a(rd.value);
+    const from = at(MARKER_IN_R, a);
+    const to = at(MARKER_OUT_R, a);
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineWidth = unit * 0.16;
+    if (i === k) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * (0.5 + 0.4 * pulse);
+    }
+    ctx.strokeStyle = rgba(accent, (i === k ? 0.95 : 0.4) * markerIn);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
   });
-  if (!cam) return;
-  
-  const gCx = vertical ? 0 : -2;
-  const gCz = 0;
-  const get2D = (r: number, deg: number, y: number = 0) => projectToRect(cam, new THREE.Vector3(gCx + Math.cos(rad(deg)) * r, y, gCz - Math.sin(rad(deg)) * r), rect);
-  const center2D = get2D(0, 0, 0.8);
 
-  ctx.save();
-  ctx.globalAlpha = faceIn;
-
-  // Zone labels
+  // ---- zone labels -----------------------------------------------------------
   let zoneStart2 = scene.min;
-  scene.zones.forEach((zn) => {
-    const tone = TONE_COLORS[zn.tone];
+  scene.zones.forEach((zn, i) => {
     if (zn.label) {
-      const mid = (v2a(zoneStart2) + v2a(zn.upTo)) / 2;
-      const lp = get2D(r3D + 0.8, mid);
-      ctx.font = `600 ${unit * 0.55}px ${FONT_SANS}`;
-      ctx.fillStyle = rgba(tone, 0.85);
-      ctx.textAlign = "center";
-      ctx.fillText(zn.label, lp.x, lp.y + unit * 0.18);
-      ctx.textAlign = "start";
+      const labelIn = easeOutCubic(enterT(env, CHROME_IN_MS, ZONE_LABEL_DELAY_MS + i * ZONE_STAGGER_MS));
+      const lp = radialLabel((v2a(zoneStart2) + v2a(zn.upTo)) / 2);
+      const live = i === liveZone;
+      ctx.save();
+      ctx.globalAlpha = labelIn;
+      ctx.font = `700 ${zonePx}px ${FONT_SANS}`;
+      ctx.textAlign = lp.align;
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = rgba(TONE_COLORS[zn.tone], live ? 0.75 + 0.25 * pulse : 0.62);
+      ctx.fillText(zn.label, lp.x, lp.y);
+      ctx.restore();
     }
     zoneStart2 = zn.upTo;
   });
 
-  // Min/Max labels
-  ctx.font = `600 ${unit * 0.58}px ${FONT_MONO}`;
-  ctx.fillStyle = THEME.textDim;
-  ctx.textAlign = "center";
-  const minP = get2D(r3D + 1.2, A_START);
-  const maxP = get2D(r3D + 1.2, A_END);
-  ctx.fillText(fmt(scene.min), minP.x, minP.y + unit * 0.5);
-  ctx.fillText(fmt(scene.max), maxP.x, maxP.y + unit * 0.5);
-  ctx.textAlign = "start";
+  // ---- min / max labels ------------------------------------------------------
+  const minmaxIn = easeOutCubic(enterT(env, CHROME_IN_MS, MINMAX_DELAY_MS));
+  ctx.save();
+  ctx.globalAlpha = minmaxIn;
+  ctx.font = `600 ${minmaxPx}px ${FONT_MONO}`;
+  ctx.fillStyle = THEME.textFaint;
+  ctx.textBaseline = "middle";
+  // Both ends use the shared radial anchor, so they sit outside the arc at the
+  // same offset as every other dial label and align AWAY from it — centring them
+  // on the arc ends is what pushed them back over the track.
+  const minA = radialLabel(A_START);
+  const maxA = radialLabel(A_END);
+  ctx.textAlign = minA.align;
+  ctx.fillText(fmt(scene.min), minA.x, minA.y);
+  ctx.textAlign = maxA.align;
+  ctx.fillText(fmt(scene.max), maxA.x, maxA.y);
+  ctx.restore();
 
-  // Big live readout below the hub
-  const readoutW = vertical ? aw * 0.6 : aw * 0.4;
-  const valText = fmt(needleVal);
+  // ---- live readout ----------------------------------------------------------
+  const readoutIn = easeOutCubic(enterT(env, CHROME_IN_MS, READOUT_DELAY_MS));
+  const readoutW = Math.min(regionW * 0.62, R * 1.5);
   const vpx = fitFontSize(ctx, fmt(scene.max), {
     maxW: readoutW,
     startPx: unit * 1.9,
@@ -266,81 +425,77 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
     weight: 800,
     family: FONT_MONO,
   });
+  ctx.save();
+  ctx.globalAlpha = readoutIn;
   ctx.font = `800 ${vpx}px ${FONT_MONO}`;
   ctx.fillStyle = THEME.text;
   ctx.textAlign = "center";
-  ctx.fillText(valText, center2D.x, center2D.y + unit * 2.5);
-  ctx.textAlign = "start";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = accentGlow;
+  ctx.shadowBlur = unit * (0.2 + 0.5 * pulse);
+  ctx.fillText(fmt(needleVal), cx, cy + READOUT_R * R);
+  ctx.restore();
 
-  // Label chip
-  const chipY = center2D.y + unit * 3.5;
+  // ---- reading label chip ----------------------------------------------------
+  const chipY = cy + CHIP_R * R;
+  const chipPx = unit * 0.7;
   const drawLabelChip = (label: string, alpha: number) => {
     if (alpha <= 0) return;
     ctx.save();
-    ctx.globalAlpha = faceIn * alpha;
-    ctx.font = `600 ${unit * 0.66}px ${FONT_SANS}`;
+    ctx.globalAlpha = alpha;
+    ctx.font = `600 ${chipPx}px ${FONT_SANS}`;
     const tw = Math.min(ctx.measureText(label).width, readoutW);
-    roundRect(ctx, center2D.x - tw / 2 - unit * 0.4, chipY - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.32);
-    ctx.fillStyle = "#0a0e13";
+    roundRect(ctx, cx - tw / 2 - unit * 0.45, chipY - unit * 0.6, tw + unit * 0.9, unit * 1.2, unit * 0.34);
+    ctx.fillStyle = rgba(THEME.panel, 0.92);
     ctx.fill();
     ctx.strokeStyle = THEME.panelBorder;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * 0.06;
     ctx.stroke();
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
-    ctx.fillText(label, center2D.x, chipY + unit * 0.23);
-    ctx.textAlign = "start";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, cx, chipY);
     ctx.restore();
   };
   if (k >= 0) {
-    const labelIn = easeOutCubic(clamp01(t * 3));
-    if (k > 0 && labelIn < 1) drawLabelChip(scene.readings[k - 1].label, 1 - labelIn);
-    drawLabelChip(scene.readings[k].label, labelIn);
+    const chipIn = easeOutCubic(clamp01(t * 3)) * easeOutCubic(enterT(env, CHROME_IN_MS, READOUT_DELAY_MS));
+    if (k > 0 && chipIn < 1) drawLabelChip(scene.readings[k - 1].label, 1 - chipIn);
+    drawLabelChip(scene.readings[k].label, chipIn);
   }
-  ctx.restore();
 
-  // Readings legend
-  const legX = vertical ? ax : ax + aw * 0.58;
-  const legW = vertical ? aw : aw * 0.42;
-  const legTop = vertical ? center2D.y + unit * 4.6 : ay + unit * 0.5;
-  const legBottom = ay + ah;
-  const n = scene.readings.length;
-  const rowH = Math.min((legBottom - legTop) / n, unit * (vertical ? 2.4 : 3.0));
-  const listY = legTop + Math.max(0, (legBottom - legTop - n * rowH) / 2);
+  // ---- readings legend -------------------------------------------------------
   scene.readings.forEach((rd, i) => {
-    const state = offset + i < active || (offset + i === active && beatT(env.beats, offset + i, totalBeats, env.p) >= 1)
-      ? "past"
-      : offset + i === active
-        ? "active"
-        : "future";
-    const rowY = listY + i * rowH + rowH / 2;
+    const rowIn = easeOutCubic(enterT(env, CHROME_IN_MS, LEGEND_DELAY_MS + i * LEGEND_STAGGER_MS));
+    if (rowIn <= 0) return;
+    const reached = offset + i <= active;
+    const isCurrent = k >= 0 && i === k;
+    const rowY = legTop + unit * 0.25 + i * legendRowH + legendRowH / 2;
     ctx.save();
-    ctx.globalAlpha = faceIn * (state === "active" ? 1 : state === "past" ? 0.7 : 0.28);
-    const dotR = unit * 0.22 * (state === "active" ? 1 + 0.12 * Math.sin(env.elapsedMs / 320) : 1);
-    if (state === "active") {
+    ctx.globalAlpha = rowIn * (isCurrent ? 1 : reached ? 0.72 : 0.3);
+    ctx.textBaseline = "middle";
+    const dotR = unit * 0.22 * (isCurrent ? 1 + 0.14 * pulse : 1);
+    if (isCurrent) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.6;
     }
     ctx.beginPath();
     ctx.arc(legX + unit * 0.3, rowY, dotR, 0, Math.PI * 2);
-    ctx.fillStyle = state === "future" ? THEME.textFaint : accent;
+    ctx.fillStyle = reached ? accent : THEME.textFaint;
     ctx.fill();
     ctx.shadowBlur = 0;
-    const textX = legX + unit * 0.9;
-    ctx.font = `800 ${unit * (vertical ? 0.85 : 0.78)}px ${FONT_MONO}`;
+    ctx.font = `800 ${unit * 0.88}px ${FONT_MONO}`;
     const vText = fmt(rd.value);
     const vw = ctx.measureText(vText).width;
-    ctx.fillStyle = state === "active" ? THEME.text : THEME.textDim;
-    ctx.fillText(vText, legX + legW - vw, rowY + unit * 0.26);
+    ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
+    ctx.fillText(vText, legX + legW - vw, rowY);
     const lpx = fitFontSize(ctx, rd.label, {
-      maxW: legW - unit * 1.2 - vw,
-      startPx: unit * 0.74,
-      minPx: unit * 0.5,
-      weight: state === "active" ? 700 : 600,
+      maxW: legW - unit * 1.4 - vw,
+      startPx: unit * 0.8,
+      minPx: unit * 0.52,
+      weight: isCurrent ? 700 : 600,
     });
-    ctx.font = `${state === "active" ? 700 : 600} ${lpx}px ${FONT_SANS}`;
-    ctx.fillText(rd.label, textX, rowY + unit * 0.24);
+    ctx.font = `${isCurrent ? 700 : 600} ${lpx}px ${FONT_SANS}`;
+    ctx.fillText(rd.label, legX + unit * 0.9, rowY);
     ctx.restore();
   });
-  ctx.textAlign = "start";
 }
