@@ -216,6 +216,18 @@ export const easeOutBack = (t: number) => {
 };
 export const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 
+/**
+ * Clamp into `[lo, hi]`, collapsing to the midpoint when the range is inverted.
+ *
+ * Containment is rubric axis 1 and the range inverts exactly when a caller's
+ * element is wider than the box it must sit in — returning the midpoint keeps it
+ * centred and symmetrically overflowing instead of jammed against one edge,
+ * which is the readable failure. Callers that must not overflow at all cap the
+ * size against the box first and then clamp the position.
+ */
+export const clampRange = (v: number, lo: number, hi: number) =>
+  hi < lo ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
+
 /* ─────────────────────────── motion vocabulary ───────────────────────────────
  * Phase 9 of improvement_plan.md: `painters/` is ~40,000 lines and its shared
  * layer held THREE easing curves, so every painter invented its own timing,
