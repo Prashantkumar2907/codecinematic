@@ -304,7 +304,10 @@ export function lerpColor(from: string, to: string, t: number): string {
 export function stagger(
   i: number,
   n: number,
-  stepMs = DUR.step,
+  // Explicitly `number`: `DUR` is `as const`, so inferring from the default gave
+  // this parameter the literal type `70` and the helper rejected every computed
+  // step — which is the main thing a caller wants to pass it.
+  stepMs: number = DUR.step,
   direction: "in" | "out" | "center" = "in"
 ): number {
   if (n <= 1) return 0;
