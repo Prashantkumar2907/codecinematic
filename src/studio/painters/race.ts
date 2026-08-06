@@ -20,6 +20,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  seriesTints,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -74,7 +75,10 @@ export function paintRace(ctx: CanvasRenderingContext2D, scene: RaceScene, env: 
   const { layout } = env;
   const { unit, contentX, contentY, contentW, vertical, safeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
-  const tints = [accent, secondary, THEME.good, THEME.warn, THEME.danger];
+  // Not the literal [accent, secondary, good, warn, danger]: Money & Finance's accent
+  // IS THEME.good byte-identical and Business & Startups' secondary IS THEME.danger,
+  // and both subjects ship this kind — two racers were drawn in one colour.
+  const tints = seriesTints(accent, secondary, 5);
   const offset = introBeatCount(scene);
   const ncp = scene.checkpoints.length;
   const totalBeats = offset + ncp;

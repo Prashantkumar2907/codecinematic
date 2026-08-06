@@ -17,6 +17,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  seriesTints,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -46,7 +47,11 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
   const aw = contentW;
   const ah = contentH - band;
 
-  const segTints = [accent, secondary, THEME.good, THEME.warn, rgba(accent, 0.6), rgba(secondary, 0.6), rgba(THEME.good, 0.6), rgba(THEME.warn, 0.6)];
+  // Base four by measured separation, then the same four at 0.6 alpha for segments
+  // 5-8. The old literal repeated `accent` and `THEME.good` in both halves, so on a
+  // subject whose accent IS THEME.good four of the eight segments collapsed to two.
+  const segHues = seriesTints(accent, secondary, 4);
+  const segTints = [...segHues, ...segHues.map((c) => rgba(c, 0.6))];
   const totalW = scene.segments.reduce((s, g) => s + g.weight, 0) || 1;
   const expected = scene.segments.reduce((s, g) => s + (g.win ? g.weight : 0), 0) / totalW;
 

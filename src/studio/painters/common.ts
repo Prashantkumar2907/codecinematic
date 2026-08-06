@@ -236,6 +236,49 @@ export const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 export const clampRange = (v: number, lo: number, hi: number) =>
   hi < lo ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
 
+/** Euclidean RGB distance between two `#rrggbb` values. */
+export function rgbDist(a: string, b: string): number {
+  const na = parseInt(a.slice(1), 16);
+  const nb = parseInt(b.slice(1), 16);
+  const dr = ((na >> 16) & 255) - ((nb >> 16) & 255);
+  const dg = ((na >> 8) & 255) - ((nb >> 8) & 255);
+  const db = (na & 255) - (nb & 255);
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+/** Below this RGB distance two series read as one colour at glyph size. */
+export const TINT_MIN_DIST = 60;
+/** Ordered so a 4-long request yields the list `pictogram` validated before this moved here. */
+const SERIES_FALLBACKS = [THEME.good, THEME.warn, THEME.danger, THEME.text, THEME.secondary, THEME.accent];
+
+/**
+ * A distinguishable colour per series, starting from the subject's own accent pair.
+ *
+ * Subject accents and the semantic tokens are drawn from the same colour ranges, so
+ * the obvious `[accent, secondary, good, warn, …]` literal hands two series the SAME
+ * colour on real kits. Measured across the subject palettes: Money & Finance's accent
+ * IS `THEME.good` byte-identical (distance 0) and it ships `race`; Business & Startups'
+ * secondary IS `THEME.danger` (0) and it also ships `race`; Environment's accent sits
+ * 58 from `THEME.good` and it ships `radar`. Eleven pairs measure under 60 in total.
+ *
+ * Fallbacks are therefore chosen by distance from what is already in use, not by
+ * position. When the palette cannot supply `count` well-separated colours the list is
+ * padded with the remaining fallbacks anyway — a close colour beats an undefined slot,
+ * and the caller has asked for more series than the palette can actually distinguish.
+ */
+export function seriesTints(accent: string, secondary: string, count = 4): string[] {
+  const tints = [accent, secondary];
+  for (const cand of SERIES_FALLBACKS) {
+    if (tints.length >= count) break;
+    if (tints.every((t) => rgbDist(t, cand) >= TINT_MIN_DIST)) tints.push(cand);
+  }
+  for (const cand of SERIES_FALLBACKS) {
+    if (tints.length >= count) break;
+    if (!tints.includes(cand)) tints.push(cand);
+  }
+  return tints.slice(0, count);
+}
+
 /* ─────────────────────────── motion vocabulary ───────────────────────────────
  * Phase 9 of improvement_plan.md: `painters/` is ~40,000 lines and its shared
  * layer held THREE easing curves, so every painter invented its own timing,

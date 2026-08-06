@@ -16,6 +16,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  seriesTints,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -60,7 +61,9 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   const webIn = enterT(env, WEB_IN_MS);
   /** Last-quarter resolve: past polygons and legend rows lift so the comparison closes. */
   const settleIn = easeOutCubic(revealT(env, 0.78, 0.96));
-  const entColors = [accent, secondary, THEME.good];
+  // Environment ships this kind and its accent sits 58 from THEME.good, inside the
+  // 60 threshold at which two polygons read as one colour.
+  const entColors = seriesTints(accent, secondary, 3);
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 

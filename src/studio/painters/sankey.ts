@@ -18,6 +18,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  seriesTints,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -34,7 +35,10 @@ const REST_MIN_FRAC = 0.02;
 const CAPTION_SAFE_Y = 0.86;
 
 function branchTints(accent: string, secondary: string): string[] {
-  return [accent, secondary, THEME.good, THEME.warn, "#f472b6", "#22d3ee"];
+  // Was [accent, secondary, good, warn, "#f472b6", "#22d3ee"] — two hardcoded hex
+  // (rubric axis 5) plus the same accent/semantic collision measured across the
+  // subject palettes. Economy and Environment both ship this kind.
+  return seriesTints(accent, secondary, 6);
 }
 
 function sampleCubic(p0: Pt, c1: Pt, c2: Pt, p1: Pt): Pt[] {
