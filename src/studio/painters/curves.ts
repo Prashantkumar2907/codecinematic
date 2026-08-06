@@ -1,15 +1,14 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, type ThreeBundle, color3 } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
   FONT_SANS,
   easeOutCubic,
-  easeInOutCubic,
   enterT,
   idle,
   clamp01,
+  clampRange,
   roundRect,
+  fitFontSize,
   drawSceneTitle,
   drawArrowhead,
   strokePolylineProgress,
@@ -22,9 +21,17 @@ import type { PaintEnv } from "./index";
 type CurvesScene = Extract<Scene, { kind: "curves" }>;
 type Shape = CurvesScene["curves"][number]["shape"];
 
-const SAMPLES = 60;
-const INK_PANEL = "#0a0e13";
+const SAMPLES = 96;
 const BELL_EDGE = Math.exp(-2.25);
+/** Fraction of a curve's own beat spent drawing; the rest holds so the narration lands. */
+const DRAW_SHARE = 0.55;
+const FRAME_IN_MS = 320;
+/** Widest plot box allowed, so a function keeps a readable slope at 16:9. */
+const MAX_PLOT_ASPECT = 2.2;
+/** Beats a finished curve takes to hand its glow to the next one, instead of snapping. */
+const FOCUS_FADE_BEATS = 0.35;
+/** Draw fraction at which a curve's label starts arriving, so it lands with the stroke. */
+const CHIP_AT = 0.8;
 
 /** Function value in 0..1 for input t in 0..1. */
 function fn(shape: Shape, t: number): number {
@@ -53,254 +60,258 @@ function fn(shape: Shape, t: number): number {
 const curveColor = (i: number, palette: PaintEnv["palette"]): string =>
   i === 0 ? palette.accent : i === 1 ? palette.secondary : THEME.good;
 
+type Chip = { x: number; y: number; w: number; h: number; label: string; color: string; alpha: number };
+
 export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
-  const { accent, accentGlow, secondary } = env.palette;
+  const { unit, contentX, contentY, contentH, contentW, vertical, safeBottom } = layout;
+  const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.curves.length + (scene.mark ? 1 : 0);
   const markBeat = scene.mark ? totalBeats - 1 : -1;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const frameIn = easeOutCubic(enterT(env, 400));
-  const key = scene.id + "-crvs3d";
+  const frameIn = easeOutCubic(enterT(env, FRAME_IN_MS));
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
-  const areaH = contentH - band;
+  // The 9:16 caption band starts far above contentH's bottom; the plot and its
+  // x-axis label row must both clear it, so safeBottom is the authority here.
+  const areaBottom = Math.min(contentY + contentH, safeBottom);
+  const areaH = Math.max(unit * 6, areaBottom - areaY);
 
-  // Plot box with margins for axis labels.
-  const marginL = unit * 1.8;
-  const marginB = unit * 1.8;
-  const marginT = unit * 1.0;
-  const marginR = unit * 1.2;
-  const plotX = contentX + marginL;
+  const marginL = unit * (scene.yLabel ? 1.35 : 0.5);
+  const marginR = unit * 0.5;
+  const marginT = unit * 0.9;
+  const marginB = unit * (scene.xLabel ? 1.7 : 0.6);
   const plotY = areaY + marginT;
-  const plotW = contentW - marginL - marginR;
   const plotH = areaH - marginT - marginB;
-  const rect = { x: contentX, y: areaY, w: contentW, h: areaH };
+  // 16:9 leaves a 3.4:1 plot box if the full content width is used, which flattens
+  // every shape to a near-horizontal smear. Cap the box aspect and centre the
+  // whole axis-label + plot block instead.
+  const plotW = Math.min(contentW - marginL - marginR, plotH * MAX_PLOT_ASPECT);
+  const plotX = contentX + (contentW - (marginL + plotW + marginR)) / 2 + marginL;
 
-  const spreadX = vertical ? 5 : 7.5;
-  const spreadY = vertical ? 3.5 : 4.5;
-  
-  const worldPos = (t: number, yVal: number, zOffset: number) => {
-    return new THREE.Vector3((t - 0.5) * spreadX, yVal * spreadY, zOffset);
-  };
+  // Axes span the whole plot box and end in arrowheads; the data range stops one
+  // arrow-length short of each tip, so a curve terminates ON the axis at t=0 and
+  // v=0 yet never overshoots the frame or collides with an arrowhead.
+  const arrowPad = unit * 0.7;
+  const axisY = plotY + plotH;
+  const dataW = plotW - arrowPad;
+  const dataH = plotH - arrowPad;
+  const cxOf = (t: number) => plotX + t * dataW;
+  const cyOf = (v: number) => axisY - v * dataH;
 
-  const beatFrac = (b: number, p: number) => {
+  const beatFrac = (b: number) => {
     const win = beatWindow(env.beats, b, totalBeats);
-    return { started: p >= win.start, t: clamp01((p - win.start) / Math.max(win.end - win.start, 0.001)) };
-  };
-
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(1.5, vertical ? 6 : 5, vertical ? 8 : 7);
-    camera.lookAt(0, spreadY / 2, 0);
-    studioLights(s, accent, secondary);
-
-    const grid = new THREE.GridHelper(Math.max(spreadX * 1.5, 10), 10, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.1;
-    s.add(grid);
-
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 2, 10),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.1;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models: { mesh: THREE.Mesh, curveIdx: number, sampleIdx: number, t: number, yVal: number, zOffset: number }[] = [];
-    
-    scene.curves.forEach((cv, i) => {
-        const colorHex = curveColor(i, env.palette);
-        const geo = new THREE.SphereGeometry(0.06, 16, 16);
-        const mat = new THREE.MeshPhysicalMaterial({
-            color: new THREE.Color(colorHex),
-            emissive: new THREE.Color(colorHex),
-            emissiveIntensity: 0.2,
-            metalness: 0.2,
-            roughness: 0.1,
-            clearcoat: 1.0,
-        });
-        const zOffset = (i - (scene.curves.length - 1) / 2) * 0.4;
-        for (let k = 0; k <= SAMPLES; k++) {
-             const t = k / SAMPLES;
-             const yVal = clamp01(fn(cv.shape, t));
-             const mesh = new THREE.Mesh(geo, mat);
-             mesh.castShadow = true;
-             mesh.receiveShadow = true;
-             s.add(mesh);
-             models.push({ mesh, curveIdx: i, sampleIdx: k, t, yVal, zOffset });
-        }
-    });
-
-    const update = (elapsedMs: number, ctxData: { gIn: number, p: number, activeIdx: number }) => {
-      const { gIn, p, activeIdx } = ctxData;
-      models.forEach((m) => {
-          const { started, t: beatT } = beatFrac(offset + m.curveIdx, p);
-          const drawProg = easeInOutCubic(clamp01(beatT / 0.55));
-          
-          if (!started || m.t > drawProg) {
-              m.mesh.scale.setScalar(0.001);
-          } else {
-              const isActive = activeIdx === offset + m.curveIdx;
-              const bob = Math.sin(elapsedMs / 800 + m.sampleIdx * 0.1) * 0.05;
-              m.mesh.position.copy(worldPos(m.t, m.yVal, m.zOffset));
-              m.mesh.position.y += bob;
-              
-              const isTip = Math.abs(m.t - drawProg) < 0.05 && drawProg < 1;
-              const s = isTip ? 1.8 : 1.0;
-              m.mesh.scale.setScalar(s * gIn);
-              
-              const mat = m.mesh.material as THREE.MeshPhysicalMaterial;
-              mat.transparent = true;
-              mat.opacity = gIn * (isActive || activeIdx < offset + m.curveIdx ? 1 : 0.4);
-              if (isTip || (drawProg >= 1 && isActive)) {
-                 mat.emissiveIntensity = 0.8 + 0.4 * Math.sin(elapsedMs / 200);
-              } else {
-                 mat.emissiveIntensity = 0.2;
-              }
-          }
-      });
+    return {
+      started: env.p >= win.start,
+      t: clamp01((env.p - win.start) / Math.max(win.end - win.start, 0.001)),
     };
-
-    return { scene: s, camera, update };
   };
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: frameIn, p: env.p, activeIdx: active });
-  if (!cam) return;
+  // Continuous playhead in beat units. The glow used to key off the boolean
+  // `active === myBeat`, so 59% of the plot box's lit pixels vanished in the one
+  // frame the next beat began; emphasis has to be a ramp, not a flag.
+  const beatPos = active < 0 ? -1 : active + beatFrac(active).t;
+  const focusOf = (b: number) => clamp01(1 - clamp01(beatPos - b - 1) / FOCUS_FADE_BEATS);
 
-  // Axes in 2D projected from 3D coords for perfect overlay
-  const origin3D = worldPos(0, 0, 0);
-  const xMax3D = worldPos(1, 0, 0);
-  const yMax3D = worldPos(0, 1, 0);
-  
-  const origin2D = projectToRect(cam, origin3D, rect);
-  const xMax2D = projectToRect(cam, xMax3D, rect);
-  const yMax2D = projectToRect(cam, yMax3D, rect);
+  // ── grid + axes ──────────────────────────────────────────────────────────────
+  const gridIn = easeOutCubic(enterT(env, FRAME_IN_MS + 160, 120));
+  ctx.save();
+  ctx.globalAlpha = gridIn;
+  ctx.strokeStyle = rgba(THEME.textDim, 0.16);
+  ctx.lineWidth = unit * 0.03;
+  ctx.beginPath();
+  for (let k = 1; k <= 3; k++) {
+    const gx = cxOf(k / 4);
+    ctx.moveTo(gx, axisY);
+    ctx.lineTo(gx, cyOf(1));
+    const gy = cyOf(k / 4);
+    ctx.moveTo(plotX, gy);
+    ctx.lineTo(cxOf(1), gy);
+  }
+  ctx.stroke();
+  ctx.restore();
 
   ctx.save();
   ctx.globalAlpha = frameIn;
-  ctx.strokeStyle = "rgba(148,163,184,0.55)";
-  ctx.fillStyle = "rgba(148,163,184,0.55)";
-  ctx.lineWidth = unit * 0.06;
+  ctx.strokeStyle = rgba(THEME.textDim, 0.62);
+  ctx.fillStyle = rgba(THEME.textDim, 0.62);
+  ctx.lineWidth = unit * 0.055;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(origin2D.x, origin2D.y);
-  ctx.lineTo(xMax2D.x, xMax2D.y);
-  ctx.moveTo(origin2D.x, origin2D.y);
-  ctx.lineTo(yMax2D.x, yMax2D.y);
+  ctx.moveTo(plotX, plotY);
+  ctx.lineTo(plotX, axisY);
+  ctx.lineTo(plotX + plotW, axisY);
   ctx.stroke();
-  
-  const angleX = Math.atan2(xMax2D.y - origin2D.y, xMax2D.x - origin2D.x);
-  const angleY = Math.atan2(yMax2D.y - origin2D.y, yMax2D.x - origin2D.x);
-  drawArrowhead(ctx, xMax2D.x, xMax2D.y, angleX, unit * 0.45);
-  drawArrowhead(ctx, yMax2D.x, yMax2D.y, angleY, unit * 0.45);
-  
-  if (scene.xLabel) {
-    ctx.font = `600 ${unit * 0.6}px ${FONT_SANS}`;
-    ctx.fillStyle = THEME.textDim;
-    ctx.textAlign = "center";
-    ctx.fillText(scene.xLabel, xMax2D.x, xMax2D.y + unit * 1.1);
-  }
-  if (scene.yLabel) {
-    ctx.font = `600 ${unit * 0.6}px ${FONT_SANS}`;
-    ctx.fillStyle = THEME.textDim;
-    ctx.textAlign = "right";
-    ctx.fillText(scene.yLabel, yMax2D.x - unit * 0.5, yMax2D.y + unit * 0.2);
-  }
-  ctx.textAlign = "start";
+  drawArrowhead(ctx, plotX + plotW, axisY, 0, unit * 0.4);
+  drawArrowhead(ctx, plotX, plotY, -Math.PI / 2, unit * 0.4);
   ctx.restore();
 
-  // Draw 2D progressive curve strokes over the 3D spheres to connect them smoothly
+  const axisPx = unit * 0.68;
+  if (scene.xLabel) {
+    ctx.save();
+    ctx.globalAlpha = frameIn;
+    ctx.font = `600 ${axisPx}px ${FONT_SANS}`;
+    ctx.fillStyle = THEME.textDim;
+    ctx.textAlign = "center";
+    ctx.fillText(scene.xLabel, plotX + dataW / 2, axisY + unit * 1.15);
+    ctx.restore();
+  }
+  if (scene.yLabel) {
+    ctx.save();
+    ctx.globalAlpha = frameIn;
+    const yPx = fitFontSize(ctx, scene.yLabel, {
+      maxW: plotH * 0.85,
+      startPx: axisPx,
+      minPx: unit * 0.48,
+      weight: 600,
+    });
+    ctx.translate(plotX - unit * 0.73, plotY + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = `600 ${yPx}px ${FONT_SANS}`;
+    ctx.fillStyle = THEME.textDim;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(scene.yLabel, 0, 0);
+    ctx.restore();
+  }
+
+  // ── curves ───────────────────────────────────────────────────────────────────
+  const chipPx = unit * (vertical ? 0.78 : 0.74);
+  const chipH = chipPx * 1.7;
+  const chips: Chip[] = [];
+
+  const chipTop = plotY;
+  const chipBottom = axisY - chipH - unit * 0.12;
+
   scene.curves.forEach((cv, i) => {
-    const { started, t } = beatFrac(offset + i, env.p);
-    const isActive = active === offset + i;
+    const { started, t } = beatFrac(offset + i);
     const color = curveColor(i, env.palette);
-    
-    const zOffset = (i - (scene.curves.length - 1) / 2) * 0.4;
-    const pts2D: {x: number, y: number}[] = [];
-    for(let k=0; k<=SAMPLES; k++){
-       const ct = k / SAMPLES;
-       const cy = clamp01(fn(cv.shape, ct));
-       const wp = worldPos(ct, cy, zOffset);
-       const bob = Math.sin(env.elapsedMs / 800 + k * 0.1) * 0.05;
-       wp.y += bob;
-       pts2D.push(projectToRect(cam, wp, rect));
+    const focus = focusOf(offset + i);
+
+    const pts: { x: number; y: number }[] = [];
+    for (let k = 0; k <= SAMPLES; k++) {
+      const ct = k / SAMPLES;
+      pts.push({ x: cxOf(ct), y: cyOf(clamp01(fn(cv.shape, ct))) });
     }
 
-    if (!started) {
-      // Faint dashed ghost of the shape.
+    // easeOut, not easeInOut: an ease-in draw-on spends the first fifth of the
+    // beat producing sub-pixel length, which measured as ~40 frames of a lone
+    // head dot with no line behind it.
+    const drawProg = started ? easeOutCubic(clamp01(t / DRAW_SHARE)) : 0;
+
+    // The dashed shape stays under the stroke and fades as the stroke covers it,
+    // so it never blinks out of existence the frame its beat opens.
+    if (drawProg < 1) {
       ctx.save();
-      ctx.globalAlpha = frameIn * 0.12;
+      ctx.globalAlpha = gridIn * 0.16 * (1 - drawProg);
       ctx.strokeStyle = color;
-      ctx.lineWidth = unit * 0.08;
-      ctx.setLineDash([unit * 0.35, unit * 0.3]);
+      ctx.lineWidth = unit * 0.07;
+      ctx.lineCap = "round";
+      ctx.setLineDash([unit * 0.3, unit * 0.28]);
       ctx.beginPath();
-      pts2D.forEach((p, k) => (k === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      pts.forEach((pt, k) => (k === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.restore();
-      return;
     }
+    if (!started) return;
 
-    const drawProg = easeInOutCubic(clamp01(t / 0.55));
+    const breathe = drawProg >= 1 ? idle(env, 2600, i * 1.2) : 0;
+    const glow = focus * (0.55 + 0.45 * breathe);
 
     ctx.save();
-    ctx.globalAlpha = frameIn * (isActive || active < offset + i ? 1 : 0.8);
+    ctx.globalAlpha = frameIn;
     ctx.strokeStyle = color;
-    ctx.lineWidth = unit * 0.12;
+    ctx.lineWidth = unit * 0.13;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    if (isActive) {
-      ctx.shadowColor = rgba(color, 0.5);
-      ctx.shadowBlur = unit * 0.7;
+    if (glow > 0.01) {
+      ctx.shadowColor = rgba(color, 0.5 * glow);
+      ctx.shadowBlur = unit * 0.7 * glow;
     }
-    const tip = strokePolylineProgress(ctx, pts2D, drawProg);
+    const tip = strokePolylineProgress(ctx, pts, drawProg);
     ctx.shadowBlur = 0;
+    // Leading head. Gated on drawProg at both ends so it can neither appear as a
+    // bare disc before the stroke has length nor blink off as the stroke lands.
+    const headIn = clamp01(drawProg / 0.04) * clamp01((1 - drawProg) / 0.2);
+    if (headIn > 0) {
+      ctx.globalAlpha = frameIn * headIn;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, unit * 0.15 * headIn, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
 
-    // Label chip near the curve's end.
-    if (drawProg > 0.6) {
-      const end = pts2D[pts2D.length - 1];
-      const chipIn = easeOutCubic(clamp01((drawProg - 0.6) / 0.3));
+    if (drawProg > CHIP_AT) {
+      const chipIn = easeOutCubic(clamp01((drawProg - CHIP_AT) / (1 - CHIP_AT)));
+      const end = pts[pts.length - 1];
       ctx.save();
-      ctx.globalAlpha = frameIn * chipIn * (isActive || active < offset + i ? 1 : 0.8);
-      const chipPx = unit * (vertical ? 0.72 : 0.62);
-      const chipH = chipPx * 1.75;
       ctx.font = `700 ${chipPx}px ${FONT_SANS}`;
-      const tw = ctx.measureText(cv.label).width;
-      const cw = tw + unit * 0.8;
-      let chX = end.x - cw;
-      chX = Math.min(Math.max(chX, contentX), contentX + contentW - cw);
-      const chY = Math.min(Math.max(end.y - chipH / 2, plotY), origin2D.y - chipH - unit * 0.05);
-      roundRect(ctx, chX, chY, cw, chipH, unit * 0.3);
-      ctx.fillStyle = INK_PANEL;
-      ctx.fill();
-      roundRect(ctx, chX, chY, cw, chipH, unit * 0.3);
-      ctx.strokeStyle = rgba(color, 0.7);
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.textAlign = "center";
-      ctx.fillText(cv.label, chX + cw / 2, chY + chipH * 0.68);
-      ctx.textAlign = "start";
+      const cw = ctx.measureText(cv.label).width + unit * 0.8;
       ctx.restore();
+      const chipX = clampRange(end.x - cw, plotX + unit * 0.12, plotX + plotW - cw);
+      // Clear the curve across the chip's WHOLE x-span, not just at the endpoint:
+      // clearing the endpoint alone put "Demand" straight through the line it
+      // names, because a falling curve is higher everywhere left of its end.
+      let spanTop = end.y;
+      let spanBottom = end.y;
+      for (const pt of pts) {
+        if (pt.x < chipX - unit * 0.1 || pt.x > chipX + cw + unit * 0.1) continue;
+        if (pt.y < spanTop) spanTop = pt.y;
+        if (pt.y > spanBottom) spanBottom = pt.y;
+      }
+      const gap = unit * 0.3;
+      const up = spanTop - chipH - gap;
+      const down = spanBottom + gap;
+      const fits = (y: number) => y >= chipTop && y <= chipBottom;
+      const wantY = fits(up) ? up : fits(down) ? down : up;
+      chips.push({
+        x: chipX,
+        y: clampRange(wantY, chipTop, chipBottom),
+        w: cw,
+        h: chipH,
+        label: cv.label,
+        color,
+        alpha: frameIn * chipIn,
+      });
     }
   });
 
-  // Mark / intersection beat.
+  // Push overlapping chips apart before drawing, then re-clamp inside the plot.
+  chips.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < chips.length; i++) {
+    const prev = chips[i - 1];
+    const cur = chips[i];
+    const overlapsX = cur.x < prev.x + prev.w && prev.x < cur.x + cur.w;
+    if (overlapsX && cur.y < prev.y + prev.h + unit * 0.16) {
+      cur.y = clampRange(prev.y + prev.h + unit * 0.16, chipTop, chipBottom);
+    }
+  }
+  for (const chip of chips) {
+    ctx.save();
+    ctx.globalAlpha = chip.alpha;
+    ctx.font = `700 ${chipPx}px ${FONT_SANS}`;
+    roundRect(ctx, chip.x, chip.y, chip.w, chip.h, unit * 0.28);
+    ctx.fillStyle = rgba(THEME.panel, 0.94);
+    ctx.fill();
+    ctx.strokeStyle = rgba(chip.color, 0.75);
+    ctx.lineWidth = unit * 0.035;
+    ctx.stroke();
+    ctx.fillStyle = chip.color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(chip.label, chip.x + chip.w / 2, chip.y + chip.h * 0.54);
+    ctx.restore();
+  }
+
+  // ── mark / intersection beat ─────────────────────────────────────────────────
   if (markBeat >= 0 && scene.mark && active >= markBeat) {
-    const { t } = beatFrac(markBeat, env.p);
-    const reveal = easeOutCubic(clamp01(t / 0.4));
+    const { t } = beatFrac(markBeat);
     let f = scene.mark.x / 100;
     let my: number;
-    let color = accent;
-    let zOffset = 0;
+    let color: string;
 
     if (scene.curves.length >= 2) {
       const inter = intersectionNear(scene.curves[0].shape, scene.curves[1].shape, f);
@@ -311,82 +322,85 @@ export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, e
       my = clamp01(fn(scene.curves[0].shape, f));
       color = curveColor(0, env.palette);
     }
-    
-    // find nearest point index for bobbing sync
-    const k = Math.round(f * SAMPLES);
-    const bob = Math.sin(env.elapsedMs / 800 + k * 0.1) * 0.05;
-    
-    const wMark = worldPos(f, my, zOffset);
-    wMark.y += bob;
-    const wFloor = worldPos(f, 0, zOffset);
-    const wAxisY = worldPos(0, my, zOffset);
-    
-    const pMark = projectToRect(cam, wMark, rect);
-    const pFloor = projectToRect(cam, wFloor, rect);
-    const pAxisY = projectToRect(cam, wAxisY, rect);
 
-    // Crosshair dashed drops to both axes
-    ctx.save();
-    ctx.globalAlpha = frameIn * reveal;
-    ctx.strokeStyle = rgba(color, 0.6);
-    ctx.lineWidth = unit * 0.06;
-    ctx.setLineDash([unit * 0.3, unit * 0.25]);
-    ctx.beginPath();
-    ctx.moveTo(pMark.x, pMark.y);
-    ctx.lineTo(pFloor.x, pFloor.y);
-    ctx.moveTo(pMark.x, pMark.y);
-    // Project towards Y axis but parallel to floor X
-    ctx.lineTo(pAxisY.x, pAxisY.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
+    const mx = cxOf(f);
+    const myPx = cyOf(my);
+    const crossIn = easeOutCubic(clamp01(t / 0.3));
+    const ringIn = easeOutCubic(clamp01((t - 0.12) / 0.3));
+    const chipIn = easeOutCubic(clamp01((t - 0.32) / 0.36));
 
-    // Burst ring + point
-    const pulse = idle(env, 1900, 1);
-    ctx.save();
-    ctx.globalAlpha = frameIn * reveal;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = unit * 0.07;
-    ctx.beginPath();
-    ctx.arc(pMark.x, pMark.y, unit * (0.5 + 0.15 * pulse), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowColor = rgba(color, 0.7);
-    ctx.shadowBlur = unit * (0.6 + 0.4 * pulse);
-    ctx.fillStyle = "#eaf6ff";
-    ctx.beginPath();
-    ctx.arc(pMark.x, pMark.y, unit * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.restore();
+    if (crossIn > 0) {
+      ctx.save();
+      ctx.globalAlpha = frameIn * crossIn * 0.9;
+      ctx.strokeStyle = rgba(color, 0.6);
+      ctx.lineWidth = unit * 0.055;
+      ctx.setLineDash([unit * 0.3, unit * 0.25]);
+      ctx.beginPath();
+      ctx.moveTo(mx, myPx);
+      ctx.lineTo(mx, axisY - (axisY - myPx) * (1 - crossIn));
+      ctx.moveTo(mx, myPx);
+      ctx.lineTo(mx - (mx - plotX) * crossIn, myPx);
+      ctx.stroke();
+      ctx.restore();
+    }
 
-    // Label chip.
-    const chipIn = easeOutCubic(clamp01((t - 0.3) / 0.35));
+    if (ringIn > 0) {
+      const pulse = idle(env, 1900, 1);
+      ctx.save();
+      ctx.globalAlpha = frameIn * ringIn;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = unit * 0.065;
+      ctx.beginPath();
+      ctx.arc(mx, myPx, unit * (0.46 + 0.12 * pulse) * (0.6 + 0.4 * ringIn), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowColor = rgba(color, 0.7);
+      ctx.shadowBlur = unit * (0.55 + 0.35 * pulse);
+      ctx.fillStyle = THEME.text;
+      ctx.beginPath();
+      ctx.arc(mx, myPx, unit * 0.2 * ringIn, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
     if (chipIn > 0) {
+      const markPx = unit * (vertical ? 0.9 : 0.8);
+      const markH = markPx * 1.75;
       ctx.save();
       ctx.globalAlpha = frameIn * chipIn;
-      const markPx = unit * (vertical ? 0.76 : 0.66);
-      const markH = markPx * 1.8;
-      ctx.font = `700 ${markPx}px ${FONT_SANS}`;
-      const tw = ctx.measureText(scene.mark.label).width;
-      const cw = tw + unit * 0.9;
-      let chX = pMark.x - cw / 2;
-      chX = Math.min(Math.max(chX, contentX), contentX + contentW - cw);
-      const chY = Math.max(pMark.y - markH - unit * 0.75, plotY);
+      ctx.font = `800 ${markPx}px ${FONT_SANS}`;
+      const cw = ctx.measureText(scene.mark.label).width + unit * 0.9;
+      const chX = clampRange(mx - cw / 2, plotX, plotX + plotW - cw);
+      // Every direction out of an intersection has a curve in it, so the badge is
+      // lifted clear of the crossing wedge and tied back with a leader instead of
+      // hugging the mark, where it sat straight on top of both lines.
+      const ringR = unit * 0.46;
+      const lift = unit * 2.6;
+      const above = myPx - markH - lift >= plotY;
+      const chY = clampRange(
+        above ? myPx - markH - lift : myPx + lift,
+        plotY,
+        axisY - markH - unit * 0.12
+      );
+      ctx.strokeStyle = rgba(color, 0.55);
+      ctx.lineWidth = unit * 0.045;
+      ctx.beginPath();
+      ctx.moveTo(mx, above ? chY + markH : chY);
+      ctx.lineTo(mx, above ? myPx - ringR : myPx + ringR);
+      ctx.stroke();
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.4;
-      roundRect(ctx, chX, chY, cw, markH, unit * 0.32);
+      roundRect(ctx, chX, chY, cw, markH, unit * 0.3);
       ctx.fillStyle = color;
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = "#06121a";
+      ctx.fillStyle = THEME.bgMid;
       ctx.textAlign = "center";
-      ctx.fillText(scene.mark.label, chX + cw / 2, chY + markH * 0.68);
-      ctx.textAlign = "start";
+      ctx.textBaseline = "middle";
+      ctx.fillText(scene.mark.label, chX + cw / 2, chY + markH * 0.54);
       ctx.restore();
     }
   }
-
-  ctx.textAlign = "start";
 }
 
 /** Sign-change crossing of two curves closest to fraction `near`. */
@@ -400,7 +414,7 @@ function intersectionNear(a: Shape, b: Shape, near: number): { f: number; y: num
     if (prevDiff === 0 || diff === 0 || prevDiff * diff < 0) {
       const t0 = (i - 1) / SAMPLES;
       const r = prevDiff === diff ? 0 : prevDiff / (prevDiff - diff);
-      const cf = t0 + (r / SAMPLES);
+      const cf = t0 + r / SAMPLES;
       const cy = clamp01(fn(a, cf));
       const dist = Math.abs(cf - near);
       if (dist < bestDist) {
