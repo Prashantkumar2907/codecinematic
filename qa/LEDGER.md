@@ -115,7 +115,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | hash_ring | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | recursion_tree | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | token_exchange | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| coin_stack | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| coin_stack | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Layout/motion/containment were already solid (0.0% edge bleed both aspects, smooth staggered entrance, coins arc correctly between stacks, locale-correct ₹ grouping). Fixed 3 palette literals: DANGER re-typed THEME.danger's exact hex (the constant exists because 12 painters did this before it existed), the baseline strip re-typed THEME.textDim as raw rgb, and the flight-label chip bg was an untethered near-black instead of THEME.bgBottom. console.log clean. | 44f4c7f | 2026-08-08 |
 | btree_index | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Pure 2D, no camera — already well composed on both aspects. Measured 0.0% edge bleed both aspects before this change. 3 hand-typed textDim rgba triplets -> `rgba(THEME.textDim, ...)`. `edge-check` 0.0% both aspects, console.log empty. | b64837b | 2026-08-08 |
 | lsm_compaction | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | vdom_diff | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
