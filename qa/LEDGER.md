@@ -116,7 +116,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | recursion_tree | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | token_exchange | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | coin_stack | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| btree_index | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| btree_index | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Pure 2D, no camera — already well composed on both aspects. Measured 0.0% edge bleed both aspects before this change. 3 hand-typed textDim rgba triplets -> `rgba(THEME.textDim, ...)`. `edge-check` 0.0% both aspects, console.log empty. | b64837b | 2026-08-08 |
 | lsm_compaction | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | vdom_diff | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | flamegraph | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
