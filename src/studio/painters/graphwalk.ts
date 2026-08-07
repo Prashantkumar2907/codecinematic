@@ -29,6 +29,13 @@ const GHOST_NODE = 0.5;
 const GHOST_EDGE = 0.22;
 /** Fraction of the step beat spent stroking the exploring edge on. */
 const EXPLORE = 0.45;
+/** A travelling marker reads as white-hot regardless of subject accent —
+ *  same convention as `cipher.ts`'s `INK_BRIGHT`. */
+const SPARK = "#eaf6ff";
+const INK_PANEL = THEME.bgBottom;
+/** Dark text on a bright accent-filled chip — same convention as
+ *  `cipher.ts`'s `INK_ON_ACCENT` (also used by `question.ts`). */
+const INK_ON_ACCENT = "#06121a";
 
 type NodeLayout = { x: number; y: number; r: number };
 
@@ -73,7 +80,7 @@ function drawWeightChip(ctx: CanvasRenderingContext2D, x: number, y: number, tex
   ctx.font = `600 ${unit * 0.5}px ${FONT_MONO}`;
   const tw = ctx.measureText(text).width;
   roundRect(ctx, x - tw / 2 - unit * 0.28, y - unit * 0.42, tw + unit * 0.56, unit * 0.84, unit * 0.22);
-  ctx.fillStyle = "#0a0e13";
+  ctx.fillStyle = INK_PANEL;
   ctx.fill();
   ctx.strokeStyle = THEME.panelBorder;
   ctx.lineWidth = 1;
@@ -159,7 +166,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
     ctx.save();
     ctx.lineCap = "round";
     ctx.globalAlpha = GHOST_EDGE * introIn;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.08;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
@@ -203,7 +210,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
       ctx.globalAlpha = prog < 1 ? 1 : 0.9 * Math.sin(Math.PI * f);
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.9;
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = SPARK;
       ctx.beginPath();
       ctx.arc(dot.x, dot.y, unit * 0.2, 0, Math.PI * 2);
       ctx.fill();
@@ -233,7 +240,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
         ctx.globalAlpha = 0.95 * Math.sin(Math.PI * f);
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 1.1;
-        ctx.fillStyle = "#eaf6ff";
+        ctx.fillStyle = SPARK;
         ctx.beginPath();
         ctx.arc(dot.x, dot.y, unit * 0.26, 0, Math.PI * 2);
         ctx.fill();
@@ -306,7 +313,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
     }
     ctx.beginPath();
     ctx.arc(nl.x, nl.y, nl.r, 0, Math.PI * 2);
-    ctx.strokeStyle = isVisited ? accent : isFrontier ? secondary : "rgba(148,163,184,0.45)";
+    ctx.strokeStyle = isVisited ? accent : isFrontier ? secondary : rgba(THEME.textDim, 0.45);
     ctx.lineWidth = isVisited ? unit * 0.12 : isFrontier ? unit * 0.1 : unit * 0.06;
     ctx.stroke();
 
@@ -362,7 +369,7 @@ function drawDistChip(ctx: CanvasRenderingContext2D, x: number, y: number, text:
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "#06121a";
+  ctx.fillStyle = INK_ON_ACCENT;
   ctx.textAlign = "center";
   ctx.fillText(text, x, y + unit * 0.22);
   ctx.textAlign = "start";
