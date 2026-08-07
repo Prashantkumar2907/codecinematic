@@ -101,7 +101,7 @@ export function paintGlobe3d(ctx: CanvasRenderingContext2D, scene: Globe3dScene,
     arcs: arcSet,
   });
 
-  const rect = { x: contentX, y: contentY + band * 0.3, w: contentW, h: contentH - band * 0.3 };
+  const rect = { x: contentX, y: contentY + band, w: contentW, h: contentH - band };
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
@@ -220,13 +220,45 @@ export function paintGlobe3d(ctx: CanvasRenderingContext2D, scene: Globe3dScene,
     const groupRotY = stt ? yawFor(stt.fromLon) + (yawFor(stt.toLon) - yawFor(stt.fromLon)) * stt.ease : 0;
     const groupRotX = stt ? ((stt.fromLat + (stt.toLat - stt.fromLat) * stt.ease) * Math.PI) / 180 * 0.6 : 0;
     const rotM = new THREE.Matrix4().makeRotationY(groupRotY).premultiply(new THREE.Matrix4().makeRotationX(groupRotX));
-    scene.markers.forEach((m) => {
-      if (!revealed.has(m.id)) return;
-      const world = lonLatToVec3(m.lon, m.lat, R * 1.02).applyMatrix4(rotM);
-      if (world.z < -R * 0.2) return; // on the far side — hide the label
+
+    // Two markers can project close together on screen (adjacent lon/lat, or
+    // just the current rotation) and their chips — always offset the same
+    // fixed way off the leader dot — would otherwise stack right on top of
+    // each other. Greedy vertical nudge, same algorithm as orbit.ts's
+    // resolveChipY; the active marker is placed first so it keeps its spot.
+    const placedChips: { x: number; y: number; w: number; h: number }[] = [];
+    const resolveChipY = (x: number, y: number, w: number, h: number): number => {
+      const overlaps = (yy: number) => placedChips.some((p) => Math.abs(x - p.x) * 2 < w + p.w && Math.abs(yy - p.y) * 2 < h + p.h);
+      let ny = y;
+      let guard = 0;
+      let dir = 1;
+      while (overlaps(ny) && guard < 10) {
+        guard++;
+        ny = y + dir * h * 0.95 * Math.ceil(guard / 2);
+        dir *= -1;
+      }
+      placedChips.push({ x, y: ny, w, h });
+      return ny;
+    };
+
+    const visibleMarkers = scene.markers
+      .filter((m) => revealed.has(m.id))
+      .map((m) => {
+        const world = lonLatToVec3(m.lon, m.lat, R * 1.02).applyMatrix4(rotM);
+        const isActive = curStep?.highlight.includes(m.id) ?? false;
+        return { m, world, isActive };
+      })
+      .filter(({ world }) => world.z >= -R * 0.2) // on the far side — hide the label
+      .sort((a, b) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1));
+
+    visibleMarkers.forEach(({ m, world, isActive }) => {
       const sp = projectToRect(cam, world, rect);
-      const isActive = curStep?.highlight.includes(m.id) ?? false;
-      drawMarkerLabel(ctx, m.label, sp.x, sp.y, unit, accent, isActive);
+      ctx.font = `${isActive ? 800 : 600} ${unit * 0.66}px ${FONT_SANS}`;
+      const chipW = ctx.measureText(m.label).width + unit * 0.45 * 2;
+      const chipH = unit * 1.2;
+      const chipCx = sp.x + unit * 0.4 + chipW / 2;
+      const resolvedY = resolveChipY(chipCx, sp.y, chipW, chipH);
+      drawMarkerLabel(ctx, m.label, sp.x, sp.y, unit, accent, isActive, resolvedY);
     });
     // Arc labels near the arc apex.
     scene.arcs.forEach((a, i) => {
@@ -256,7 +288,8 @@ function drawMarkerLabel(
   y: number,
   unit: number,
   accent: string,
-  isActive: boolean
+  isActive: boolean,
+  chipY: number = y
 ) {
   ctx.save();
   ctx.font = `${isActive ? 800 : 600} ${unit * 0.66}px ${FONT_SANS}`;
@@ -265,8 +298,18 @@ function drawMarkerLabel(
   const chipW = tw + padX * 2;
   const chipH = unit * 1.2;
   const bx = x + unit * 0.4;
-  const by = y - chipH / 2;
-  ctx.fillStyle = "rgba(9,13,18,0.85)";
+  const by = chipY - chipH / 2;
+  // The dot marks the marker's true position; when a collision nudge moved
+  // the chip away from it, a short leader keeps the two connected.
+  if (Math.abs(chipY - y) > 0.5) {
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(bx, chipY);
+    ctx.stroke();
+  }
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.85);
   roundRect(ctx, bx, by, chipW, chipH, unit * 0.3);
   ctx.fill();
   ctx.strokeStyle = rgba(accent, isActive ? 0.95 : 0.45);
