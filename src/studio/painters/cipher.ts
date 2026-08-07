@@ -8,6 +8,7 @@ import {
   easeOutCubic,
   easeOutBack,
   enterT,
+  shade,
   clamp01,
   roundRect,
   drawSceneTitle,
@@ -22,10 +23,19 @@ type CipherScene = Extract<Scene, { kind: "cipher" }>;
 const HEX = "0123456789abcdef";
 const HASH_LEN = 8;
 const HASH_LABEL = "SHA-256";
-const INK_PANEL = "#0a0e13";
+const INK_PANEL = THEME.bgBottom;
 const INK_FILL = "#0e2433";
 const INK_BRIGHT = "#eaf6ff";
 const INK_ON_ACCENT = "#06121a";
+/** Idle (unlit) letter-tile face — matches `table.ts`/`bits.ts`/`circuit.ts`'s
+ *  idle-face convention rather than a one-off hex. */
+const IDLE_FACE = shade(THEME.panel, 0.09);
+/** Shallow on purpose (mirrors `circuit.ts`/`diagram.ts`): world thickness for
+ *  the tile bevel, never mapped to pixels itself. */
+const DEPTH = 0.16;
+/** A pale tint of `THEME.danger`, legible as body text on the dark tiles —
+ *  derived from the semantic token rather than a one-off hex. */
+const DANGER_TEXT = shade(THEME.danger, 0.6);
 
 const shiftChar = (c: string, s: number): string =>
   c === " " ? " " : String.fromCharCode(((c.charCodeAt(0) - 65 + s) % 26) + 65);
@@ -59,127 +69,148 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
 
   const isHash = scene.mode === "hash";
 
-  // STOPGAP, pending this painter's own polish round — same cause as dayclock's.
-  // This span was tuned against a taller rect; the caption-aware `contentH` narrows
-  // the frustum's half-width (halfW = halfH * rect.w/rect.h), so a hardcoded ±8
-  // world span plus half a 5.0-wide box overflowed the left edge (measured: short
-  // 2.6%). The real fix is the systemic rework this painter still needs.
-  const spreadX = 6.4;
-  const spreadZ = isHash ? 4.0 : 3.0;
+  /**
+   * The systemic rework this painter was left waiting for (`qa/ledger.json` ->
+   * `2d-layout-round-tripped-through-camera`): rows sat at literal world Z
+   * under a camera elevated to (0,12,10)/(0,10,8), so the hardcoded spans
+   * above were tuned for one `rect` and drifted (measured: short 2.6% left
+   * bleed) the moment the caption-aware `contentH` changed its aspect. Rows
+   * are now laid out in PIXELS first — `pixelPos` maps a row/column straight
+   * into `rect` — and blocks are mapped onto that via an on-axis camera +
+   * `mappingAt`/`toWorld` (same technique as `table.ts`/`circuit.ts`).
+   */
+  const rowMin = isHash ? -1 : -0.5;
+  const rowMax = isHash ? 1 : 0.5;
+  const marginSide = unit * 1.4;
+  const marginTop = unit * (scene.mode === "shift" ? 2.3 : 1.0);
+  const marginBottom = unit * 1.1;
+  const gridX = contentX + marginSide;
+  const gridW = Math.max(unit * 4, contentW - marginSide * 2);
+  const gridTop = areaY + marginTop;
+  const gridH = Math.max(unit * 4, areaH - marginTop - marginBottom);
+  const colX = (i: number, total: number) => (total === 1 ? gridX + gridW / 2 : gridX + (i / (total - 1)) * gridW);
+  const rowY = (row: number) => gridTop + ((row - rowMin) / (rowMax - rowMin)) * gridH;
+  const pixelPos = (i: number, row: number, total: number): { x: number; y: number } => ({ x: colX(i, total), y: rowY(row) });
+  const BOB_PX = unit * 0.4;
+  const bobFor = (i: number, elapsedMs: number, periodMs = 1200) => Math.sin(elapsedMs / periodMs + i) * BOB_PX;
 
-  const worldPos = (i: number, row: number, total: number) => {
-    const x = total === 1 ? 0 : (i / (total - 1) - 0.5) * spreadX * 2;
-    const z = row * spreadZ;
-    return new THREE.Vector3(x, 0, z);
+  const boxW = Math.min(gridW * 0.42, unit * 11);
+  // Fixed, not boxW-proportional: it must fit two rows of unit-sized scrambling
+  // hex text regardless of how wide/narrow the box ends up.
+  const boxH = unit * 3.2;
+
+  /** Pixels-per-world-unit and pixel origin on the z=`z` plane, for a camera
+   *  sitting ON-AXIS at (0,0,D) — exact, invertible pixel<->world map (same
+   *  technique as `table.ts`/`circuit.ts`/`diagram.ts`). */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
   };
-  
-  const boxW = 5.0;
-  const boxD = 2.5;
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 12 : 10, vertical ? 10 : 8);
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, vertical ? 15 : 12);
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
+    const m = mappingAt(camera, DEPTH / 2);
+    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
+    const setFootprint = (g: THREE.Group, wPx: number, dPx: number): THREE.Vector3 => {
+      const base = new THREE.Vector3(wPx / m.sx, dPx / m.sy, DEPTH);
+      g.scale.copy(base);
+      return base;
+    };
+    const place = (g: THREE.Group, i: number, row: number, total: number) => {
+      const p = pixelPos(i, row, total);
+      const w = toWorld(p.x, p.y);
+      g.position.set(w.x, w.y, 0);
+    };
+    /** Re-place a mesh each frame at its pixel slot minus the shared bob, so
+     *  the 3D block and its independently-drawn 2D text stay together — both
+     *  read the same `bobFor(i, elapsedMs)`, never a mesh-local world bob. */
+    const placeBobbed = (g: THREE.Group, i: number, row: number, total: number, elapsedMs: number, periodMs = 1200) => {
+      const p = pixelPos(i, row, total);
+      const w = toWorld(p.x, p.y - bobFor(i, elapsedMs, periodMs));
+      g.position.set(w.x, w.y, 0);
+    };
 
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadX * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const topBlocks: { mesh: THREE.Group, i: number, c: string }[] = [];
-    const botBlocks: { mesh: THREE.Group, i: number }[] = [];
+    const topBlocks: { mesh: THREE.Group, i: number, c: string, base: THREE.Vector3 }[] = [];
+    const botBlocks: { mesh: THREE.Group, i: number, base: THREE.Vector3 }[] = [];
     let hashBox: THREE.Group | null = null;
-    
-    const blockW = (spreadX * 2.0) / Math.max(n, 1) * 0.6;
-    const blockD = blockW;
+    let hashBoxBase = new THREE.Vector3(1, 1, 1);
+
+    const blockPx = Math.min((gridW / Math.max(n, 1)) * 0.6, unit * 3);
 
     for (let i = 0; i < n; i++) {
         const c = chars[i];
         if (c !== " ") {
-            const g = makeBlock(blockW, 0.4, blockD, "#1e293b", "#31435a");
-            g.position.copy(worldPos(i, isHash ? -1 : -0.5, n));
+            const g = makeBlock(1, 1, 1, IDLE_FACE, THEME.textDim);
+            const base = setFootprint(g, blockPx, blockPx);
+            place(g, i, isHash ? -1 : -0.5, n);
             s.add(g);
-            topBlocks.push({ mesh: g, i, c });
+            topBlocks.push({ mesh: g, i, c, base });
         }
     }
-    
+
     if (isHash) {
-        hashBox = makeBlock(boxW, 1.2, boxD, "#0f172a", accent);
-        hashBox.position.copy(worldPos(0, 0, 1));
+        hashBox = makeBlock(1, 1, 1, THEME.panel, accent);
+        hashBoxBase = new THREE.Vector3(boxW / m.sx, boxH / m.sy, DEPTH);
+        hashBox.scale.copy(hashBoxBase);
+        place(hashBox, 0, 0, 1);
         s.add(hashBox);
-        
-        const outW = (spreadX * 2.0) / HASH_LEN * 0.6;
+
+        const outPx = Math.min((gridW / HASH_LEN) * 0.6, unit * 3);
         for (let i = 0; i < HASH_LEN; i++) {
-            const g = makeBlock(outW, 0.4, outW, "#0e2433", accent);
-            g.position.copy(worldPos(i, 1, HASH_LEN));
+            const g = makeBlock(1, 1, 1, INK_FILL, accent);
+            const base = setFootprint(g, outPx, outPx);
+            place(g, i, 1, HASH_LEN);
             s.add(g);
-            botBlocks.push({ mesh: g, i });
+            botBlocks.push({ mesh: g, i, base });
         }
     } else {
         for (let i = 0; i < n; i++) {
             const c = chars[i];
             if (c !== " ") {
-                const g = makeBlock(blockW, 0.4, blockD, "#0e2433", accent);
-                g.position.copy(worldPos(i, 0.5, n));
+                const g = makeBlock(1, 1, 1, INK_FILL, accent);
+                const base = setFootprint(g, blockPx, blockPx);
+                place(g, i, 0.5, n);
                 s.add(g);
-                botBlocks.push({ mesh: g, i });
+                botBlocks.push({ mesh: g, i, base });
             }
         }
     }
 
     const update = (elapsedMs: number, ctxData: any) => {
         const { gIn, stRev, outputRevealed, digestScales, avalancheFlashing, isMixing } = ctxData;
-        
-        topBlocks.forEach(({ mesh, i, c }) => {
-            mesh.visible = gIn > 0;
-            const bob = Math.sin(elapsedMs / 1200 + i) * 0.05;
-            const p = worldPos(i, isHash ? -1 : -0.5, n);
-            mesh.position.set(p.x, p.y + bob, p.z);
-            mesh.scale.setScalar(Math.max(0.01, gIn));
-            
-            let anim = false;
-            let rev = 0;
-            if (stRev && stRev[i]) {
-                anim = stRev[i].anim;
-                rev = stRev[i].rev;
-            }
-            const flash = anim ? 1 : 0;
-            
+
+        topBlocks.forEach(({ mesh, i, base }) => {
+            mesh.visible = gIn > 0.01;
+            placeBobbed(mesh, i, isHash ? -1 : -0.5, n, elapsedMs);
+            mesh.scale.copy(base).multiplyScalar(Math.max(0.01, gIn));
+
+            const anim = !!stRev?.[i]?.anim;
+            const flashOn = anim || !!avalancheFlashing?.[i];
+
             mesh.children.forEach(child => {
                 if (child instanceof THREE.Mesh) {
                     const mat = child.material as THREE.MeshPhysicalMaterial;
                     mat.transparent = true;
                     mat.opacity = gIn * 0.9;
-                    if (flash > 0 || avalancheFlashing?.[i]) {
-                        mat.color.setStyle(THEME.warn);
-                        mat.emissive.setStyle(THEME.warn);
-                        mat.emissiveIntensity = 0.5;
-                    } else {
-                        mat.color.setStyle("#1e293b");
-                        mat.emissive.setStyle("#1e293b");
-                        mat.emissiveIntensity = 0.1;
-                    }
+                    const face = flashOn ? THEME.warn : IDLE_FACE;
+                    mat.color.setStyle(face);
+                    mat.emissive.setStyle(face);
+                    mat.emissiveIntensity = flashOn ? 0.5 : 0.1;
                 }
             });
         });
-        
+
         if (isHash && hashBox) {
-            hashBox.visible = gIn > 0;
-            const bob = Math.sin(elapsedMs / 900) * 0.05;
-            hashBox.position.y = bob;
-            hashBox.scale.setScalar(Math.max(0.01, gIn));
+            hashBox.visible = gIn > 0.01;
+            placeBobbed(hashBox, 0, 0, 1, elapsedMs, 900);
+            hashBox.scale.copy(hashBoxBase).multiplyScalar(Math.max(0.01, gIn));
             hashBox.children.forEach(child => {
                 if (child instanceof THREE.Mesh) {
                     const mat = child.material as THREE.MeshPhysicalMaterial;
@@ -189,41 +220,32 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
                 }
             });
         }
-        
-        botBlocks.forEach(({ mesh, i }) => {
+
+        botBlocks.forEach(({ mesh, i, base }) => {
             if (!isHash) {
                 const rev = stRev?.[i]?.rev ?? 0;
-                mesh.visible = rev > 0 && gIn > 0;
+                mesh.visible = rev > 0 && gIn > 0.01;
                 if (mesh.visible) {
                     const pop = easeOutBack(clamp01(rev));
-                    mesh.scale.setScalar(Math.max(0.01, pop * gIn));
-                    const bob = Math.sin(elapsedMs / 1200 + i) * 0.05;
-                    const p = worldPos(i, 0.5, n);
-                    mesh.position.set(p.x, p.y + bob, p.z);
+                    placeBobbed(mesh, i, 0.5, n, elapsedMs);
+                    mesh.scale.copy(base).multiplyScalar(Math.max(0.01, pop * gIn));
                 }
             } else {
                 mesh.visible = outputRevealed && digestScales[i] > 0;
                 if (mesh.visible) {
                     const scale = digestScales[i];
-                    mesh.scale.set(Math.max(0.01, scale * gIn), Math.max(0.01, gIn), Math.max(0.01, gIn));
-                    const bob = Math.sin(elapsedMs / 1200 + i) * 0.05;
-                    const p = worldPos(i, 1, HASH_LEN);
-                    mesh.position.set(p.x, p.y + bob, p.z);
-                    
+                    placeBobbed(mesh, i, 1, HASH_LEN, elapsedMs);
+                    mesh.scale.set(base.x * Math.max(0.01, scale * gIn), base.y * Math.max(0.01, gIn), base.z * Math.max(0.01, gIn));
+
                     mesh.children.forEach(child => {
                         if (child instanceof THREE.Mesh) {
                             const mat = child.material as THREE.MeshPhysicalMaterial;
                             mat.transparent = true;
                             mat.opacity = gIn * 0.9;
-                            if (avalancheFlashing?.[i]) {
-                                mat.color.setStyle(THEME.warn);
-                                mat.emissive.setStyle(THEME.warn);
-                                mat.emissiveIntensity = 0.5;
-                            } else {
-                                mat.color.setStyle("#0e2433");
-                                mat.emissive.setStyle("#0e2433");
-                                mat.emissiveIntensity = 0.1;
-                            }
+                            const face = avalancheFlashing?.[i] ? THEME.warn : INK_FILL;
+                            mat.color.setStyle(face);
+                            mat.emissive.setStyle(face);
+                            mat.emissiveIntensity = avalancheFlashing?.[i] ? 0.5 : 0.1;
                         }
                     });
                 }
@@ -234,8 +256,6 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
     return { scene: s, camera, update };
   };
 
-  const get2D = (i: number, row: number, total: number, cam: THREE.Camera) => projectToRect(cam, worldPos(i, row, total), rect);
-
   if (scene.mode === "shift") {
       const shift = scene.shift ?? 0;
       const letterBeat: (number | null)[] = chars.map(() => null);
@@ -243,7 +263,14 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
       const groupSize: Record<number, number> = {};
       let prev = 0;
       scene.steps.forEach((st, k) => {
-        if (st.op === "map" && st.upTo != null) {
+        // Unrelated bug found while verifying the layout fix against the only
+        // `mode: "shift"` fixture (`s2-cipher`): its reveal step is authored as
+        // `op: "input"` ("we push the plaintext through, letter by letter"),
+        // but only `op: "map"` built `letterBeat` — so no letter ever revealed,
+        // regardless of playback progress. Both ops legitimately mean "reveal
+        // up to `upTo` letters" for shift mode; the schema's shared `op` enum
+        // just doesn't reserve one exclusively for it.
+        if ((st.op === "map" || st.op === "input") && st.upTo != null) {
           const u = Math.min(st.upTo, n);
           let g = 0;
           for (let i = prev; i < u; i++) {
@@ -267,9 +294,8 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
       };
       
       const stRev = chars.map((_, i) => letterState(i));
-      const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: frameIn, stRev });
-      if (!cam) return;
-      
+      render3D(ctx, key, rect, build, env.elapsedMs, { gIn: frameIn, stRev });
+
       const label = `SHIFT +${shift}`;
       ctx.save();
       ctx.globalAlpha = frameIn;
@@ -293,9 +319,9 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
       for (let i = 0; i < n; i++) {
         const c = chars[i];
         if (c === " ") continue;
-        const p1 = get2D(i, -0.5, n, cam);
-        const p2 = get2D(i, 0.5, n, cam);
-        const bob = Math.sin(env.elapsedMs / 1200 + i) * unit * 1.5;
+        const p1 = pixelPos(i, -0.5, n);
+        const p2 = pixelPos(i, 0.5, n);
+        const bob = bobFor(i, env.elapsedMs);
         const state = letterState(i);
         
         ctx.save();
@@ -386,39 +412,38 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
         currentHex.push(ch);
       }
       
-      const cam = render3D(ctx, key, rect, build, env.elapsedMs, { 
-          gIn: frameIn, 
-          outputRevealed, 
-          digestScales, 
-          avalancheFlashing, 
-          isMixing: mixing 
+      render3D(ctx, key, rect, build, env.elapsedMs, {
+          gIn: frameIn,
+          outputRevealed,
+          digestScales,
+          avalancheFlashing,
+          isMixing: mixing
       });
-      if (!cam) return;
-      
+
       // Input Row
       for (let i = 0; i < n; i++) {
         const c = chars[i];
         if (c === " ") continue;
         const flip = avalanche && i === changedIdx;
         const shown = flip ? shiftChar(c, 1) : c;
-        const p1 = get2D(i, -1, n, cam);
-        const bob = Math.sin(env.elapsedMs / 1200 + i) * unit * 1.5;
-        
+        const p1 = pixelPos(i, -1, n);
+        const bob = bobFor(i, env.elapsedMs);
+
         ctx.save();
         ctx.globalAlpha = frameIn;
         ctx.font = `700 ${unit * 1.2}px ${FONT_MONO}`;
-        ctx.fillStyle = flip ? "#fecaca" : THEME.text;
+        ctx.fillStyle = flip ? DANGER_TEXT : THEME.text;
         ctx.textAlign = "center";
         ctx.fillText(shown, p1.x, p1.y - bob + unit * 0.4);
         ctx.restore();
       }
-      
+
       if (inputBeat >= 0) {
         const win = beatWindow(env.beats, inputBeat, totalBeats);
         const bt = clamp01((env.p - win.start) / Math.max(win.end - win.start, 0.001));
         if (bt > 0 && bt < 1) {
-          const pTop = get2D(Math.floor(n/2), -1, n, cam);
-          const pBot = get2D(0, 0, 1, cam);
+          const pTop = pixelPos(Math.floor(n/2), -1, n);
+          const pBot = pixelPos(0, 0, 1);
           const cy = pTop.y + (pBot.y - pTop.y) * easeOutCubic(bt);
           ctx.save();
           ctx.globalAlpha = frameIn * Math.sin(Math.PI * bt);
@@ -431,28 +456,29 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
           ctx.restore();
         }
       }
-      
+
       // Box overlay
-      const pBox = get2D(0, 0, 1, cam);
-      const bob = Math.sin(env.elapsedMs / 900) * unit * 1.5;
+      const pBox = pixelPos(0, 0, 1);
+      const bob = bobFor(0, env.elapsedMs, 900);
       const cy = pBox.y - bob;
       ctx.save();
       ctx.globalAlpha = frameIn;
       ctx.font = `800 ${unit * 0.72}px ${FONT_SANS}`;
       const lw = ctx.measureText(HASH_LABEL).width + unit * 0.9;
       ctx.fillStyle = rgba(secondary, 0.9);
-      roundRect(ctx, pBox.x - lw / 2, cy - unit * 1.8, lw, unit * 1.2, unit * 0.4);
+      roundRect(ctx, pBox.x - lw / 2, cy - boxH / 2 - unit * 1.5, lw, unit * 1.2, unit * 0.4);
       ctx.fill();
       ctx.fillStyle = INK_ON_ACCENT;
       ctx.textAlign = "center";
-      ctx.fillText(HASH_LABEL, pBox.x, cy - unit * 0.9);
-      
+      ctx.fillText(HASH_LABEL, pBox.x, cy - boxH / 2 - unit * 0.6);
+
       const interval = mixing ? 55 : 170;
       ctx.font = `700 ${unit * 1.0}px ${FONT_MONO}`;
+      const digitHalfSpan = boxW * 0.42;
       for (let r = 0; r < 2; r++) {
         for (let cI = 0; cI < 4; cI++) {
-          const gx = pBox.x - unit * 2.5 + (cI / 3) * unit * 5.0;
-          const gy = cy + unit * 0.5 + (r - 0.5) * unit * 1.5;
+          const gx = pBox.x - digitHalfSpan + (cI / 3) * digitHalfSpan * 2;
+          const gy = cy + (r - 0.5) * boxH * 0.5;
           const idx = Math.floor(env.elapsedMs / interval + r * 5 + cI * 3) % 16;
           ctx.globalAlpha = frameIn * (mixing ? 0.7 : 0.3);
           ctx.fillStyle = mixing ? accent : THEME.textDim;
@@ -460,17 +486,17 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
         }
       }
       ctx.restore();
-      
+
       // Output hex
       for (let i = 0; i < HASH_LEN; i++) {
         if (!outputRevealed || digestScales[i] <= 0) continue;
-        const p = get2D(i, 1, HASH_LEN, cam);
-        const yBob = Math.sin(env.elapsedMs / 1200 + i) * unit * 1.5;
+        const p = pixelPos(i, 1, HASH_LEN);
+        const yBob = bobFor(i, env.elapsedMs);
         
         ctx.save();
         ctx.globalAlpha = frameIn * clamp01(digestScales[i] * 1.6);
         ctx.font = `700 ${unit * 1.0}px ${FONT_MONO}`;
-        ctx.fillStyle = avalancheFlashing[i] ? "#fecaca" : INK_BRIGHT;
+        ctx.fillStyle = avalancheFlashing[i] ? DANGER_TEXT : INK_BRIGHT;
         ctx.textAlign = "center";
         ctx.fillText(currentHex[i], p.x, p.y - yBob + unit * 0.35);
         ctx.restore();
