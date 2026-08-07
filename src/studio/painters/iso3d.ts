@@ -58,7 +58,7 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
     camera.position.copy(new THREE.Vector3(1, 0.82, 1.32).normalize().multiplyScalar(dist));
     camera.lookAt(0, 0, vertical ? -0.3 : 0);
     studioLights(s, accent, secondary);
-    const grid = new THREE.GridHelper(spread * 4, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(spread * 4, 14, new THREE.Color(accent), new THREE.Color(THEME.textDim));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.3;
     grid.position.y = -1.3;
@@ -77,10 +77,10 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
       const isCyl = st.shape === "database" || st.shape === "disk";
       const isServer = st.shape === "server";
       const g = isCyl
-        ? makeDatabaseStack(0.82, 1.9, col.toString(), "#eaf3ff")
+        ? makeDatabaseStack(0.82, 1.9, col.toString(), THEME.text)
         : isServer
-          ? makeServerRack(1.6, 2.2, 1.6, col.toString(), "#eaf3ff")
-          : makeBlock(1.6, 1.5, 1.6, col.toString(), "#eaf3ff");
+          ? makeServerRack(1.6, 2.2, 1.6, col.toString(), THEME.text)
+          : makeBlock(1.6, 1.5, 1.6, col.toString(), THEME.text);
       const p = stagePos(i, n, vertical, spread);
       g.position.set(p.x, isCyl ? -0.25 : isServer ? -0.05 : -0.5, p.z);
       s.add(g);
@@ -146,9 +146,9 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
     const padX = unit * 0.5;
     const chipW = tw + padX * 2, chipH = unit * 1.5;
     roundRect(ctx, sx - chipW / 2, sy, chipW, chipH, unit * 0.35);
-    ctx.fillStyle = "rgba(10,16,22,0.82)";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
     ctx.fill();
-    ctx.strokeStyle = rgba(isActive ? accent : "#94a3b8", isActive ? 0.9 : 0.4);
+    ctx.strokeStyle = rgba(isActive ? accent : THEME.textDim, isActive ? 0.9 : 0.4);
     ctx.lineWidth = isActive ? 2 : 1;
     ctx.stroke();
     ctx.fillStyle = THEME.text;
