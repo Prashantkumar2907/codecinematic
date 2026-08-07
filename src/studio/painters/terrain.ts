@@ -10,6 +10,7 @@ import {
   enterT,
   idle,
   hashStr,
+  shade,
   sub,
   clamp01,
   roundRect,
@@ -23,6 +24,16 @@ import {
 } from "./common";
 import type { PaintEnv } from "./index";
 import { createNoise2D } from "simplex-noise";
+
+/** A travelling marker/glow reads as white-hot regardless of subject accent —
+ *  same convention as `cipher.ts`'s `INK_BRIGHT`. */
+const SPARK = "#eaf6ff";
+/** Landmark icon/chip fill — same convention as `cipher.ts`'s `INK_FILL`. */
+const INK_FILL = "#0e2433";
+const INK_PANEL = THEME.bgBottom;
+/** Idle terrain-block face — matches `table.ts`/`bits.ts`/`circuit.ts`'s
+ *  idle-face convention rather than a one-off hex. */
+const IDLE_FACE = shade(THEME.panel, 0.09);
 
 type TerrainScene = Extract<Scene, { kind: "terrain" }>;
 type Feature = TerrainScene["features"][number];
@@ -130,7 +141,7 @@ function drawVignette(
       ctx.ellipse(0, 0, unit * 1.1, unit * 0.32, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = SPARK;
       for (let i = 0; i < 2; i++) {
         ctx.globalAlpha = vin * (0.3 + 0.7 * Math.abs(Math.sin(ms / 500 + i * 1.7)));
         ctx.beginPath();
@@ -142,7 +153,7 @@ function drawVignette(
     case "dam": {
       const wallW = unit * 0.36;
       const wallTop = fy - unit * 1.2;
-      ctx.fillStyle = "#0e2433";
+      ctx.fillStyle = INK_FILL;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.06;
       ctx.fillRect(fx - wallW / 2, wallTop, wallW, fy - wallTop + unit * 0.25);
@@ -174,7 +185,7 @@ function drawVignette(
       CITY_HEIGHTS.forEach((hh, i) => {
         const bx = fx + (i - 1.5) * unit * 0.46;
         const by = ridgeYAt(ridge, bx);
-        ctx.fillStyle = "#0e2433";
+        ctx.fillStyle = INK_FILL;
         ctx.strokeStyle = rgba(accent, 0.6);
         ctx.lineWidth = unit * 0.04;
         ctx.fillRect(bx - bw / 2, by - unit * hh, bw, unit * hh);
@@ -207,7 +218,7 @@ function drawVignette(
         for (const pt of arm) ctx.lineTo(pt.x, pt.y);
         ctx.stroke();
       }
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = SPARK;
       arms.forEach((arm, i) => {
         const f = (ms / 1800 + i / 3) % 1;
         const dot = pointAlongPolyline(arm, f);
@@ -220,7 +231,7 @@ function drawVignette(
     }
     case "rain": {
       const cy = fy - unit * 2.3;
-      ctx.fillStyle = "rgba(148,163,184,0.28)";
+      ctx.fillStyle = rgba(THEME.textDim, 0.28);
       ctx.beginPath();
       ctx.arc(fx - unit * 0.35, cy, unit * 0.42, 0, Math.PI * 2);
       ctx.arc(fx + unit * 0.35, cy + unit * 0.08, unit * 0.5, 0, Math.PI * 2);
@@ -386,7 +397,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color(THEME.textDim));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.5;
@@ -416,8 +427,8 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
     geo.computeVertexNormals();
 
     const mat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color("#1e293b"),
-      emissive: new THREE.Color("#0f172a"),
+      color: new THREE.Color(IDLE_FACE),
+      emissive: new THREE.Color(IDLE_FACE),
       emissiveIntensity: 0.1,
       metalness: 0.2,
       roughness: 0.5,
@@ -435,7 +446,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
       const fracX = f.at / AT_MAX;
       const x3D = (fracX - 0.5) * spreadX * 2;
       const y3D = ridgeYAt(ridge3D, x3D);
-      const block = makeBlock(0.5, 0.5, 0.5, "#0e2433", accent);
+      const block = makeBlock(0.5, 0.5, 0.5, INK_FILL, accent);
       block.position.set(x3D, y3D + 0.25, 0);
       s.add(block);
       return { mesh: block, x: x3D, y: y3D };
@@ -486,7 +497,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
         ctx.lineTo(riverPts[s].x, riverPts[s].y);
         ctx.stroke();
       }
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = SPARK;
       for (let d = 0; d < 3; d++) {
         const f = (env.elapsedMs / 2600 + d / 3) % 1;
         const dot = pointAlongPolyline(riverPts, f);
@@ -524,7 +535,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
     const chipY = areaY + unit * 0.2 + (k % 3) * (chipH + unit * 0.35);
     const leadIn = easeOutCubic(sub(t, 0.22, 0.22));
     if (leadIn > 0) {
-      ctx.strokeStyle = "rgba(148,163,184,0.4)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.4);
       ctx.lineWidth = unit * 0.045;
       strokePolylineProgress(
         ctx,
@@ -544,10 +555,10 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
         ctx.shadowBlur = unit * 0.55;
       }
       roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.32);
-      ctx.fillStyle = "#0a0e13";
+      ctx.fillStyle = INK_PANEL;
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = isCurrent ? rgba(accent, 0.7) : "rgba(148,163,184,0.35)";
+      ctx.strokeStyle = isCurrent ? rgba(accent, 0.7) : rgba(THEME.textDim, 0.35);
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
