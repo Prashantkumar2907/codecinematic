@@ -180,7 +180,7 @@ export function paintEcosystemWeb(ctx: CanvasRenderingContext2D, scene: Ecosyste
     ctx.save();
     ctx.lineCap = "round";
     ctx.globalAlpha = GHOST_LINK * introIn;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.05;
     if (isAffects) ctx.setLineDash([unit * 0.22, unit * 0.2]);
     ctx.beginPath();
@@ -235,7 +235,7 @@ export function paintEcosystemWeb(ctx: CanvasRenderingContext2D, scene: Ecosyste
       ctx.globalAlpha = introIn * clamp01((ap - 0.7) / 0.3);
       ctx.font = `600 ${unit * 0.52}px ${FONT_SANS}`;
       const tw = ctx.measureText(link.label).width;
-      ctx.fillStyle = "rgba(10,16,22,0.82)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
       roundRect(ctx, mid.x - tw / 2 - unit * 0.26, mid.y - unit * 0.42, tw + unit * 0.52, unit * 0.78, unit * 0.2);
       ctx.fill();
       ctx.fillStyle = THEME.textDim;
@@ -266,11 +266,11 @@ export function paintEcosystemWeb(ctx: CanvasRenderingContext2D, scene: Ecosyste
       ctx.shadowBlur = unit * 0.9;
     }
     nodeGlyphPath(ctx, node.kind, p.x, p.y, r);
-    ctx.fillStyle = ap > 0 ? rgba(fill, 0.22) : "rgba(148,163,184,0.08)";
+    ctx.fillStyle = ap > 0 ? rgba(fill, 0.22) : rgba(THEME.textDim, 0.08);
     ctx.fill();
     ctx.shadowBlur = 0;
     nodeGlyphPath(ctx, node.kind, p.x, p.y, r);
-    ctx.strokeStyle = ap > 0 ? fill : "rgba(148,163,184,0.4)";
+    ctx.strokeStyle = ap > 0 ? fill : rgba(THEME.textDim, 0.4);
     ctx.lineWidth = ap > 0 ? unit * (isActive ? 0.13 : 0.09) : unit * 0.06;
     ctx.stroke();
 
