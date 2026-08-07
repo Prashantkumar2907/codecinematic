@@ -28,6 +28,8 @@ type LsmState = { memtable: MemKey[]; levels: FileCard[][] };
 type Pt = { x: number; y: number };
 
 const CAP_PER_ROW = 6;
+/** Dark ink for text on a bright accent-filled badge (matches cipher.ts / graphwalk.ts / control_loop.ts). */
+const INK_ON_ACCENT = "#06121a";
 
 function clampLevel(l: number, n: number): number {
   return Math.max(0, Math.min(l, n - 1));
@@ -126,7 +128,7 @@ export function paintLsmCompaction(ctx: CanvasRenderingContext2D, scene: LsmScen
   const drawGhostSlot = (cx: number, cy: number, w: number, h: number, alpha: number) => {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = "rgba(148,163,184,0.5)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.5);
     ctx.setLineDash([unit * 0.16, unit * 0.14]);
     ctx.lineWidth = unit * 0.04;
     roundRect(ctx, cx - w / 2, cy - h / 2, w, h, unit * 0.18);
@@ -251,7 +253,7 @@ export function paintLsmCompaction(ctx: CanvasRenderingContext2D, scene: LsmScen
         ctx.fillStyle = THEME.warn;
         roundRect(ctx, bx - bw / 2 - unit * 0.12, by - unit * 0.32, bw + unit * 0.24, unit * 0.56, unit * 0.2);
         ctx.fill();
-        ctx.fillStyle = "#1a1204";
+        ctx.fillStyle = INK_ON_ACCENT;
         ctx.fillText(badge, bx, by - unit * 0.03);
       }
       ctx.restore();
