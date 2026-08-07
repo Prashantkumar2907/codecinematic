@@ -27,6 +27,10 @@ type Rect = { x: number; y: number; w: number; h: number };
 
 const GRID = 12;
 const DIM_ALPHA = 0.38;
+/** A travelling shimmer reads as white-hot regardless of subject accent —
+ *  same convention as `cipher.ts`'s `INK_BRIGHT`. */
+const SPARK = "#eaf6ff";
+const INK_PANEL = THEME.bgBottom;
 
 type GridMap = { ox: number; oy: number; cw: number; ch: number };
 
@@ -423,7 +427,7 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
     if (highlighted && !inTail && drawProg >= 1) {
       ctx.save();
       ctx.globalAlpha = 0.24;
-      ctx.strokeStyle = "#eaf6ff";
+      ctx.strokeStyle = SPARK;
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.5, unit * 0.9]);
       ctx.lineDashOffset = -((env.elapsedMs / 40) % (unit * 1.4));
@@ -478,7 +482,7 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
       if (chipIn > 0) {
         ctx.globalAlpha = chipIn;
         roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.32);
-        ctx.fillStyle = "#0a0e13";
+        ctx.fillStyle = INK_PANEL;
         ctx.fill();
         ctx.strokeStyle = rgba(accent, 0.55);
         ctx.lineWidth = 1.5;
