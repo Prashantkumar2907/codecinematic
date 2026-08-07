@@ -215,7 +215,16 @@ export function paintDominoCascade(ctx: CanvasRenderingContext2D, scene: DominoS
 
     if (domino.icon) {
       const iconSize = Math.min(tile.w, tile.h) * 0.85;
-      drawIcon(ctx, domino.icon, farPt.x, farPt.y, iconSize, env, "#eaf3ff");
+      // Some emoji (muted skin/hard-hat/factory tones) read as a dark smudge
+      // against the tile's own saturated face colour — a light neutral plate
+      // keeps any icon legible regardless of the domino's accent.
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.beginPath();
+      ctx.arc(farPt.x, farPt.y, iconSize * 0.58, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      drawIcon(ctx, domino.icon, farPt.x, farPt.y, iconSize, env, THEME.text);
     } else {
       ctx.beginPath();
       ctx.arc(farPt.x, farPt.y, pipR, 0, Math.PI * 2);
