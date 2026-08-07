@@ -8,28 +8,29 @@ edge, so content can sit fully inside the frame and still be drawn under the cap
 kinds did exactly that while edge-bleed read 0.0%. A row here means painted content crossed
 `safeBottom` at one or more sampled progress values.
 
-**43 of 222 kind/aspect combinations intrude into the caption band.**
+**A row is a CANDIDATE, not a verdict.** The rule is that nothing LOAD-BEARING may sit in the
+band; a decorative backdrop may overhang, and several painters set their 3D viewport to the full
+frame deliberately. `stat` showed both at once: its context sentence ended below the line (a real
+defect) while its slab and plinth reach 340px lower by design. Open the frame before fixing.
+
+**39 of 222 kind/aspect combinations intrude into the caption band.**
 
 | kind | aspect | lowest row | safeBottom | over by | % of band | worst p |
 |---|---|---|---|---|---|---|
-| stat | short | 1663 | 1321.5 | **341.5px** | 8.25% | 0.93 |
-| bigtext | short | 1619 | 1321.5 | **297.5px** | 2.96% | 0.85 |
-| dayclock | short | 1543 | 1321.5 | **221.5px** | 1.23% | 0.4 |
+| stat | short | 1663 | 1321.5 | **341.5px** | 7.99% | 0.93 |
+| bigtext | short | 1619 | 1321.5 | **297.5px** | 0.23% | 0.85 |
 | bigtext | long | 1079 | 863.1 | **215.9px** | 1.24% | 0.06 |
-| dayclock | long | 1079 | 863.1 | **215.9px** | 1.09% | 0.4 |
 | stat | long | 1060 | 863.1 | **196.9px** | 3.70% | 0.93 |
-| vocab | long | 1006 | 863.1 | **142.9px** | 55.42% | 0.93 |
+| dayclock | long | 1021 | 863.1 | **157.9px** | 1.91% | 0.4 |
 | timeline | long | 994 | 863.1 | **130.9px** | 1.55% | 0.85 |
 | domino_cascade | short | 1452 | 1321.5 | **130.5px** | 0.94% | 0.93 |
-| question | short | 1444 | 1321.5 | **122.5px** | 9.22% | 0.675 |
-| vocab | short | 1421 | 1321.5 | **99.5px** | 13.65% | 0.85 |
 | quote | short | 1417 | 1321.5 | **95.5px** | 14.76% | 0.93 |
+| dayclock | short | 1408 | 1321.5 | **86.5px** | 1.21% | 0.4 |
 | iso3d | long | 944 | 863.1 | **80.9px** | 0.94% | 0.93 |
 | fluidflow | short | 1391 | 1321.5 | **69.5px** | 0.01% | 0.75 |
 | fluidflow | long | 926 | 863.1 | **62.9px** | 0.04% | 0.75 |
 | cipher | long | 925 | 863.1 | **61.9px** | 0.49% | 0.85 |
 | vdom_diff | long | 909 | 863.1 | **45.9px** | 0.51% | 0.5 |
-| question | long | 905 | 863.1 | **41.9px** | 6.29% | 0.675 |
 | vector_space | long | 904 | 863.1 | **40.9px** | 0.39% | 0.02 |
 | probability | short | 1359 | 1321.5 | **37.5px** | 0.96% | 0.75 |
 | matrix | long | 884 | 863.1 | **20.9px** | 0.15% | 0.75 |
@@ -62,6 +63,7 @@ kinds did exactly that while edge-bleed read 0.0%. A row here means painted cont
 |---|---|---|
 | trace | long | 0.1px |
 | iso3d | short | 0.5px |
+| question | short | 0.5px |
 | zoomladder | short | 0.5px |
 | matrix | short | 0.5px |
 | bodymap | short | 0.5px |
