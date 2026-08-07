@@ -10,6 +10,16 @@
 //
 // The write-only-when-sweeping split mirrors edge-check vs edge-audit so parallel
 // QA agents scoped to one kind cannot collide on a shared report file.
+//
+// KNOWN LIMITATION — read before "fixing" a row. This reports the lowest
+// hard-contrast pixel, but the documented rule is that nothing LOAD-BEARING may
+// sit in the band (`CLAUDE_PROMPT.md` §28): a decorative backdrop is allowed to
+// overhang, and several painters set their 3D viewport to the full frame on
+// purpose. `stat` is the worked example — at 9:16 its context sentence finished
+// at y=1345 against a safeBottom of 1321.5 (a real defect, fixed), while its
+// slab and plinth reach y=1663 (deliberate, left alone). The row said 341px
+// either way. So a row here is a CANDIDATE: open the frame and decide whether
+// what crosses the line is content or backdrop.
 import { chromium } from "playwright";
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -72,6 +82,11 @@ if (args.kind) {
     "edge, so content can sit fully inside the frame and still be drawn under the caption; four",
     "kinds did exactly that while edge-bleed read 0.0%. A row here means painted content crossed",
     "`safeBottom` at one or more sampled progress values.",
+    "",
+    "**A row is a CANDIDATE, not a verdict.** The rule is that nothing LOAD-BEARING may sit in the",
+    "band; a decorative backdrop may overhang, and several painters set their 3D viewport to the full",
+    "frame deliberately. `stat` showed both at once: its context sentence ended below the line (a real",
+    "defect) while its slab and plinth reach 340px lower by design. Open the frame before fixing.",
     "",
     `**${bad.length} of ${rows.length} kind/aspect combinations intrude into the caption band.**`,
     "",

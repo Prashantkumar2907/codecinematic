@@ -255,10 +255,16 @@ export function paintStat(ctx: CanvasRenderingContext2D, scene: StatScene, env: 
       ctx.textAlign = "center";
       // Must follow the label's actual line count — a fixed 6.0 offset overlapped
       // the context onto the label's second line.
+      const cLines = wrapText(ctx, scene.context, contentW * 0.85);
+      // ...and then lift the whole block if its LAST line would cross into the
+      // burned-in caption. Measured at 9:16: the second line landed at y=1345
+      // against a safeBottom of 1321.5, so the sentence finished underneath the
+      // caption. The decorative slab below it may overhang — the rule is that
+      // nothing LOAD-BEARING sits in that band — but this is the sentence.
       const cyc = floatY + unit * 3.5 + labelLines.length * unit * 1.7 + unit * 1.1;
-      wrapText(ctx, scene.context, contentW * 0.85).forEach((line, i) =>
-        ctx.fillText(line, w / 2, cyc + i * unit * 1.35)
-      );
+      const lastY = cyc + (cLines.length - 1) * unit * 1.35;
+      const lift = Math.max(0, lastY - (layout.safeBottom - unit * 0.4));
+      cLines.forEach((line, i) => ctx.fillText(line, w / 2, cyc - lift + i * unit * 1.35));
     }
     ctx.restore();
   }

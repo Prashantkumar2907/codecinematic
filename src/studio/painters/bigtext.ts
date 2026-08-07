@@ -632,7 +632,8 @@ export function paintBigtext(ctx: CanvasRenderingContext2D, scene: BigtextScene,
     px * 0.1 +
     unit * 1.0 +
     Math.max(subWrapped.length - 1, 0) * subLineH;
-  const safeLimit = h * SHORTS_SAFE_BOTTOM - unit * SHORTS_SAFE_GAP;
+  // 0.75h - gap is below the caption band (which starts at 0.70h on a Short).
+  const safeLimit = layout.safeBottom - unit * SHORTS_SAFE_GAP;
   const safeLift = vertical && scene.sub ? Math.max(0, subBlockBottom - safeLimit) : 0;
 
   // Apply the base float, shake, and center the canvas

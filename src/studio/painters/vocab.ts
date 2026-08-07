@@ -155,7 +155,11 @@ export function paintVocab(ctx: CanvasRenderingContext2D, scene: VocabScene, env
   // The example stack fills everything between the measured meaning and the safe
   // bottom. Centring it in the leftover space instead left a dead void on 9:16.
   const availTop = mTop + mLines.length * mLineH + unit * 1.0;
-  const safeBottom = (vertical ? SAFE_BOTTOM_SHORT : SAFE_BOTTOM_LONG) * layout.h;
+  // Was `(vertical ? 0.75 : 0.94) * layout.h`, a local clamp that SHADOWED the
+  // caption-aware bound and sat below it on both aspects (0.94h = 1015px against a
+  // safeBottom of 863). Measured 55.4% of the caption band covered at 16:9 — the
+  // worst intrusion in the library — while edge-bleed read 0.0%.
+  const safeBottom = layout.safeBottom;
   const nEx = scene.examples.length;
 
   const key = scene.id + "-vocab3d";

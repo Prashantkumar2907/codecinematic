@@ -244,7 +244,12 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
     const bob = (idle(env, 2400) - 0.5) * unit * 0.2 * clamp01(ctaT);
     // 0.86h put the CTA under the Shorts caption strip; keep it above the band and
     // leave room for the clamped parallax nudge on top.
-    const ctaFloor = (layout.vertical ? SHORTS_SAFE_BOTTOM : 0.94) * h - bh - maxNudge;
+    // 0.75h/0.94h both sit BELOW the caption band; layout.safeBottom is the real
+    // boundary and already accounts for the burned-in caption on both aspects.
+    // `bob` is added AFTER the clamp, so it can carry the pill back across the
+    // line it was just clamped to — measured 3.9px over. Its amplitude is half of
+    // `unit * 0.2`, so reserve that in the floor as well as the parallax nudge.
+    const ctaFloor = layout.safeBottom - bh - maxNudge - unit * 0.1;
     const by = Math.min(Math.max(cursor + unit * 0.8, h * 0.68), ctaFloor) + bob;
 
     ctx.globalAlpha = Math.min(1, ctaIn);
