@@ -10,6 +10,8 @@ import {
   easeInOutCubic,
   enterT,
   idle,
+  shade,
+  lerpColor,
   clamp01,
   roundRect,
   fitFontSize,
@@ -21,8 +23,18 @@ import {
 import type { PaintEnv } from "./index";
 
 type BasketScene = Extract<Scene, { kind: "basket" }>;
+type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number };
+type Ctx = { gIn: number; flash: number[] };
 
 const RISE = 0.6;
+/** Card thickness — a fixed, shallow WORLD depth for the bevel, same lesson as
+ *  `circuit.ts`: never derive it from the pixel-mapping scale, or an off-centre
+ *  card (whose viewing ray isn't square-on) shows a thick slab of side wall. */
+const CARD_DEPTH = 0.16;
+/** Cap on cell growth so a 2-item basket doesn't blow up into a billboard. */
+const CELL_MAX_UNITS = 6.5;
+const IDLE_FACE = shade(THEME.panel, 0.09);
+const INK_PANEL = THEME.bgBottom;
 
 export function paintBasket(ctx: CanvasRenderingContext2D, scene: BasketScene, env: PaintEnv) {
   const { layout } = env;
@@ -57,6 +69,13 @@ export function paintBasket(ctx: CanvasRenderingContext2D, scene: BasketScene, e
   };
   const roseOf = (it: BasketScene["items"][number]): boolean => !ghost && yi >= 1 && it.prices[yi] > it.prices[yi - 1];
   const liveBeat = !ghost && t < 1;
+  /** Rise-then-settle pulse per item: 0 -> 1 by `t=RISE`, back to 0 by `t=RISE+0.3`.
+   *  Drives emphasis by MAGNITUDE (lerp), never a boolean switch — a switch made
+   *  any nonzero residual (down to a floating-point sliver right at t=1) render
+   *  as the full warn colour, so a card stayed solid yellow for nearly the whole
+   *  tail instead of fading back to idle. */
+  const flashOf = (it: BasketScene["items"][number]): number =>
+    roseOf(it) && liveBeat ? easeOutCubic(clamp01(t / RISE)) * (1 - clamp01((t - RISE) / 0.3)) : 0;
 
   const total = scene.items.reduce((s, it) => s + priceOf(it), 0);
   const base0 = scene.items.reduce((s, it) => s + it.prices[0], 0);
@@ -102,83 +121,110 @@ export function paintBasket(ctx: CanvasRenderingContext2D, scene: BasketScene, e
   const n = scene.items.length;
   const cols = Math.min(n, vertical ? 2 : 3);
   const rows = Math.ceil(n / cols);
-  
+
   const rect = { x: ax, y: gridTop, w: aw, h: gridH };
 
-  const spreadX = vertical ? 3.5 : 5.5;
-  const spreadZ = vertical ? 4.5 : 3.5;
-
-  const worldPos = (c: number, r: number) => {
-    const x = cols === 1 ? 0 : (c / (cols - 1) - 0.5) * spreadX * 2;
-    const z = rows === 1 ? 0 : (r / (rows - 1) - 0.5) * spreadZ * 2;
-    return new THREE.Vector3(x, 0, z);
+  /**
+   * `qa/ledger.json` -> systemic `2d-layout-round-tripped-through-camera`: cards
+   * sat on a ground plane at a fixed world spread (3.5-5.5 units) under a camera
+   * elevated to (0,12,10), so how much of the frame they filled depended on that
+   * plane's foreshortening, never on `rect` — a 2x2 basket rendered into a small
+   * patch near the top of both aspects with dead space below. The grid is now
+   * laid out in pixels first (cell pitch capped so a 2-item basket doesn't
+   * become a billboard) and cards are mapped onto it via an on-axis camera +
+   * `mappingAt`/`toWorld` (same technique as `table.ts`/`circuit.ts`).
+   */
+  const cellW = aw / cols;
+  const cellH = Math.min(gridH / rows, unit * CELL_MAX_UNITS);
+  const cellTop = gridTop + Math.max(0, (gridH - cellH * rows) / 2);
+  const cellRect = (c: number, r: number): Rect => {
+    const x = ax + c * cellW;
+    const y = cellTop + r * cellH;
+    return { x, y, w: cellW, h: cellH, cx: x + cellW / 2, cy: y + cellH / 2 };
+  };
+  const blockWpx = cellW * 0.72;
+  /**
+   * Explicit vertical stack within a cell — icon, then label, then the card,
+   * then the price tag. Icon/label/tag are fixed sizes in `unit`s (they're
+   * text/glyph chrome, not something that should balloon with the grid); the
+   * card fills whatever is left, so it still grows to use a roomy cell. The
+   * card used to be a thin ground-level slab (0.4 of a ~2.8-wide footprint) so
+   * a label floating just above its centre never touched it; sized to
+   * actually fill its cell, that same offset ran the label through its top.
+   */
+  const MIN_CARD = unit * 1.2;
+  /** A dense grid (e.g. 4 items at 3 columns -> a sparse 2nd row on a 16:9 frame)
+   *  can make `cellH` shorter than the fixed chrome needs — the zones shrink
+   *  together rather than overflow into the next row down. */
+  const zoneScale = Math.min(1, cellH / (unit * 1.5 + unit * 0.15 + unit * 1.0 + unit * 0.15 + unit * 1.35 + MIN_CARD));
+  const ICON_ZONE = unit * 1.5 * zoneScale;
+  const LABEL_ZONE = unit * 1.0 * zoneScale;
+  const TAG_ZONE = unit * 1.35 * zoneScale;
+  const ZONE_GAP = unit * 0.15 * zoneScale;
+  const blockHpx = Math.max(MIN_CARD * zoneScale, cellH - ICON_ZONE - ZONE_GAP - LABEL_ZONE - ZONE_GAP - TAG_ZONE);
+  const cellLayout = (cr: Rect) => {
+    const cardTop = cr.y + ICON_ZONE + ZONE_GAP + LABEL_ZONE + ZONE_GAP;
+    return {
+      iconBaseline: cr.y + ICON_ZONE * 0.78,
+      labelBaseline: cr.y + ICON_ZONE + ZONE_GAP + LABEL_ZONE * 0.72,
+      cardCy: cardTop + blockHpx / 2,
+      tagTop: cardTop + blockHpx + ZONE_GAP,
+    };
   };
 
-  const build = (): ThreeBundle => {
+  /** Pixels-per-world-unit and pixel origin on the z=`z` plane, for a camera
+   *  sitting ON-AXIS at (0,0,D) — exact, invertible pixel<->world map (same
+   *  technique as `table.ts`/`circuit.ts`/`diagram.ts`). */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
+  };
+
+  const build = (): ThreeBundle<Ctx> => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 12 : 10, vertical ? 10 : 8);
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, vertical ? 15 : 12);
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
+    const m = mappingAt(camera, CARD_DEPTH / 2);
+    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
 
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const blockW = (spreadX * 2.0) / cols * 0.8;
-    const blockD = (spreadZ * 2.0) / rows * 0.8;
-
-    const models: { mesh: THREE.Group, r: number, c: number, item: any, idx: number }[] = [];
-    scene.items.forEach((it, i) => {
-        const c = i % cols;
-        const r = Math.floor(i / cols);
-        const g = makeBlock(blockW, 0.4, blockD, "#1e293b", "#31435a");
-        g.position.copy(worldPos(c, r));
-        s.add(g);
-        models.push({ mesh: g, r, c, item: it, idx: i });
+    const models = scene.items.map((it, i) => {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      const cr = cellRect(c, r);
+      const g = makeBlock(blockWpx / m.sx, blockHpx / m.sy, CARD_DEPTH, IDLE_FACE, THEME.textDim);
+      const w = toWorld(cr.cx, cellLayout(cr).cardCy);
+      g.position.set(w.x, w.y, 0);
+      s.add(g);
+      return { mesh: g, item: it, idx: i, base: g.position.clone() };
     });
 
-    const update = (elapsedMs: number, ctxData: { gIn: number, t: number, ghost: boolean, yi: number, mv: number, liveBeat: boolean }) => {
-      const { gIn, t, ghost, yi, mv, liveBeat } = ctxData;
-      
-      models.forEach(({ mesh, r, c, item, idx }) => {
-        mesh.visible = gIn > 0;
+    const update = (elapsedMs: number, data?: Ctx) => {
+      if (!data) return;
+      const { gIn, flash } = data;
+      models.forEach(({ mesh, idx, base }) => {
+        mesh.visible = gIn > 0.01;
+        const f = flash[idx] ?? 0;
+        const bobPx = Math.sin(elapsedMs / 1200 + idx) * unit * 0.4;
+        const popPx = f * unit * 3.0;
+        const worldOffset = (bobPx + popPx) / m.sy;
+        mesh.position.set(base.x, base.y + worldOffset, base.z);
         mesh.scale.setScalar(Math.max(0.001, 0.9 * gIn));
-        
-        const isRose = !ghost && yi >= 1 && item.prices[yi] > item.prices[yi - 1];
-        const flash = isRose && liveBeat ? easeOutCubic(clamp01(t / RISE)) * (1 - clamp01((t - RISE) / 0.3)) : 0;
 
-        const baseP = worldPos(c, r);
-        const bob = Math.sin(elapsedMs / 1200 + idx) * 0.05;
-        const pop = flash * 0.4;
-        mesh.position.y = baseP.y + bob + pop;
-
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.MeshPhysicalMaterial;
-                mat.transparent = true;
-                mat.opacity = gIn * 0.9;
-                if (flash > 0) {
-                    mat.color.setStyle(THEME.warn);
-                    mat.emissive.setStyle(THEME.warn);
-                    mat.emissiveIntensity = 0.5 * flash;
-                } else {
-                    mat.color.setStyle("#1e293b");
-                    mat.emissive.setStyle("#1e293b");
-                    mat.emissiveIntensity = 0.1;
-                }
-            }
+        mesh.children.forEach((child) => {
+          if (child instanceof THREE.Mesh) {
+            const mat = child.material as THREE.MeshPhysicalMaterial;
+            mat.transparent = true;
+            mat.opacity = gIn * 0.9;
+            const face = lerpColor(IDLE_FACE, THEME.warn, f);
+            mat.color.setStyle(face);
+            mat.emissive.setStyle(face);
+            mat.emissiveIntensity = 0.1 + 0.5 * f;
+          }
         });
       });
     };
@@ -186,65 +232,77 @@ export function paintBasket(ctx: CanvasRenderingContext2D, scene: BasketScene, e
     return { scene: s, camera, update };
   };
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: ghostIn, t, ghost, yi, mv, liveBeat });
-  if (!cam) return;
+  const flashByIdx = scene.items.map((it) => flashOf(it));
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: ghostIn, flash: flashByIdx }, env);
+  const flat = !cam;
 
-  const get2D = (c: number, r: number) => projectToRect(cam, worldPos(c, r), rect);
-  
-  const blockW2D = contentW / cols * 0.8;
-  const blockH2D = gridH / rows * 0.8;
-
-  // Items Overlays
+  // Items overlays — drawn from the same pixel cell centers the 3D layer was
+  // mapped onto, so the card and its icon/label/price tag can never drift apart.
   scene.items.forEach((it, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
     const rose = roseOf(it);
-    const flash = rose && liveBeat ? easeOutCubic(clamp01(t / RISE)) * (1 - clamp01((t - RISE) / 0.3)) : 0;
-    
-    const p = get2D(col, row);
-    // Add same bob to 2D
-    const bob = Math.sin(env.elapsedMs / 1200 + i) * unit * 1.5;
-    const pop = flash * unit * 6.0;
-    const cy = p.y - bob - pop;
+    const flash = flashByIdx[i];
+
+    const cr = cellRect(col, row);
+    const cl = cellLayout(cr);
+    const bobPx = Math.sin(env.elapsedMs / 1200 + i) * unit * 0.4;
+    const popPx = flash * unit * 3.0;
+    const shiftPx = bobPx + popPx;
 
     ctx.save();
     ctx.globalAlpha = ghost ? 0.6 * ghostIn : ghostIn;
 
-    ctx.textAlign = "center";
-    const cxc = p.x;
-    let cursorY = cy - blockH2D * 0.2;
-    if (it.icon) {
-      ctx.font = `${blockH2D * 0.3}px ${FONT_SANS}`;
-      ctx.fillText(it.icon, cxc, cursorY);
-      cursorY += blockH2D * 0.15;
+    if (flat) {
+      roundRect(ctx, cr.cx - blockWpx / 2, cl.cardCy - shiftPx - blockHpx / 2, blockWpx, blockHpx, unit * 0.15);
+      ctx.fillStyle = lerpColor(IDLE_FACE, THEME.warn, flash);
+      ctx.fill();
+      ctx.strokeStyle = THEME.textDim;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
-    const lpx = fitFontSize(ctx, it.label, { maxW: blockW2D * 0.8, startPx: unit * 0.66, minPx: unit * 0.46, weight: 600 });
+
+    ctx.textAlign = "center";
+    const cxc = cr.cx;
+    if (it.icon) {
+      ctx.font = `${ICON_ZONE * 0.72}px ${FONT_SANS}`;
+      ctx.fillText(it.icon, cxc, cl.iconBaseline - shiftPx);
+    }
+    const lpx = fitFontSize(ctx, it.label, { maxW: cellW * 0.8, startPx: unit * 0.66 * zoneScale, minPx: unit * 0.46, weight: 600 });
     ctx.font = `600 ${lpx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
-    ctx.fillText(it.label, cxc, cursorY + blockH2D * 0.1);
+    ctx.fillText(it.label, cxc, cl.labelBaseline - shiftPx);
 
-    // Price tag pill
+    // Price tag pill — sized off `zoneScale` too, or a tight grid reserves a
+    // shrunken `TAG_ZONE` but draws a full-size pill into it, overflowing into
+    // the row below (the same fixed-vs-shrunk mismatch `TAG_ZONE` itself fixes).
     const priceTxt = fmt(priceOf(it));
-    ctx.font = `800 ${unit * (vertical ? 0.78 : 0.72)}px ${FONT_MONO}`;
+    const tagPx = unit * (vertical ? 0.78 : 0.72) * zoneScale;
+    ctx.font = `800 ${tagPx}px ${FONT_MONO}`;
     const arrow = rose ? " ↑" : "";
     const pw = ctx.measureText(priceTxt + arrow).width + unit * 0.8;
-    const tagY = cy + blockH2D * 0.25;
+    const tagH = unit * 1.0 * zoneScale;
+    const tagY = cl.tagTop - shiftPx;
+    const tagColor = lerpColor(THEME.text, THEME.warn, flash);
+    // `lerpColor` returns an `rgb()` string, which `rgba()`'s hex parser can't
+    // read — alpha is ramped by re-declaring the colour with a trailing alpha.
+    const borderColor = lerpColor(accent, THEME.warn, flash).replace("rgb(", "rgba(").replace(")", `, ${0.4 + 0.6 * flash})`);
     if (flash > 0) {
       ctx.shadowColor = rgba(THEME.warn, 0.6);
       ctx.shadowBlur = unit * 0.5 * flash;
     }
-    roundRect(ctx, cxc - pw / 2, tagY, pw, unit * 1.0, unit * 0.28);
-    ctx.fillStyle = "#0a0e13";
+    roundRect(ctx, cxc - pw / 2, tagY, pw, tagH, unit * 0.28 * zoneScale);
+    ctx.fillStyle = INK_PANEL;
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = flash > 0 ? THEME.warn : rgba(accent, 0.4);
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.fillStyle = flash > 0 ? THEME.warn : THEME.text;
-    ctx.fillText(priceTxt, cxc - (arrow ? ctx.measureText(arrow).width / 2 : 0), tagY + unit * 0.72);
+    ctx.fillStyle = tagColor;
+    ctx.fillText(priceTxt, cxc - (arrow ? ctx.measureText(arrow).width / 2 : 0), tagY + tagH * 0.72);
     if (arrow) {
       ctx.fillStyle = THEME.warn;
-      ctx.fillText(arrow, cxc + ctx.measureText(priceTxt).width / 2, tagY + unit * 0.72);
+      ctx.fillText(arrow, cxc + ctx.measureText(priceTxt).width / 2, tagY + tagH * 0.72);
     }
     ctx.textAlign = "start";
     ctx.restore();
