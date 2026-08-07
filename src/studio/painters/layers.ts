@@ -69,7 +69,7 @@ export function paintLayers(ctx: CanvasRenderingContext2D, scene: LayersScene, e
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
     camera.position.set(6, 6, 8);
     camera.lookAt(0, 0, 0);
-    studioLights(s, palette.accent, "rgba(148,163,184,0.5)");
+    studioLights(s, palette.accent, THEME.textDim);
     
     const grid = new THREE.GridHelper(12, 12, new THREE.Color(palette.accent), new THREE.Color("#31435a"));
     (grid.material as THREE.Material).transparent = true;
