@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
+import { render3D, projectToRect, studioLights, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -8,6 +8,7 @@ import {
   easeInOutCubic,
   enterT,
   idle,
+  shade,
   sub,
   clamp01,
   roundRect,
@@ -28,6 +29,12 @@ type Rect = { x: number; y: number; w: number; h: number };
 
 const GRID = 12;
 const DIM_ALPHA = 0.4;
+/** Idle (unlit) part face — matches `table.ts`/`bits.ts`/`circuit.ts`'s
+ *  idle-face convention rather than a one-off near-black hex, which under
+ *  this scene's studio lighting rendered every unhighlighted part almost
+ *  invisible against the background. */
+const IDLE_FACE = shade(THEME.panel, 0.09);
+const INK_PANEL = THEME.bgBottom;
 
 type GridMap = { ox: number; oy: number; cw: number; ch: number };
 
@@ -108,28 +115,35 @@ function createShape3D(shape: ShapeName, w: number, h: number, d: number, color:
             mesh = new THREE.Mesh(new THREE.TorusGeometry(Math.min(w,h)/2, Math.min(w,h)*0.1, 16, 32), mat);
             break;
         case "arch": {
-            // An arch made of a half-torus + two pillars
+            // An arch made of a half-torus + two pillars. The generic `d`
+            // (depth proportional to width, meant for a block's Z-extent) was
+            // also being read as the torus TUBE diameter here — at d=w*0.4,
+            // the tube's own radius (d/2=w*0.2) rivaled the ring radius
+            // (w/2-d/4=w*0.4), so the "arch" rendered as a solid dome/ball
+            // with barely a hole, not a thin arch band. `archD` gives the
+            // arch its own, much shallower thickness.
             const archGrp = new THREE.Group();
-            
+            const archD = Math.min(d, w * 0.16);
+
             const arcMat = mat.clone();
-            const arcMesh = new THREE.Mesh(new THREE.TorusGeometry(w/2 - d/4, d/2, 16, 32, Math.PI), arcMat);
+            const arcMesh = new THREE.Mesh(new THREE.TorusGeometry(w/2 - archD/4, archD/2, 16, 32, Math.PI), arcMat);
             arcMesh.castShadow = true;
             arcMesh.receiveShadow = true;
-            arcMesh.position.y = h/2 - d/2; // top part
+            arcMesh.position.y = h/2 - archD/2; // top part
             archGrp.add(arcMesh);
-            
-            const pHeight = h - d/2;
-            const pGeo = new THREE.CylinderGeometry(d/2, d/2, pHeight, 16);
+
+            const pHeight = h - archD/2;
+            const pGeo = new THREE.CylinderGeometry(archD/2, archD/2, pHeight, 16);
             const pLeft = new THREE.Mesh(pGeo, arcMat);
-            pLeft.position.set(-w/2 + d/4, -d/4, 0);
+            pLeft.position.set(-w/2 + archD/4, -archD/4, 0);
             pLeft.castShadow = true; pLeft.receiveShadow = true;
             archGrp.add(pLeft);
-            
+
             const pRight = new THREE.Mesh(pGeo, arcMat);
-            pRight.position.set(w/2 - d/4, -d/4, 0);
+            pRight.position.set(w/2 - archD/4, -archD/4, 0);
             pRight.castShadow = true; pRight.receiveShadow = true;
             archGrp.add(pRight);
-            
+
             return archGrp;
         }
         case "stairs": {
@@ -252,7 +266,7 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
     camera.lookAt(0, (spanY * scale3D) / 2, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(spreadX * 2, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(spreadX * 2, 14, new THREE.Color(accent), new THREE.Color(THEME.textDim));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.05;
@@ -274,7 +288,7 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
         const h = part.h * scale3D;
         const d = Math.max(w * 0.4, 0.5); // depth proportional to width
         
-        const g = createShape3D(part.shape, w, h, d, "#1e293b");
+        const g = createShape3D(part.shape, w, h, d, IDLE_FACE);
         const wp = worldPos(part.x, part.y, part.w, part.h);
         g.position.copy(wp);
         
@@ -322,8 +336,8 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
                           mat.emissive.setStyle(accent);
                           mat.emissiveIntensity = 0.5 + 0.3 * Math.sin(elapsedMs / 300);
                       } else {
-                          mat.color.setStyle("#1e293b");
-                          mat.emissive.setStyle("#1e293b");
+                          mat.color.setStyle(IDLE_FACE);
+                          mat.emissive.setStyle(IDLE_FACE);
                           mat.emissiveIntensity = 0.1;
                       }
                   }
@@ -396,7 +410,7 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
       if (chipIn > 0) {
         ctx.globalAlpha = chipIn;
         roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.32);
-        ctx.fillStyle = "#0a0e13";
+        ctx.fillStyle = INK_PANEL;
         ctx.fill();
         ctx.strokeStyle = rgba(accent, 0.55);
         ctx.lineWidth = 1.5;
