@@ -109,7 +109,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | canvas_reveal | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Swatch labels overlapped into unreadable text — `fitFontSize`'s `maxW` for a label was `chipW*1.7`, 70% wider than the chip itself, while chips are packed with only a `unit*0.6` gap. Measured concretely: "Tandul white" ran straight into "Rice-husk black" on the first render. `maxW` is now the chip's own slot (width + a little of its trailing gap). Also: caption background was a hand-typed `rgba(9,13,18,0.72)` — an exact match for `THEME.bgBottom` — swapped in. `edge-check` 0.0% both aspects, console.log empty. | addb7c4 | 2026-08-08 |
 | scalecompare | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | fluidflow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| ecosystem_web | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| ecosystem_web | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Layout/motion/containment already solid at both aspects. The 3-node triangle only using the top ~60% of its ellipse is inherent to 3 nodes at 120° spacing (one hits the top extreme, the other two sit at ±30° elevation, not the bottom extreme) — verified against layoutNodes()'s geometry, not a bug; 4+ node webs use the full ellipse evenly. Fixed 4 literals: three rgba(148,163,184,X) re-typed THEME.textDim; one rgba(10,16,22,0.82) re-typed THEME.bgBottom (same unfixed variant still in server_rack.ts/sysarch.ts). console.log clean, 0.0% edge bleed both aspects. | 46b6510 | 2026-08-08 |
 | turing_tape | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | grid_flood | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | hash_ring | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
