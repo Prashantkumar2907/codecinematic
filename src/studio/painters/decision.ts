@@ -6,6 +6,7 @@ import {
   easeInOutCubic,
   enterT,
   idle,
+  lerpColor,
   clamp01,
   wrapText,
   roundRect,
@@ -35,6 +36,10 @@ const CURVE_SAMPLES = 20;
 const GHOST_NODE = 0.35;
 const GHOST_EDGE = 0.2;
 const REJECTED = 0.15;
+/** A travelling marker/tail head reads as white-hot regardless of subject
+ *  accent — same convention as `cipher.ts`'s `INK_BRIGHT`. */
+const SPARK = "#eaf6ff";
+const INK_PANEL = THEME.bgBottom;
 
 type GridMap = { ox: number; oy: number; cw: number; ch: number; rot: boolean; maxYo: number };
 
@@ -203,8 +208,8 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     }
     ctx.save();
     ctx.globalAlpha = alpha * introIn;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
-    ctx.fillStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
+    ctx.fillStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.07;
     ctx.lineCap = "round";
     strokePolylineProgress(ctx, pts, 1);
@@ -232,7 +237,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     if (prog > 0 && prog < 1) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.9;
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = SPARK;
       ctx.beginPath();
       ctx.arc(tip.x, tip.y, unit * 0.2, 0, Math.PI * 2);
       ctx.fill();
@@ -258,7 +263,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     ctx.font = `600 ${unit * (vertical ? 0.62 : 0.55)}px ${FONT_SANS}`;
     const tw = ctx.measureText(e.label).width;
     roundRect(ctx, at.x - tw / 2 - unit * 0.3, at.y - unit * 0.46, tw + unit * 0.6, unit * 0.92, unit * 0.24);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = INK_PANEL;
     ctx.fill();
     ctx.strokeStyle = taken ? rgba(accent, 0.6) : THEME.panelBorder;
     ctx.lineWidth = 1;
@@ -310,11 +315,11 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     const outcomeWarm = !isQ && reach > 0;
     if (isQ) {
       diamondPath(ctx, r);
-      ctx.fillStyle = reach > 0 ? "#0e2433" : THEME.panel;
+      ctx.fillStyle = reach > 0 ? lerpColor(THEME.panel, accent, 0.25) : THEME.panel;
       ctx.fill();
       ctx.shadowBlur = 0;
       diamondPath(ctx, r);
-      ctx.strokeStyle = reach > 0 ? accent : "rgba(148,163,184,0.45)";
+      ctx.strokeStyle = reach > 0 ? accent : rgba(THEME.textDim, 0.45);
       ctx.lineWidth = reach > 0 ? unit * (0.11 + breathe) : unit * 0.06;
       ctx.lineJoin = "round";
       ctx.stroke();
@@ -388,7 +393,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     for (let i = 0; i <= 8; i++) seg.push(pointAlongPolyline(chain, Math.max(f - 0.07 + (i / 8) * 0.07, 0)));
     ctx.save();
     ctx.globalAlpha = 0.55 * Math.sin(Math.PI * f);
-    ctx.strokeStyle = "#eaf6ff";
+    ctx.strokeStyle = SPARK;
     ctx.lineWidth = unit * 0.2;
     ctx.lineCap = "round";
     ctx.shadowColor = accentGlow;
