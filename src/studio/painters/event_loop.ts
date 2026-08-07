@@ -23,6 +23,17 @@ type EventLoopScene = Extract<Scene, { kind: "event_loop" }>;
 type Task = EventLoopScene["tasks"][number];
 type Status = "ready" | "running" | "waiting" | "done";
 
+/** Dark accent-tinted panel fill (matches cipher.ts / queueflow.ts / threads.ts / terrain.ts). */
+const INK_FILL = "#0e2433";
+/** Brighter accent-tinted fill for the currently-running task's chip. */
+const INK_HOT = "#123249";
+/** Bright travelling marker, regardless of accent (matches cipher.ts's INK_BRIGHT / circuit.ts's SPARK). */
+const SPARK = "#eaf6ff";
+/** Dimmed neutral fill for a completed task's chip. */
+const CHIP_DONE_FILL = "rgba(20,26,32,0.5)";
+/** Fallback dot colour for a task chip with no icon. */
+const DOT_FALLBACK = "rgba(200,210,222,0.8)";
+
 /**
  * Replay steps 0..uptoStep (inclusive) to get each task's cumulative status.
  * Each task keeps one fixed home angle for its whole life (ready/waiting/done
@@ -114,7 +125,7 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
   ctx.shadowBlur = unit * (blockingHold ? 1.1 : 0.8) * (0.7 + 0.3 * idle(env, 1400));
   ctx.beginPath();
   ctx.arc(cx, cy, hubR, 0, Math.PI * 2);
-  ctx.fillStyle = "#0e2433";
+  ctx.fillStyle = INK_FILL;
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.strokeStyle = blockingHold ? THEME.warn : accent;
@@ -123,7 +134,7 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(spin * Math.PI * 2);
-  drawIcon(ctx, "gear", 0, 0, hubR * 1.15, env, blockingHold ? THEME.warn : "#eaf6ff");
+  drawIcon(ctx, "gear", 0, 0, hubR * 1.15, env, blockingHold ? THEME.warn : SPARK);
   ctx.restore();
   ctx.restore();
 
@@ -179,10 +190,10 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
     }
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, chipR, 0, Math.PI * 2);
-    ctx.fillStyle = heat !== "none" ? "#123249" : status === "done" ? "rgba(20,26,32,0.5)" : THEME.panel;
+    ctx.fillStyle = heat !== "none" ? INK_HOT : status === "done" ? CHIP_DONE_FILL : THEME.panel;
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = heat !== "none" ? hotColor : status === "waiting" ? rgba(secondary, 0.75) : status === "done" ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.55)";
+    ctx.strokeStyle = heat !== "none" ? hotColor : status === "waiting" ? rgba(secondary, 0.75) : status === "done" ? rgba(THEME.textDim, 0.35) : rgba(THEME.textDim, 0.55);
     ctx.lineWidth = heat !== "none" ? unit * 0.11 : unit * 0.06;
     if (dashed) ctx.setLineDash([unit * 0.2, unit * 0.18]);
     ctx.stroke();
@@ -193,7 +204,7 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
       ctx.globalAlpha = introIn * (status === "done" ? 0.5 : 1);
       ctx.fillText(task.icon, pos.x, pos.y + chipR * 0.36);
     } else {
-      ctx.fillStyle = heat !== "none" ? hotColor : status === "waiting" ? secondary : "rgba(200,210,222,0.8)";
+      ctx.fillStyle = heat !== "none" ? hotColor : status === "waiting" ? secondary : DOT_FALLBACK;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, unit * 0.22, 0, Math.PI * 2);
       ctx.fill();
@@ -218,9 +229,19 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
     const lx = pos.x + c * dist;
     const ly = pos.y + s * dist;
     const side: -1 | 0 | 1 = Math.abs(c) < 0.35 ? 0 : c > 0 ? 1 : -1;
+    // A task parked out on the waiting arc can sit close enough to the ring's
+    // outer edge that its label — which grows away from the chip, not toward
+    // centre — would otherwise run past the content box on that side.
+    const edgeRoom =
+      side === 1
+        ? contentX + contentW - (lx + unit * 0.15)
+        : side === -1
+          ? lx - unit * 0.15 - contentX
+          : unit * 5;
+    const maxW = Math.max(unit * 1.2, Math.min(unit * 5, edgeRoom - unit * 0.2));
     ctx.save();
     ctx.globalAlpha = introIn * (status === "done" ? 0.55 : 0.95);
-    const px = fitFontSize(ctx, task.label, { maxW: unit * 5, startPx: unit * 0.62, minPx: unit * 0.5, weight: 700 });
+    const px = fitFontSize(ctx, task.label, { maxW, startPx: unit * 0.62, minPx: unit * 0.5, weight: 700 });
     ctx.font = `700 ${px}px ${FONT_SANS}`;
     ctx.fillStyle = status === "waiting" ? THEME.textDim : THEME.text;
     ctx.textAlign = side === 1 ? "left" : side === -1 ? "right" : "center";
@@ -291,7 +312,7 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
   ctx.globalAlpha = tokenAlpha;
   ctx.shadowColor = blockingHold ? rgba(THEME.warn, 0.8) : accentGlow;
   ctx.shadowBlur = unit * 1.1;
-  ctx.fillStyle = blockingHold ? THEME.warn : "#eaf6ff";
+  ctx.fillStyle = blockingHold ? THEME.warn : SPARK;
   ctx.beginPath();
   ctx.arc(tokenPos.x, tokenPos.y + (runningTask ? tokenBob : 0), unit * 0.26, 0, Math.PI * 2);
   ctx.fill();
