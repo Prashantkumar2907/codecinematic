@@ -23,8 +23,9 @@ import type { PaintEnv } from "./index";
 type ControlLoopScene = Extract<Scene, { kind: "control_loop" }>;
 type Item = ControlLoopScene["items"][number];
 
-/** THEME has no error color (only `good`/`warn`) — established codebase red for drift (matches server_rack.ts / codediff.ts). */
-const DRIFT = "#f87171";
+const DRIFT = THEME.danger;
+/** Dark ink for text/icons on a bright accent-filled card (matches cipher.ts / graphwalk.ts / probability.ts). */
+const INK_ON_ACCENT = "#06121a";
 
 /** Per-item live state as of a given step index: the actual value shown and
  *  whether it currently matches desired (in sync) or has drifted. */
@@ -255,19 +256,19 @@ function drawItemCard(
   const iconCx = x + iconSize * 0.62;
   const iconCy = y + h / 2;
   if (item.icon) {
-    drawIcon(ctx, item.icon, iconCx, iconCy, iconSize, env, "#0b1016");
+    drawIcon(ctx, item.icon, iconCx, iconCy, iconSize, env, INK_ON_ACCENT);
   }
   const textX = x + (item.icon ? iconSize * 1.15 : unit * 0.4);
   const maxW = w - (textX - x) - unit * 0.35;
   const labelPx = fitFontSize(ctx, item.label, { maxW, startPx: unit * 0.58, minPx: unit * 0.4, weight: 700 });
   ctx.font = `700 ${labelPx}px ${FONT_SANS}`;
-  ctx.fillStyle = "#0b1016";
+  ctx.fillStyle = INK_ON_ACCENT;
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(item.label, textX, y + h * 0.42);
   const valuePx = fitFontSize(ctx, value, { maxW, startPx: unit * 0.62, minPx: unit * 0.4, weight: 800, family: FONT_MONO });
   ctx.font = `800 ${valuePx * (0.9 + 0.1 * valuePop)}px ${FONT_MONO}`;
-  ctx.fillStyle = "rgba(6,10,14,0.72)";
+  ctx.fillStyle = rgba(INK_ON_ACCENT, 0.72);
   ctx.fillText(value, textX, y + h * 0.76);
   if (active) {
     ctx.globalAlpha = alpha * breathe * 0.8;
@@ -296,7 +297,7 @@ function drawController(
   }
 ) {
   const { cx, cy, r, unit, env, label, accent, active, alpha } = opts;
-  const ringColor = active === "drift" ? "#f87171" : active === "reconcile" ? THEME.good : accent;
+  const ringColor = active === "drift" ? DRIFT : active === "reconcile" ? THEME.good : accent;
   const period = 3600;
   const phaseIdx = Math.floor((env.elapsedMs / period) * 3) % 3;
 
@@ -338,7 +339,7 @@ function drawController(
 
   // Controller hub.
   isoBox3D(ctx, cx - r, cy - r, r * 2, r * 2, unit * 0.24, accent, active ? ringColor : undefined, r * 0.3);
-  drawIcon(ctx, "gear", cx, cy - r * 0.18, r * 1.15, env, "#eaf3ff");
+  drawIcon(ctx, "gear", cx, cy - r * 0.18, r * 1.15, env, THEME.text);
 
   ctx.font = `800 ${unit * 0.56}px ${FONT_SANS}`;
   ctx.fillStyle = THEME.text;
