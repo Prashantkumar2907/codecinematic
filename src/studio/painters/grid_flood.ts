@@ -175,7 +175,7 @@ export function paintGridFlood(ctx: CanvasRenderingContext2D, scene: GridFloodSc
     ctx.save();
     roundRect(ctx, x, y, cell, cell, radius);
     ctx.clip();
-    ctx.strokeStyle = "rgba(148,163,184,0.16)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.16);
     ctx.lineWidth = unit * 0.05;
     for (let d = -cell; d < cell * 2; d += cell * 0.3) {
       ctx.beginPath();
@@ -200,7 +200,7 @@ export function paintGridFlood(ctx: CanvasRenderingContext2D, scene: GridFloodSc
       if (ghostIn <= 0) continue;
       ctx.save();
       ctx.globalAlpha = 0.14 * introIn * easeOutCubic(ghostIn);
-      ctx.strokeStyle = "rgba(148,163,184,0.9)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.9);
       ctx.lineWidth = unit * 0.045;
       ctx.setLineDash([unit * 0.22, unit * 0.2]);
       roundRect(ctx, cellX(c), cellY(r), cell, cell, radius);
