@@ -25,8 +25,7 @@ type CoinStackScene = Extract<Scene, { kind: "coin_stack" }>;
 type Pt = { x: number; y: number };
 type Flight = { from?: Pt; to?: Pt; e: number; amount: number; label: string; up: boolean };
 
-/** Established codebase red for a "danger" tone (matches browserframe.ts / geomap.ts). */
-const DANGER = "#f87171";
+const DANGER = THEME.danger;
 const MIN_COIN_H_UNIT = 0.16;
 const MAX_COIN_H_UNIT = 0.85;
 // Captions sit in the bottom ~12% of vertical frames; keep stacks above it (see ledger.ts).
@@ -198,7 +197,7 @@ export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackSc
     ctx.translate(-cx, -baseline);
 
     roundRect(ctx, cx - stackW / 2, baseline, stackW, unit * 0.14, unit * 0.06);
-    ctx.fillStyle = "rgba(148,163,184,0.25)";
+    ctx.fillStyle = rgba(THEME.textDim, 0.25);
     ctx.fill();
 
     const height = Math.min(count * coinH, maxStackH);
@@ -268,7 +267,7 @@ export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackSc
       const tw = ctx.measureText(label).width;
       const tone = up ? DANGER : THEME.good;
       roundRect(ctx, chipAt.x - tw / 2 - unit * 0.4, chipAt.y - unit * 1.5, tw + unit * 0.8, unit * 1.05, unit * 0.3);
-      ctx.fillStyle = "#0a0e13";
+      ctx.fillStyle = THEME.bgBottom;
       ctx.fill();
       ctx.strokeStyle = rgba(tone, 0.6);
       ctx.lineWidth = 1.5;
