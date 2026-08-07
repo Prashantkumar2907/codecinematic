@@ -32,6 +32,8 @@ const LABEL_MARGIN_UNIT = 2.0;
 /** Cap on drawn virtual-node tick marks per node — `tokens` can be declared in the hundreds (e.g. 256). */
 const MAX_TOKEN_DOTS = 20;
 const ARC_WIDTH_UNIT = 0.16;
+/** Dark ink for text on a bright accent-filled badge (matches cipher.ts / graphwalk.ts / control_loop.ts). */
+const INK_ON_ACCENT = "#06121a";
 
 function nodeAngleOf(scene: HashRingScene, node: RingNode): number {
   return node.angle ?? hashStr(`${scene.id}:node:${node.id}`) % 360;
@@ -299,11 +301,9 @@ export function paintHashRing(ctx: CanvasRenderingContext2D, scene: HashRingScen
     ctx.strokeStyle = glowNow ? accent : rgba(accent, 0.6);
     ctx.lineWidth = unit * (glowNow ? 0.12 : 0.07);
     ctx.stroke();
-    drawIcon(ctx, "server", p.x, p.y, size * 0.92, env, glowNow ? accent : "#eaf3ff");
+    drawIcon(ctx, "server", p.x, p.y, size * 0.92, env, glowNow ? accent : THEME.text);
 
     const labelPos = pointOnRing(cx, cy, R + unit * 1.3, deg);
-    const labelPx = fitFontSize(ctx, n.label, { maxW: unit * 4.2, startPx: unit * 0.68, minPx: unit * 0.46, weight: 800 });
-    ctx.font = `800 ${labelPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;
     // A centred label only clears the icon for a near-vertical outward
     // direction (top/bottom of the ring): its horizontal spread is symmetric
@@ -312,8 +312,21 @@ export function paintHashRing(ctx: CanvasRenderingContext2D, scene: HashRingScen
     // away from the node instead: left-align when outward points right,
     // right-align when it points left.
     const cosOut = (p.x - cx) / R;
-    ctx.textAlign = cosOut > 0.35 ? "left" : cosOut < -0.35 ? "right" : "center";
+    const align = cosOut > 0.35 ? "left" : cosOut < -0.35 ? "right" : "center";
+    ctx.textAlign = align;
     ctx.textBaseline = "middle";
+    // A node sitting on the ring's left/right flank can be close enough to
+    // the frame's own edge that growing the label away from the icon still
+    // isn't enough — cap the width to the room actually available in that
+    // direction so e.g. "Server C" on the left doesn't run past contentX.
+    const roomLeft = labelPos.x - contentX;
+    const roomRight = contentX + contentW - labelPos.x;
+    const maxW =
+      align === "left" ? Math.max(unit * 1.5, Math.min(unit * 4.2, roomRight)) :
+      align === "right" ? Math.max(unit * 1.5, Math.min(unit * 4.2, roomLeft)) :
+      Math.max(unit * 1.5, Math.min(unit * 4.2, Math.min(roomLeft, roomRight) * 2));
+    const labelPx = fitFontSize(ctx, n.label, { maxW, startPx: unit * 0.68, minPx: unit * 0.46, weight: 800 });
+    ctx.font = `800 ${labelPx}px ${FONT_SANS}`;
     ctx.fillText(n.label, labelPos.x, labelPos.y);
 
     if (n.tokens > 1) {
@@ -324,7 +337,7 @@ export function paintHashRing(ctx: CanvasRenderingContext2D, scene: HashRingScen
       ctx.fillStyle = secondary;
       roundRect(ctx, labelPos.x - tw / 2 - unit * 0.35, by - unit * 0.42, tw + unit * 0.7, unit * 0.8, unit * 0.25);
       ctx.fill();
-      ctx.fillStyle = "#08131f";
+      ctx.fillStyle = INK_ON_ACCENT;
       ctx.fillText(badge, labelPos.x, by);
     }
     ctx.restore();
