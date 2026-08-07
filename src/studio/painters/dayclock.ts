@@ -47,7 +47,14 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
   const availH = contentH - titleBand;
 
   // 3D Scene setup
-  const R = 4.0;
+  // STOPGAP, pending this painter's own polish round. The dial radius was tuned
+  // against a rect that ran to `h - bottomBand`; once `contentH` became
+  // caption-aware the stage got shorter and the ground-plane disc — whose content
+  // actually reaches R + 2.5 at the readout — projected past the bottom edge
+  // (measured: long 5.5% bottom bleed). The real fix is the systemic one this
+  // painter still needs: an on-axis camera with a pixel-authoritative layout,
+  // rather than a hardcoded world span under a tilted camera at (0, 10, 8).
+  const R = 3.1;
   const rect = { x: contentX, y: areaY, w: contentW, h: availH };
 
   const faceIn = easeOutCubic(enterT(env, 380));

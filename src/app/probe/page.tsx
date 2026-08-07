@@ -90,6 +90,13 @@ const BLEED_BAND = 3;
 const BLEED_DELTA = 18;
 /** A difference this large is solid geometry or type, not a soft full-bleed glow. */
 const BLEED_HARD_DELTA = 70;
+/**
+ * Progress samples for the caption-band check. Denser than edge-bleed's two,
+ * because the intrusions found so far were transient rather than steady state:
+ * `calendar`'s was an entrance dip visible at p=0.675 only, and it took a scan
+ * across 41 values to catch. Entrance and settle are both sampled.
+ */
+const SAFE_PS = [0.02, 0.06, 0.12, 0.2, 0.3, 0.4, 0.5, 0.6, 0.675, 0.75, 0.85, 0.93, 1.0];
 
 type KindEntry = { scene: Scene; script: SceneScript; richness: number };
 
@@ -250,6 +257,19 @@ type ProbeWindow = Window & {
     aspect?: AspectName;
     ps?: number[];
   }) => Promise<{ top: number; bottom: number; left: number; right: number; worstP: number } | null>;
+  __PROBE_SAFEBOTTOM?: (a: {
+    kind: SceneKind;
+    sceneId?: string;
+    aspect?: AspectName;
+    ps?: number[];
+  }) => Promise<{
+    safeBottom: number;
+    lowest: number;
+    clearance: number;
+    over: number;
+    worstP: number;
+    height: number;
+  } | null>;
   __PROBE_FILMSTRIP?: (a: {
     kind: SceneKind;
     sceneId?: string;
@@ -376,6 +396,87 @@ export default function Probe() {
         if (any) worst.worstP = p;
       }
       return worst;
+    };
+    /**
+     * Caption-band intrusion — the failure `__PROBE_EDGEBLEED` is structurally
+     * blind to.
+     *
+     * Edge-bleed samples a 3px ring at the FRAME edge, so content can sit well
+     * inside the frame and still be drawn underneath the burned-in karaoke
+     * caption and the YouTube UI. That is a different boundary: `layout.safeBottom`.
+     * Measured across `showdown`, `race`, `constellation` and `calendar`, all four
+     * intruded past it while edge-bleed reported 0.0% throughout — a stroke
+     * centred ON the boundary puts half its width below it, a glow blooms past it,
+     * and an entrance dip overshoots it.
+     *
+     * Reports the lowest painted row so a caller can see the magnitude, not just
+     * a pass/fail: clearance is `safeBottom - lowest`, negative when intruding.
+     */
+    win.__PROBE_SAFEBOTTOM = async ({ kind, sceneId, aspect = "short", ps = SAFE_PS }) => {
+      await ensureStudioFonts();
+      const entry = lookup(kind, sceneId);
+      if (!entry) return null;
+      const dims = ASPECTS[aspect];
+      const { safeBottom } = makeLayout(dims.width, dims.height);
+      const mk = () => {
+        const c = document.createElement("canvas");
+        c.width = dims.width;
+        c.height = dims.height;
+        return c;
+      };
+      const a = mk();
+      const b = mk();
+      const actx = a.getContext("2d", { willReadFrequently: true })!;
+      const bctx = b.getContext("2d", { willReadFrequently: true })!;
+      const palette = paletteForSubject(entry.script.subject);
+      const bandTop = Math.floor(safeBottom);
+      const bandH = dims.height - bandTop;
+      let worstOver = 0;
+      let lowest = -1;
+      let worstP = 0;
+      if (bandH <= 0) return { safeBottom, lowest, clearance: 0, over: 0, worstP: 0, height: dims.height };
+      for (const p of ps) {
+        resetThree3D();
+        const ms = p * sceneDurationMs(entry);
+        actx.clearRect(0, 0, dims.width, dims.height);
+        bctx.clearRect(0, 0, dims.width, dims.height);
+        drawBackground(bctx, dims.width, dims.height, ms, palette, 0);
+        try {
+          paintInto(actx, entry, dims, p, ms);
+        } catch {
+          continue;
+        }
+        const pa = actx.getImageData(0, bandTop, dims.width, bandH).data;
+        const pb = bctx.getImageData(0, bandTop, dims.width, bandH).data;
+        let hit = 0;
+        for (let i = 0; i < pa.length; i += 4) {
+          const d = Math.max(
+            Math.abs(pa[i] - pb[i]),
+            Math.abs(pa[i + 1] - pb[i + 1]),
+            Math.abs(pa[i + 2] - pb[i + 2])
+          );
+          // Same hard-contrast rule as edge-bleed: a soft aura is a backdrop, not
+          // content sitting under the caption.
+          if (d > BLEED_HARD_DELTA) {
+            hit++;
+            const row = bandTop + Math.floor(i / 4 / dims.width);
+            if (row > lowest) lowest = row;
+          }
+        }
+        const frac = hit / (pa.length / 4);
+        if (frac > worstOver) {
+          worstOver = frac;
+          worstP = p;
+        }
+      }
+      return {
+        safeBottom,
+        lowest,
+        clearance: lowest < 0 ? safeBottom : safeBottom - lowest,
+        over: worstOver,
+        worstP,
+        height: dims.height,
+      };
     };
     win.__PROBE_FILMSTRIP = async ({ kind, sceneId, aspect = "short", cols = 4, rows = 4, cellW = DEFAULT_CELL_W, fromMs, toMs }) => {
       win.__PROBE_DONE = false;

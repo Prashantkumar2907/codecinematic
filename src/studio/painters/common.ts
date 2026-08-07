@@ -209,7 +209,14 @@ export function makeLayout(w: number, h: number): Layout {
     contentX: margin,
     contentY: topBand,
     contentW: w - margin * 2,
-    contentH: h - topBand - bottomBand,
+    // Caption-aware, and this is the whole point: `contentH` used to run to
+    // `h - bottomBand`, which is 1785px at 9:16 against a `safeBottom` of 1321.5 —
+    // a 464px overshoot straight into the burned-in caption. 92 of 111 painters lay
+    // out against `contentH` and only 33 had adopted `safeBottom`, so the measured
+    // intrusions clustered at exactly 462-477px over (`qa/SAFEAREA.md`): the old
+    // bottom edge itself. Bounding it here fixes them all at once rather than asking
+    // 92 painters to each remember the caption exists.
+    contentH: safeBottom - topBand,
     safeBottom,
     safeH: safeBottom - topBand,
   };

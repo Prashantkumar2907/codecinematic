@@ -59,7 +59,12 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
 
   const isHash = scene.mode === "hash";
 
-  const spreadX = 8.0;
+  // STOPGAP, pending this painter's own polish round — same cause as dayclock's.
+  // This span was tuned against a taller rect; the caption-aware `contentH` narrows
+  // the frustum's half-width (halfW = halfH * rect.w/rect.h), so a hardcoded ±8
+  // world span plus half a 5.0-wide box overflowed the left edge (measured: short
+  // 2.6%). The real fix is the systemic rework this painter still needs.
+  const spreadX = 6.4;
   const spreadZ = isHash ? 4.0 : 3.0;
 
   const worldPos = (i: number, row: number, total: number) => {
