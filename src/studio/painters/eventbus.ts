@@ -136,17 +136,17 @@ export function paintEventbus(ctx: CanvasRenderingContext2D, scene: EventbusScen
     const update = (elapsedMs: number, ctxData: any) => {
       const { gIn, actPubId, actSubId, actTopicId } = ctxData;
 
-      const applyMat = (b: THREE.Group, isActive: boolean, color: string, basePos: THREE.Vector3, bobOffset: number) => {
+      const applyMat = (b: THREE.Group, isActive: boolean, color: string, basePos: THREE.Vector3, bobOffset: number, opacityMul = 1) => {
         b.visible = gIn > 0;
         b.scale.setScalar(Math.max(0.001, gIn));
         b.position.y = basePos.y + Math.sin(elapsedMs / 1200 + bobOffset) * 0.05 + (isActive ? 0.2 : 0);
-        
+
         b.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
                 const mat = child.material as THREE.MeshPhysicalMaterial;
                 mat.transparent = true;
-                mat.opacity = gIn * 0.9;
-                
+                mat.opacity = gIn * 0.9 * opacityMul;
+
                 if (isActive) {
                     mat.color.setStyle(color);
                     mat.emissive.setStyle(color);
@@ -172,7 +172,12 @@ export function paintEventbus(ctx: CanvasRenderingContext2D, scene: EventbusScen
 
       topicBlocks.forEach((b, i) => {
         const isActive = actTopicId === scene.topics[i].id;
-        applyMat(b, isActive, palette.accentSoft, getTopicPos(i), i + 20);
+        // palette.accentSoft is an rgba() string (alpha baked in for 2D fills) —
+        // THREE.Color.setStyle() can't parse that alpha, so it was silently
+        // dropped (console warning, and topics rendered full-strength accent
+        // instead of the intended soft wash). Use the solid accent and carry
+        // the "soft" look through opacity instead.
+        applyMat(b, isActive, palette.accent, getTopicPos(i), i + 20, 0.5);
       });
 
       // Bus stays mostly static but bobs
