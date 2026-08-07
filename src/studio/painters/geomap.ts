@@ -95,7 +95,7 @@ export function paintGeomap(ctx: CanvasRenderingContext2D, scene: GeomapScene, e
     const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
     camera.position.set(0, 10, 7);
     camera.lookAt(0, 0, 0);
-    studioLights(s, palette.accent, "rgba(148,163,184,0.5)");
+    studioLights(s, palette.accent, THEME.textDim);
     
     const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(palette.accent), new THREE.Color("#31435a"));
     (grid.material as THREE.Material).transparent = true;
