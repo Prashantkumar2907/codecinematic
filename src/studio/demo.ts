@@ -2317,8 +2317,11 @@ export const DEMO_WAVE1: SceneScript = {
       shape: "stack",
       layers: [
         { label: "Application Layer", detail: "HTTP / DNS", say: "Application layer handles high-level protocols." },
+        { label: "Presentation Layer", detail: "Encryption / Compression", say: "Presentation layer formats and encrypts data for the application." },
+        { label: "Session Layer", detail: "Sessions / Auth", say: "Session layer opens, manages, and closes connections between apps." },
         { label: "Transport Layer", detail: "TCP / UDP", say: "Transport layer manages end-to-end connections." },
         { label: "Network Layer", detail: "IP Routing", say: "Network layer routes packets across networks." },
+        { label: "Data Link Layer", detail: "MAC / Switches", say: "Data Link layer handles node-to-node delivery within one network." },
         { label: "Physical Layer", detail: "Ethernet / Fiber", say: "Physical layer transmits raw binary bits." },
       ],
     },
