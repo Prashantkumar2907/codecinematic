@@ -133,4 +133,4 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | vector_space | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | neural_network | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | matrix_convolution | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| consensus_quorum | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| consensus_quorum | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Layout/motion/containment already solid: ring geometry keeps adjacent node circles well separated at both aspects (verified nodeR stays capped below the sin-based touching threshold), quorum meter/threshold marker/arrows all read correctly. The overlapping glow around adjacent commit-toned nodes in one still frame is glowRing's per-node pulse phase coincidentally aligning — decorative, transient, same shared helper already accepted elsewhere. Only fix: DANGER re-typed THEME.danger's exact hex. console.log clean, 0.0% edge bleed both aspects. | 34e3d51 | 2026-08-08 |
