@@ -91,7 +91,7 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
   for (let i = 0; i <= ticks; i++) {
     const ms = (scene.totalMs / ticks) * i;
     const x = xAt(ms);
-    ctx.strokeStyle = "rgba(148,163,184,0.14)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.14);
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x, trackY - unit * 0.1);
@@ -164,7 +164,9 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
       ctx.fillText(bar.label, x + padX, y + rowH / 2);
       if (w > unit * 4 && appear >= 0.98) {
         ctx.font = `600 ${Math.min(unit * 0.48, rowH * 0.34)}px ${FONT_MONO}`;
-        ctx.fillStyle = THEME.textDim;
+        // THEME.textDim doesn't have enough contrast against the bar's own
+        // bright fill — dim the same white bar.label uses successfully instead.
+        ctx.fillStyle = rgba(THEME.text, 0.65);
         ctx.textAlign = "end";
         ctx.fillText(durText, x + w - padX, y + rowH / 2);
       }
