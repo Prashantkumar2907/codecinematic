@@ -30,6 +30,8 @@ type Pt = { x: number; y: number };
 const CAPTURE_THETA = (34 * Math.PI) / 180;
 /** A different diagonal for portal connectors so they never overlap the capture ray. */
 const PORTAL_THETA = (-58 * Math.PI) / 180;
+/** Dark ink for text on a bright accent-filled chip (matches cipher.ts / graphwalk.ts / control_loop.ts). */
+const INK_ON_ACCENT = "#06121a";
 
 function borderPoint(cx: number, cy: number, halfW: number, halfH: number, theta: number): Pt {
   const ct = Math.cos(theta);
@@ -144,7 +146,7 @@ export function paintDomEventFlow(ctx: CanvasRenderingContext2D, scene: DomEvent
       if (ghostIn <= 0) continue;
       ctx.save();
       ctx.globalAlpha = 0.16 * introIn * easeOutCubic(ghostIn);
-      ctx.strokeStyle = "rgba(148,163,184,0.9)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.9);
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.26, unit * 0.22]);
       roundRect(ctx, r.x, r.y, r.w, r.h, radius);
@@ -216,7 +218,7 @@ export function paintDomEventFlow(ctx: CanvasRenderingContext2D, scene: DomEvent
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.5;
       }
-      ctx.fillStyle = "#08131f";
+      ctx.fillStyle = INK_ON_ACCENT;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(label2, bx - tw - unit * 0.32, by + unit * 0.34);
@@ -232,7 +234,7 @@ export function paintDomEventFlow(ctx: CanvasRenderingContext2D, scene: DomEvent
       const tw = ctx.measureText(chip).width;
       const cx = r.x + r.w / 2;
       const cy = r.y + r.h + unit * 0.62;
-      ctx.fillStyle = "rgba(9,13,18,0.85)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.85);
       roundRect(ctx, cx - tw / 2 - unit * 0.35, cy - unit * 0.4, tw + unit * 0.7, unit * 0.82, unit * 0.3);
       ctx.fill();
       ctx.strokeStyle = accent;
@@ -286,7 +288,7 @@ export function paintDomEventFlow(ctx: CanvasRenderingContext2D, scene: DomEvent
       const tw = ctx.measureText(tag).width;
       const tx = pulsePos.x + unit * 0.5;
       const ty = pulsePos.y - unit * 0.75;
-      ctx.fillStyle = "rgba(9,13,18,0.88)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.88);
       roundRect(ctx, tx - unit * 0.2, ty - unit * 0.4, tw + unit * 0.4, unit * 0.78, unit * 0.22);
       ctx.fill();
       ctx.strokeStyle = rgba(pulseColor, 0.8);
@@ -308,7 +310,7 @@ export function paintDomEventFlow(ctx: CanvasRenderingContext2D, scene: DomEvent
   const stw = ctx.measureText(statusText).width;
   const sx = vertical ? figCx : contentX + contentW - stw - unit * 1.1;
   const sy = areaY + unit * 0.1;
-  ctx.fillStyle = "rgba(9,13,18,0.8)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.8);
   roundRect(ctx, sx - unit * 0.4, sy, stw + unit * 0.8, unit * 0.9, unit * 0.28);
   ctx.fill();
   ctx.strokeStyle = rgba(phaseNow === "bubble" ? secondary : accent, 0.7);
