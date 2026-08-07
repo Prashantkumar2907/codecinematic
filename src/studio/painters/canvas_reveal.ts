@@ -272,7 +272,7 @@ export function paintCanvasReveal(ctx: CanvasRenderingContext2D, scene: CanvasRe
     const px = frame.x + unit * 0.4;
     const capH = unit * 0.9;
     const capY = frame.y + frame.h + unit * 0.25;
-    ctx.fillStyle = "rgba(9,13,18,0.72)";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.72);
     roundRect(ctx, px - unit * 0.3, capY, tw + unit * 0.6, capH, unit * 0.22);
     ctx.fill();
     ctx.fillStyle = THEME.textDim;
@@ -331,7 +331,11 @@ export function paintCanvasReveal(ctx: CanvasRenderingContext2D, scene: CanvasRe
         ctx.strokeStyle = shade(sw.hex, -0.3);
         ctx.lineWidth = unit * 0.05;
         ctx.stroke();
-        const labelPx = fitFontSize(ctx, sw.label, { maxW: chipW * 1.7, startPx: unit * 0.42, minPx: unit * 0.28, weight: 700, family: FONT_MONO });
+        // Capped to this chip's own slot (its width plus a little of its
+        // trailing gap) — `chipW * 1.7` let a long label overflow straight
+        // into the next chip's label with chips this close together
+        // (measured: "Tandul white" running into "Rice-husk black").
+        const labelPx = fitFontSize(ctx, sw.label, { maxW: chipW + unit * 0.4, startPx: unit * 0.42, minPx: unit * 0.28, weight: 700, family: FONT_MONO });
         ctx.font = `700 ${labelPx}px ${FONT_MONO}`;
         ctx.fillStyle = THEME.textDim;
         ctx.textAlign = "center";
