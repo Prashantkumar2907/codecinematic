@@ -150,6 +150,14 @@ export function paintFluidflow(ctx: CanvasRenderingContext2D, scene: FluidflowSc
   // --- Particles: a continuous looping stream per revealed source. ---
   const margin = mapSize * 0.14;
   ctx.save();
+  // The map can fill contentW edge to edge with zero horizontal slack (9:16
+  // in particular), so the fade margin below has nowhere to fade INTO before
+  // it crosses the frame's own safe boundary. Clip to the content box itself
+  // so a streamline can still travel past the map's own border (the intended
+  // look) without ever bleeding past the frame.
+  ctx.beginPath();
+  ctx.rect(contentX, contentY, contentW, contentH);
+  ctx.clip();
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     const srcIdx = hashStr(`${scene.id}#p${i}`) % scene.sources.length;
     const src = scene.sources[srcIdx];
@@ -234,7 +242,7 @@ export function paintFluidflow(ctx: CanvasRenderingContext2D, scene: FluidflowSc
       return;
     }
     const appear = easeOutBack(clamp01(enterT(env, 420, 60 + i * 90) * 1.05));
-    drawSinkPin(ctx, p, sink.label, appear, introIn, unit, secondary);
+    drawSinkPin(ctx, p, sink.label, appear, introIn, unit, secondary, contentX + contentW, contentX);
   });
 
   // --- Source markers: dashed ghost until revealed, then a glowing origin pin. ---
@@ -249,7 +257,7 @@ export function paintFluidflow(ctx: CanvasRenderingContext2D, scene: FluidflowSc
     const isHot = activeHighlight.has(src.id);
     const appear = easeOutBack(clamp01(enterT(env, 420, 40 + i * 90) * 1.05));
     const breathe = isHot ? 0.75 + 0.25 * idle(env, 1400) : 1;
-    drawSourcePin(ctx, p, src.label, src.icon, appear, introIn * breathe, unit, accent, isHot);
+    drawSourcePin(ctx, p, src.label, src.icon, appear, introIn * breathe, unit, accent, isHot, contentX + contentW, contentX);
     if (isHot) glowRing(ctx, p.x, p.y, unit * 0.42, accent, env, 1500);
   });
 
@@ -270,19 +278,37 @@ function drawGhost(ctx: CanvasRenderingContext2D, p: Pt, r: number, alpha: numbe
   ctx.restore();
 }
 
-function labelChip(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, unit: number, accent: string, bold: boolean) {
+function labelChip(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  x: number,
+  y: number,
+  unit: number,
+  accent: string,
+  bold: boolean,
+  rightEdge: number,
+  leftEdge: number
+) {
   ctx.save();
   const weight = bold ? 800 : 600;
-  const maxW = unit * 6.5;
+  const padX = unit * 0.4;
+  const gap = unit * 0.45;
+  const roomRight = rightEdge - (x + gap) - padX * 2;
+  const roomLeft = x - gap - leftEdge - padX * 2;
+  // A pin always grew its chip rightward, which ran labels like "Bay of
+  // Bengal" off the frame when the pin itself sits near the right edge —
+  // flip to the left side when that has more room instead of shrinking text
+  // down to nothing.
+  const growLeft = roomRight < unit * 2.4 && roomLeft > roomRight;
+  const maxW = Math.max(unit * 0.8, Math.min(unit * 6.5, growLeft ? roomLeft : roomRight));
   const px = fitFontSize(ctx, label, { maxW, startPx: unit * 0.6, minPx: unit * 0.42, weight });
   ctx.font = `${weight} ${px}px ${FONT_SANS}`;
   const tw = Math.min(ctx.measureText(label).width, maxW);
-  const padX = unit * 0.4;
   const chipW = tw + padX * 2;
   const chipH = unit * 0.9;
-  const bx = x + unit * 0.45;
+  const bx = growLeft ? x - gap - chipW : x + gap;
   const by = y - chipH / 2;
-  ctx.fillStyle = "rgba(9,13,18,0.78)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.78);
   roundRect(ctx, bx, by, chipW, chipH, unit * 0.24);
   ctx.fill();
   ctx.strokeStyle = rgba(accent, bold ? 0.85 : 0.4);
@@ -304,7 +330,9 @@ function drawSourcePin(
   alpha: number,
   unit: number,
   accent: string,
-  isHot: boolean
+  isHot: boolean,
+  rightEdge: number,
+  leftEdge: number
 ) {
   const r = unit * (isHot ? 0.34 : 0.26) * appear;
   ctx.save();
@@ -329,11 +357,21 @@ function drawSourcePin(
     ctx.textBaseline = "middle";
     ctx.fillText(emoji, p.x, p.y - unit * 1.05);
   }
-  labelChip(ctx, label, p.x + r, p.y, unit, accent, isHot);
+  labelChip(ctx, label, p.x + r, p.y, unit, accent, isHot, rightEdge, leftEdge);
   ctx.restore();
 }
 
-function drawSinkPin(ctx: CanvasRenderingContext2D, p: Pt, label: string, appear: number, alpha: number, unit: number, secondary: string) {
+function drawSinkPin(
+  ctx: CanvasRenderingContext2D,
+  p: Pt,
+  label: string,
+  appear: number,
+  alpha: number,
+  unit: number,
+  secondary: string,
+  rightEdge: number,
+  leftEdge: number
+) {
   const s = unit * 0.5 * appear;
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -347,6 +385,6 @@ function drawSinkPin(ctx: CanvasRenderingContext2D, p: Pt, label: string, appear
   ctx.strokeStyle = secondary;
   ctx.lineWidth = unit * 0.05;
   ctx.stroke();
-  labelChip(ctx, label, p.x + s * 0.6, p.y - s * 0.2, unit, secondary, false);
+  labelChip(ctx, label, p.x + s * 0.6, p.y - s * 0.2, unit, secondary, false, rightEdge, leftEdge);
   ctx.restore();
 }
