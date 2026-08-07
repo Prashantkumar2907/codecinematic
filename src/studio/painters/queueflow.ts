@@ -19,6 +19,8 @@ type QueueflowScene = Extract<Scene, { kind: "queueflow" }>;
 type Pt = { x: number; y: number };
 
 const DOT_R_UNIT = 0.42;
+/** Idle-source/chip fill — same convention as `cipher.ts`'s `INK_FILL`. */
+const INK_FILL = "#0e2433";
 
 function lerp(a: Pt, b: Pt, t: number): Pt {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
@@ -134,7 +136,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   // Ghost slot rail.
   ctx.save();
   ctx.globalAlpha = 0.14 * introIn;
-  ctx.strokeStyle = "rgba(148,163,184,0.9)";
+  ctx.strokeStyle = rgba(THEME.textDim, 0.9);
   ctx.lineWidth = unit * 0.05;
   ctx.setLineDash([unit * 0.24, unit * 0.2]);
   for (let i = 0; i < capacity; i++) {
@@ -156,7 +158,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   ctx.arc(source.x, source.y, unit * (0.7 + 0.4 * pulse), 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
-  drawDot(ctx, source, unit * 0.55, "#0e2433", accentGlow, introIn);
+  drawDot(ctx, source, unit * 0.55, INK_FILL, accentGlow, introIn);
   ctx.save();
   ctx.globalAlpha = introIn;
   ctx.strokeStyle = accent;
@@ -184,12 +186,12 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
     ctx.fill();
     ctx.shadowBlur = 0;
     roundRect(ctx, c.x - half, c.y - half, serverSize, serverSize, unit * 0.4);
-    ctx.strokeStyle = busy ? accent : "rgba(148,163,184,0.4)";
+    ctx.strokeStyle = busy ? accent : rgba(THEME.textDim, 0.4);
     ctx.lineWidth = busy ? unit * 0.11 : unit * 0.06;
     ctx.stroke();
     // Spinner arc (rotates while busy; static tick when idle).
     const ang = busy ? (env.elapsedMs / 500) * Math.PI * 2 + si : 0;
-    ctx.strokeStyle = busy ? accent : "rgba(148,163,184,0.35)";
+    ctx.strokeStyle = busy ? accent : rgba(THEME.textDim, 0.35);
     ctx.lineWidth = unit * 0.14;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -259,7 +261,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   const cx = vertical ? areaX + areaW - tw - unit * 1.2 : slot0.x + slotVec.x * (Math.min(capacity, 3) + 1);
   const cy = vertical ? areaTop + unit * 0.3 : slot0.y - (areaHH / 2) * 0.72;
   roundRect(ctx, cx - unit * 0.4, cy - unit * 0.6, tw + unit * 0.8, unit * 1.2, unit * 0.3);
-  ctx.fillStyle = "#0e2433";
+  ctx.fillStyle = INK_FILL;
   ctx.fill();
   ctx.strokeStyle = rgba(accent, 0.6);
   ctx.lineWidth = 1;
