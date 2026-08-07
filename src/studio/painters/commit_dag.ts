@@ -199,9 +199,9 @@ export function paintCommitDag(ctx: CanvasRenderingContext2D, scene: CommitDagSc
       const bothRevealed = revealedSet.has(c.id) && revealedSet.has(pid);
       const faded = fadeSet.has(c.id) || fadeSet.has(pid);
 
-      strokePts(ctx, pts, "rgba(148,163,184,0.9)", unit * 0.07, 0.16 * introIn, false);
+      strokePts(ctx, pts, rgba(THEME.textDim, 0.9), unit * 0.07, 0.16 * introIn, false);
       if (bothRevealed && !faded) strokePts(ctx, pts, accent, unit * 0.12, 0.75 * introIn, false);
-      else if (bothRevealed && faded) strokePts(ctx, pts, "rgba(148,163,184,0.75)", unit * 0.09, 0.4 * introIn, true);
+      else if (bothRevealed && faded) strokePts(ctx, pts, rgba(THEME.textDim, 0.75), unit * 0.09, 0.4 * introIn, true);
 
       if (bothRevealed && revealStepOf.get(c.id) === activeStep) {
         const prog = easeOutCubic(clamp01(stepT * 1.6));
@@ -236,7 +236,7 @@ export function paintCommitDag(ctx: CanvasRenderingContext2D, scene: CommitDagSc
       if (ghostIn <= 0) return;
       ctx.save();
       ctx.globalAlpha = 0.18 * introIn * easeOutCubic(ghostIn);
-      ctx.strokeStyle = "rgba(148,163,184,0.9)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.9);
       ctx.lineWidth = unit * 0.06;
       ctx.setLineDash([unit * 0.18, unit * 0.16]);
       ctx.beginPath();
@@ -270,28 +270,35 @@ export function paintCommitDag(ctx: CanvasRenderingContext2D, scene: CommitDagSc
     ctx.shadowBlur = 0;
     ctx.beginPath();
     ctx.arc(cp.x, cp.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = isFaded ? "rgba(148,163,184,0.16)" : rgba(accent, 0.18);
+    ctx.fillStyle = isFaded ? rgba(THEME.textDim, 0.16) : rgba(accent, 0.18);
     ctx.fill();
     ctx.beginPath();
     ctx.arc(cp.x, cp.y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = isFaded ? "rgba(148,163,184,0.55)" : accent;
+    ctx.strokeStyle = isFaded ? rgba(THEME.textDim, 0.55) : accent;
     ctx.lineWidth = isHeadCommit ? unit * 0.16 : unit * 0.11;
     ctx.stroke();
     if (c.parents.length === 2) {
       // Merge commit: a second, slightly larger ring reads as "two parents joined here".
       ctx.beginPath();
       ctx.arc(cp.x, cp.y, r * 1.35, 0, Math.PI * 2);
-      ctx.strokeStyle = isFaded ? "rgba(148,163,184,0.35)" : rgba(accent, 0.5);
+      ctx.strokeStyle = isFaded ? rgba(THEME.textDim, 0.35) : rgba(accent, 0.5);
       ctx.lineWidth = unit * 0.055;
       ctx.stroke();
     }
 
     const labelPx = fitFontSize(ctx, c.label, { maxW: laneStep * 0.92, startPx: unit * 0.5, minPx: unit * 0.3, weight: 700, family: FONT_MONO });
     ctx.font = `700 ${labelPx}px ${FONT_MONO}`;
+    const labelY = cp.y + r + unit * 0.22;
+    const labelW = ctx.measureText(c.label).width;
+    // Same-lane commits share an x, so the parent->child edge runs straight through
+    // this spot in vertical layouts; a halo keeps the id readable over the line.
+    roundRect(ctx, cp.x - labelW / 2 - unit * 0.12, labelY - unit * 0.06, labelW + unit * 0.24, labelPx + unit * 0.16, unit * 0.08);
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.7);
+    ctx.fill();
     ctx.fillStyle = isFaded ? THEME.textFaint : THEME.textDim;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText(c.label, cp.x, cp.y + r + unit * 0.22);
+    ctx.fillText(c.label, cp.x, labelY);
     ctx.textAlign = "start";
     ctx.textBaseline = "alphabetic";
     ctx.restore();
@@ -325,7 +332,7 @@ export function paintCommitDag(ctx: CanvasRenderingContext2D, scene: CommitDagSc
     const c = scene.commits[ci];
     const base = pos(ci, c.lane);
     const topY = base.y - unit * 0.9 - (chips.length - 1) * chipGap;
-    strokePts(ctx, [base, { x: base.x, y: topY + unit * 0.5 }], "rgba(148,163,184,0.55)", unit * 0.05, 0.5 * introIn, false);
+    strokePts(ctx, [base, { x: base.x, y: topY + unit * 0.5 }], rgba(THEME.textDim, 0.55), unit * 0.05, 0.5 * introIn, false);
 
     chips.forEach((chip, level) => {
       const finalPt: Pt = { x: base.x, y: base.y - unit * 0.9 - level * chipGap };
