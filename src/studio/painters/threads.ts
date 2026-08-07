@@ -7,6 +7,7 @@ import {
   FONT_MONO,
   easeOutCubic,
   enterT,
+  shade,
   clamp01,
   roundRect,
   drawSceneTitle,
@@ -21,9 +22,18 @@ import type { PaintEnv } from "./index";
 type ThreadsScene = Extract<Scene, { kind: "threads" }>;
 type Task = ThreadsScene["tasks"][number];
 
-const DANGER = "#f87171";
 const PAST_ALPHA = 0.7;
 const MIN_TIME_SPAN = 12;
+/** Idle block face — matches `table.ts`/`bits.ts`/`circuit.ts`'s idle-face
+ *  convention rather than a one-off hex. */
+const IDLE_FACE = shade(THEME.panel, 0.09);
+/** A "wait" task reads as an inert dark-glass slab, distinct from the
+ *  idle-face tone used for not-yet-revealed tasks. */
+const WAIT_FACE = "#0f172a";
+const WAIT_LINE = "#475569";
+/** Lane-label / marker chip fill — same convention as `cipher.ts`'s
+ *  `INK_FILL`. */
+const INK_FILL = "#0e2433";
 
 function hatchBlock(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, unit: number, color: string) {
   ctx.save();
@@ -70,7 +80,6 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
   const fenceBottom = laneTop(nLanes - 1) + laneH + unit * 0.2;
 
   const timeSpan = Math.max(...scene.tasks.map((t) => t.start + t.len), MIN_TIME_SPAN);
-  const timeX = (t: number) => trackX0 + (t / timeSpan) * trackW;
 
   const revealStep = new Map<string, number>();
   scene.steps.forEach((st, k) => st.reveal.forEach((id) => { if (!revealStep.has(id)) revealStep.set(id, k); }));
@@ -78,89 +87,96 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
 
   const stepBeatT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const clashNow = new Set<string>(activeStep >= 0 ? scene.steps[activeStep].clash : []);
-  
-  // 3D setup
+
+  /**
+   * `qa/ledger.json` -> systemic `2d-layout-round-tripped-through-camera`,
+   * with a second-order symptom: `worldPos` mapped a task's start/len across
+   * the FULL `-spreadX..spreadX` range regardless of `labelW` — the gutter
+   * reserved for the "Thread A"/"Thread B" chips — so the earliest tasks
+   * projected under the same screen X as the lane labels and rendered on
+   * top of them (measured: "Thread A" and the "read" task label unreadable
+   * on top of each other). Tasks are now placed in pixels first, inside the
+   * SAME `trackX0..trackX0+trackW` band the lane-label gutter math already
+   * carves out, via an on-axis camera + `mappingAt`/`toWorld`.
+   */
   const rect = { x: contentX, y: laneAreaY, w: contentW, h: laneAreaH };
-  const spreadX = 8.5;
-  const spreadZ = 3.5;
-  
-  const worldPos = (start: number, len: number, lane: number) => {
-    // start 0..timeSpan maps to -spreadX..spreadX
-    const cx = (start + len / 2) / timeSpan; // 0..1
-    const x = (cx - 0.5) * spreadX * 2;
-    const z = nLanes === 1 ? 0 : (lane / (nLanes - 1) - 0.5) * spreadZ * 2;
-    return new THREE.Vector3(x, 0, z);
+  const DEPTH = 0.5;
+  const pixelPos = (start: number, len: number, lane: number): { x: number; y: number } => ({
+    x: trackX0 + ((start + len / 2) / timeSpan) * trackW,
+    y: laneCenter(Math.min(lane, nLanes - 1)),
+  });
+  const pixelW = (len: number) => (len / timeSpan) * trackW;
+
+  /** Pixels-per-world-unit and pixel origin on the z=`z` plane, for a camera
+   *  sitting ON-AXIS at (0,0,D) — exact, invertible pixel<->world map (same
+   *  technique as `table.ts`/`circuit.ts`/`diagram.ts`). */
+  const mappingAt = (camera: THREE.Camera, z: number) => {
+    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
+    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
+    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
+    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
   };
-  const worldW = (len: number) => (len / timeSpan) * spreadX * 2;
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 12 : 10, vertical ? 10 : 8);
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
+    camera.position.set(0, 0, vertical ? 15 : 12);
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
+    const m = mappingAt(camera, DEPTH / 2);
+    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
 
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, Math.max(spreadX, spreadZ) * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
+    const models: { mesh: THREE.Group, task: Task, base: THREE.Vector3, baseWorld: { x: number; y: number } }[] = [];
 
-    const models: { mesh: THREE.Group, task: Task }[] = [];
-    
-    // Lane markers in 3D
+    // Lane markers, one per lane, spanning the full track width in pixels.
     for (let i = 0; i < nLanes; i++) {
-        const lineGeo = new THREE.BoxGeometry(spreadX * 2.2, 0.05, 0.05);
-        const lineMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.1 });
+        const cy = laneCenter(i);
+        const wLeft = toWorld(trackX0, cy);
+        const wRight = toWorld(trackX0 + trackW, cy);
+        const lineGeo = new THREE.BoxGeometry(wRight.x - wLeft.x, 0.05, 0.05);
+        const lineMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.textDim), transparent: true, opacity: 0.1 });
         const line = new THREE.Mesh(lineGeo, lineMat);
-        line.position.z = nLanes === 1 ? 0 : (i / (nLanes - 1) - 0.5) * spreadZ * 2;
-        line.position.y = -0.4;
+        line.position.set((wLeft.x + wRight.x) / 2, wLeft.y, 0);
         s.add(line);
     }
-    
+
     scene.tasks.forEach((task) => {
-        const w = worldW(task.len);
         const lane = Math.min(task.lane, nLanes - 1);
-        const g = makeBlock(w * 0.95, 0.4, 1.0, "#1e293b", "#31435a");
-        g.position.copy(worldPos(task.start, task.len, lane));
+        const wPx = pixelW(task.len) * 0.95;
+        const hPx = Math.min(laneH * 0.72, unit * 2.2);
+        const base = new THREE.Vector3(wPx / m.sx, hPx / m.sy, DEPTH);
+        const g = makeBlock(1, 1, 1, IDLE_FACE, THEME.textDim);
+        g.scale.copy(base);
+        const p = pixelPos(task.start, task.len, lane);
+        const w = toWorld(p.x, p.y);
+        g.position.set(w.x, w.y, 0);
         s.add(g);
-        models.push({ mesh: g, task });
+        models.push({ mesh: g, task, base, baseWorld: w });
     });
 
-    const update = (elapsedMs: number, ctxData: { gIn: number, aStep: number, sBeatT: number, clash: Set<string> }) => {
+    const update = (_elapsedMs: number, ctxData: { gIn: number, aStep: number, sBeatT: number, clash: Set<string> }) => {
       const { gIn, aStep, sBeatT, clash } = ctxData;
-      
-      models.forEach(({ mesh, task }) => {
+
+      models.forEach(({ mesh, task, base, baseWorld }) => {
         const rStep = revealStep.get(task.id) ?? 0;
         const visible = rStep <= aStep;
-        
+
         const local = rStep === aStep ? sBeatT : 1;
         const grow = visible ? easeOutCubic(clamp01(local / 0.4)) : 0;
         const appear = visible ? easeOutCubic(clamp01(local / 0.35)) : 0;
-        
+
         mesh.visible = appear > 0;
-        
-        const baseP = worldPos(task.start, task.len, Math.min(task.lane, nLanes - 1));
-        
-        // Scale from left to right like 2D
-        const w = worldW(task.len);
-        // Pivot is center, so to scale from left, shift X
+
+        // Scale from left to right: pivot is center, so shift X by the
+        // shrunk half-width (in WORLD units, matching `base.x`).
         const maxScale = Math.max(0.01, grow);
-        mesh.scale.set(maxScale, 1, 1);
-        mesh.position.x = baseP.x - (w / 2) * (1 - maxScale);
-        
+        mesh.scale.set(base.x * maxScale, base.y, base.z);
+        mesh.position.set(baseWorld.x - (base.x / 2) * (1 - maxScale), baseWorld.y, 0);
+
         const isCurrent = rStep === aStep;
         const isClash = clash.has(task.id);
-        
+
         mesh.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
                 const mat = child.material as THREE.MeshPhysicalMaterial | THREE.LineBasicMaterial;
@@ -168,8 +184,8 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
                 if (mat instanceof THREE.MeshPhysicalMaterial) {
                     mat.opacity = appear * gIn * (isCurrent ? 1 : PAST_ALPHA);
                     if (task.kind === "wait") {
-                        mat.color.setStyle("#0f172a");
-                        mat.emissive.setStyle("#0f172a");
+                        mat.color.setStyle(WAIT_FACE);
+                        mat.emissive.setStyle(WAIT_FACE);
                         mat.emissiveIntensity = 0;
                         mat.transmission = 0.5;
                     } else if (task.kind === "crit") {
@@ -183,7 +199,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
                     }
                 } else if (mat instanceof THREE.LineBasicMaterial) {
                     mat.opacity = appear * gIn * 0.6;
-                    mat.color.setStyle(task.kind === "crit" ? THEME.warn : (task.kind === "wait" ? "#475569" : accent));
+                    mat.color.setStyle(task.kind === "crit" ? THEME.warn : (task.kind === "wait" ? WAIT_LINE : accent));
                 }
             }
         });
@@ -194,10 +210,9 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
   };
 
   const ctxData = { gIn: introIn, aStep: activeStep, sBeatT: stepBeatT, clash: clashNow };
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, ctxData);
-  if (!cam) return;
+  render3D(ctx, key, rect, build, env.elapsedMs, ctxData);
 
-  const get2D = (start: number, len: number, lane: number) => projectToRect(cam, worldPos(start, len, lane), rect);
+  const get2D = (start: number, len: number, lane: number) => pixelPos(start, len, lane);
 
   // 2D Overlays
 
@@ -205,11 +220,9 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
   for (let i = 0; i < nLanes; i++) {
     const laneIn = easeOutCubic(enterT(env, 320, 80 + i * 70));
     if (laneIn <= 0) continue;
-    
-    // We map the lane center from 3D to get accurate Y
-    const p3 = projectToRect(cam, new THREE.Vector3(0, 0, nLanes === 1 ? 0 : (i / (nLanes - 1) - 0.5) * spreadZ * 2), rect);
-    const cy = p3.y;
-    
+
+    const cy = laneCenter(i);
+
     ctx.save();
     ctx.globalAlpha = introIn * laneIn;
 
@@ -217,7 +230,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     const chipW = labelW - unit * 0.7;
     const chipH = Math.min(laneH * 0.7, unit * 1.7);
     roundRect(ctx, contentX, cy - chipH / 2, chipW, chipH, unit * 0.3);
-    ctx.fillStyle = "#0e2433";
+    ctx.fillStyle = INK_FILL;
     ctx.fill();
     ctx.strokeStyle = THEME.panelBorder;
     ctx.lineWidth = 1;
@@ -243,12 +256,9 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     const appear = easeOutCubic(clamp01(local / 0.35));
 
     const p3 = get2D(task.start, task.len, lane);
-    // Approximate screen width
-    const pLeft = projectToRect(cam, worldPos(task.start, 0, lane), rect);
-    const pRight = projectToRect(cam, worldPos(task.start + task.len, 0, lane), rect);
-    const fullW = pRight.x - pLeft.x;
+    const fullW = pixelW(task.len);
     const w = fullW * grow;
-    const x = pLeft.x;
+    const x = trackX0 + (task.start / timeSpan) * trackW;
     // Y is centered
     const y = p3.y - (unit * 1.0);
     const blockH = unit * 2.0;
@@ -292,7 +302,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
       const g = unit * (0.1 + 0.7 * easeOutCubic(ringF));
       ctx.save();
       ctx.globalAlpha = 0.7 * (1 - ringF) * introIn;
-      ctx.strokeStyle = DANGER;
+      ctx.strokeStyle = THEME.danger;
       ctx.lineWidth = unit * 0.1;
       roundRect(ctx, x - g, y - g, w + g * 2, blockH + g * 2, unit * 0.2 + g);
       ctx.stroke();
@@ -316,8 +326,8 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
       const burst = 0.6 + 0.4 * Math.sin(env.elapsedMs / 120);
       ctx.save();
       ctx.globalAlpha = introIn * burst;
-      ctx.fillStyle = DANGER;
-      ctx.shadowColor = rgba(DANGER, 0.7);
+      ctx.fillStyle = THEME.danger;
+      ctx.shadowColor = rgba(THEME.danger, 0.7);
       ctx.shadowBlur = unit * 1.0;
       ctx.font = `900 ${unit * 1.3}px ${FONT_SANS}`;
       ctx.textAlign = "center";
@@ -333,14 +343,10 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     const isCurrent = k === activeStep;
     const drawT = isCurrent ? easeOutCubic(clamp01(beatT(env.beats, offset + k, totalBeats, env.p) * 2)) : 1;
     
-    // Project top and bottom points
-    const pTop = projectToRect(cam, new THREE.Vector3((st.marker.at / timeSpan - 0.5) * spreadX * 2, 0, -spreadZ - 0.5), rect);
-    const pBot = projectToRect(cam, new THREE.Vector3((st.marker.at / timeSpan - 0.5) * spreadX * 2, 0, spreadZ + 0.5), rect);
-    
-    const mx = pTop.x;
-    const myTop = pTop.y;
-    const myBot = pBot.y;
-    
+    const mx = trackX0 + (st.marker.at / timeSpan) * trackW;
+    const myTop = fenceTop;
+    const myBot = fenceBottom;
+
     const yEnd = myTop + (myBot - myTop) * drawT;
     ctx.save();
     ctx.globalAlpha = introIn * (isCurrent ? 1 : 0.55);
@@ -353,18 +359,21 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     ctx.stroke();
     ctx.setLineDash([]);
     
-    // Label chip at top.
+    // Label chip at top — clamped so a marker near either end of the track
+    // can't hang its chip off the frame.
     ctx.font = `700 ${unit * 0.55}px ${FONT_MONO}`;
     const tw = ctx.measureText(st.marker.label).width;
-    roundRect(ctx, mx - tw / 2 - unit * 0.3, myTop - unit * 1.1, tw + unit * 0.6, unit * 0.9, unit * 0.22);
-    ctx.fillStyle = "#0e2433";
+    const chipW = tw + unit * 0.6;
+    const chipCx = Math.max(contentX + chipW / 2, Math.min(contentX + contentW - chipW / 2, mx));
+    roundRect(ctx, chipCx - chipW / 2, myTop - unit * 1.1, chipW, unit * 0.9, unit * 0.22);
+    ctx.fillStyle = INK_FILL;
     ctx.fill();
     ctx.strokeStyle = rgba(THEME.warn, 0.6);
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = THEME.warn;
     ctx.textAlign = "center";
-    ctx.fillText(st.marker.label, mx, myTop - unit * 0.45);
+    ctx.fillText(st.marker.label, chipCx, myTop - unit * 0.45);
     ctx.textAlign = "start";
     ctx.restore();
   });
