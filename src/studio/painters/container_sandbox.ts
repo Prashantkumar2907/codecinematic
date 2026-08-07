@@ -136,7 +136,7 @@ export function paintContainerSandbox(ctx: CanvasRenderingContext2D, scene: Sand
     roundRect(ctx, x, y, chipW, chipH, unit * 0.26);
     ctx.fillStyle = rgba(accent, 0.06 + 0.08 * (1 - hAlpha));
     ctx.fill();
-    ctx.strokeStyle = hAlpha > 0.5 ? "rgba(148,163,184,0.4)" : rgba(accent, 0.55);
+    ctx.strokeStyle = hAlpha > 0.5 ? rgba(THEME.textDim, 0.4) : rgba(accent, 0.55);
     ctx.lineWidth = unit * 0.055;
     ctx.stroke();
     const iconColor = hAlpha > 0.5 ? THEME.textFaint : accent;
@@ -207,7 +207,7 @@ export function paintContainerSandbox(ctx: CanvasRenderingContext2D, scene: Sand
     ctx.save();
     ctx.globalAlpha = introIn * boxIn * sibAlpha * 0.5;
     isoBox3D(ctx, sibCx - sibW / 2, sibCy - sibH / 2, sibW, sibH, depth * 0.6, secondary);
-    drawIcon(ctx, "server", sibCx, sibCy - sibH * 0.08, sibH * 0.4, env, "#eaf3ff");
+    drawIcon(ctx, "server", sibCx, sibCy - sibH * 0.08, sibH * 0.4, env, THEME.text);
     ctx.font = `700 ${unit * 0.4}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
@@ -243,7 +243,7 @@ export function paintContainerSandbox(ctx: CanvasRenderingContext2D, scene: Sand
   const glow = isolateActive ? accentGlow : limitActive ? secondaryGlow : undefined;
   isoBox3D(ctx, cx - boxW / 2, cy - boxH / 2, boxW, boxH, depth, accent, glow);
   const bob = isolateActive || limitActive ? Math.sin(env.elapsedMs / 1200) * unit * 0.05 : 0;
-  drawIcon(ctx, "server", cx, cy - boxH * 0.16 + bob, boxH * 0.4, env, "#eaf3ff");
+  drawIcon(ctx, "server", cx, cy - boxH * 0.16 + bob, boxH * 0.4, env, THEME.text);
   const labelPx = fitFontSize(ctx, scene.processLabel, { maxW: boxW * 0.82, startPx: unit * 0.8, minPx: unit * 0.46, weight: 800 });
   ctx.font = `800 ${labelPx}px ${FONT_SANS}`;
   ctx.fillStyle = THEME.text;
@@ -252,9 +252,11 @@ export function paintContainerSandbox(ctx: CanvasRenderingContext2D, scene: Sand
   ctx.fillText(scene.processLabel, cx, cy + boxH * 0.22);
   const visibleCount = scene.resources.filter((r) => hiddenAlpha(r.id) < 0.5).length;
   ctx.font = `600 ${Math.min(unit * 0.42, boxH * 0.1)}px ${FONT_MONO}`;
-  ctx.fillStyle = THEME.textDim;
   // boxH*0.4 left almost no clearance before the box's own bottom edge
   // (half-height = boxH*0.5), so the caption clipped against the border.
+  // THEME.textDim (a mid grey-blue) has too little contrast against the
+  // bright accent-filled face — dim the same white the label above uses.
+  ctx.fillStyle = rgba(THEME.text, 0.65);
   ctx.fillText(`sees ${visibleCount}/${n}`, cx, cy + boxH * 0.33);
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
