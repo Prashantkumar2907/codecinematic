@@ -106,7 +106,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | jigsaw_puzzle | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | domino_cascade | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | sheet_music | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| canvas_reveal | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| canvas_reveal | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Swatch labels overlapped into unreadable text — `fitFontSize`'s `maxW` for a label was `chipW*1.7`, 70% wider than the chip itself, while chips are packed with only a `unit*0.6` gap. Measured concretely: "Tandul white" ran straight into "Rice-husk black" on the first render. `maxW` is now the chip's own slot (width + a little of its trailing gap). Also: caption background was a hand-typed `rgba(9,13,18,0.72)` — an exact match for `THEME.bgBottom` — swapped in. `edge-check` 0.0% both aspects, console.log empty. | addb7c4 | 2026-08-08 |
 | scalecompare | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | fluidflow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | ecosystem_web | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
