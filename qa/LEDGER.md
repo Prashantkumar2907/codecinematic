@@ -125,7 +125,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | dom_event_flow | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | commit_dag | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | On 9:16, same-lane consecutive commits share an x, so the straight parent->child edge line ran directly through the commit's own id label (fixed offset below the dot, same vertical line) — confirmed by pixel-cropping the rendered frame. Gave each label a small halo (roundRect, THEME.bgBottom) sized to its measured text box, drawn before the text; 16:9 was unaffected since labels sit off the horizontal edge axis there. Also swapped 6 raw rgba(148,163,184,X) literals for rgba(THEME.textDim, X). console.log clean, 0.0% edge bleed both aspects. | 89ece7d | 2026-08-08 |
 | partitioned_log | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| container_sandbox | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| container_sandbox | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | The "sees N/M" caption inside the process box used THEME.textDim against the box's bright accent face — too little contrast to read, confirmed by cropping the rendered frame. Fixed by dimming the same white the process label above it already uses successfully, instead of a fixed muddy grey. Also replaced "#eaf3ff" (re-typed THEME.text, the same literal iso3d.ts's polish consolidated) on both server icons, and one rgba(148,163,184,0.4) re-typed THEME.textDim. console.log clean, 0.0% edge bleed both aspects. | b1d1e00 | 2026-08-08 |
 | control_loop | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | telemetry_trace | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | spatial_index | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
