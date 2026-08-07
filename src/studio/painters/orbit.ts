@@ -8,6 +8,9 @@ type OrbitScene = Extract<Scene, { kind: "orbit" }>;
 
 /** Beat state the cached three.js `update` reads each frame (build runs once). */
 const orbitState = new Map<string, { revealed: number }>();
+const INK_PANEL = THEME.bgBottom;
+/** Fraction of the tighter frustum half-extent the outermost ring should fill. */
+const FILL_FRACTION = 0.82;
 
 /**
  * Real-3-D orbital system (three.js): a central body with bodies orbiting on
@@ -37,14 +40,29 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 46 : 40, 1, 0.1, 100);
+    const fovDeg = vertical ? 46 : 40;
+    const camera = new THREE.PerspectiveCamera(fovDeg, rect.w / rect.h, 0.1, 100);
     const maxR = ringR(n - 1);
-    const dist = (maxR + 2.2) * (vertical ? 2.75 : 1.7);
+    /**
+     * `qa/ledger.json` -> systemic `2d-layout-round-tripped-through-camera`:
+     * `dist` was a hand-tuned constant multiplier unrelated to `rect`, so the
+     * system rendered as a small centred cluster with a lot of dead space on
+     * every side (measured: filled under half the frame). Solved for
+     * analytically instead: at distance D from a camera with vertical half-fov
+     * `h`, the visible half-extent at the origin is `tan(h) * D` — the same
+     * relation `frustumHalfExtent` uses for on-axis cameras, still a good
+     * planar approximation here since the rings are flat and centred on the
+     * look-at point. Solving for D so the outermost ring fills
+     * `FILL_FRACTION` of whichever axis is tighter for this rect's aspect.
+     */
+    const aspect = rect.w / rect.h;
+    const tanHalfFov = Math.tan((fovDeg * Math.PI) / 360);
+    const dist = maxR / (FILL_FRACTION * tanHalfFov * Math.min(1, aspect));
     camera.position.set(0, dist * 0.62, dist * 0.78);
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(dist * 2.5, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(dist * 2.5, 14, new THREE.Color(accent), new THREE.Color(THEME.textDim));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -1.5;
@@ -126,19 +144,45 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
 
   const cam = render3D(ctx, key, rect, build, env.elapsedMs);
 
+  /**
+   * Labels track continuously-orbiting bodies at independent periods, so at
+   * some point in an "spins forever" animation any two are bound to project
+   * to nearly the same spot — measured concretely: the Sun/Venus and
+   * Earth/Mars labels overlapping into unreadable text at p=0.9. Chips are
+   * placed in priority order (fixed centre label, then the active body, then
+   * the rest) and a fresh-per-frame chip nudges down/up off anything already
+   * placed this frame rather than drawing on top of it.
+   */
+  const placedChips: { x: number; y: number; w: number; h: number }[] = [];
+  const resolveChipY = (x: number, y: number, w: number, h: number): number => {
+    const overlaps = (yy: number) => placedChips.some((p) => Math.abs(x - p.x) * 2 < w + p.w && Math.abs(yy - p.y) * 2 < h + p.h);
+    let ny = y;
+    let guard = 0;
+    let dir = 1;
+    while (overlaps(ny) && guard < 10) {
+      guard++;
+      ny = y + dir * h * 0.95 * Math.ceil(guard / 2);
+      dir *= -1;
+    }
+    placedChips.push({ x, y: ny, w, h });
+    return ny;
+  };
+
   const drawChip = (sx: number, sy: number, text: string, activeChip: boolean, revealed: number) => {
     if (revealed <= 0) return;
     ctx.save();
-    ctx.globalAlpha = easeOutCubic(clamp01(revealed));
+    ctx.globalAlpha = easeOutCubic(clamp01(revealed)) * (activeChip ? 1 : 0.75);
     ctx.font = `${activeChip ? 800 : 600} ${unit * 0.72}px ${FONT_SANS}`;
     const tw = ctx.measureText(text).width;
     const cw = tw + unit;
+    const ch = unit * 1.3;
     // Keep the chip fully inside the frame even when its body orbits near the edge.
     sx = Math.max(rect.x + cw / 2 + unit * 0.2, Math.min(rect.x + rect.w - cw / 2 - unit * 0.2, sx));
-    roundRect(ctx, sx - cw / 2, sy - unit * 0.65, cw, unit * 1.3, unit * 0.32);
-    ctx.fillStyle = "rgba(10,16,22,0.82)";
+    sy = resolveChipY(sx, sy, cw, ch);
+    roundRect(ctx, sx - cw / 2, sy - ch / 2, cw, ch, unit * 0.32);
+    ctx.fillStyle = INK_PANEL;
     ctx.fill();
-    ctx.strokeStyle = rgba(activeChip ? accent : "#94a3b8", activeChip ? 0.9 : 0.4);
+    ctx.strokeStyle = rgba(activeChip ? accent : THEME.textDim, activeChip ? 0.9 : 0.4);
     ctx.lineWidth = activeChip ? 2 : 1;
     ctx.stroke();
     ctx.fillStyle = THEME.text;
@@ -150,11 +194,14 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
 
   if (cam) {
     const revealed = orbitState.get(key)?.revealed ?? 0;
-    // Centre label under the central body.
+    // Centre label under the central body — placed first so it keeps its
+    // stable spot and orbiting bodies nudge around it, not the other way.
     const cp = projectToRect(cam, new THREE.Vector3(0, -1.3, 0), rect);
     drawChip(cp.x, cp.y, scene.center, false, 1);
-    // Body labels track their orbiting spheres.
-    for (let i = 0; i < n; i++) {
+    // Body labels track their orbiting spheres; the active one gets priority
+    // placement over the merely-revealed ones.
+    const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => (a === activeIdx ? -1 : b === activeIdx ? 1 : a - b));
+    for (const i of order) {
       const local = clamp01(revealed - i);
       if (local <= 0) continue;
       const r = ringR(i);
