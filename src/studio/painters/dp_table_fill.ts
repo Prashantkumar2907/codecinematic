@@ -98,7 +98,7 @@ export function paintDpTableFill(ctx: CanvasRenderingContext2D, scene: DpScene, 
   const drawGhost = (r: number, c: number, alpha: number) => {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.05;
     ctx.setLineDash([unit * 0.26, unit * 0.22]);
     roundRect(ctx, cellX(c), cellY(r), cell, cell, radius);
