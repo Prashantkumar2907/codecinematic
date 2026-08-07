@@ -192,7 +192,7 @@ export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScen
         ctx.lineTo(polygonPts[i].x, polygonPts[i].y);
       }
       ctx.closePath();
-      ctx.fillStyle = fIdx % 2 === 0 ? rgba(palette.accentSoft, 0.4) : rgba(palette.secondary, 0.2);
+      ctx.fillStyle = fIdx % 2 === 0 ? rgba(palette.accent, 0.4) : rgba(palette.secondary, 0.2);
       ctx.fill();
       ctx.strokeStyle = palette.accent;
       ctx.lineWidth = 1.5;
@@ -223,12 +223,33 @@ export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScen
       else if (style === "ray") color = palette.accent;
       else if (style === "radius") color = palette.secondary;
 
-      const midX = (pA.x + pB.x) / 2;
-      const midY = (pA.y + pB.y) / 2;
+      // Offset perpendicular to the segment, not a fixed vertical shift —
+      // a diagonal segment (e.g. the hypotenuse) otherwise still runs the
+      // line straight through the label instead of clearing it.
+      const dx = pB.x - pA.x;
+      const dy = pB.y - pA.y;
+      const segLen = Math.hypot(dx, dy) || 1;
+      const offset = unit * 0.4;
+      const nx = -dy / segLen;
+      const ny = dx / segLen;
+      const midX = (pA.x + pB.x) / 2 + nx * offset;
+      const midY = (pA.y + pB.y) / 2 + ny * offset;
       ctx.font = `600 ${Math.round(unit * 0.45)}px ${FONT_SANS}`;
       ctx.fillStyle = color;
+      // Center-aligned text at a small offset still straddles a near-vertical
+      // or near-horizontal line (its own half-width/height reaches back past
+      // the offset) — grow away from the line along whichever axis the
+      // perpendicular is dominant on instead of just centering on the offset point.
+      if (Math.abs(nx) > Math.abs(ny)) {
+        ctx.textAlign = nx > 0 ? "left" : "right";
+        ctx.textBaseline = "middle";
+      } else {
+        ctx.textAlign = "center";
+        ctx.textBaseline = ny > 0 ? "top" : "bottom";
+      }
+      ctx.fillText(seg.label, midX, midY);
       ctx.textAlign = "center";
-      ctx.fillText(seg.label, midX, midY - 12);
+      ctx.textBaseline = "alphabetic";
     });
   }
 
@@ -242,7 +263,12 @@ export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScen
 
       const a1 = Math.atan2(fromPt.y - atPt.y, fromPt.x - atPt.x);
       const a2 = Math.atan2(toPt.y - atPt.y, toPt.x - atPt.x);
-      const radius = unit * 1.2;
+      // Scale to the actual arm lengths, not just `unit` — on a small triangle
+      // (more figure per pixel, e.g. a compact 16:9 layout) a fixed radius
+      // pushed the label past the vertex's own corner and into the fill's
+      // centroid label sitting at the middle of the shape.
+      const armLen = Math.min(Math.hypot(fromPt.x - atPt.x, fromPt.y - atPt.y), Math.hypot(toPt.x - atPt.x, toPt.y - atPt.y));
+      const radius = Math.min(unit * 1.2, armLen * 0.4);
 
       ctx.beginPath();
       if (ang.right) {
@@ -261,7 +287,12 @@ export function paintGeometry(ctx: CanvasRenderingContext2D, scene: GeometryScen
       ctx.stroke();
 
       if (ang.label) {
-        const midA = (a1 + a2) / 2;
+        // Averaging the two raw angles breaks across the wraparound (e.g. a
+        // ~180deg arm and a ~-90deg arm naively average to 45deg — the
+        // bisector of the REFLEX angle on the far side, not the corner drawn
+        // above) — average the unit vectors instead so it's always the near
+        // bisector, matching whichever side the arc/right-angle mark was drawn on.
+        const midA = Math.atan2(Math.sin(a1) + Math.sin(a2), Math.cos(a1) + Math.cos(a2));
         const lx = atPt.x + Math.cos(midA) * radius * 1.6;
         const ly = atPt.y + Math.sin(midA) * radius * 1.6;
         ctx.font = `600 ${Math.round(unit * 0.45)}px ${FONT_SANS}`;
