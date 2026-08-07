@@ -218,7 +218,7 @@ export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene
     const hl = highlightOf(n.id);
     ctx.save();
     ctx.globalAlpha = introIn * inp * (0.32 + 0.5 * hl);
-    ctx.strokeStyle = hl > 0.1 ? accent : "rgba(148,163,184,0.7)";
+    ctx.strokeStyle = hl > 0.1 ? accent : rgba(THEME.textDim, 0.7);
     ctx.lineWidth = unit * (0.06 + 0.05 * hl);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -265,14 +265,14 @@ export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene
     const hl = segHighlightOf(a.id, b.id);
     ctx.save();
     ctx.globalAlpha = introIn * inp * (0.35 + 0.5 * hl);
-    ctx.strokeStyle = hl > 0.1 ? secondary : "rgba(148,163,184,0.55)";
+    ctx.strokeStyle = hl > 0.1 ? secondary : rgba(THEME.textDim, 0.55);
     ctx.lineWidth = unit * (0.055 + 0.05 * hl);
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
-    ctx.fillStyle = hl > 0.1 ? secondary : "rgba(148,163,184,0.55)";
+    ctx.fillStyle = hl > 0.1 ? secondary : rgba(THEME.textDim, 0.55);
     drawArrowhead(ctx, to.x, to.y, 0, unit * 0.22);
     ctx.restore();
     if (hl > 0.15) flowDots(ctx, [from, to], env, { count: 2, speedMs: 1100, r: unit * 0.13, color: secondary });
