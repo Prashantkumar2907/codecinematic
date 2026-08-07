@@ -13,14 +13,16 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  shade,
 } from "./common";
 import type { PaintEnv } from "./index";
 
 type CodediffScene = Extract<Scene, { kind: "codediff" }>;
 
 const GOOD = THEME.good;
-const DANGER = "#f87171";
+const DANGER = THEME.danger;
 const MIN_COLS = 30;
+const TRAFFIC_LIGHTS = ["#ff5f57", "#febc2e", "#28c840"] as const;
 const SIGN: Record<"same" | "add" | "del", string> = { same: "", add: "+", del: "-" };
 
 /**
@@ -66,11 +68,13 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
 
   const nLines = scene.lines.length;
   const longest = Math.max(MIN_COLS, ...scene.lines.map((l) => l.text.length + 1));
-  const fontPx = Math.min((codeW / longest) * 1.62, vertical ? unit * 1.1 : unit * 0.92);
-  const lineH = fontPx * 1.7;
   const bottom = vertical ? Math.min(areaY + areaH, layout.h * 0.92) : areaY + areaH;
   const availH = bottom - areaY;
-  const fh = Math.min(availH, barH + lineH * (nLines + 0.9) + sbH);
+  const widthFontPx = Math.min((codeW / longest) * 1.62, vertical ? unit * 1.1 : unit * 0.92);
+  const heightLineH = (availH - barH - sbH) / (nLines + 0.9);
+  const fontPx = Math.min(widthFontPx, heightLineH / 1.7);
+  const lineH = fontPx * 1.7;
+  const fh = barH + lineH * (nLines + 0.9) + sbH;
   const fy = areaY + Math.max(0, (availH - fh) / 2);
   const codeTop = fy + barH + lineH * 0.4;
 
@@ -97,17 +101,17 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
   roundRect(ctx, fx, fy, fw, barH, unit * 0.7);
   ctx.clip();
   const tb = ctx.createLinearGradient(fx, fy, fx, fy + barH);
-  tb.addColorStop(0, "#161b22");
-  tb.addColorStop(1, "#12161d");
+  tb.addColorStop(0, rgba(shade(THEME.panel, 0.1), 0.8));
+  tb.addColorStop(1, rgba(shade(THEME.panel, 0.05), 0.8));
   ctx.fillStyle = tb;
   ctx.fillRect(fx, fy, fw, barH);
   ctx.restore();
-  ctx.strokeStyle = "rgba(48,54,64,0.45)";
+  ctx.strokeStyle = THEME.panelBorder;
   ctx.beginPath();
   ctx.moveTo(fx, fy + barH);
   ctx.lineTo(fx + fw, fy + barH);
   ctx.stroke();
-  ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
+  TRAFFIC_LIGHTS.forEach((c, i) => {
     ctx.fillStyle = c;
     ctx.beginPath();
     ctx.arc(fx + unit * (0.9 + i * 0.8), fy + barH / 2, unit * 0.21, 0, Math.PI * 2);
@@ -137,7 +141,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
   ctx.textBaseline = "alphabetic";
 
   // Sign-gutter background strip.
-  ctx.fillStyle = "rgba(13,17,23,0.5)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.5);
   ctx.fillRect(fx, fy + barH, gutterW, fh - barH - sbH);
 
   // Clip the code body.
@@ -158,7 +162,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
       // Not yet reached — dashed placeholder keeps the panel height stable.
       ctx.save();
       ctx.globalAlpha = 0.16;
-      ctx.strokeStyle = "rgba(148,163,184,0.9)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.9);
       ctx.lineWidth = Math.max(1, unit * 0.05);
       ctx.setLineDash([unit * 0.3, unit * 0.26]);
       ctx.beginPath();
@@ -254,7 +258,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
   }
 
   // Status bar.
-  ctx.fillStyle = "#161b22";
+  ctx.fillStyle = rgba(shade(THEME.panel, 0.1), 0.8);
   roundRect(ctx, fx, fy + fh - sbH, fw, sbH, unit * 0.35);
   ctx.fill();
   ctx.fillStyle = THEME.textFaint;
