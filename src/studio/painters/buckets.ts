@@ -16,6 +16,10 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  shade,
+  stagger,
+  STROKE,
+  RADIUS,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -78,15 +82,17 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
   const labelH = unit * (vertical ? 2.6 : 2.3);
   const areaTop = ay + topPad;
   const baseline = ay + ah - labelH;
-  const maxBucketH = Math.max(baseline - areaTop, unit * 4);
   const rect = { x: ax, y: areaTop - unit * 2, w: aw, h: baseline - areaTop + unit * 2 };
 
   const n = scene.buckets.length;
   const maxCap = Math.max(...scene.buckets.map((b) => b.capacity), 1e-9);
-  
+
   const spreadX = vertical ? 3.5 : 5.5;
   const spreadY = vertical ? 4.5 : 3.5;
   const bucketW3D = (spreadX * 2.0) / n * 0.7;
+
+  // Siblings enter on a stagger, not all on the same tick (rubric axis 3).
+  const ghostIns = scene.buckets.map((_, i) => easeOutCubic(enterT(env, 400, stagger(i, n))));
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
@@ -95,7 +101,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(spreadX * 3, 10, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(spreadX * 3, 10, new THREE.Color(accent), new THREE.Color(shade(THEME.textDim, -0.55)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -spreadY / 2;
@@ -116,8 +122,11 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
         const x = n === 1 ? 0 : (i / (n - 1) - 0.5) * spreadX * 2;
         const bH = clamp01(bucket.capacity / maxCap) * spreadY * 0.58 + spreadY * 0.42;
 
-        // Container (glass-like)
-        const container = makeBlock(bucketW3D, bH, bucketW3D * 0.8, "rgba(148,163,184,0.05)", "rgba(148,163,184,0.4)");
+        // Container (glass-like). Opacity is set on the materials below, not
+        // baked into these hex strings: THREE.Color drops an rgba() alpha and
+        // logs a warning per call, which is where qa/buckets/console.log's
+        // "Alpha component ... will be ignored" spam came from.
+        const container = makeBlock(bucketW3D, bH, bucketW3D * 0.8, THEME.textDim, THEME.textDim);
         container.position.set(x, -spreadY / 2 + bH / 2, 0);
         container.children.forEach(c => {
             if (c instanceof THREE.Mesh) {
@@ -140,39 +149,31 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
         models.push({ container, liquid, bucket, i, maxH: bH });
     });
 
-    const update = (elapsedMs: number, ctxData: { gIn: number, fills: number[], fillingIndex: number, flowing: boolean }) => {
-      const { gIn, fills, fillingIndex, flowing } = ctxData;
-      
+    const update = (elapsedMs: number, ctxData: { gIns: number[], fills: number[], fillingIndex: number, flowing: boolean }) => {
+      const { gIns, fills, fillingIndex, flowing } = ctxData;
+
       models.forEach(({ container, liquid, i, maxH }) => {
+        const gIn = gIns[i];
         const full = fills[i] >= scene.buckets[i].capacity - FULL_EPS && fills[i] > 0;
         const isFilling = flowing && i === fillingIndex;
         const fillAmt = clamp01(fills[i] / scene.buckets[i].capacity);
-        
-        container.visible = gIn > 0;
-        container.children.forEach(c => {
-            if (c instanceof THREE.Mesh) {
-                const mat = c.material as THREE.MeshPhysicalMaterial;
-                mat.transparent = true;
-                mat.opacity = 0.15 * gIn;
-            }
-        });
 
-        // Highlight container walls if filling
-        if (isFilling) {
-            container.children.forEach(c => {
-                if (c instanceof THREE.LineSegments) {
-                    (c.material as THREE.LineBasicMaterial).color.setStyle(accent);
-                    (c.material as THREE.LineBasicMaterial).opacity = 0.8;
-                }
+        container.visible = gIn > 0;
+        // makeBlock() parents its edge LineSegments to the face Mesh, not this
+        // group (three3d.ts) — container.children is only ever [mesh], so the
+        // wall highlight below must descend one level to find the edges.
+        container.children.forEach(c => {
+            if (!(c instanceof THREE.Mesh)) return;
+            const mat = c.material as THREE.MeshPhysicalMaterial;
+            mat.transparent = true;
+            mat.opacity = 0.15 * gIn;
+            c.children.forEach(e => {
+                if (!(e instanceof THREE.LineSegments)) return;
+                const lineMat = e.material as THREE.LineBasicMaterial;
+                lineMat.color.setStyle(isFilling ? accent : THEME.textDim);
+                lineMat.opacity = isFilling ? 0.8 : 0.4;
             });
-        } else {
-            container.children.forEach(c => {
-                if (c instanceof THREE.LineSegments) {
-                    (c.material as THREE.LineBasicMaterial).color.setStyle("rgba(148,163,184,0.4)");
-                    (c.material as THREE.LineBasicMaterial).opacity = 0.4;
-                }
-            });
-        }
+        });
 
         if (fillAmt > 0) {
             liquid.visible = true;
@@ -209,7 +210,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
     return { scene: s, camera, update };
   };
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: ghostIn, fills, fillingIndex, flowing });
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIns: ghostIns, fills, fillingIndex, flowing });
   if (!cam) return;
 
   const get2D = (i: number, isTop: boolean) => {
@@ -231,21 +232,22 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
   scene.buckets.forEach((bucket, i) => {
     const isFilling = flowing && i === fillingIndex;
     const has = fills[i] > 0;
-    
+    const gIn = ghostIns[i];
+
     // Rate chip
     if (bucket.rate) {
       const topP = get2D(i, true);
       ctx.save();
-      ctx.globalAlpha = ghostIn * (isFilling ? 1 : 0.8);
+      ctx.globalAlpha = gIn * (isFilling ? 1 : 0.8);
       ctx.font = `800 ${unit * 0.6}px ${FONT_MONO}`;
       const rw = ctx.measureText(bucket.rate).width + unit * 0.6;
       const rx = topP.x - rw / 2;
       const ryc = topP.y - unit * 1.0;
-      roundRect(ctx, rx, ryc - unit * 0.5, rw, unit * 1.0, unit * 0.28);
-      ctx.fillStyle = "#0a0e13";
+      roundRect(ctx, rx, ryc - unit * 0.5, rw, unit * 1.0, unit * RADIUS.md);
+      ctx.fillStyle = THEME.bgBottom;
       ctx.fill();
       ctx.strokeStyle = rgba(accent, 0.55);
-      ctx.lineWidth = 1;
+      ctx.lineWidth = unit * STROKE.hair;
       ctx.stroke();
       ctx.fillStyle = accent;
       ctx.textAlign = "center";
@@ -257,7 +259,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
     // Labels
     const botP = get2DBottom(i);
     ctx.save();
-    ctx.globalAlpha = ghostIn * (isFilling ? 1 : has ? 0.9 : 0.55);
+    ctx.globalAlpha = gIn * (isFilling ? 1 : has ? 0.9 : 0.55);
     ctx.textAlign = "center";
     const bw2D = contentW / n * 0.8;
     const lpx = fitFontSize(ctx, bucket.label, { maxW: bw2D, startPx: unit * 0.72, minPx: unit * 0.5, weight: 700 });
@@ -287,7 +289,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
       ctx.globalAlpha = ghostIn * 0.85;
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.5;
-      ctx.strokeStyle = "#eaf6ff";
+      ctx.strokeStyle = shade(accent, 0.82);
       ctx.lineWidth = unit * 0.16;
       ctx.lineCap = "round";
       ctx.beginPath();
@@ -326,7 +328,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
       const f = (env.elapsedMs / 420 + d / 3) % 1;
       const dy = areaTop - unit * 0.6 + (sP.y - (areaTop - unit * 0.6)) * f;
       ctx.globalAlpha = ghostIn * Math.sin(Math.PI * f);
-      ctx.fillStyle = "#eaf6ff";
+      ctx.fillStyle = shade(accent, 0.82);
       ctx.beginPath();
       ctx.arc(sP.x + Math.sin(env.elapsedMs / 200 + d) * unit * 0.1, dy, unit * 0.09, 0, Math.PI * 2);
       ctx.fill();
@@ -355,12 +357,12 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
     ctx.shadowBlur = unit * (0.15 + 0.25 * idle(env, 2600));
   }
   const chipH = totPx * 1.45;
-  roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.35);
-  ctx.fillStyle = "#0a0e13";
+  roundRect(ctx, chipX, chipY, chipW, chipH, unit * RADIUS.md);
+  ctx.fillStyle = THEME.bgBottom;
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.strokeStyle = rgba(accent, 0.5);
-  ctx.lineWidth = 1;
+  ctx.lineWidth = unit * STROKE.hair;
   ctx.stroke();
   ctx.textAlign = "left";
   ctx.font = `600 ${unit * 0.62}px ${FONT_SANS}`;
