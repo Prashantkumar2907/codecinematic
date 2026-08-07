@@ -21,12 +21,17 @@ import {
   activeBeatIndex,
   rgba,
 } from "./common";
-import { render3D, projectToRect, studioLights, type ThreeBundle, makeBlock, color3, makeCylinder } from "./three3d";
+import { render3D, projectToRect, studioLights, frustumHalfExtent, type ThreeBundle, makeBlock, color3, makeCylinder } from "./three3d";
 import type { PaintEnv } from "./index";
 
 type BodymapScene = Extract<Scene, { kind: "bodymap" }>;
 type Region = BodymapScene["marks"][number]["region"];
 type BBox = { x: number; y: number; w: number; h: number };
+
+/** A travelling marker/highlight core reads as white-hot regardless of subject
+ *  accent — same convention as `cipher.ts`'s `INK_BRIGHT`. */
+const SPARK = "#eaf6ff";
+const INK_PANEL = THEME.bgBottom;
 
 /** Anatomical anchor per region as (fx = offset from centre, fy = down) fractions of body height. */
 const REGION_POS: Record<Region, { fx: number; fy: number }> = {
@@ -77,9 +82,26 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
     return;
   }
 
+  /**
+   * `qa/ledger.json` -> systemic `2d-layout-round-tripped-through-camera`: the
+   * figure was a fixed world size (~7.2 wide, ~14.5 tall) under a camera fixed
+   * at (0,0,20) regardless of `rect` — on a 9:16 frame it filled a small
+   * patch with dead space on every side; on 16:9 it shrank to a thumbnail in
+   * the middle of the frame. `frustumHalfExtent` gives the space actually
+   * available for this `rect`'s aspect; the figure is scaled to fill 82% of
+   * whichever axis is tighter, same fit-to-frame idea as `bits.ts`/`chart.ts`.
+   */
+  const BODY_W = 7.2;
+  const BODY_H = 14.5;
+  const fitCamera = new THREE.PerspectiveCamera(40, rect.w / rect.h, 0.1, 100);
+  fitCamera.position.set(0, 0, 20);
+  fitCamera.lookAt(0, 0, 0);
+  const { halfW, halfH } = frustumHalfExtent(fitCamera, rect);
+  const fitScale = Math.min((halfW * 2 * 0.82) / BODY_W, (halfH * 2 * 0.82) / BODY_H);
+
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(40, rect.w / rect.h, 0.1, 100);
     camera.position.set(0, 0, 20);
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, env.palette.secondary);
@@ -132,12 +154,13 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
       }
     });
 
+    group.scale.setScalar(fitScale);
     s.add(group);
 
-    const grid = new THREE.GridHelper(30, 30, color3(accent), color3("#31435a"));
+    const grid = new THREE.GridHelper(30 * fitScale, 30, color3(accent), color3(THEME.textDim));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -8;
+    grid.position.y = -8 * fitScale;
     s.add(grid);
 
     const update = (elapsedMs: number, ctxData: { alpha: number }) => {
@@ -163,10 +186,16 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
   };
 
   const cam = render3D(ctx, scene.id + "-body3d", rect, build, env.elapsedMs, { alpha: bodyIn });
-  if (!cam) return;
+  // A WebGL failure drops the body silhouette, but the marks/labels are the
+  // actual lesson content — `fitCamera` gives them somewhere to project to
+  // rather than blanking the whole scene.
+  const projCam = cam ?? fitCamera;
 
   const get2DPos = (region: Region) => {
-    const p3d = regionPoint3D(region);
+    // `fitScale` first — it lands in the 3D group's `scale`, which composes
+    // before rotation/position, so applying it after would rotate/bob the
+    // point around the wrong (unscaled) radius and drift off the model.
+    const p3d = regionPoint3D(region).multiplyScalar(fitScale);
     // Apply the same bob and rot as the group in 3D
     const bob = Math.sin(env.elapsedMs / 1200) * 0.2;
     const rot = Math.sin(env.elapsedMs / 2000) * 0.05;
@@ -176,7 +205,7 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
     p3d.applyEuler(euler);
     p3d.y += bob;
     
-    return projectToRect(cam, p3d, rect);
+    return projectToRect(projCam, p3d, rect);
   };
 
   const pts = scene.marks.map((m) => get2DPos(m.region));
@@ -186,7 +215,7 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
     ctx.globalAlpha = alpha;
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.9;
-    ctx.fillStyle = "#eaf6ff";
+    ctx.fillStyle = SPARK;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -208,7 +237,7 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
     ctx.arc(x, y, unit * 0.44, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = "#eaf6ff";
+    ctx.fillStyle = SPARK;
     ctx.beginPath();
     ctx.arc(x, y, unit * 0.18, 0, Math.PI * 2);
     ctx.fill();
@@ -245,7 +274,7 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
     if (leadIn > 0) {
       ctx.save();
       ctx.globalAlpha = baseAlpha;
-      ctx.strokeStyle = hot ? rgba(accent, 0.55) : "rgba(148,163,184,0.4)";
+      ctx.strokeStyle = hot ? rgba(accent, 0.55) : rgba(THEME.textDim, 0.4);
       ctx.lineWidth = unit * 0.045;
       strokePolylineProgress(ctx, [{ x: organ.x, y: organ.y }, { x: innerX, y: chipY + chipH / 2 }], leadIn);
       ctx.restore();
@@ -259,10 +288,10 @@ export function paintBodymap(ctx: CanvasRenderingContext2D, scene: BodymapScene,
       ctx.shadowBlur = unit * 0.5;
     }
     roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.32);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = INK_PANEL;
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = hot ? rgba(accent, 0.7) : "rgba(148,163,184,0.35)";
+    ctx.strokeStyle = hot ? rgba(accent, 0.7) : rgba(THEME.textDim, 0.35);
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.fillStyle = hot ? THEME.text : THEME.textDim;
