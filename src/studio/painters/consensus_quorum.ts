@@ -25,8 +25,7 @@ type ConsensusQuorumScene = Extract<Scene, { kind: "consensus_quorum" }>;
 type Step = ConsensusQuorumScene["steps"][number];
 type Tone = "idle" | "acked" | "commit" | "fail";
 
-/** Established codebase red for a "fail" tone (matches gauge.ts / threads.ts / table.ts). */
-const DANGER = "#f87171";
+const DANGER = THEME.danger;
 
 /** 0deg = top (12 o'clock), clockwise — matches hash_ring.ts's canvas convention. */
 function canvasAngle(deg: number): number {
