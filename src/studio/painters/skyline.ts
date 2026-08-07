@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
+import { render3D, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 import { introBeatCount, SKYLINE_BUILDINGS, type Scene } from "../schema";
 import {
   THEME,
@@ -14,6 +14,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  shade,
   hashStr,
 } from "./common";
 import type { PaintEnv } from "./index";
@@ -54,7 +55,6 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
   const chipRowH = unit * 1.4;
   const areaTop = chipRowY + chipRowH + unit * 0.4;
   const groundY = contentY + contentH - unit * (vertical ? 1.4 : 1.0);
-  const maxH = (groundY - areaTop) * 0.94;
 
   const placed: Placed[] = [];
   scene.eras.forEach((era, ei) => {
@@ -99,14 +99,21 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
     const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, 1, 0.1, 100);
     camera.position.set(0, vertical ? 12 : 9, vertical ? 9 : 7);
     camera.lookAt(0, 3, 0);
-    studioLights(s, accent, rgba(secondary, 0.5));
-    
-    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color("#31435a"));
+    // studioLights() casts shadows from both its key and rim lights; a second
+    // shadow direction reads as a stray double shadow, so only the key light
+    // (added first) keeps castShadow here.
+    studioLights(s, accent, secondary);
+    s.children
+      .filter((o): o is THREE.DirectionalLight => o instanceof THREE.DirectionalLight)
+      .slice(1)
+      .forEach((light) => { light.castShadow = false; });
+
+    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color(shade(secondary, -0.6)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.5;
     s.add(grid);
-    
+
     const shadowPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
       new THREE.ShadowMaterial({ opacity: 0.4 })
@@ -119,8 +126,11 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
     const models = placed.map(pl => {
       const g = new THREE.Group();
       
-      const faceColor = "#1e293b"; // base
-      const edgeColor = rgba(accent, 0.8);
+      const faceColor = THEME.panel;
+      // Plain hex: makeBlock/makeCylinder already apply opacity 0.6 to the edge
+      // material, so an rgba() string here would only make THREE.Color warn and
+      // drop the alpha it never uses.
+      const edgeColor = accent;
       
       const maxH_units = 5.0; // max logical height in 3D
       const blockH = (pl.hUnits / 10) * maxH_units;
@@ -276,16 +286,16 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.font = `800 ${unit * 0.72}px ${FONT_MONO}`;
-    ctx.fillStyle = "#06121a";
+    ctx.fillStyle = THEME.bgBottom;
     ctx.textAlign = "center";
     ctx.fillText(era.when, chipCx + (whenW + unit * 1.2) / 2, chipRowY + chipRowH / 2 + unit * 0.26);
     if (era.stat) {
       const sx = chipCx + whenW + unit * 1.2 + unit * 0.4;
       roundRect(ctx, sx, chipRowY, statW, chipRowH, chipRowH / 2);
-      ctx.fillStyle = "#0a0e13";
+      ctx.fillStyle = THEME.panel;
       ctx.fill();
       ctx.strokeStyle = rgba(secondary, 0.6);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = unit * 0.05;
       ctx.stroke();
       ctx.font = `700 ${unit * 0.66}px ${FONT_MONO}`;
       ctx.fillStyle = secondary;

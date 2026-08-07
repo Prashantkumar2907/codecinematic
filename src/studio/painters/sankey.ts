@@ -19,6 +19,7 @@ import {
   activeBeatIndex,
   rgba,
   seriesTints,
+  shade,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -33,6 +34,11 @@ const ARRIVE_AT = 0.75;
 const REST_MIN_FRAC = 0.02;
 // Captions sit in the bottom ~14% of vertical frames; keep branch blocks above.
 const CAPTION_SAFE_Y = 0.86;
+// Breathing room reserved between two adjacent branch label/value slots, as a
+// fraction of unit. Sized against the nearest-neighbour screen gap so two
+// narrow branches converging close together (e.g. two 20% slices side by
+// side) shrink their text instead of overlapping it.
+const LABEL_GUTTER = 0.35;
 
 function branchTints(accent: string, secondary: string): string[] {
   // Was [accent, secondary, good, warn, "#f472b6", "#22d3ee"] — two hardcoded hex
@@ -152,7 +158,7 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(12, 12, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(12, 12, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.3)));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -0.5;
@@ -173,11 +179,14 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
 
     const branchMeshes = branches3D.map((b, i) => {
       const tint = tints[i % tints.length];
-      const mesh = makeBlock(b.w, blockH, b.d, "#1e293b", tint);
+      const mesh = makeBlock(b.w, blockH, b.d, THEME.panel, tint);
       mesh.position.set(b.x, 0, b.z);
       s.add(mesh);
       return mesh;
     });
+    // Active branch face: same panel tone, darkened, so the pop/glow reads as
+    // the highlight rather than a second hardcoded hex fighting the palette.
+    const activeFace = shade(THEME.panel, -0.3);
 
     const update = (elapsedMs: number, ctxData: { gIn: number, times: number[], activeIdx: number }) => {
       const { gIn, times, activeIdx } = ctxData;
@@ -203,8 +212,8 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
                 if (child instanceof THREE.Mesh) {
                     const mat = child.material as THREE.MeshPhysicalMaterial;
                     if (isActive) {
-                        mat.color.setStyle("#0e2433");
-                        mat.emissive.setStyle("#0e2433");
+                        mat.color.setStyle(activeFace);
+                        mat.emissive.setStyle(activeFace);
                     } else {
                         mat.color.setStyle(THEME.panel);
                         mat.emissive.setStyle(THEME.panel);
@@ -223,7 +232,20 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
   if (!cam) return;
 
   const get2D = (x: number, z: number, y: number = 0) => projectToRect(cam, new THREE.Vector3(x, y, z), rect);
-  
+
+  // Screen-space gap to the nearest neighbouring branch, per branch — caps how
+  // wide a label/value row may grow so close-together branches never collide
+  // (measured defect: two adjacent 20% branches overlapped their text at 9:16).
+  const branchAxis = branches3D.map((bb) => {
+    const p = get2D(bb.x, bb.z, blockH + 0.2);
+    return vertical ? p.x : p.y;
+  });
+  const branchSlotPx = branchAxis.map((v, i) => {
+    const left = i > 0 ? Math.abs(v - branchAxis[i - 1]) : Infinity;
+    const right = i < n - 1 ? Math.abs(branchAxis[i + 1] - v) : Infinity;
+    return Math.min(left, right);
+  });
+
   const ribbons: Ribbon[] = [];
   
   let srcCumZ = -spread3D / 2;
@@ -304,7 +326,7 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
         const f = (((env.elapsedMs % 1400) / 1400) + d * 0.5) % 1;
         const dot = pointAlongPolyline(rb.center, f * e);
         ctx.globalAlpha = 0.85 * Math.sin(Math.PI * f);
-        ctx.fillStyle = "#eaf6ff";
+        ctx.fillStyle = THEME.text;
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.6;
         ctx.beginPath();
@@ -364,7 +386,8 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
     ctx.textAlign = "center";
     const bcx = bCenter.x;
     
-    const branchPx = vertical ? aw * 0.25 : aw * 0.15;
+    const slotPx = Math.max(unit * 1.2, branchSlotPx[i] - unit * LABEL_GUTTER);
+    const branchPx = Math.min(vertical ? aw * 0.25 : aw * 0.15, slotPx);
     const lpx = fitFontSize(ctx, b.label, { maxW: branchPx, startPx: unit * 0.75, minPx: unit * 0.45, weight: 700 });
     ctx.font = `700 ${lpx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;
@@ -375,23 +398,39 @@ export function paintSankey(ctx: CanvasRenderingContext2D, scene: SankeyScene, e
       const pctText = `${Math.round((b.value / total) * 100)}%`;
       const valText = fmt(b.value, easeOutCubic(cIn));
       ctx.globalAlpha *= easeOutCubic(cIn);
-      ctx.font = `800 ${unit * 0.6}px ${FONT_MONO}`;
-      const pw = ctx.measureText(pctText).width;
-      ctx.font = `700 ${unit * 0.72}px ${FONT_MONO}`;
-      const vw = ctx.measureText(valText).width;
-      const rowW = pw + unit * 0.55 + unit * 0.35 + vw;
+      const rowGap = unit * 0.55 + unit * 0.35;
+      const rowSlot = Math.min(vertical ? aw * 0.25 : aw * 0.15, slotPx);
+      let pctPx = unit * 0.6;
+      let valPx = unit * 0.72;
+      ctx.font = `800 ${pctPx}px ${FONT_MONO}`;
+      let pw = ctx.measureText(pctText).width;
+      ctx.font = `700 ${valPx}px ${FONT_MONO}`;
+      let vw = ctx.measureText(valText).width;
+      let rowW = pw + rowGap + vw;
+      if (rowW > rowSlot) {
+        // Shrink both tiers together, keeping their ratio, rather than
+        // letting the row overflow into the next branch's slot.
+        const scale = Math.max(0.55, rowSlot / rowW);
+        pctPx *= scale;
+        valPx *= scale;
+        ctx.font = `800 ${pctPx}px ${FONT_MONO}`;
+        pw = ctx.measureText(pctText).width;
+        ctx.font = `700 ${valPx}px ${FONT_MONO}`;
+        vw = ctx.measureText(valText).width;
+        rowW = pw + rowGap + vw;
+      }
       const rowX = bcx - rowW / 2;
       const rowY = bCenter.y + unit * 0.8;
-      
+
       const tint = tints[i % tints.length];
       roundRect(ctx, rowX - unit * 0.12, rowY - unit * 0.52, pw + unit * 0.55, unit * 0.95, unit * 0.28);
       ctx.fillStyle = rgba(tint, 0.18);
       ctx.fill();
       ctx.textAlign = "start";
-      ctx.font = `800 ${unit * 0.6}px ${FONT_MONO}`;
+      ctx.font = `800 ${pctPx}px ${FONT_MONO}`;
       ctx.fillStyle = tint;
       ctx.fillText(pctText, rowX + unit * 0.15, rowY + unit * 0.18);
-      ctx.font = `700 ${unit * 0.72}px ${FONT_MONO}`;
+      ctx.font = `700 ${valPx}px ${FONT_MONO}`;
       ctx.fillStyle = THEME.text;
       ctx.fillText(valText, rowX + pw + unit * 0.55 + unit * 0.35, rowY + unit * 0.22);
     }
