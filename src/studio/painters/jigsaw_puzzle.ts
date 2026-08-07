@@ -162,7 +162,7 @@ export function paintJigsawPuzzle(ctx: CanvasRenderingContext2D, scene: JigsawSc
     const poly = roundClosed(pieceOutline(x, y, pw, ph, knobsFor(i), hw, dp), corner);
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.05;
     ctx.setLineDash([unit * 0.4, unit * 0.32]);
     tracePoly(ctx, poly);
@@ -213,13 +213,30 @@ export function paintJigsawPuzzle(ctx: CanvasRenderingContext2D, scene: JigsawSc
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const maxW = pw * 0.82;
-    const labelPx = fitFontSize(ctx, piece.label, { maxW, startPx: knobDim * 0.34, minPx: knobDim * 0.2, weight: 800 });
+    let labelPx = fitFontSize(ctx, piece.label, { maxW, startPx: knobDim * 0.34, minPx: knobDim * 0.2, weight: 800 });
+    ctx.font = `800 ${labelPx}px ${FONT_SANS}`;
+    // Was capped at 2 lines, which silently dropped a whole trailing word
+    // ("Access token as login" lost "login" entirely on a narrow 16:9
+    // piece) instead of just shrinking further — the vertical-fit guard
+    // below now shrinks the font to make room for a 3rd line instead.
+    const lines = ctx.measureText(piece.label).width > maxW ? wrapText(ctx, piece.label, maxW).slice(0, 3) : [piece.label];
+    let subPx = hasSub ? fitFontSize(ctx, piece.sub as string, { maxW, startPx: knobDim * 0.18, minPx: knobDim * 0.11, weight: 600 }) : 0;
+    // Icon + a 2-line-wrapped label + a sub-label can outgrow the piece's own
+    // bottom edge (width-only fitFontSize never checks vertical space) —
+    // shrink both text sizes together, not just reposition one of them,
+    // which only relocates the overflow onto whatever sits below it (the
+    // seam boundary marker on a mismatched neighbour, in one observed case).
+    const contentBottom = ty + lines.length * labelPx * 0.72 + (hasSub ? knobDim * 0.16 + subPx * 0.9 : 0);
+    const safeBottom = py + ph - knobDim * 0.08;
+    if (contentBottom > safeBottom && contentBottom > ty) {
+      const scale = Math.max(0.55, (safeBottom - ty) / (contentBottom - ty));
+      labelPx *= scale;
+      subPx *= scale;
+    }
     ctx.font = `800 ${labelPx}px ${FONT_SANS}`;
     ctx.fillStyle = LABEL_LIGHT;
-    const lines = ctx.measureText(piece.label).width > maxW ? wrapText(ctx, piece.label, maxW).slice(0, 2) : [piece.label];
     lines.forEach((ln, k) => ctx.fillText(ln, cx, ty + (k - (lines.length - 1) / 2) * labelPx * 1.14));
     if (hasSub) {
-      const subPx = fitFontSize(ctx, piece.sub as string, { maxW, startPx: knobDim * 0.18, minPx: knobDim * 0.11, weight: 600 });
       ctx.font = `600 ${subPx}px ${FONT_SANS}`;
       ctx.fillStyle = rgba("#ffffff", 0.72);
       ctx.fillText(piece.sub as string, cx, ty + lines.length * labelPx * 0.72 + knobDim * 0.16);
@@ -293,9 +310,14 @@ export function paintJigsawPuzzle(ctx: CanvasRenderingContext2D, scene: JigsawSc
   // "Not-fit" marker: a warn cross on the empty seam of the rattling piece.
   if (activeIdx >= 0 && !scene.pieces[activeIdx].fits && stepT > 0.55) {
     const { x, y } = homeRect(activeIdx);
-    const mx = horizontal ? (activeIdx === 0 ? x + pw : x) : x + pw / 2;
-    const my = horizontal ? y + ph / 2 : activeIdx === 0 ? y + ph : y;
+    let mx = horizontal ? (activeIdx === 0 ? x + pw : x) : x + pw / 2;
+    let my = horizontal ? y + ph / 2 : activeIdx === 0 ? y + ph : y;
     const r = knobDim * 0.16;
+    // Nudge fully inside this piece instead of straddling the seam: centred
+    // exactly on the boundary, the mark's own radius spilled into whichever
+    // neighbour sits across it, overlapping that piece's label/sub-label.
+    if (horizontal) mx += activeIdx === 0 ? -r : r;
+    else my += activeIdx === 0 ? -r : r;
     const puls = 0.6 + 0.4 * idle(env, 700);
     ctx.save();
     ctx.globalAlpha = groupIn * clamp01((stepT - 0.55) / 0.2) * puls;
