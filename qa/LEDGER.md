@@ -98,7 +98,7 @@ conversation, which gets summarised and lost. Update a row in the same commit th
 | topology | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | scroll | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | tactical_map | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
-| architecture_blueprint | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
+| architecture_blueprint | 2 | Wave 2 | passed | 1 | 4 | 4 | 4 | 4 | 4 | Pure 2D, no camera — already correctly built with the `diagram.ts`-style centred, capped grid-fit (`gridMap`, f<=1.25). Measured 0.0% edge bleed both aspects before this change. 2 hardcoded hex -> named constants matching `cipher.ts`'s `INK_BRIGHT` convention / `THEME.bgBottom`. `edge-check` 0.0% both aspects, console.log empty. | 9a8e2d9 | 2026-08-08 |
 | packet_delivery | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | codediff | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
 | parliament_arc | 2 | Wave 2 | todo | 0 | – | – | – | – | – |  |  |  |
