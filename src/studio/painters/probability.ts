@@ -24,6 +24,14 @@ import type { PaintEnv } from "./index";
 type ProbabilityScene = Extract<Scene, { kind: "probability" }>;
 
 const POINTER = -Math.PI / 2;
+/** Fraction of the tighter frustum half-extent the wheel should fill. */
+const FILL_FRACTION = 0.85;
+/** A travelling marker/flash reads as white-hot regardless of subject accent
+ *  — same convention as `cipher.ts`'s `INK_BRIGHT`. */
+const SPARK = "#eaf6ff";
+/** Dark text on a bright accent-filled chip — same convention as
+ *  `cipher.ts`'s `INK_ON_ACCENT` (also used by `question.ts`). */
+const INK_ON_ACCENT = "#06121a";
 const SPIN_TURNS = 3;
 const SETTLE = 0.85;
 
@@ -123,10 +131,26 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
     const camera = isoCamera();
-    if (vertical) camera.position.set(8.5, 7.2, 9.5);
+    /**
+     * `qa/ledger.json` -> systemic `2d-layout-round-tripped-through-camera`:
+     * `isoCamera()`'s position was only ever overridden for `vertical`, so a
+     * horizontal `rect` (which here uses the FULL content height, not a
+     * square-ish area) fell through to a position tuned for something else
+     * entirely — measured concretely: the wheel clipped clean off the left
+     * edge on 16:9. Distance along the same iso viewing direction is now
+     * solved analytically (same technique as `orbit.ts`) so the wheel fills
+     * `FILL_FRACTION` of whichever frustum axis is tighter for this rect.
+     */
+    const isoDir = (vertical ? new THREE.Vector3(8.5, 7.2, 9.5) : new THREE.Vector3(6.5, 5.2, 7.5)).normalize();
+    const aspect = rect.w / rect.h;
+    const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
+    const fitExtent = radius3D + 0.6; // a little headroom for the pointer/labels above the rim
+    const dist = fitExtent / (FILL_FRACTION * tanHalfFov * Math.min(1, aspect));
+    camera.position.copy(isoDir.multiplyScalar(dist));
+    camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
 
-    const grid = new THREE.GridHelper(12, 12, new THREE.Color(accent), new THREE.Color("#31435a"));
+    const grid = new THREE.GridHelper(12, 12, new THREE.Color(accent), new THREE.Color(THEME.textDim));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.2;
     grid.position.y = -height3D/2 - 0.1;
@@ -143,7 +167,7 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
 
     const hub = new THREE.Mesh(
       new THREE.CylinderGeometry(radius3D * 0.15, radius3D * 0.15, height3D + 0.2, 32),
-      new THREE.MeshPhysicalMaterial({ color: 0x0a0e13, metalness: 0.8, roughness: 0.2 })
+      new THREE.MeshPhysicalMaterial({ color: new THREE.Color(THEME.bgBottom), metalness: 0.8, roughness: 0.2 })
     );
     hub.castShadow = true;
     s.add(hub);
@@ -205,8 +229,8 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
                  mat.transparent = true;
                  mat.opacity = ghostIn * (m.win ? 1 : 0.85);
                  if (flash > 0) {
-                     mat.color.setStyle("#eaf6ff");
-                     mat.emissive.setStyle("#eaf6ff");
+                     mat.color.setStyle(SPARK);
+                     mat.emissive.setStyle(SPARK);
                      mat.emissiveIntensity = 0.5 * flash;
                  } else {
                      mat.color.setStyle(m.baseColor);
@@ -243,7 +267,7 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
     const ly = p2d.y;
     const lpx = fitFontSize(ctx, seg.label, { maxW: wheelR * 0.7, startPx: unit * 0.58, minPx: unit * 0.4, weight: 700 });
     ctx.font = `700 ${lpx}px ${FONT_SANS}`;
-    ctx.fillStyle = "#06121a";
+    ctx.fillStyle = INK_ON_ACCENT;
     ctx.textAlign = "center";
     ctx.fillText(seg.label, lx, ly + lpx * 0.34);
     if (seg.win) {
@@ -262,7 +286,7 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
   ctx.lineTo(pointer2d.x - unit * 0.42, pointer2d.y - unit * 0.4);
   ctx.lineTo(pointer2d.x + unit * 0.42, pointer2d.y - unit * 0.4);
   ctx.closePath();
-  ctx.fillStyle = "#eaf6ff";
+  ctx.fillStyle = SPARK;
   ctx.shadowColor = accentGlow;
   ctx.shadowBlur = atRest ? 0 : unit * 0.5;
   ctx.fill();
@@ -289,7 +313,7 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
   ctx.save();
   ctx.globalAlpha = ghostIn;
   roundRect(ctx, tx, barY, tw, barH, barH / 2);
-  ctx.fillStyle = "rgba(148,163,184,0.1)";
+  ctx.fillStyle = rgba(THEME.textDim, 0.1);
   ctx.fill();
   if (landed > 0) {
     const winW = tw * actual;
@@ -303,7 +327,7 @@ export function paintProbability(ctx: CanvasRenderingContext2D, scene: Probabili
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.font = `800 ${unit * 0.6}px ${FONT_MONO}`;
-    ctx.fillStyle = "#06121a";
+    ctx.fillStyle = INK_ON_ACCENT;
     ctx.fillText(`${wins}W`, tx + unit * 0.4, barY + barH * 0.68);
     if (landed - wins > 0) {
       ctx.fillStyle = THEME.textDim;
