@@ -27,6 +27,9 @@ import type { PaintEnv } from "./index";
 type HeapScene = Extract<Scene, { kind: "object_heap" }>;
 type Pt = { x: number; y: number };
 
+/** Dark ink for text on a bright accent-filled badge (matches cipher.ts / graphwalk.ts / control_loop.ts). */
+const INK_ON_ACCENT = "#06121a";
+
 /** Bindings/links/collections as of (and including) step index `upto`; -1 = nothing has run yet.
  *  A single replay function (mirrors dp_table_fill's cumulative-write pattern) is the one source
  *  of truth for "what does the heap look like right now" — refcounts, arrows and GC status are
@@ -218,9 +221,9 @@ export function paintObjectHeap(ctx: CanvasRenderingContext2D, scene: HeapScene,
     ctx.save();
     ctx.globalAlpha = introIn;
     roundRect(ctx, bx, by, w, h, unit * 0.3);
-    ctx.fillStyle = boundNow ? rgba(accent, 0.14) : "rgba(148,163,184,0.08)";
+    ctx.fillStyle = boundNow ? rgba(accent, 0.14) : rgba(THEME.textDim, 0.08);
     ctx.fill();
-    ctx.strokeStyle = boundNow ? accent : "rgba(148,163,184,0.4)";
+    ctx.strokeStyle = boundNow ? accent : rgba(THEME.textDim, 0.4);
     ctx.lineWidth = unit * 0.07;
     ctx.setLineDash(boundNow ? [] : [unit * 0.22, unit * 0.18]);
     ctx.stroke();
@@ -268,7 +271,7 @@ export function paintObjectHeap(ctx: CanvasRenderingContext2D, scene: HeapScene,
     isoBox3D(ctx, bx, by, w * scale, h * scale, unit * 0.5, face, isMutating ? accentGlow : dying ? rgba(THEME.warn, 0.4) : undefined);
     ctx.setLineDash([]);
 
-    if (obj.icon) drawIcon(ctx, obj.icon, x, by + h * scale * 0.32, h * scale * 0.4, env, "#eaf3ff");
+    if (obj.icon) drawIcon(ctx, obj.icon, x, by + h * scale * 0.32, h * scale * 0.4, env, THEME.text);
     const labelY = by + h * scale * (obj.icon ? 0.72 : 0.5);
     const labelPx = fitFontSize(ctx, obj.label, { maxW: w * scale * 0.84, startPx: unit * 0.62, minPx: unit * 0.4, weight: 700 });
     ctx.font = `700 ${labelPx}px ${FONT_SANS}`;
@@ -278,7 +281,7 @@ export function paintObjectHeap(ctx: CanvasRenderingContext2D, scene: HeapScene,
     ctx.fillText(obj.label, x, labelY);
 
     if (!obj.mutable) {
-      ctx.strokeStyle = rgba("#eaf3ff", 0.5);
+      ctx.strokeStyle = rgba(THEME.text, 0.5);
       ctx.lineWidth = unit * 0.04;
       roundRect(ctx, bx + unit * 0.14, by + unit * 0.14, w * scale - unit * 0.28, h * scale - unit * 0.28, unit * 0.2);
       ctx.stroke();
@@ -299,7 +302,7 @@ export function paintObjectHeap(ctx: CanvasRenderingContext2D, scene: HeapScene,
     roundRect(ctx, -bw / 2, -unit * 0.42, bw, unit * 0.84, unit * 0.42);
     ctx.fillStyle = rcShown === 0 ? THEME.warn : rc > rcPrev ? THEME.good : accent;
     ctx.fill();
-    ctx.fillStyle = "#08131f";
+    ctx.fillStyle = INK_ON_ACCENT;
     ctx.fillText(badge, 0, unit * 0.02);
     ctx.restore();
 
@@ -329,7 +332,11 @@ export function paintObjectHeap(ctx: CanvasRenderingContext2D, scene: HeapScene,
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    const noteY = vertical ? Math.min(contentY + contentH + unit * 0.2, layout.h - unit * 0.6) : contentY + contentH + unit * 0.1;
+    // contentY + contentH already equals layout.safeBottom (the caption-safe
+    // boundary) — the previous formula added unit*0.1-0.2 past it, and the
+    // vertical clamp (layout.h - unit*0.6) fell even deeper into the
+    // burned-in caption band. Stay comfortably above safeBottom instead.
+    const noteY = layout.safeBottom - unit * 0.35;
     ctx.fillText(scene.steps[activeStep].note!, layout.w / 2, noteY);
     ctx.restore();
   }
