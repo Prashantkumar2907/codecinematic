@@ -219,6 +219,23 @@ export function paintSpatialIndex(ctx: CanvasRenderingContext2D, scene: SpatialI
 
   // Points, dropping in from above with a settle bounce.
   const showLabels = points.length <= 10;
+  // Points near a capacity-triggered split routinely land within a pixel or
+  // two of each other (that clustering IS the story) — labels independently
+  // centred above each point then overlap into unreadable text ("D1"/"D2"
+  // running together). Nudge a colliding label further up, same pattern as
+  // orbit.ts's resolveChipY.
+  const placedLabels: { x: number; y: number; w: number; h: number }[] = [];
+  const resolveLabelY = (x: number, y: number, w: number, h: number): number => {
+    const overlaps = (yy: number) => placedLabels.some((p) => Math.abs(x - p.x) * 2 < w + p.w && Math.abs(yy - p.y) * 2 < h + p.h);
+    let ny = y;
+    let guard = 0;
+    while (overlaps(ny) && guard < 10) {
+      guard++;
+      ny = y - guard * h;
+    }
+    placedLabels.push({ x, y: ny, w, h });
+    return ny;
+  };
   points.forEach((p) => {
     const appear = easeOutCubic(p.revealP);
     const pop = easeOutBack(p.revealP);
@@ -247,7 +264,9 @@ export function paintSpatialIndex(ctx: CanvasRenderingContext2D, scene: SpatialI
       ctx.fillStyle = THEME.textDim;
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
-      ctx.fillText(p.label, x, dropY - r - unit * 0.25);
+      const tw = ctx.measureText(p.label).width;
+      const ly = resolveLabelY(x, dropY - r - unit * 0.25, tw + unit * 0.3, unit * 0.62);
+      ctx.fillText(p.label, x, ly);
       ctx.restore();
     }
   });
