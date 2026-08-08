@@ -123,7 +123,7 @@ export function paintTelemetryTrace(ctx: CanvasRenderingContext2D, scene: TraceS
   for (let i = 0; i <= ticks; i++) {
     const ms = (scene.totalMs / ticks) * i;
     const x = xAt(ms);
-    ctx.strokeStyle = "rgba(148,163,184,0.13)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.13);
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x, trackTop0 - unit * 0.1);
@@ -226,7 +226,7 @@ export function paintTelemetryTrace(ctx: CanvasRenderingContext2D, scene: TraceS
     if (bw > unit * 1.6 && appear >= 0.98) {
       ctx.globalAlpha = fade;
       ctx.font = `600 ${Math.min(unit * 0.46, rowH * 0.36)}px ${FONT_MONO}`;
-      ctx.fillStyle = "rgba(6,10,14,0.85)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.85);
       ctx.textAlign = "start";
       ctx.textBaseline = "middle";
       ctx.fillText(`${Math.round(span.durMs)}${scene.unitLabel}`, bx + unit * 0.2, y + rowH / 2);
@@ -286,7 +286,7 @@ export function paintTelemetryTrace(ctx: CanvasRenderingContext2D, scene: TraceS
     ctx.save();
     ctx.globalAlpha = introIn * slide;
     roundRect(ctx, contentX, by, contentW, bannerH, unit * 0.35);
-    ctx.fillStyle = "rgba(8,13,18,0.86)";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.86);
     ctx.fill();
     ctx.lineWidth = unit * 0.1;
     ctx.strokeStyle = tone;
