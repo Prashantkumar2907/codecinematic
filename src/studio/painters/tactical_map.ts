@@ -7,6 +7,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -49,7 +50,9 @@ export function paintTacticalMap(ctx: CanvasRenderingContext2D, scene: TacticalM
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
@@ -102,9 +105,14 @@ export function paintTacticalMap(ctx: CanvasRenderingContext2D, scene: TacticalM
     );
   }
 
-  // Troop blocks.
-  const blockW = Math.min(cell * 1.9, unit * 2.6);
-  const blockH = Math.min(cell * 1.3, unit * 1.7);
+  // Troop blocks. Capped by the closest any two units ever sit at any step
+  // boundary across the WHOLE battle (not just what's revealed so far) — a
+  // fixed cell*1.9 cap overlapped badly when a scripted endgame (e.g. a
+  // reserve committed one grid cell from the line it reinforces) brought two
+  // blocks within a single cell of each other.
+  const closestGap = minUnitGap(scene);
+  const blockW = Math.min(cell * 1.9, unit * 2.6, closestGap * cell * 0.82);
+  const blockH = Math.min(cell * 1.3, unit * 1.7, closestGap * cell * 0.82);
   const depth = unit * 0.4;
   scene.units.forEach((u, i) => {
     const pos = running.get(u.id)!;
@@ -161,6 +169,25 @@ export function paintTacticalMap(ctx: CanvasRenderingContext2D, scene: TacticalM
 
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
+}
+
+/** Smallest grid distance any two units ever sit at, at any step boundary
+ *  across the whole battle — used to cap block size so blocks can't overlap
+ *  once a scripted move brings two units within a cell of each other. */
+function minUnitGap(scene: TacticalMapScene): number {
+  const pos = new Map<string, Pt>(scene.units.map((u) => [u.id, { x: u.x, y: u.y }]));
+  let min = Infinity;
+  const checkAll = () => {
+    const pts = [...pos.values()];
+    for (let i = 0; i < pts.length; i++)
+      for (let j = i + 1; j < pts.length; j++) min = Math.min(min, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
+  };
+  checkAll();
+  for (const step of scene.steps) {
+    for (const mv of step.moves) pos.set(mv.unit, { x: mv.toX, y: mv.toY });
+    checkAll();
+  }
+  return Number.isFinite(min) ? Math.max(min, 0.5) : 2;
 }
 
 function centroid(scene: TacticalMapScene, running: Map<string, { x: number; y: number }>): { x: number; y: number } {
