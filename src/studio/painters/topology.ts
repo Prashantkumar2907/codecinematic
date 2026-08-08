@@ -34,6 +34,9 @@ const IS_DEVICE: Record<NodeKind, boolean> = {
   node: false,
 };
 
+/** Dark ink on a bright accent-tone badge — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
+
 const KIND_TAG: Record<NodeKind, string> = {
   hub: "HUB",
   switch: "SWITCH",
@@ -111,7 +114,7 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
     ctx.save();
     ctx.lineCap = "round";
     ctx.globalAlpha = 0.28 * introIn * easeOutCubic(linkIn);
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.09;
     ctx.beginPath();
     ctx.moveTo(pa.x, pa.y);
@@ -204,8 +207,8 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
     ctx.scale(scale, scale);
     ctx.translate(-nl.x, -nl.y);
 
-    const border = isFocus ? emitColor : isReceiver ? rgba(emitColor, 0.5 + 0.5 * recT) : wasMarked ? accent : "rgba(148,163,184,0.5)";
-    const glyphColor = lit ? "#eaf3ff" : "#aeb9c8";
+    const border = isFocus ? emitColor : isReceiver ? rgba(emitColor, 0.5 + 0.5 * recT) : wasMarked ? accent : rgba(THEME.textDim, 0.5);
+    const glyphColor = lit ? THEME.text : "#aeb9c8";
 
     if (nl.device) {
       const w = nl.r * 2.5;
@@ -289,7 +292,11 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
     const f = map.get(focusId);
     if (f) {
       const text = emit === "all" ? "BROADCAST → ALL" : "UNICAST → 1";
-      const py = f.y - (f.device ? f.r * 0.85 : f.r) - unit * 1.35;
+      // A device card's kind tag sits just above its top edge (unit*0.28 clear
+      // plus glyph height), so the caption's own gap (unit*1.35, minus half its
+      // own height) left it only ~0.2 unit of clearance — its shadowBlur then
+      // bled straight onto the tag text. Push it further up.
+      const py = f.y - (f.device ? f.r * 0.85 : f.r) - unit * 1.7;
       const appear = easeOutBack(clamp01((stepT - 0.08) / 0.3));
       ctx.save();
       ctx.globalAlpha = introIn * clamp01(appear);
@@ -305,7 +312,7 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
       ctx.fillStyle = emitColor;
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = "#06121a";
+      ctx.fillStyle = INK_ON_ACCENT;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(text, 0, unit * 0.02);
