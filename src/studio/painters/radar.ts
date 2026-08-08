@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, studioLights, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -17,6 +15,7 @@ import {
   activeBeatIndex,
   rgba,
   seriesTints,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -28,14 +27,6 @@ const DRAW = 0.65;
 const TAU = Math.PI * 2;
 /** Axis names ride this multiple of the outer ring, leaving a gutter above a value of 100. */
 const LABEL_RING = 1.3;
-/**
- * The web is laid out in PIXELS and the 3D nodes are mapped into world space from it.
- * A camera on the +z axis makes that mapping an exact similarity on the z=0 plane, so a
- * node lands on its own vertex; the tilted `isoCamera` this painter used to share squashed
- * the web into an irregular blob and threw two axis labels off the frame.
- */
-const CAM_FOV = 32;
-const CAM_Z = 12;
 const SWEEP_MS = 4200;
 const SWEEP_ARC = 0.55;
 const WEB_IN_MS = 560;
@@ -45,7 +36,6 @@ const HANDOFF = 0.2;
 const GUTTER_MAX = 0.24;
 
 type NodeState = { x: number; y: number; r: number; opacity: number; emissive: number };
-type RadarCtx = { nodes: (NodeState | null)[] };
 
 export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env: PaintEnv) {
   const { layout } = env;
@@ -58,6 +48,8 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const entIdx = active - offset;
   const ghostIn = easeOutCubic(enterT(env, 420));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
   const webIn = enterT(env, WEB_IN_MS);
   /** Last-quarter resolve: past polygons and legend rows lift so the comparison closes. */
   const settleIn = easeOutCubic(revealT(env, 0.78, 0.96));
@@ -127,10 +119,9 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   const mix = (from: number, to: number, f: number) => from + (to - from) * f;
   const restAlpha = 0.5 + 0.3 * settleIn;
 
+  // Per-vertex node state, drawn directly in 2D below — pixel position, radius and a
+  // 0-1 emissive value that used to drive a three.js sphere's emissiveIntensity.
   const nodes: (NodeState | null)[] = [];
-  const worldHalfH = Math.tan((CAM_FOV * Math.PI) / 360) * CAM_Z;
-  const pxToWorldX = (2 * worldHalfH * (Math.max(2, Math.round(rect.w)) / Math.max(2, Math.round(rect.h)))) / rect.w;
-  const pxToWorldY = (2 * worldHalfH) / rect.h;
   for (let k = 0; k < nEnt; k++) {
     const st = stateOf(k);
     for (let j = 0; j < nAxes; j++) {
@@ -144,61 +135,18 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
       // vertex is already legible ~150ms in instead of being a sub-pixel speck.
       const nodePx = unit * mix(0.21, 0.3, st.focus) * (0.4 + 0.6 * rv);
       nodes.push({
-        x: (p.x - cx) * pxToWorldX,
-        y: -(p.y - cy) * pxToWorldY,
-        r: nodePx * pxToWorldY,
+        x: p.x,
+        y: p.y,
+        r: nodePx,
         opacity: clamp01(rv * 1.6) * ghostIn * mix(0.6 + 0.3 * settleIn, 1, st.focus),
         emissive: mix(0.2, 0.55, st.focus),
       });
     }
   }
 
-  const build = (): ThreeBundle<RadarCtx> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 0.1, 100);
-    camera.position.set(0, 0, CAM_Z);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const meshes: THREE.Mesh[] = [];
-    for (let k = 0; k < nEnt; k++) {
-      const color = entColors[k % entColors.length];
-      for (let j = 0; j < nAxes; j++) {
-        const mesh = new THREE.Mesh(
-          new THREE.SphereGeometry(1, 32, 24),
-          new THREE.MeshPhysicalMaterial({
-            color: new THREE.Color(color),
-            emissive: new THREE.Color(color),
-            emissiveIntensity: 0.2,
-            metalness: 0.25,
-            roughness: 0.15,
-            clearcoat: 0.8,
-            clearcoatRoughness: 0.2,
-            transparent: true,
-          })
-        );
-        s.add(mesh);
-        meshes.push(mesh);
-      }
-    }
-
-    const update = (_elapsedMs: number, data: RadarCtx) => {
-      meshes.forEach((mesh, i) => {
-        const n = data?.nodes[i] ?? null;
-        mesh.visible = !!n;
-        if (!n) return;
-        mesh.position.set(n.x, n.y, 0);
-        mesh.scale.setScalar(n.r);
-        const mat = mesh.material as THREE.MeshPhysicalMaterial;
-        mat.opacity = n.opacity;
-        mat.emissiveIntensity = n.emissive;
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
   // ---- Ghost web: rings ping outward, then spokes, then the axis names ----
   ctx.save();
+  ctx.globalAlpha = leave;
   ctx.lineWidth = unit * 0.045;
   for (let r = 1; r <= RINGS; r++) {
     const ri = easeOutCubic(clamp01((webIn - (r - 1) * 0.14) / 0.58));
@@ -246,7 +194,7 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   ctx.lineTo(cx + Math.cos(sweepA) * hand, cy + Math.sin(sweepA) * hand);
   ctx.stroke();
 
-  ctx.globalAlpha = ghostIn;
+  ctx.globalAlpha = ghostIn * leave;
   ctx.fillStyle = THEME.textDim;
   ctx.textBaseline = "middle";
   scene.axes.forEach((axis, j) => {
@@ -282,7 +230,7 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
     const whole = revealed >= nAxes;
 
     ctx.save();
-    ctx.globalAlpha = mix(restAlpha, 1, st.focus) * ghostIn;
+    ctx.globalAlpha = mix(restAlpha, 1, st.focus) * ghostIn * leave;
 
     const fillA = st.isPast
       ? mix(0.1 + 0.06 * settleIn, 0.15, st.focus)
@@ -320,21 +268,25 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
   for (let k = 0; k < nEnt; k++) if (k !== entIdx) drawEntity(k);
   if (entIdx >= 0 && entIdx < nEnt) drawEntity(entIdx);
 
-  // ---- 3D vertex nodes, mapped from the pixel vertices; 2D discs if WebGL is out ----
-  const cam = render3D(ctx, scene.id + "-radar3d", rect, build, env.elapsedMs, { nodes }, env);
-  if (!cam) {
-    ctx.save();
-    nodes.forEach((n, i) => {
-      if (!n) return;
-      const k = Math.floor(i / nAxes);
-      ctx.globalAlpha = n.opacity;
-      ctx.fillStyle = entColors[k % entColors.length];
-      ctx.beginPath();
-      ctx.arc(cx + n.x / pxToWorldX, cy - n.y / pxToWorldY, n.r / pxToWorldY, 0, TAU);
-      ctx.fill();
-    });
-    ctx.restore();
-  }
+  // ---- Vertex nodes: a glossy dot per revealed axis, drawn directly in 2D ----
+  ctx.save();
+  nodes.forEach((n, i) => {
+    if (!n) return;
+    const k = Math.floor(i / nAxes);
+    const color = entColors[k % entColors.length];
+    ctx.globalAlpha = n.opacity * leave;
+    ctx.shadowColor = rgba(color, 0.6 * n.emissive);
+    ctx.shadowBlur = unit * 0.5 * n.emissive;
+    const glow = ctx.createRadialGradient(n.x - n.r * 0.35, n.y - n.r * 0.35, 0, n.x, n.y, n.r);
+    glow.addColorStop(0, rgba(THEME.text, 0.5 * n.emissive));
+    glow.addColorStop(0.4, color);
+    glow.addColorStop(1, color);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, TAU);
+    ctx.fill();
+  });
+  ctx.restore();
 
   // ---- Values for the series in focus (both of them mid-handoff) ----
   const drawValues = (k: number) => {
@@ -364,7 +316,7 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
       });
       const dir = gapOut >= gapIn ? 1 : -1;
       const p = ptAt(j, (v / 100) * rv);
-      ctx.globalAlpha = rv * ghostIn * st.focus;
+      ctx.globalAlpha = rv * ghostIn * st.focus * leave;
       ctx.textAlign = Math.abs(c) < 0.35 ? "center" : dir * c > 0 ? "left" : "right";
       ctx.fillText(String(v), p.x + dir * c * unit * 0.72, p.y + dir * Math.sin(a) * unit * 0.72);
     }
@@ -382,7 +334,7 @@ export function paintRadar(ctx: CanvasRenderingContext2D, scene: RadarScene, env
     const rowY = legTop + k * rowH;
     ctx.save();
     const lead = st.focus > 0.5;
-    ctx.globalAlpha = ghostIn * mix(st.shown ? 0.7 + 0.3 * settleIn : 0.28, 1, st.focus);
+    ctx.globalAlpha = ghostIn * leave * mix(st.shown ? 0.7 + 0.3 * settleIn : 0.28, 1, st.focus);
     if (st.focus > 0.02) {
       ctx.shadowColor = rgba(entColors[k % entColors.length], 0.6 * st.focus);
       ctx.shadowBlur = unit * 0.4 * st.focus;
