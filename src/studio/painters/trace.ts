@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -17,12 +15,12 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  departT,
+  applyElevation,
+  clearShadow,
 } from "./common";
 import type { PaintEnv } from "./index";
 
-const BLOCK_DEPTH = 0.3;
-/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
-const EDGE_ALPHA = 0.6;
 const PANEL_FACE_LIFT = 0.16;
 /** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16). */
 const SAFE_BOTTOM_SHORT = 0.75;
@@ -65,7 +63,8 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
   const t = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const frameIn = easeOutCubic(enterT(env, 380));
-  if (frameIn <= 0) return;
+  const leave = departT(env, 380);
+  if (frameIn <= 0 || leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.35;
   const areaY = contentY + band;
@@ -89,62 +88,14 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
   const toLine = clampLine(scene.steps[Math.max(activeStep, 0)].line);
   const fromLine = clampLine(scene.steps[Math.max(activeStep - 1, 0)].line);
   
-  const key = scene.id + "-trace3d";
-  
-  // The 3D viewport is the code panel plus a hairline for its edge glow. It used to be
-  // the WHOLE FRAME with a hardcoded 7-wide block: at 9:16 the frustum half-width is
-  // only ~3.49, so the block hung off both edges and dragged the pixel chrome with it.
-  const rectPad = unit * 0.3;
-  const rect = {
-    x: panelX - rectPad,
-    y: panelY - rectPad,
-    w: panelW + rectPad * 2,
-    h: panelH + rectPad * 2,
-  };
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, vertical ? 15 : 12);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, BLOCK_DEPTH / 2);
-    const block = makeBlock(panelW / m.sx, panelH / m.sy, BLOCK_DEPTH, THEME.panel, accent);
-    s.add(block);
-
-    const update = () => {
-      // No offset, scale, bob or rotation: the chrome below is drawn in pixels on this
-      // block's own rect, so any transform here slides the two layers apart.
-      const gIn = easeOutCubic(enterT(env, 600));
-      block.traverse((o) => {
-        const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if (!mat) return;
-        mat.transparent = true;
-        mat.opacity = gIn * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 0.95);
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
-  if (!cam) return;
-
   ctx.save();
-  ctx.globalAlpha = frameIn;
+  ctx.globalAlpha = frameIn * leave;
 
-  // draw the code panel borders over 3D block
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
+  applyElevation(ctx, unit, "raised");
+  roundRect(ctx, panelX, panelY, panelW, panelH, unit * 0.5);
+  ctx.fillStyle = THEME.panel;
+  ctx.fill();
+  clearShadow(ctx);
   roundRect(ctx, panelX, panelY, panelW, panelH, unit * 0.5);
   ctx.strokeStyle = THEME.panelBorder;
   ctx.lineWidth = 1;
@@ -170,7 +121,7 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
   const breathe = 0.7 + 0.3 * idle(env, 3800);
   const barY = codeTop + (lineF - 1) * lineH;
   ctx.save();
-  ctx.globalAlpha = frameIn * (activeStep >= 0 ? breathe : 0.25 * breathe);
+  ctx.globalAlpha = frameIn * leave * (activeStep >= 0 ? breathe : 0.25 * breathe);
   ctx.fillStyle = accentSoft;
   ctx.fillRect(panelX + unit * 0.16, barY, panelW - unit * 0.32, lineH);
   ctx.fillStyle = accent;
@@ -194,7 +145,7 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
 
   // Now draw the array cells!
   ctx.save();
-  ctx.globalAlpha = frameIn;
+  ctx.globalAlpha = frameIn * leave;
   ctx.translate(0, (1 - frameIn) * unit * 0.5);
 
   const n = scene.cells.length;
@@ -246,7 +197,7 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
     const y = tileY + (1 - appear) * unit * 0.5;
     const mark = marks.get(i);
     ctx.save();
-    ctx.globalAlpha = appear;
+    ctx.globalAlpha = appear * leave;
     paintTileFrame(x, y, mark, activeMarked.has(i));
     const hidden = swapping && (i === swap.a || i === swap.b);
     if (!hidden) {
@@ -308,7 +259,7 @@ export function paintTrace(ctx: CanvasRenderingContext2D, scene: TraceScene, env
     const ny = notchTop + level * unit * 1.2 + bob;
 
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     ctx.translate(cx, ny);
     ctx.scale(pop, pop);
     ctx.translate(-cx, -ny);
