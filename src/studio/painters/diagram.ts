@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -24,7 +22,9 @@ import {
   beatWindow,
   beatT,
   activeBeatIndex,
-  variantOf,
+  departT,
+  applyElevation,
+  clearShadow,
   type Layout,
 } from "./common";
 import { drawIcon, isVectorIcon } from "./icons";
@@ -91,7 +91,10 @@ const FIT_TRIES = 3;
 const FIT_FONT_SHRINK = 0.85;
 const FIT_ICON_SHRINK = 0.8;
 
-const NODE_SHAPES: NodeShape[] = ["rounded", "pill", "hex"];
+/** One canonical shape under the phase's one-look-per-kind decision: rounded
+ *  reads correctly for both a single word and a two-line label, where pill
+ *  over-rounds a tall box and hex's indent eats into short labels. */
+const NODE_SHAPE: NodeShape = "rounded";
 
 /** Build a node outline path (no fill/stroke) — family is picked once per scene. */
 function nodePath(ctx: CanvasRenderingContext2D, rect: Rect, shape: NodeShape, unit: number) {
@@ -325,6 +328,7 @@ type NodeState = {
 
 export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene, env: PaintEnv) {
   const { layout } = env;
+  ctx.save();
   const { unit, vertical } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
@@ -332,8 +336,10 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
-  // Node-shape family is a deterministic, purely-visual per-scene flourish.
-  const nodeShape = NODE_SHAPES[variantOf(scene.id, NODE_SHAPES.length)];
+  const nodeShape = NODE_SHAPE;
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const area = contentArea(layout, titleBand);
@@ -401,7 +407,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
       if (sub(env.p, reveals.get(node.id) ?? 0, NODE_IN_P) > 0) continue;
       const rect = rects.get(node.id)!;
       ctx.save();
-      ctx.globalAlpha = GHOST_FILL_A * ghostIn;
+      ctx.globalAlpha = GHOST_FILL_A * ghostIn * leave;
       nodePath(ctx, rect, nodeShape, unit);
       ctx.fillStyle = THEME.panel;
       ctx.fill();
@@ -411,7 +417,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
       nodePath(ctx, rect, nodeShape, unit);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.globalAlpha = GHOST_LABEL_A * ghostIn;
+      ctx.globalAlpha = GHOST_LABEL_A * ghostIn * leave;
       ctx.fillStyle = THEME.textDim;
       const gpx = unit * 0.72;
       ctx.font = `700 ${gpx}px ${FONT_SANS}`;
@@ -439,6 +445,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const straight = arrowPath(from, to);
     const pts = arrow.curve ? curvedPath(straight[0], straight[straight.length - 1]) : straight;
     ctx.save();
+    ctx.globalAlpha = leave;
     ctx.strokeStyle = accent;
     ctx.fillStyle = accent;
     ctx.lineCap = "round";
@@ -470,7 +477,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
       const f = (env.elapsedMs % FLOW_MS) / FLOW_MS;
       const dot = pointAlongPolyline(pts, f);
       ctx.save();
-      ctx.globalAlpha = 0.9 * Math.sin(Math.PI * f); // fade in/out at the ends
+      ctx.globalAlpha = 0.9 * Math.sin(Math.PI * f) * leave; // fade in/out at the ends
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.9;
       ctx.fillStyle = THEME.text;
@@ -483,69 +490,6 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     ctx.restore();
   }
 
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), area);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), area);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), area);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  // Per-node state travels through render3D's `context`. `build` runs once per
-  // key, so anything its `update` closure reads from here — positions, highlight
-  // sets, entrance progress — would otherwise be frozen at frame 0 for the whole
-  // scene (`qa/ledger.json` → systemic `frozen-painter-local-output-array`).
-  const build = (): ThreeBundle<{ nodes: NodeState[] }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, area.w / area.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, THEME.textDim);
-
-    const m = mappingAt(camera, SLAB_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-
-    // Unit slabs, scaled per frame from the pixel rect, so a node that MOVES or
-    // resizes needs no rebuild and stays registered with its 2D chrome.
-    const models = scene.nodes.map(() => {
-      const g = makeBlock(1, 1, SLAB_DEPTH, THEME.panel, THEME.textDim);
-      s.add(g);
-      return g;
-    });
-
-    const update = (_elapsedMs: number, data?: { nodes: NodeState[] }) => {
-      models.forEach((group, i) => {
-        const st = data?.nodes[i];
-        group.visible = !!st?.visible;
-        if (!st?.visible) return;
-        const c = toWorld(st.cx, st.cy);
-        group.position.set(c.x, c.y, 0);
-        group.scale.set((st.w / m.sx) * st.scale, (st.h / m.sy) * st.scale, 1);
-        group.traverse((o) => {
-          if (o instanceof THREE.LineSegments) {
-            const mat = o.material as THREE.LineBasicMaterial;
-            mat.transparent = true;
-            mat.opacity = EDGE_OPACITY * st.opacity;
-            mat.color.set(st.edge);
-          } else if (o instanceof THREE.Mesh) {
-            const mat = o.material as THREE.MeshPhysicalMaterial;
-            mat.transparent = true;
-            mat.opacity = st.opacity;
-            mat.color.set(st.face);
-            mat.emissive.set(st.face);
-          }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, "diag3d-" + scene.id, area, build, env.elapsedMs, { nodes: states }, env);
-  // Without WebGL the slabs never composite, so the card body has to be filled
-  // in 2D. The pixel layout is authoritative either way, so this is the same
-  // scene minus the material — not the blank frame an early return would leave.
-  const flat = !cam;
-
   scene.nodes.forEach((node, i) => {
     const st = states[i];
     if (!st.visible) return;
@@ -554,16 +498,16 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const dimmed = !highlighted && highlights.size > 0;
 
     ctx.save();
-    ctx.globalAlpha = st.opacity;
+    ctx.globalAlpha = st.opacity * leave;
     ctx.translate(rect.cx, rect.cy);
     ctx.scale(st.scale, st.scale);
     ctx.translate(-rect.cx, -rect.cy);
 
-    if (flat) {
-      nodePath(ctx, rect, nodeShape, unit);
-      ctx.fillStyle = st.face;
-      ctx.fill();
-    }
+    applyElevation(ctx, unit, highlighted ? "floating" : "raised");
+    nodePath(ctx, rect, nodeShape, unit);
+    ctx.fillStyle = st.face;
+    ctx.fill();
+    clearShadow(ctx);
 
     if (highlighted) {
       ctx.shadowColor = accentGlow;
@@ -633,7 +577,7 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     const straight = arrowPath(from, to);
     const pts = arrow.curve ? curvedPath(straight[0], straight[straight.length - 1]) : straight;
     ctx.save();
-    ctx.globalAlpha = sub(env.p, startAt + ARROW_IN_P, 0.08);
+    ctx.globalAlpha = sub(env.p, startAt + ARROW_IN_P, 0.08) * leave;
     ctx.font = `600 ${unit * 0.62}px ${FONT_SANS}`;
     const tw = ctx.measureText(arrow.label).width;
     const chipW = tw + unit * 0.8;
@@ -651,4 +595,5 @@ export function paintDiagram(ctx: CanvasRenderingContext2D, scene: DiagramScene,
     ctx.restore();
   }
   ctx.textAlign = "start";
+  ctx.restore();
 }
