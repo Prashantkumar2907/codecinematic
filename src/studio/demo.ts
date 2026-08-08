@@ -4133,9 +4133,9 @@ export const DEMO_WAVE3F: SceneScript = {
     { direction: "forward", layerIndex: 2, label: "ReLU(Wh+b)", say: "Hidden layer two builds on those features." },
     { direction: "forward", layerIndex: 3, label: "ŷ", say: "The output layer produces a prediction." },
     { direction: "backward", layerIndex: 3, label: "loss", say: "We compare that prediction to the true label and compute a loss." },
-    { direction: "backward", layerIndex: 2, label: "∂L/∂W3", say: "The gradient flows back into the last weight matrix." },
-    { direction: "backward", layerIndex: 1, label: "∂L/∂W2", say: "It keeps flowing backward, layer by layer." },
-    { direction: "backward", layerIndex: 0, label: "∂L/∂W1", say: "Finally the earliest weights get their share of the blame." },
+    { direction: "backward", layerIndex: 2, label: "dL/dW3", say: "The gradient flows back into the last weight matrix." },
+    { direction: "backward", layerIndex: 1, label: "dL/dW2", say: "It keeps flowing backward, layer by layer." },
+    { direction: "backward", layerIndex: 0, label: "dL/dW1", say: "Finally the earliest weights get their share of the blame." },
   ],
 },
     {
