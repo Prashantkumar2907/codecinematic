@@ -27,8 +27,8 @@ type VdomDiffScene = Extract<Scene, { kind: "vdom_diff" }>;
 type VNode = VdomDiffScene["nodes"][number];
 type Pt = { x: number; y: number };
 
-/** Red isn't in THEME (only `good`/`warn`) — codediff.ts sets the same precedent. */
-const DANGER = "#f87171";
+/** Dark ink on a bright accent-tone/tier fill — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
 
 type NodeStat = { appearAt: number; appearKind: "render" | "add"; removeAt: number | null; updateSteps: number[] };
 
@@ -54,7 +54,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true });
   const chips: { label: string; color: string }[] = [];
   if (scene.steps.some((s) => s.add.length)) chips.push({ label: "Added", color: THEME.good });
-  if (scene.steps.some((s) => s.remove.length)) chips.push({ label: "Removed", color: DANGER });
+  if (scene.steps.some((s) => s.remove.length)) chips.push({ label: "Removed", color: THEME.danger });
   if (scene.steps.some((s) => s.update.length)) chips.push({ label: "Updated", color: THEME.warn });
   const band = titleBand + unit * (chips.length ? 1.35 : 0.5);
 
@@ -119,7 +119,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   };
   const tintOf = (id: string): string | null => {
     const st = stat.get(id)!;
-    if (st.removeAt === activeStep) return DANGER;
+    if (st.removeAt === activeStep) return THEME.danger;
     if (st.appearAt === activeStep && st.appearKind === "add") return THEME.good;
     if (st.updateSteps.includes(activeStep)) return THEME.warn;
     return null;
@@ -151,7 +151,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   });
 
   // Tier styling for nodes with no active diff tint this beat.
-  const tier = (d: number) => (d === 0 ? { fill: secondary, text: "#0b0f14", outline: false } : d === 1 ? { fill: accent, text: "#0b0f14", outline: false } : { fill: accent, text: THEME.text, outline: true });
+  const tier = (d: number) => (d === 0 ? { fill: secondary, text: INK_ON_ACCENT, outline: false } : d === 1 ? { fill: accent, text: INK_ON_ACCENT, outline: false } : { fill: accent, text: THEME.text, outline: true });
 
   // --- legend chips (only for kinds this scene actually uses) ----------------
   if (chips.length) {
@@ -193,7 +193,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
     const tint = tintOf(n.id);
     ctx.save();
     ctx.globalAlpha = edgeAlpha;
-    ctx.strokeStyle = tint ? rgba(tint, 0.7) : "rgba(148,163,184,0.75)";
+    ctx.strokeStyle = tint ? rgba(tint, 0.7) : rgba(THEME.textDim, 0.75);
     ctx.lineWidth = tint ? unit * 0.1 : unit * 0.06;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -226,8 +226,15 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
       const travel = easeInOutCubic(clamp01(stepT * 1.1));
       const pos = pointAlongPolyline(pts, travel);
       const pillW = unit * 2.1, pillH = unit * 0.85;
+      // pointAlongPolyline(pts, 1) is exactly the destination node's centre —
+      // the same spot its own label renders. Without a fade, the pill sits
+      // fully opaque on top of that label for the last stretch of the beat
+      // (confirmed visually: "props" overlapping "Item: Milk"). The arrival
+      // glow ring below already marks the destination, so fade the pill out
+      // as it completes the journey instead of leaving it parked on the label.
+      const arrivalFade = 1 - easeOutCubic(clamp01((travel - 0.82) / 0.18));
       ctx.save();
-      ctx.globalAlpha = clamp01(stepT * 3);
+      ctx.globalAlpha = clamp01(stepT * 3) * arrivalFade;
       ctx.shadowColor = rgba(secondary, 0.6);
       ctx.shadowBlur = unit * 0.7;
       roundRect(ctx, pos.x - pillW / 2, pos.y - pillH / 2, pillW, pillH, pillH / 2);
@@ -235,7 +242,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.font = `800 ${unit * 0.48}px ${FONT_MONO}`;
-      ctx.fillStyle = "#0b0f14";
+      ctx.fillStyle = INK_ON_ACCENT;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("props", pos.x, pos.y);
@@ -258,7 +265,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
     const rOut = removeT(n.id);
     const pop = easeOutBack(clamp01(aIn * 1.3));
     const isActive = isActiveNow(n.id);
-    const shake = tint === DANGER ? Math.sin(env.elapsedMs / 40) * unit * 0.05 * rOut : 0;
+    const shake = tint === THEME.danger ? Math.sin(env.elapsedMs / 40) * unit * 0.05 * rOut : 0;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -331,7 +338,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
       ctx.fillStyle = tint ?? accent;
       ctx.fill();
       ctx.font = `800 ${bs * 0.68}px ${FONT_MONO}`;
-      ctx.fillStyle = "#0b0f14";
+      ctx.fillStyle = INK_ON_ACCENT;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(badge, bx, by + bs * 0.02);
