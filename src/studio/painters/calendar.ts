@@ -21,6 +21,7 @@ import {
   activeBeatIndex,
   idle,
   rgba,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -110,6 +111,8 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeMark = active - offset;
   const glow = idle(env, GLOW_PERIOD_MS);
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaTop = contentY + band;
@@ -144,7 +147,7 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
   /** One month cell: panel base staggered in, tint crossfaded on top of it. */
   const drawCell = (month: number, x: number, y: number, w: number, h: number, labelPx: number) => {
     const idx = month - 1;
-    const grow = easeOutCubic(enterT(env, DUR.fast, idx * CELL_STEP_MS));
+    const grow = easeOutCubic(enterT(env, DUR.fast, idx * CELL_STEP_MS)) * leave;
     if (grow <= 0) return;
     const tint = monthTint(month);
     const radius = unit * RADIUS.md;
@@ -245,7 +248,7 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
         const gi = easeOutCubic(enterT(env, DUR.base, DUR.fast + k * SLOT_STEP_MS));
         if (gi > 0) {
           ctx.save();
-          ctx.globalAlpha = GHOST_ALPHA * gi * (1 - appear);
+          ctx.globalAlpha = GHOST_ALPHA * gi * (1 - appear) * leave;
           roundRect(ctx, chipX, slotY, chipW, chipH, chipH / 2);
           ctx.strokeStyle = color;
           ctx.lineWidth = unit * STROKE.hair;
@@ -257,14 +260,17 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
       if (!started) return;
 
       ctx.save();
-      ctx.globalAlpha = appear * lerp(0.8, 1, e);
+      ctx.globalAlpha = appear * lerp(0.8, 1, e) * leave;
       ctx.translate(0, (1 - appear) * unit * CHIP_RISE);
       if (e >= 1) {
         ctx.shadowColor = rgba(color, 0.5);
         ctx.shadowBlur = unit * (GLOW_BASE + GLOW_SWING * glow);
       }
       roundRect(ctx, chipX, slotY, chipW, chipH, chipH / 2);
-      ctx.fillStyle = rgba(color, lerp(0.14, 0.22, e));
+      // The active chip's fill breathes with the same glow phase — the edge glow
+      // alone is too little area to keep the frame from reading as still once
+      // the chip has landed and is just holding for the rest of its beat.
+      ctx.fillStyle = rgba(color, e >= 1 ? lerp(0.14, 0.3, glow) : 0.14);
       ctx.fill();
       ctx.shadowBlur = 0;
       roundRect(ctx, chipX, slotY, chipW, chipH, chipH / 2);
@@ -329,7 +335,7 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
       const gi = easeOutCubic(enterT(env, DUR.base, DUR.fast + k * SLOT_STEP_MS));
       if (gi > 0) {
         ctx.save();
-        ctx.globalAlpha = GHOST_ALPHA * gi * (1 - sweep);
+        ctx.globalAlpha = GHOST_ALPHA * gi * (1 - sweep) * leave;
         roundRect(ctx, x0, y, fullW, h, h / 2);
         ctx.strokeStyle = color;
         ctx.lineWidth = unit * STROKE.hair;
@@ -349,7 +355,7 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
     const by = y + (h - bh) / 2;
 
     ctx.save();
-    ctx.globalAlpha = lerp(0.85, 1, e);
+    ctx.globalAlpha = lerp(0.85, 1, e) * leave;
 
     // No leader line back up to the ribbon: the band is already column-aligned with
     // the months it covers AND those cells carry its tone, so a hairline across the
@@ -387,7 +393,7 @@ export function paintCalendar(ctx: CanvasRenderingContext2D, scene: CalendarScen
     // only appear once the sweep has laid the band down under all of it.
     const labelIn = easeOutBack(clamp01((t - SWEEP_FRAC) / LABEL_IN_FRAC));
     if (labelIn > 0) {
-      ctx.globalAlpha = lerp(0.85, 1, e) * clamp01(labelIn);
+      ctx.globalAlpha = lerp(0.85, 1, e) * clamp01(labelIn) * leave;
       const px = fitFontSize(ctx, mark.label, { maxW: fullW - unit * 0.8, startPx: h * 0.6, minPx: unit * 0.45, weight: 700 });
       ctx.font = `700 ${px}px ${FONT_SANS}`;
       ctx.textAlign = "center";
