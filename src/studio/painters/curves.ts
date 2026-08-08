@@ -15,6 +15,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -70,7 +71,9 @@ export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, e
   const totalBeats = offset + scene.curves.length + (scene.mark ? 1 : 0);
   const markBeat = scene.mark ? totalBeats - 1 : -1;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const frameIn = easeOutCubic(enterT(env, FRAME_IN_MS));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const frameIn = easeOutCubic(enterT(env, FRAME_IN_MS)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
@@ -116,7 +119,7 @@ export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, e
   const focusOf = (b: number) => clamp01(1 - clamp01(beatPos - b - 1) / FOCUS_FADE_BEATS);
 
   // ── grid + axes ──────────────────────────────────────────────────────────────
-  const gridIn = easeOutCubic(enterT(env, FRAME_IN_MS + 160, 120));
+  const gridIn = easeOutCubic(enterT(env, FRAME_IN_MS + 160, 120)) * leave;
   ctx.save();
   ctx.globalAlpha = gridIn;
   ctx.strokeStyle = rgba(THEME.textDim, 0.16);
@@ -219,9 +222,13 @@ export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, e
 
     const breathe = drawProg >= 1 ? idle(env, 2600, i * 1.2) : 0;
     const glow = focus * (0.55 + 0.45 * breathe);
+    // The focused curve's own stroke breathes, not just its shadow blur — a glow
+    // pulse alone is edge-only and too little area to keep the plot from reading
+    // as still once the line has finished drawing and is just holding.
+    const strokeBreathe = 1 - 0.18 * focus * (1 - breathe);
 
     ctx.save();
-    ctx.globalAlpha = frameIn;
+    ctx.globalAlpha = frameIn * strokeBreathe;
     ctx.strokeStyle = color;
     ctx.lineWidth = unit * 0.13;
     ctx.lineCap = "round";
@@ -388,12 +395,17 @@ export function paintCurves(ctx: CanvasRenderingContext2D, scene: CurvesScene, e
       ctx.moveTo(mx, above ? chY + markH : chY);
       ctx.lineTo(mx, above ? myPx - ringR : myPx + ringR);
       ctx.stroke();
+      // The badge fill breathes with the ring's own pulse — once it lands this is
+      // the largest element on screen and the only thing keeping the tail alive.
+      const badgePulse = idle(env, 1900, 1);
       ctx.shadowColor = accentGlow;
-      ctx.shadowBlur = unit * 0.4;
+      ctx.shadowBlur = unit * (0.3 + 0.5 * badgePulse);
       roundRect(ctx, chX, chY, cw, markH, unit * 0.3);
       ctx.fillStyle = color;
+      ctx.globalAlpha = frameIn * chipIn * (0.85 + 0.15 * badgePulse);
       ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.globalAlpha = frameIn * chipIn;
       ctx.fillStyle = THEME.bgMid;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
