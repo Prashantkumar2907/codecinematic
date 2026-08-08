@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeCylinder, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -22,12 +20,17 @@ import {
   pointAlongPolyline,
   shade,
   rgba,
+  departT,
+  idle,
+  applyElevation,
+  clearShadow,
 } from "./common";
 import type { PaintEnv } from "./index";
 
 type CycleScene = Extract<Scene, { kind: "cycle" }>;
 
 const IDLE_FACE_LIFT = 0.09;
+const NODE_BOB_UNIT = 0.04;
 type Pt = { x: number; y: number };
 
 const ARC_GAP = (14 * Math.PI) / 180;
@@ -41,6 +44,8 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
   const totalBeats = offset + n;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   // `h * 0.86` let the bottom node's label chip cross the caption band.
@@ -52,92 +57,17 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
   if (vertical) radius = Math.min(radius, contentW / 2 - nodeR - unit * 3.2);
   const step = (Math.PI * 2) / n;
   const angleOf = (k: number) => -Math.PI / 2 + k * step;
-  
-  const rawPosOf = (a: number) => ({ x: cx + Math.cos(a) * radius, y: cy + Math.sin(a) * radius });
-  
-  const worldRadius = 4.0;
-  const worldPos = (px: number, py: number) => {
-    const nx = (px - cx) / radius;
-    const ny = (py - cy) / radius;
-    return new THREE.Vector3(nx * worldRadius, 0, ny * worldRadius);
-  };
+  const posOf = (a: number): Pt => ({ x: cx + Math.cos(a) * radius, y: cy + Math.sin(a) * radius });
+  const idleFace = shade(THEME.panel, IDLE_FACE_LIFT);
 
   const ghostIn = easeOutCubic(enterT(env, 420));
-  const key = scene.id + "-cyc3d";
-  const rect = { x: contentX, y: contentY + titleBand, w: contentW, h: availH };
-
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 14 : 11, vertical ? 11 : 8.5);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, THEME.textDim);
-    
-    const grid = new THREE.GridHelper(worldRadius * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
-    
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(worldRadius * 4, worldRadius * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models = scene.nodes.map((node, k) => {
-      const g = makeCylinder(1.2, 0.5, shade(THEME.panel, IDLE_FACE_LIFT), accent);
-      s.add(g);
-      return { id: k, mesh: g, node };
-    });
-
-    const update = (elapsedMs: number) => {
-      models.forEach(({ id, mesh }) => {
-        const t = beatT(env.beats, offset + id, totalBeats, env.p);
-        const isActive = active === offset + id;
-        
-        const pop = easeOutBack(clamp01(t / 0.3));
-        const pulse = isActive ? 1 + 0.018 * Math.sin(elapsedMs / 250) : 1;
-        mesh.scale.setScalar(Math.max(0.001, pop * pulse));
-        mesh.visible = ghostIn > 0 || t > 0.01;
-        if (t <= 0) {
-            mesh.scale.setScalar(Math.max(0.001, 0.9 * ghostIn));
-        }
-        
-        const raw = rawPosOf(angleOf(id));
-        const wp = worldPos(raw.x, raw.y);
-        mesh.position.copy(wp);
-        mesh.position.y = (t <= 0 ? -0.4 : 0) + (isActive ? 0.2 : 0) + Math.sin(elapsedMs / 1500 + id) * 0.05;
-        
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.Material;
-                mat.transparent = true;
-                mat.opacity = t <= 0 ? 0.2 * ghostIn : 1.0;
-            }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
-  if (!cam) return;
-
-  const posOf = (a: number) => {
-    const raw = rawPosOf(a);
-    return projectToRect(cam, worldPos(raw.x, raw.y), rect);
-  };
 
   const getArcPts = (a0: number, a1: number): Pt[] => {
     const pts: Pt[] = [];
     const steps = 30;
-    for(let i=0; i<=steps; i++) {
-        const a = a0 + (a1 - a0) * (i/steps);
-        pts.push(posOf(a));
+    for (let i = 0; i <= steps; i++) {
+      const a = a0 + (a1 - a0) * (i / steps);
+      pts.push(posOf(a));
     }
     return pts;
   };
@@ -150,7 +80,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
 
   const glowDot = (x: number, y: number, alpha: number, r: number) => {
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.9;
     ctx.fillStyle = THEME.text;
@@ -167,7 +97,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
 
     if (prog < 1 && ghostIn > 0) {
       ctx.save();
-      ctx.globalAlpha = 0.15 * ghostIn;
+      ctx.globalAlpha = 0.15 * ghostIn * leave;
       ctx.strokeStyle = THEME.textDim;
       ctx.lineWidth = unit * 0.08;
       ctx.setLineDash([unit * 0.3, unit * 0.32]);
@@ -181,9 +111,9 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const isHot = !inTail && (active === offset + j + 1 || (j === n - 1 && prog < 1));
     const aEnd = a0 + (a1 - a0) * prog;
     const activePts = getArcPts(a0, aEnd);
-    
+
     ctx.save();
-    ctx.globalAlpha = isHot || inTail ? 1 : 0.55;
+    ctx.globalAlpha = (isHot || inTail ? 1 : 0.55) * leave;
     ctx.strokeStyle = accent;
     ctx.fillStyle = accent;
     ctx.lineWidth = unit * 0.14;
@@ -193,10 +123,10 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.5;
     }
-    
+
     strokePolylineProgress(ctx, activePts, 1);
     ctx.shadowBlur = 0;
-    
+
     if (prog > 0.2 && activePts.length >= 2) {
       const last = activePts[activePts.length - 1];
       const prev = activePts[activePts.length - 2];
@@ -229,20 +159,20 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
   const drawLabelChip = (k: number, slide: number, alpha: number, ghost: boolean) => {
     if (alpha <= 0) return;
     const node = scene.nodes[k];
-    
+
     const projectedPos = posOf(angleOf(k));
     const ax = projectedPos.x;
-    
+
     // Determine logical side using the raw angle to keep layout stable
     const rawA = angleOf(k);
     const rawC = Math.cos(rawA);
     const rawS = Math.sin(rawA);
-    
-    // Offset slightly out from the 3D projected center
+
+    // Offset slightly out from the node's centre
     const dist2D = nodeR + unit * (0.25 + 0.45 * slide);
     const finalX = ax + rawC * dist2D;
     const finalY = projectedPos.y + rawS * dist2D;
-    
+
     const side: -1 | 0 | 1 = Math.abs(rawC) < 0.35 ? 0 : rawC > 0 ? 1 : -1;
     // Bounded by the CONTENT box, not the frame: measuring against `w` let the chip
     // grow into the margin, and "Log" / "Route" were cut off at both edges.
@@ -259,9 +189,9 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const rawChipX = side === 1 ? finalX : side === -1 ? finalX - chipW : finalX - chipW / 2;
     const chipX = Math.min(Math.max(rawChipX, contentX), contentX + contentW - chipW);
     const chipY = Math.min(Math.max(finalY - chipH / 2, contentY), layout.safeBottom - chipH);
-    
+
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.3);
     ctx.fillStyle = THEME.bgBottom;
     ctx.fill();
@@ -280,13 +210,22 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const node = scene.nodes[k];
     const pos = posOf(angleOf(k));
     const t = beatT(env.beats, offset + k, totalBeats, env.p);
+    // Every node bobs gently and independently of its label/arc anchor — the same
+    // small, purely decorative offset the removed 3D mesh carried on its own y-axis.
+    const bobPx = unit * NODE_BOB_UNIT * (idle(env, 1500, k) - 0.5) * 2;
 
     if (t <= 0) {
       if (ghostIn <= 0) continue;
       ctx.save();
-      ctx.globalAlpha = 0.14 * ghostIn;
+      ctx.globalAlpha = 0.14 * ghostIn * leave;
+      applyElevation(ctx, unit, "raised");
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y + bobPx, nodeR, 0, Math.PI * 2);
+      ctx.fillStyle = idleFace;
+      ctx.fill();
+      clearShadow(ctx);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y + bobPx, nodeR, 0, Math.PI * 2);
       ctx.strokeStyle = rgba(THEME.textDim, 0.7);
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.3, unit * 0.3]);
@@ -298,35 +237,39 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     }
 
     const isActive = active === offset + k;
-    const pop = easeOutBack(clamp01(t / 0.3));
+    const pulse = isActive ? 1 + 0.03 * idle(env, 900) : 1;
+    const pop = easeOutBack(clamp01(t / 0.3)) * pulse;
     ctx.save();
-    ctx.globalAlpha = (isActive ? 1 : 0.65) * clamp01(t * 4);
-    ctx.translate(pos.x, pos.y);
+    ctx.globalAlpha = (isActive ? 1 : 0.65) * clamp01(t * 4) * leave;
+    ctx.translate(pos.x, pos.y + bobPx);
     ctx.scale(pop, pop);
-    ctx.translate(-pos.x, -pos.y);
+    ctx.translate(-pos.x, -(pos.y + bobPx));
+    applyElevation(ctx, unit, isActive ? "floating" : "raised");
     if (isActive) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 1.0;
-    } else {
-      ctx.shadowBlur = 0;
     }
-    
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
-    ctx.shadowBlur = 0;
+    ctx.arc(pos.x, pos.y + bobPx, nodeR, 0, Math.PI * 2);
+    ctx.fillStyle = idleFace;
+    ctx.fill();
+    clearShadow(ctx);
+
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y + bobPx, nodeR, 0, Math.PI * 2);
     ctx.strokeStyle = isActive ? accent : rgba(THEME.textDim, 0.5);
     ctx.lineWidth = isActive ? unit * 0.12 : unit * 0.07;
     ctx.stroke();
-    
+
     if (node.icon) {
       ctx.font = `${nodeR}px ${FONT_SANS}`;
       ctx.textAlign = "center";
-      ctx.fillText(node.icon, pos.x, pos.y + nodeR * 0.36);
+      ctx.fillText(node.icon, pos.x, pos.y + bobPx + nodeR * 0.36);
       ctx.textAlign = "start";
     } else {
       ctx.fillStyle = accent;
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, unit * 0.24, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y + bobPx, unit * 0.24, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -334,11 +277,11 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     if (isActive) {
       const pr = (env.elapsedMs % 1800) / 1800;
       ctx.save();
-      ctx.globalAlpha = (1 - pr) * 0.35;
+      ctx.globalAlpha = (1 - pr) * 0.35 * leave;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.07;
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, nodeR * (1 + pr * 0.5), 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y + bobPx, nodeR * (1 + pr * 0.5), 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -356,17 +299,15 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
   const drawDetail = (text: string, alpha: number, dy: number) => {
     if (alpha <= 0) return;
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     ctx.font = `500 ${unit * (vertical ? 0.8 : 0.78)}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
-    
-    const centerProj = projectToRect(cam, new THREE.Vector3(0, 0, 0), rect);
-    
+
     const lines = wrapText(ctx, text, radius * 1.3).slice(0, 3);
     const lh = unit * 1.0;
-    const y0 = centerProj.y - ((lines.length - 1) * lh) / 2 + unit * 0.28 + dy;
-    lines.forEach((l, i) => ctx.fillText(l, centerProj.x, y0 + i * lh));
+    const y0 = cy - ((lines.length - 1) * lh) / 2 + unit * 0.28 + dy;
+    lines.forEach((l, i) => ctx.fillText(l, cx, y0 + i * lh));
     ctx.textAlign = "start";
     ctx.restore();
   };
@@ -377,9 +318,8 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const glyphAlpha = 0.25 * (prev ? fadeIn : ghostIn);
     if (glyphAlpha > 0) {
       ctx.save();
-      ctx.globalAlpha = glyphAlpha;
-      const centerProj = projectToRect(cam, new THREE.Vector3(0, 0, 0), rect);
-      ctx.translate(centerProj.x, centerProj.y);
+      ctx.globalAlpha = glyphAlpha * leave;
+      ctx.translate(cx, cy);
       ctx.rotate((env.elapsedMs / 4000) * Math.PI * 2 * 0.05);
       ctx.strokeStyle = THEME.textDim;
       ctx.fillStyle = THEME.textDim;
