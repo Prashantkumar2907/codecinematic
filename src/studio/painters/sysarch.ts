@@ -23,6 +23,9 @@ import type { PaintEnv } from "./index";
 type SysarchScene = Extract<Scene, { kind: "sysarch" }>;
 type Tier = SysarchScene["tiers"][number];
 
+/** Dark ink on a bright accent-tone badge — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
+
 /** Tier kind → vector-icon name understood by drawIcon. */
 const ICON: Record<Tier["kind"], string> = {
   client: "client",
@@ -86,11 +89,15 @@ export function paintSysarch(ctx: CanvasRenderingContext2D, scene: SysarchScene,
     if (aIn <= 0) return;
     const a = pos(ai);
     const b = pos(bi);
-    // Route to the near edges of the cards.
+    // Route to the near edges of the cards. In horizontal layout the replica
+    // stack (below) extends rightward past the primary card's own edge, so a
+    // flow leaving a replicated tier must start past the stack too — otherwise
+    // its line (and label) render partially hidden behind the stack.
+    const aStackExtra = !vertical ? (Math.min(scene.tiers[ai].count, 5) - 1) * unit * 0.35 : 0;
     const a2 = { x: a.x, y: a.y };
     const b2 = { x: b.x, y: b.y };
     if (!vertical) {
-      a2.x += cardW / 2;
+      a2.x += cardW / 2 + aStackExtra;
       b2.x -= cardW / 2;
     } else {
       a2.y += cardH / 2;
@@ -120,7 +127,7 @@ export function paintSysarch(ctx: CanvasRenderingContext2D, scene: SysarchScene,
       ctx.textAlign = "center";
       const mid = { x: (a2.x + end.x) / 2, y: (a2.y + end.y) / 2 };
       const tw = ctx.measureText(f.label).width;
-      ctx.fillStyle = "rgba(10,16,22,0.8)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.8);
       roundRect(ctx, mid.x - tw / 2 - unit * 0.3, mid.y - unit * 0.55, tw + unit * 0.6, unit * 0.95, unit * 0.25);
       ctx.fill();
       ctx.fillStyle = THEME.textDim;
@@ -160,7 +167,7 @@ export function paintSysarch(ctx: CanvasRenderingContext2D, scene: SysarchScene,
 
     // Glyph + label.
     const bob = isActive ? Math.sin(env.elapsedMs / 1300) * unit * 0.06 : 0;
-    drawIcon(ctx, ICON[tier.kind], x, by + hgt * 0.36 + bob, hgt * 0.44, env, "#eaf3ff");
+    drawIcon(ctx, ICON[tier.kind], x, by + hgt * 0.36 + bob, hgt * 0.44, env, THEME.text);
     const labelPx = fitFontSize(ctx, tier.label, { maxW: w * 0.86, startPx: unit * 0.82, minPx: unit * 0.55, weight: 700 });
     ctx.font = `700 ${labelPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;
@@ -178,7 +185,7 @@ export function paintSysarch(ctx: CanvasRenderingContext2D, scene: SysarchScene,
       ctx.fillStyle = accent;
       roundRect(ctx, bxr - tw - unit * 0.5, byr - unit * 0.1, tw + unit * 0.7, unit * 1.0, unit * 0.3);
       ctx.fill();
-      ctx.fillStyle = "#08131f";
+      ctx.fillStyle = INK_ON_ACCENT;
       ctx.fillText(badge, bxr - tw / 2 - unit * 0.15, byr + unit * 0.42);
     }
 
