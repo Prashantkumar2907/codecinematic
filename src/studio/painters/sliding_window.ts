@@ -25,6 +25,8 @@ type SlidingWindowScene = Extract<Scene, { kind: "slidingwindow" }>;
 type Step = SlidingWindowScene["steps"][number];
 
 const MAX_CELL_UNIT = 2.4;
+/** Dark ink on a bright accent-tone badge — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
 
 /** Tone → the hex the window frame + in-window cells derive from. */
 function toneHex(tone: Step["tone"], palette: Palette): string {
@@ -135,7 +137,7 @@ export function paintSlidingWindow(ctx: CanvasRenderingContext2D, scene: Sliding
     ctx.fill();
     ctx.shadowBlur = 0;
     roundRect(ctx, x, stripTop, cell, cell, radius);
-    ctx.strokeStyle = inWin ? rgba(toneCol, 0.9 * breathe) : "rgba(148,163,184,0.32)";
+    ctx.strokeStyle = inWin ? rgba(toneCol, 0.9 * breathe) : rgba(THEME.textDim, 0.32);
     ctx.lineWidth = unit * (inWin ? 0.1 : 0.055);
     ctx.stroke();
 
@@ -190,7 +192,7 @@ export function paintSlidingWindow(ctx: CanvasRenderingContext2D, scene: Sliding
     ctx.fillStyle = toneCol;
     roundRect(ctx, wbx, frameTop - unit * 0.55, wtw + unit * 0.8, unit * 1.05, unit * 0.28);
     ctx.fill();
-    ctx.fillStyle = "#08131f";
+    ctx.fillStyle = INK_ON_ACCENT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(wLabel, (leftPx + rightPx) / 2, frameTop - unit * 0.02);
@@ -215,7 +217,7 @@ export function paintSlidingWindow(ctx: CanvasRenderingContext2D, scene: Sliding
     ctx.shadowColor = rgba(toneCol, 0.28);
     ctx.shadowBlur = unit * 0.8;
     roundRect(ctx, panelX, readoutY, panelW, readoutH, unit * 0.5);
-    ctx.fillStyle = "rgba(13,17,23,0.9)";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.9);
     ctx.fill();
     ctx.shadowBlur = 0;
     roundRect(ctx, panelX, readoutY, panelW, readoutH, unit * 0.5);
@@ -250,7 +252,7 @@ export function paintSlidingWindow(ctx: CanvasRenderingContext2D, scene: Sliding
       const cw = ctx.measureText(chips[i]).width + unit * 0.9;
       chipX -= cw;
       roundRect(ctx, chipX, readoutY + readoutH / 2 - unit * 0.62, cw, unit * 1.24, unit * 0.3);
-      ctx.fillStyle = i < 2 ? rgba(toneCol, 0.16) : "rgba(148,163,184,0.14)";
+      ctx.fillStyle = i < 2 ? rgba(toneCol, 0.16) : rgba(THEME.textDim, 0.14);
       ctx.fill();
       ctx.fillStyle = i < 2 ? toneCol : THEME.textDim;
       ctx.fillText(chips[i], chipX + cw / 2, readoutY + readoutH / 2);
@@ -305,7 +307,7 @@ function drawPointer(
   ctx.lineTo(x, cy + h / 2 + unit * 0.4);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#08131f";
+  ctx.fillStyle = INK_ON_ACCENT;
   ctx.font = `800 ${unit * 0.68}px ${FONT_SANS}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
