@@ -22,6 +22,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -137,6 +138,8 @@ export function paintBracket(ctx: CanvasRenderingContext2D, scene: BracketScene,
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.matches.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
@@ -286,7 +289,7 @@ export function paintBracket(ctx: CanvasRenderingContext2D, scene: BracketScene,
       const ky = yPos[c][s];
       const fRight = colLeft(c - 1) + faceW;
       const mx = (fRight + kx) / 2;
-      const structural = skeletonT(order) * SKELETON_ALPHA;
+      const structural = skeletonT(order) * SKELETON_ALPHA * leave;
       if (structural <= 0) continue;
 
       const bw = gm >= 0 ? beatWindow(env.beats, offset + gm, totalBeats) : null;
@@ -308,7 +311,7 @@ export function paintBracket(ctx: CanvasRenderingContext2D, scene: BracketScene,
         }
         const hot = subPolyline(pts, 0, lit);
         if (hot.length) {
-          ctx.globalAlpha = 1;
+          ctx.globalAlpha = leave;
           ctx.strokeStyle = rgba(accent, 0.85);
           ctx.lineWidth = unit * STROKE.base;
           ctx.shadowColor = accentGlow;
@@ -385,7 +388,7 @@ export function paintBracket(ctx: CanvasRenderingContext2D, scene: BracketScene,
         const gi = skeletonT(order);
         if (gi <= 0) continue;
         ctx.save();
-        ctx.globalAlpha = GHOST_ALPHA * gi;
+        ctx.globalAlpha = GHOST_ALPHA * gi * leave;
         ctx.setLineDash([unit * 0.3, unit * 0.25]);
         ctx.strokeStyle = rgba(THEME.textDim, 0.7);
         ctx.lineWidth = unit * STROKE.thin;
@@ -407,7 +410,7 @@ export function paintBracket(ctx: CanvasRenderingContext2D, scene: BracketScene,
       const hot = isChampion ? crownT : role && isWinner ? goldT(role.m.beat) : 0;
       const crowned = isChampion && crownT > 0;
 
-      let alpha = easeOutCubic(t);
+      let alpha = easeOutCubic(t) * leave;
       if (isLoser && past) alpha *= LOSER_ALPHA;
       else if (isWinner && past && !isChampion) alpha *= SETTLED_WINNER_ALPHA;
 
