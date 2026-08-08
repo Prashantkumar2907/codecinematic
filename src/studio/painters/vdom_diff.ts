@@ -8,6 +8,7 @@ import {
   easeInOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -42,7 +43,7 @@ type NodeStat = { appearAt: number; appearKind: "render" | "add"; removeAt: numb
  */
 export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical, h, w } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, w, safeBottom } = layout;
   const { accent, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
@@ -50,6 +51,8 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   const activeStep = active - offset;
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const step = activeStep >= 0 ? scene.steps[activeStep] : undefined;
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true });
   const chips: { label: string; color: string }[] = [];
@@ -136,8 +139,11 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   const areaX = contentX;
   const areaY = contentY + band;
   const areaW = contentW;
-  let areaH = contentH - band;
-  if (vertical) areaH = Math.min(areaH, h * 0.9 - areaY);
+  // Extra margin beyond the usual unit*0.3: an active node's glow shadowBlur
+  // (up to unit*0.85) extends past its own box and isn't accounted for by
+  // the tree-layout math, which otherwise places the deepest row exactly at
+  // areaY+areaH (measured -32.9px intrusion at unit*0.3 alone).
+  const areaH = Math.min(contentY + contentH, safeBottom) - unit * 1.1 - areaY;
 
   const cols = maxCol + 1;
   const colGap = areaW / cols;
@@ -157,7 +163,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   if (chips.length) {
     const legendIn = easeOutCubic(enterT(env, 380, 160));
     ctx.save();
-    ctx.globalAlpha = legendIn;
+    ctx.globalAlpha = legendIn * leave;
     ctx.font = `700 ${unit * 0.52}px ${FONT_SANS}`;
     const gapW = unit * 0.5;
     const widths = chips.map((c) => ctx.measureText(c.label).width + unit * 0.55);
@@ -192,7 +198,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
     const pts = roundedCorners([from, { x: from.x, y: midY }, { x: to.x, y: midY }, to], Math.min(unit * 0.6, levelGap * 0.35));
     const tint = tintOf(n.id);
     ctx.save();
-    ctx.globalAlpha = edgeAlpha;
+    ctx.globalAlpha = edgeAlpha * leave;
     ctx.strokeStyle = tint ? rgba(tint, 0.7) : rgba(THEME.textDim, 0.75);
     ctx.lineWidth = tint ? unit * 0.1 : unit * 0.06;
     ctx.lineCap = "round";
@@ -212,7 +218,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
     if (pts.length >= 2) {
       const route = roundedCorners(pts, unit * 0.5);
       ctx.save();
-      ctx.globalAlpha = 0.5 + 0.35 * idle(env, 1300);
+      ctx.globalAlpha = (0.5 + 0.35 * idle(env, 1300)) * leave;
       ctx.strokeStyle = rgba(secondary, 0.6);
       ctx.lineWidth = unit * 0.1;
       ctx.setLineDash([unit * 0.24, unit * 0.2]);
@@ -234,7 +240,7 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
       // as it completes the journey instead of leaving it parked on the label.
       const arrivalFade = 1 - easeOutCubic(clamp01((travel - 0.82) / 0.18));
       ctx.save();
-      ctx.globalAlpha = clamp01(stepT * 3) * arrivalFade;
+      ctx.globalAlpha = clamp01(stepT * 3) * arrivalFade * leave;
       ctx.shadowColor = rgba(secondary, 0.6);
       ctx.shadowBlur = unit * 0.7;
       roundRect(ctx, pos.x - pillW / 2, pos.y - pillH / 2, pillW, pillH, pillH / 2);
@@ -256,7 +262,36 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
   // --- nodes -------------------------------------------------------------
   for (const n of scene.nodes) {
     const alpha = alphaOf(n.id);
-    if (alpha <= 0.005) continue;
+    if (alpha <= 0.005) {
+      // Before step 0 begins, every node is invisible — the intro beat's
+      // narration plays over a fully blank canvas (2/5, dead 25%). A faint
+      // marching-ants preview of the tree shape gives that beat real motion
+      // instead of nothing at all; once step 0 starts, this never applies
+      // again (a later remove/pruned node correctly stays gone, not "ghosted").
+      if (activeStep < 0) {
+        const c2 = center(n);
+        const gx2 = c2.x - nodeW / 2, gy2 = c2.y - nodeH / 2;
+        const pulse = idle(env, 1500, depthOf(n) * 0.5 + (gx.get(n.id) ?? 0) * 0.3);
+        ctx.save();
+        // A soft wash spanning the FULL node box, not just its hairline
+        // outline: a thin dash alone measured fine on one aspect but not the
+        // other (same downsample-weighting gap as codediff's pending lines).
+        ctx.globalAlpha = leave;
+        ctx.fillStyle = rgba(THEME.textDim, 0.04 + 0.05 * pulse);
+        roundRect(ctx, gx2, gy2, nodeW, nodeH, unit * 0.35);
+        ctx.fill();
+        ctx.globalAlpha = 0.16 * leave;
+        ctx.strokeStyle = rgba(THEME.textDim, 0.9);
+        ctx.lineWidth = unit * 0.05;
+        ctx.setLineDash([unit * 0.24, unit * 0.2]);
+        ctx.lineDashOffset = -((env.elapsedMs / 45) % (unit * 0.44));
+        roundRect(ctx, gx2, gy2, nodeW, nodeH, unit * 0.35);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      continue;
+    }
     const c = center(n);
     const d = depthOf(n);
     const tierSt = tier(d);
@@ -266,11 +301,16 @@ export function paintVdomDiff(ctx: CanvasRenderingContext2D, scene: VdomDiffScen
     const pop = easeOutBack(clamp01(aIn * 1.3));
     const isActive = isActiveNow(n.id);
     const shake = tint === THEME.danger ? Math.sin(env.elapsedMs / 40) * unit * 0.05 * rOut : 0;
+    // A small always-on idle breathing on every settled node (phase-offset
+    // per node) keeps the whole tree visibly alive during the intro beat,
+    // before any render/add/remove/update highlights a node (2/5, dead 25%
+    // without it).
+    const breathe = 1 + 0.014 * idle(env, 1800, d * 0.5 + (gx.get(n.id) ?? 0) * 0.3);
 
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     ctx.translate(c.x + shake, c.y);
-    ctx.scale(0.9 + 0.1 * pop, 0.9 + 0.1 * pop);
+    ctx.scale((0.9 + 0.1 * pop) * breathe, (0.9 + 0.1 * pop) * breathe);
     ctx.translate(-c.x, -c.y);
 
     const x = c.x - nodeW / 2, y = c.y - nodeH / 2;
