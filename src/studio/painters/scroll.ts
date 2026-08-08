@@ -6,6 +6,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -46,7 +47,9 @@ export function paintScroll(ctx: CanvasRenderingContext2D, scene: ScrollScene, e
   const activeLine = active - offset;
   const stepT = activeLine >= 0 ? beatT(env.beats, offset + activeLine, totalBeats, env.p) : 0;
 
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
   const areaH = contentH - band;
@@ -98,7 +101,7 @@ export function paintScroll(ctx: CanvasRenderingContext2D, scene: ScrollScene, e
   // Deterministic aged fibres + a couple of foxing stains.
   ctx.save();
   ctx.strokeStyle = rgba(ink, 0.05);
-  ctx.lineWidth = 1;
+  ctx.lineWidth = Math.max(1, unit * 0.03);
   const fibres = 9;
   for (let i = 0; i < fibres; i++) {
     const fy = py + (hashStr(scene.id + "f" + i) % 1000) / 1000 * fullH;
