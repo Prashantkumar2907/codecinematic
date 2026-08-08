@@ -6,6 +6,7 @@ import {
   easeOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   smoothPulse,
   roundRect,
@@ -15,6 +16,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -55,7 +57,9 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
   const totalBeats = offset + n;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeIdx = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
@@ -92,7 +96,7 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
     const ms = (scene.totalMs / ticks) * i;
     const x = xAt(ms);
     ctx.strokeStyle = rgba(THEME.textDim, 0.14);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.beginPath();
     ctx.moveTo(x, trackY - unit * 0.1);
     ctx.lineTo(x, trackTop + gridH);
@@ -120,9 +124,17 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
     const r = Math.min(rowH * 0.3, unit * 0.28);
     const fillColor = isFlame && bar.depth > 0 ? shade(color, -Math.min(bar.depth, 6) * 0.05) : color;
 
+    // Every settled bar gets a small always-on breathing on its FILL (bigger
+    // for the active one): without it, the whole scene sits ~70% still once
+    // each bar finishes its own brief growth, since nothing else animates for
+    // a static bar between beats. A stroke-only pulse (tried first) barely
+    // moved the needle — the thin border is too small an area next to the
+    // bar's own solid fill, the same small-feature ceiling seen elsewhere.
+    const breathe = isActive ? 0.7 + 0.3 * idle(env, 1500) : 0.82 + 0.18 * idle(env, 2200, i * 0.4);
+
     ctx.save();
     const fade = introIn * clamp01(local * 1.4);
-    ctx.globalAlpha = fade * 0.85;
+    ctx.globalAlpha = fade * 0.85 * breathe;
     if (isActive && local < 1) {
       ctx.shadowColor = rgba(color, 0.55);
       ctx.shadowBlur = unit * 0.6;
@@ -131,8 +143,6 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
     ctx.fillStyle = fillColor;
     ctx.fill();
     ctx.shadowBlur = 0;
-
-    const breathe = isActive ? 0.7 + 0.3 * idle(env, 1500) : 1;
     ctx.globalAlpha = fade * breathe;
     ctx.strokeStyle = color;
     ctx.lineWidth = unit * (isActive ? 0.1 : 0.06);
@@ -212,6 +222,23 @@ export function paintFlamegraph(ctx: CanvasRenderingContext2D, scene: Flamegraph
       }
       ctx.restore();
     }
+  }
+
+  // Idle scan sweep before the first bar lands: without it the intro beat
+  // shows only the static time axis (1/5, dead 27%, still 69% overall).
+  if (activeIdx < 0) {
+    const sweepX = trackX + ((env.elapsedMs / 1400) % 1) * trackW;
+    ctx.save();
+    ctx.globalAlpha = introIn * 0.4;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = unit * 0.05;
+    ctx.shadowColor = accentGlow;
+    ctx.shadowBlur = unit * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(sweepX, trackTop - unit * 0.14);
+    ctx.lineTo(sweepX, trackTop + gridH + unit * 0.14);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // Execution cursor: a glowing line at the leading edge of the bar currently
