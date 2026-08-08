@@ -26,6 +26,8 @@ type TacticalMapScene = Extract<Scene, { kind: "tactical_map" }>;
 type Unit = TacticalMapScene["units"][number];
 
 const GRID = 12;
+/** Dark ink on a bright accent-tone badge — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
 
 type Pt = { x: number; y: number };
 
@@ -106,7 +108,15 @@ export function paintTacticalMap(ctx: CanvasRenderingContext2D, scene: TacticalM
   const depth = unit * 0.4;
   scene.units.forEach((u, i) => {
     const pos = running.get(u.id)!;
-    const { x, y } = toPx(pos.x, pos.y);
+    const raw = toPx(pos.x, pos.y);
+    // A unit positioned near the grid edge (e.g. a reserve held back at the
+    // map's border) would otherwise render its block half outside the map
+    // panel — clamp the block's centre so it always stays fully inside.
+    // isoBox3D's depth extrusion extends the visible right/bottom edge past
+    // w/h, so that reach must be reserved too, not just the block's own size.
+    const edgeGap = unit * 0.15;
+    const x = Math.max(mapX + blockW / 2, Math.min(mapX + mapSize - blockW / 2 - depth - edgeGap, raw.x));
+    const y = Math.max(mapY + blockH / 2, Math.min(mapY + mapSize - blockH / 2 - depth * 0.55 - edgeGap, raw.y));
     const appear = easeOutBack(clamp01(enterT(env, 460, 120 + i * 70) * 1.05));
     if (appear <= 0) return;
     const movingNow = !isClash && activeStep >= 0 && scene.steps[activeStep].moves.some((m) => m.unit === u.id);
@@ -123,7 +133,7 @@ export function paintTacticalMap(ctx: CanvasRenderingContext2D, scene: TacticalM
 
     // Strength pips along the block top edge.
     const pips = Math.min(u.strength, 6);
-    ctx.fillStyle = "#0b1017";
+    ctx.fillStyle = INK_ON_ACCENT;
     for (let p = 0; p < pips; p++) {
       const px = bx + w * ((p + 0.5) / pips);
       ctx.beginPath();
@@ -133,7 +143,7 @@ export function paintTacticalMap(ctx: CanvasRenderingContext2D, scene: TacticalM
 
     const labelPx = fitFontSize(ctx, u.label, { maxW: w * 0.86, startPx: unit * 0.62, minPx: unit * 0.42, weight: 800 });
     ctx.font = `800 ${labelPx}px ${FONT_SANS}`;
-    ctx.fillStyle = "#eaf3ff";
+    ctx.fillStyle = THEME.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(u.label, x, by + hgt * 0.66);
@@ -390,7 +400,7 @@ function drawLegend(
     const tw = ctx.measureText(it.label).width;
     const chipW = tw + unit * 1.5;
     const lx = mapX + size - chipW - unit * 0.5;
-    ctx.fillStyle = "rgba(9,13,18,0.72)";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.72);
     roundRect(ctx, lx, ly - unit * 0.5, chipW, unit, unit * 0.3);
     ctx.fill();
     ctx.fillStyle = it.color;
