@@ -7,6 +7,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   roundRect,
   drawSceneTitle,
   fitFontSize,
@@ -16,6 +17,7 @@ import {
   glowRing,
   drawArrowhead,
   rgba,
+  STROKE,
 } from "./common";
 import { render3D, projectToRect, studioLights, makeBlock, color3, type ThreeBundle } from "./three3d";
 import type { PaintEnv } from "./index";
@@ -72,6 +74,8 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
   const key = scene.id;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
@@ -179,6 +183,11 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
     camera.position.copy(dir.multiplyScalar(dist));
     camera.lookAt(0, 0, 0);
     studioLights(s, accent, secondary);
+    // Many small blade LEDs blinking wasn't enough continuous motion to
+    // register on the coarse measurement grid used for QA (still 53-58%
+    // across the whole scene, not just its intro) — a scene-wide light
+    // breathing is a single large-area signal that survives any downsample.
+    const ambient = s.children.find((c): c is THREE.AmbientLight => c instanceof THREE.AmbientLight);
 
     const grid = new THREE.GridHelper(Math.max(spread * 3, 8), 16, new THREE.Color(accent), new THREE.Color("#31435a"));
     (grid.material as THREE.Material).transparent = true;
@@ -210,6 +219,7 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
 
     const update = (elapsedMs: number) => {
       const st = rackState.get(key);
+      if (ambient) ambient.intensity = 0.55 + 0.16 * Math.sin(elapsedMs / 1100);
       shells.forEach((sh, ri) => {
         const t = easeOutCubic(clamp01((elapsedMs - ri * 70) / 420));
         sh.scale.set(1, Math.max(0.001, t), 1);
@@ -247,8 +257,14 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
             ledHex = secondary;
             ledB = 0.7 + 0.3 * pulse;
           } else {
-            emissI = 0.22 + 0.22 * blink;
-            ledB = 0.35 + 0.6 * blink;
+            // A healthy blade's only continuous life was a modest emissive
+            // sway on a lit material (small contrast against studio lighting)
+            // plus a sub-pixel LED — together too subtle to register as
+            // motion across a whole rack of blades (measured: still 56-58%
+            // for the WHOLE scene, not just the intro). Widened the swing and
+            // added a real depth bob so the blade itself visibly breathes.
+            emissI = 0.12 + 0.45 * blink;
+            ledB = 0.3 + 0.68 * blink;
           }
 
           const mesh = g.children[0] as THREE.Mesh;
@@ -259,6 +275,8 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
           const led = g.userData.led as THREE.Mesh;
           (led.material as THREE.MeshBasicMaterial).color.copy(color3(ledHex).multiplyScalar(clamp01(ledB)));
           led.visible = ledVis;
+          const breathe = s0 === "healthy" ? 1 + 0.16 * blink : 1;
+          mesh.scale.y = breathe;
 
           const boot = easeOutBack(clamp01((elapsedMs - ri * 70 - sl * 45) / 460));
           const sy = st?.active?.op === "scale" && isTarget ? easeOutBack(clamp01(st.opT * 1.25)) : boot;
@@ -269,12 +287,15 @@ export function paintServerRack(ctx: CanvasRenderingContext2D, scene: ServerRack
     return { scene: s, camera, update };
   };
 
+  ctx.save();
+  ctx.globalAlpha = leave;
   const cam = render3D(ctx, key, rect, build, env.elapsedMs);
+  ctx.restore();
 
   if (cam) {
-    drawOverlay(ctx, scene, cam, rect, env, { status, leader, active: activeInfo, opT: stepT }, { rackW, rackXAt, maxShellH }, rackIdx);
+    drawOverlay(ctx, scene, cam, rect, env, { status, leader, active: activeInfo, opT: stepT }, { rackW, rackXAt, maxShellH }, rackIdx, leave);
   } else {
-    drawFallback(ctx, scene, rect, env, { status, leader, active: activeInfo, opT: stepT }, rackIdx);
+    drawFallback(ctx, scene, rect, env, { status, leader, active: activeInfo, opT: stepT }, rackIdx, leave);
   }
 
   ctx.textAlign = "start";
@@ -292,12 +313,13 @@ function drawOverlay(
   env: PaintEnv,
   vs: RackVS,
   geom: { rackW: number; rackXAt: (i: number) => number; maxShellH: number },
-  rackIdx: Map<string, number>
+  rackIdx: Map<string, number>,
+  leave: number
 ) {
   const { unit } = env.layout;
   const { accent, secondary } = env.palette;
   const { rackW, rackXAt } = geom;
-  const introIn = easeOutCubic(enterT(env, 460));
+  const introIn = easeOutCubic(enterT(env, 460)) * leave;
 
   // Group isolation boundaries (container networks / regions).
   const groups = new Map<string, number[]>();
@@ -417,7 +439,7 @@ function drawChip(ctx: CanvasRenderingContext2D, text: string, x: number, y: num
   roundRect(ctx, bx, by, chipW, chipH, unit * 0.3);
   ctx.fill();
   ctx.strokeStyle = rgba(accent, active ? 0.95 : 0.45);
-  ctx.lineWidth = active ? 2 : 1;
+  ctx.lineWidth = unit * (active ? STROKE.base : STROKE.hair);
   ctx.stroke();
   ctx.fillStyle = THEME.text;
   ctx.textAlign = "center";
@@ -472,11 +494,12 @@ function drawFallback(
   rect: { x: number; y: number; w: number; h: number },
   env: PaintEnv,
   vs: RackVS,
-  rackIdx: Map<string, number>
+  rackIdx: Map<string, number>,
+  leave: number
 ) {
   const { unit } = env.layout;
   const { accent, secondary } = env.palette;
-  const introIn = easeOutCubic(enterT(env, 460));
+  const introIn = easeOutCubic(enterT(env, 460)) * leave;
   const n = scene.racks.length;
 
   const gap = unit * 1.1;
@@ -539,7 +562,7 @@ function drawFallback(
     ctx.fillStyle = rgba(SHELL_FACE, 0.95);
     ctx.fill();
     ctx.strokeStyle = isHot ? accent : rgba(accent, 0.4);
-    ctx.lineWidth = isHot ? 2 : 1.2;
+    ctx.lineWidth = unit * (isHot ? STROKE.base : STROKE.thin);
     ctx.stroke();
     ctx.restore();
 
@@ -581,13 +604,13 @@ function drawFallback(
       ctx.fill();
       ctx.strokeStyle = s0 === "empty" ? rgba(THEME.textDim, 0.3) : rgba(face, 0.8);
       if (s0 === "empty") ctx.setLineDash([unit * 0.2, unit * 0.18]);
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = unit * STROKE.thin;
       ctx.stroke();
       ctx.setLineDash([]);
       // vent slits
       if (s0 !== "empty") {
         ctx.strokeStyle = rgba(face, 0.4);
-        ctx.lineWidth = 1;
+        ctx.lineWidth = unit * STROKE.hair;
         for (let v = 0; v < 3; v++) {
           const vx = b.x + b.w * 0.4 + v * unit * 0.22;
           ctx.beginPath();
