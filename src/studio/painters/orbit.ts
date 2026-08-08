@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutCubic, enterT, clamp01, roundRect, drawSceneTitle, beatT, activeBeatIndex, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutCubic, easeOutBack, enterT, clamp01, roundRect, drawSceneTitle, beatT, activeBeatIndex, rgba, departT, STROKE } from "./common";
 import { render3D, projectToRect, studioLights, type ThreeBundle } from "./three3d";
 import type { PaintEnv } from "./index";
 
@@ -28,6 +28,8 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeIdx = active - offset;
   const key = scene.id;
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
   const flowT = activeIdx >= 0 ? beatT(env.beats, offset + activeIdx, totalBeats, env.p) : 0;
@@ -129,7 +131,11 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
       center.scale.setScalar(Math.max(0.001, cs));
       for (let i = 0; i < n; i++) {
         const local = clamp01(revealed - i);
-        const sc = easeOutCubic(local);
+        // Scale pops in over the first 40% of the reveal window with an
+        // overshoot, rather than tracking `local`'s full (slower) span — a
+        // ring/body growing in lockstep with the beat's whole flowT spread
+        // the pop across too much time to ever read as a discrete event.
+        const sc = easeOutBack(clamp01(local / 0.4));
         rings[i].scale.setScalar(Math.max(0.001, sc));
         (rings[i].material as THREE.LineBasicMaterial).opacity = 0.32 * sc;
         const r = ringR(i);
@@ -171,7 +177,7 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
   const drawChip = (sx: number, sy: number, text: string, activeChip: boolean, revealed: number) => {
     if (revealed <= 0) return;
     ctx.save();
-    ctx.globalAlpha = easeOutCubic(clamp01(revealed)) * (activeChip ? 1 : 0.75);
+    ctx.globalAlpha = easeOutCubic(clamp01(revealed)) * (activeChip ? 1 : 0.75) * leave;
     ctx.font = `${activeChip ? 800 : 600} ${unit * 0.72}px ${FONT_SANS}`;
     const tw = ctx.measureText(text).width;
     const cw = tw + unit;
@@ -183,7 +189,7 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
     ctx.fillStyle = INK_PANEL;
     ctx.fill();
     ctx.strokeStyle = rgba(activeChip ? accent : THEME.textDim, activeChip ? 0.9 : 0.4);
-    ctx.lineWidth = activeChip ? 2 : 1;
+    ctx.lineWidth = unit * (activeChip ? STROKE.base : STROKE.thin);
     ctx.stroke();
     ctx.fillStyle = THEME.text;
     ctx.textAlign = "center";
@@ -215,13 +221,14 @@ export function paintOrbit(ctx: CanvasRenderingContext2D, scene: OrbitScene, env
     const maxPx = Math.min(rect.w, rect.h) * 0.42;
     const revealed = orbitState.get(key)?.revealed ?? 0;
     ctx.save();
+    ctx.globalAlpha = leave;
     ctx.fillStyle = secondary;
     ctx.beginPath(); ctx.arc(cx, cy, unit * 1.1, 0, Math.PI * 2); ctx.fill();
     for (let i = 0; i < n; i++) {
       const local = clamp01(revealed - i);
       if (local <= 0) continue;
       const rr = maxPx * ((i + 1) / n);
-      ctx.globalAlpha = easeOutCubic(local);
+      ctx.globalAlpha = easeOutCubic(local) * leave;
       ctx.strokeStyle = rgba(accent, 0.35); ctx.lineWidth = unit * 0.05;
       ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
       const ang = env.elapsedMs / (1600 + i * 700) + i * 1.7;
