@@ -164,8 +164,13 @@ export function paintScroll(ctx: CanvasRenderingContext2D, scene: ScrollScene, e
     cursorY += unit * 0.3;
   }
 
+  // The wax seal always lands below the last line once it's fully written, so
+  // its footprint must be reserved up front — otherwise a scene with enough
+  // lines to reach near the sheet's floor gets its final line overwritten by
+  // the seal instead of sitting cleanly above it.
+  const sealFootprintH = unit * 2.8;
   const linesTop = cursorY;
-  const linesBottom = py + fullH - rodH * 1.5;
+  const linesBottom = py + fullH - rodH * 1.5 - sealFootprintH;
   const slotH = (linesBottom - linesTop) / n;
   const hasLabel = scene.lines.some((l) => !!l.label);
   const bodyPx = Math.min(unit * 0.92, slotH * (hasLabel ? 0.3 : 0.36));
@@ -257,7 +262,7 @@ export function paintScroll(ctx: CanvasRenderingContext2D, scene: ScrollScene, e
   const sealReveal = activeLine >= n - 1 ? easeOutBack(clamp01((stepT - 0.25) / 0.75)) : 0;
   if (sealReveal > 0) {
     const scx = px + sway + panelW * (vertical ? 0.5 : 0.78);
-    const scy = py + fullH - rodH * 2.0;
+    const scy = py + fullH - rodH * 1.5 - sealFootprintH / 2;
     const sr = unit * 1.15 * clamp01(sealReveal);
     ctx.save();
     ctx.globalAlpha = introIn * clamp01(sealReveal);
