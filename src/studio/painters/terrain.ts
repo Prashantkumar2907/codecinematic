@@ -21,6 +21,8 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  departT,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 import { createNoise2D } from "simplex-noise";
@@ -105,11 +107,12 @@ function drawVignette(
   t: number,
   ridge: Pt[],
   groundBottom: number,
-  env: PaintEnv
+  env: PaintEnv,
+  leave: number
 ) {
   const { unit, contentX } = env.layout;
   const { accent, secondary } = env.palette;
-  const vin = easeOutCubic(clamp01((t - 0.25) / 0.3));
+  const vin = easeOutCubic(clamp01((t - 0.25) / 0.3)) * leave;
   if (vin <= 0) return;
   const ms = env.elapsedMs;
   ctx.save();
@@ -118,7 +121,7 @@ function drawVignette(
   ctx.lineJoin = "round";
   switch (feature.kind) {
     case "peak": {
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.strokeStyle = rgba(THEME.text, 0.5);
       ctx.lineWidth = unit * 0.08;
       for (let i = 0; i < 3; i++) {
         const hw = unit * (0.28 + i * 0.16);
@@ -136,7 +139,7 @@ function drawVignette(
       ctx.save();
       ctx.translate(fx, fy + unit * 0.35);
       ctx.rotate(slope);
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillStyle = rgba(THEME.text, 0.35);
       ctx.beginPath();
       ctx.ellipse(0, 0, unit * 1.1, unit * 0.32, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -381,7 +384,9 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
   };
   rough3D(ridge3D, 0.15 * maxH3D);
 
-  const landIn = easeInOutCubic(enterT(env, 460));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const landIn = easeInOutCubic(enterT(env, 460)) * leave;
   if (landIn <= 0) {
     ctx.textAlign = "start";
     return;
@@ -454,8 +459,13 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
 
     const update = (elapsedMs: number, ctxData: { tVals: number[], landIn: number }) => {
       terrainMesh.position.y = -0.5 + 0.5 * ctxData.landIn;
+      // The relief itself has no other continuous motion once it has landed —
+      // a slow emissive breath keeps the whole (large) surface visibly alive
+      // between feature beats, rather than relying only on the small per-feature
+      // vignette animations to carry the scene's motion.
       (mat as THREE.MeshPhysicalMaterial).opacity = ctxData.landIn;
-      
+      (mat as THREE.MeshPhysicalMaterial).emissiveIntensity = 0.08 + 0.07 * (0.5 + 0.5 * Math.sin(elapsedMs / 2600));
+
       featureModels.forEach((m, k) => {
         const t = ctxData.tVals[k] || 0;
         const pop = easeOutBack(clamp01(t / 0.25));
@@ -523,7 +533,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
     const fy = pt.y;
     
     const isCurrent = active === offset + k;
-    const featAlpha = isCurrent ? 1 : 0.6;
+    const featAlpha = (isCurrent ? 1 : 0.6) * leave;
 
     ctx.save();
     ctx.globalAlpha = featAlpha;
@@ -559,7 +569,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = isCurrent ? rgba(accent, 0.7) : rgba(THEME.textDim, 0.35);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = unit * STROKE.thin;
       ctx.stroke();
       ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
       ctx.textAlign = "center";
@@ -568,7 +578,7 @@ export function paintTerrain(ctx: CanvasRenderingContext2D, scene: TerrainScene,
       ctx.restore();
     }
 
-    drawVignette(ctx, feature, fx, fy, t, projectedRidge, groundBottom, env);
+    drawVignette(ctx, feature, fx, fy, t, projectedRidge, groundBottom, env, leave);
     ctx.restore();
   });
   ctx.textAlign = "start";
