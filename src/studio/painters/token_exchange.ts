@@ -7,6 +7,7 @@ import {
   clamp01,
   sub,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -17,6 +18,7 @@ import {
   glowRing,
   rgba,
   shade,
+  STROKE,
 } from "./common";
 import { drawIcon } from "./icons";
 import type { PaintEnv } from "./index";
@@ -62,14 +64,16 @@ const ACTION_LABEL: Record<Step["action"], string> = {
  */
 export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenExchangeScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
   const sigColor = shade(accent, -0.5);
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
@@ -81,7 +85,7 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
   const chipW = Math.min(colW - unit * 0.5, unit * 6.5);
   const chipY = contentY + band;
   const lifelinesTop = chipY + chipH + unit * 0.7;
-  const lifelinesBottom = vertical ? Math.min(contentY + contentH, layout.h * 0.86) : contentY + contentH;
+  const lifelinesBottom = Math.min(contentY + contentH, safeBottom) - unit * 0.3;
   const lifelinesH = lifelinesBottom - lifelinesTop;
   const slotY = (k: number) => lifelinesTop + (k + 0.5) * (lifelinesH / Math.max(scene.steps.length, MIN_SLOTS));
 
@@ -309,7 +313,7 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
       ctx.fillStyle = rgba(THEME.bgBottom, 0.85);
       ctx.fill();
       ctx.strokeStyle = THEME.panelBorder;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = unit * STROKE.hair;
       ctx.stroke();
       ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
       ctx.fillText(text, cardX, ly + unit * 0.2);
@@ -320,7 +324,7 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
   // Actor chips (client / gateway / auth / resource) with vector role glyphs.
   scene.actors.forEach((actor, i) => {
     const cx = actorX(i);
-    const chipIn = easeOutCubic(enterT(env, 320, 40 + i * 70));
+    const chipIn = easeOutCubic(enterT(env, 320, 40 + i * 70)) * leave;
     if (chipIn <= 0) return;
     const isHot = !!hot && (hot.from === actor.id || hot.to === actor.id);
     const pop = easeOutBack(chipIn) * (isHot ? 1 + 0.012 * Math.sin(env.elapsedMs / 220) : 1);
