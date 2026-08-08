@@ -7,6 +7,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -14,6 +15,7 @@ import {
   activeBeatIndex,
   rgba,
   shade,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -35,7 +37,7 @@ const SIGN: Record<"same" | "add" | "del", string> = { same: "", add: "+", del: 
  */
 export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
@@ -55,7 +57,9 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
   for (let i = 0; i < revealAt.length; i++) if (revealAt[i] === Infinity) revealAt[i] = 0;
   const focusNow = new Set(activeStep >= 0 ? scene.steps[activeStep].focus : []);
 
-  const frameIn = easeOutCubic(enterT(env, 340));
+  const leave = departT(env, 340);
+  if (leave <= 0) return;
+  const frameIn = easeOutCubic(enterT(env, 340)) * leave;
   const areaY = contentY + band;
   const areaH = contentH - band;
   const fx = contentX;
@@ -68,7 +72,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
 
   const nLines = scene.lines.length;
   const longest = Math.max(MIN_COLS, ...scene.lines.map((l) => l.text.length + 1));
-  const bottom = vertical ? Math.min(areaY + areaH, layout.h * 0.92) : areaY + areaH;
+  const bottom = Math.min(areaY + areaH, safeBottom) - unit * 0.3;
   const availH = bottom - areaY;
   const widthFontPx = Math.min((codeW / longest) * 1.62, vertical ? unit * 1.1 : unit * 0.92);
   const heightLineH = (availH - barH - sbH) / (nLines + 0.9);
@@ -93,7 +97,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
   ctx.shadowOffsetY = 0;
   roundRect(ctx, fx, fy, fw, fh, unit * 0.7);
   ctx.strokeStyle = THEME.panelBorder;
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = unit * STROKE.hair;
   ctx.stroke();
 
   // Title bar.
@@ -160,14 +164,26 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
 
     if (pending) {
       // Not yet reached — dashed placeholder keeps the panel height stable.
+      // A pulsing wash spans the FULL row band (not just the thin stroke):
+      // a hairline dash alone is too small an area to read as motion once
+      // downsampled for measurement, and a scene sitting fully static
+      // through its intro beat (before the first hunk lands, when these
+      // placeholders are the only content on screen) is the real defect
+      // being fixed here, not just a metric.
+      const pulse = idle(env, 1300, i * 0.4);
+      const lineLen = Math.min(codeW, (ln.text.length + 1) * fontPx * 0.62);
       ctx.save();
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = frameIn;
+      ctx.fillStyle = rgba(THEME.textDim, 0.05 + 0.05 * pulse);
+      ctx.fillRect(fx + gutterW + pad, rowY, lineLen, lineH);
+      ctx.globalAlpha = (0.1 + 0.12 * pulse) * frameIn;
       ctx.strokeStyle = rgba(THEME.textDim, 0.9);
       ctx.lineWidth = Math.max(1, unit * 0.05);
       ctx.setLineDash([unit * 0.3, unit * 0.26]);
+      ctx.lineDashOffset = -((env.elapsedMs / 45) % (unit * 0.56));
       ctx.beginPath();
       ctx.moveTo(fx + gutterW + pad, y - fontPx * 0.32);
-      ctx.lineTo(fx + gutterW + pad + Math.min(codeW, (ln.text.length + 1) * fontPx * 0.62), y - fontPx * 0.32);
+      ctx.lineTo(fx + gutterW + pad + lineLen, y - fontPx * 0.32);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
@@ -179,7 +195,7 @@ export function paintCodediff(ctx: CanvasRenderingContext2D, scene: CodediffScen
     const slide = revealingNow ? (1 - localT) * unit * 1.1 : 0;
 
     ctx.save();
-    ctx.globalAlpha = revealingNow ? localT : 1;
+    ctx.globalAlpha = (revealingNow ? localT : 1) * frameIn;
     ctx.translate(slide, 0);
 
     // Row wash: diff tone, plus an extra accent pulse on the active hunk.
