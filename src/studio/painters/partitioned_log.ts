@@ -32,6 +32,7 @@ const MAX_CELL_UNIT = 2.3;
 const MIN_CELL_UNIT = 0.85;
 const MARKER_BAND_UNIT = 1.5;
 const ROW_GAP_UNIT = 0.6;
+const INK_FILL = "#0e2433";
 
 const lerp = (a: Pt, b: Pt, t: number): Pt => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
@@ -170,7 +171,7 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
     roundRect(ctx, chipX, chipY, chipW, chipH, chipH * 0.3);
     ctx.fillStyle = isSpot ? rgba(accent, 0.22) : THEME.panel;
     ctx.fill();
-    ctx.strokeStyle = isSpot ? accent : "rgba(148,163,184,0.4)";
+    ctx.strokeStyle = isSpot ? accent : rgba(THEME.textDim, 0.4);
     ctx.lineWidth = isSpot ? unit * 0.09 : unit * 0.05;
     ctx.stroke();
     const labelPx = fitFontSize(ctx, part.label, { maxW: chipW * 0.86, startPx: unit * 0.58, minPx: unit * 0.4, weight: 700, family: FONT_MONO });
@@ -196,7 +197,7 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
         if (ghostIn <= 0) continue;
         ctx.save();
         ctx.globalAlpha = introIn * laneIn * 0.16 * ghostIn;
-        ctx.strokeStyle = "rgba(148,163,184,0.9)";
+        ctx.strokeStyle = rgba(THEME.textDim, 0.9);
         ctx.lineWidth = unit * 0.05;
         ctx.setLineDash([unit * 0.24, unit * 0.2]);
         roundRect(ctx, x, rowY, cellSize, cellSize, radius);
@@ -204,7 +205,7 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
         ctx.setLineDash([]);
         if (isTrailingGhost) {
           ctx.globalAlpha = introIn * laneIn * 0.4 * ghostIn;
-          ctx.strokeStyle = "rgba(148,163,184,0.8)";
+          ctx.strokeStyle = rgba(THEME.textDim, 0.8);
           drawArrowhead(ctx, x + cellSize * 0.66, rowY + cellSize / 2, 0, cellSize * 0.14);
         }
         ctx.restore();
@@ -264,18 +265,38 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
   });
 
   // --- Consumer flag markers: static, sliding (advance), or arcing (rebalance). ---
-  const usedX = new Map<number, Set<number>>();
-  const dedupeX = (laneI: number, x: number): number => {
-    const set = usedX.get(laneI) ?? new Set<number>();
-    let dx = x;
-    let bump = 0;
-    while (set.has(Math.round(dx))) {
-      bump += 1;
-      dx = x + bump * unit * 0.5;
+  // Two consumers can settle at the same/adjacent offset in one lane (e.g. a
+  // rebalance target next to one already there) — bumping the anchor by a
+  // flat unit*0.5 on exact-pixel collision only avoided EXACT overlap, not
+  // the chip's actual rendered width, so two label chips (each several units
+  // wide) still overlapped each other's text. Push by the real chip half-widths.
+  const placedFlags = new Map<number, { x: number; halfW: number }[]>();
+  const flagChipHalfWidth = (label: string, lagText?: string): number => {
+    ctx.save();
+    ctx.font = `700 ${unit * 0.52}px ${FONT_SANS}`;
+    const text = lagText ? `${label} · ${lagText}` : label;
+    const tw = ctx.measureText(text).width;
+    ctx.restore();
+    return (tw + unit * 0.7) / 2;
+  };
+  const resolveFlagX = (laneI: number, x: number, halfW: number): number => {
+    const arr = placedFlags.get(laneI) ?? [];
+    let nx = x;
+    const minGap = unit * 0.25;
+    let moved = true;
+    let guard = 0;
+    while (moved && guard++ < 20) {
+      moved = false;
+      for (const p of arr) {
+        if (Math.abs(nx - p.x) < halfW + p.halfW + minGap) {
+          nx = p.x + halfW + p.halfW + minGap;
+          moved = true;
+        }
+      }
     }
-    set.add(Math.round(dx));
-    usedX.set(laneI, set);
-    return dx;
+    arr.push({ x: nx, halfW });
+    placedFlags.set(laneI, arr);
+    return nx;
   };
 
   const drawFlag = (anchor: Pt, label: string, lagText: string | undefined, color: string, alpha: number, scale: number) => {
@@ -299,7 +320,7 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
     const chipW = tw + unit * 0.7;
     const chipH = unit * 0.92;
     roundRect(ctx, -chipW / 2, -unit * 0.32 - chipH, chipW, chipH, chipH * 0.32);
-    ctx.fillStyle = "#0e2433";
+    ctx.fillStyle = INK_FILL;
     ctx.fill();
     ctx.strokeStyle = rgba(color, 0.7);
     ctx.lineWidth = 1;
@@ -347,7 +368,8 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
       const pos = pointAlongPolyline(arc, t);
       const holding = stepT >= 0.35 && stepT < 0.68;
       const wobble = holding ? Math.sin(env.elapsedMs / 160) * unit * 0.05 : 0;
-      drawFlag({ x: dedupeX(li, pos.x) + wobble, y: pos.y }, c.label, `lag ${lag}`, holding ? THEME.warn : accent, introIn * laneIn, holding ? 1.06 : 1);
+      const halfW = flagChipHalfWidth(c.label, `lag ${lag}`);
+      drawFlag({ x: resolveFlagX(li, pos.x, halfW) + wobble, y: pos.y }, c.label, `lag ${lag}`, holding ? THEME.warn : accent, introIn * laneIn, holding ? 1.06 : 1);
       return;
     }
 
@@ -361,7 +383,8 @@ export function paintPartitionedLog(ctx: CanvasRenderingContext2D, scene: PLScen
       scale = 1 + Math.sin(t * Math.PI) * 0.12;
     }
     const bob = (idle(env, 2200, li * 1.3) - 0.5) * unit * 0.06;
-    const anchor: Pt = { x: dedupeX(li, x), y: cellRowY(li) - unit * 0.1 + bob };
+    const halfW = flagChipHalfWidth(c.label, `lag ${lag}`);
+    const anchor: Pt = { x: resolveFlagX(li, x, halfW), y: cellRowY(li) - unit * 0.1 + bob };
     const dim = c.id === rebalancingConsumerId ? 1 : pauseDim;
     drawFlag(anchor, c.label, `lag ${lag}`, accent, introIn * laneIn * dim, scale);
   });
