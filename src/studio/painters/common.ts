@@ -940,3 +940,122 @@ export function autoLayoutGrid(
 }
 
 
+
+/**
+ * Visual language. Before this, `painters/` held 453 `roundRect` calls and 389
+ * `shadowBlur` sites against exactly four `export function draw*` helpers, so
+ * every card, chip and shadow was re-invented per file.
+ *
+ * LIGHT is upper-left, matching `isoBox`'s lit top / shadowed right faces.
+ * `three3d.ts` `studioLights` puts its key upper-RIGHT and disagrees; the 2D
+ * layer is authoritative under the phase's 2D-first decision.
+ */
+export const LIGHT = { x: -0.55, y: -0.83 } as const;
+
+/** Shadow tiers, in units of `layout.unit` so they hold at both aspects. */
+export const ELEVATION = {
+  flat: { blur: 0, offset: 0, alpha: 0 },
+  raised: { blur: 0.5, offset: 0.1, alpha: 0.35 },
+  floating: { blur: 1.1, offset: 0.22, alpha: 0.45 },
+  overlay: { blur: 2.2, offset: 0.4, alpha: 0.55 },
+} as const;
+
+export type Elevation = keyof typeof ELEVATION;
+
+export function applyElevation(ctx: CanvasRenderingContext2D, unit: number, level: Elevation) {
+  const e = ELEVATION[level];
+  ctx.shadowColor = `rgba(0,0,0,${e.alpha})`;
+  ctx.shadowBlur = e.blur * unit;
+  ctx.shadowOffsetX = -LIGHT.x * e.offset * unit;
+  ctx.shadowOffsetY = -LIGHT.y * e.offset * unit;
+}
+
+export function clearShadow(ctx: CanvasRenderingContext2D) {
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+}
+
+export type SurfaceOpts = {
+  fill?: string;
+  stroke?: string;
+  radius?: number;
+  elevation?: Elevation;
+  lineWidth?: number;
+  alpha?: number;
+};
+
+/** The card/panel primitive the library never had. */
+export function drawCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  unit: number,
+  opts: SurfaceOpts = {}
+) {
+  const {
+    fill = THEME.panel,
+    stroke = THEME.panelBorder,
+    radius = RADIUS.md,
+    elevation = "raised",
+    lineWidth = STROKE.thin,
+    alpha = 1,
+  } = opts;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  applyElevation(ctx, unit, elevation);
+  roundRect(ctx, x, y, w, h, radius * unit);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  clearShadow(ctx);
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth * unit;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Pill label. Returns its width so callers can lay out a row of them. */
+export function drawChip(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  label: string,
+  unit: number,
+  opts: SurfaceOpts & { color?: string; fontPx?: number } = {}
+): number {
+  const fontPx = opts.fontPx ?? unit * 0.62;
+  ctx.save();
+  ctx.font = `800 ${fontPx}px ${FONT_SANS}`;
+  const padX = fontPx * 0.7;
+  const w = ctx.measureText(label).width + padX * 2;
+  const h = fontPx * 1.85;
+  drawCard(ctx, x, y, w, h, unit, {
+    radius: h / (2 * unit),
+    elevation: opts.elevation ?? "flat",
+    fill: opts.fill ?? THEME.panel,
+    stroke: opts.stroke ?? "",
+    alpha: opts.alpha,
+  });
+  ctx.fillStyle = opts.color ?? THEME.text;
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, x + padX, y + h / 2);
+  ctx.restore();
+  return w;
+}
+
+/**
+ * Per-aspect composition, as numbers a painter reads rather than prose it has to
+ * remember. 9:16 is a tall column whose bottom band is lost to the YouTube UI and
+ * captions, so it wants a vertical stack, bigger type and fewer things at once;
+ * 16:9 is wide and can hold more. Rubric v2 section 10 scores these separately.
+ */
+export function composition(layout: Layout) {
+  return layout.vertical
+    ? { stack: true, maxElements: 5, titleScale: 1.15, bodyScale: 1.1, gutter: layout.unit * 1.2, columns: 1 }
+    : { stack: false, maxElements: 8, titleScale: 1.0, bodyScale: 1.0, gutter: layout.unit * 0.9, columns: 2 };
+}
