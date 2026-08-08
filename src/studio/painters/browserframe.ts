@@ -1,9 +1,6 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
-  FONT_SANS,
   FONT_MONO,
   easeOutCubic,
   easeInOutCubic,
@@ -19,6 +16,9 @@ import {
   shade,
   STROKE,
   lerpColor,
+  departT,
+  applyElevation,
+  clearShadow,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -27,7 +27,6 @@ type BlockRole = BrowserframeScene["blocks"][number]["role"];
 type Rect = { x: number; y: number; w: number; h: number; cx: number; cy: number };
 
 const GRID = 12;
-const SKELETON_FILL = rgba(THEME.textDim, 0.06);
 const CARET_MS = 530;
 /**
  * Rows the page's blocks actually occupy drive the vertical mapping, not the full 12.
@@ -36,31 +35,11 @@ const CARET_MS = 530;
  * content. Horizontal still divides by GRID: a page is as wide as the window.
  */
 const MIN_ROWS = 5;
-/** Fraction of the visible frustum the browser window occupies. */
+/** Fraction of the window rect the page content occupies. */
 const WINDOW_FILL = 0.92;
-const SHIMMER_MS = 900;
+const BOB_UNITS = 0.12;
 
-function roleFill(role: BlockRole, palette: Palette): string | null {
-  switch (role) {
-    case "hero":
-    case "card":
-      return palette.accentSoft;
-    case "image":
-      return rgba(palette.secondary, 0.14);
-    case "header":
-    case "button":
-      return rgba(palette.accent, 0.2);
-    case "text":
-      return null;
-  }
-}
-
-/**
- * Opaque equivalent of `roleFill` for the 3D layer. `roleFill` returns rgba tints, which
- * are correct for a canvas fill but are handed to `THREE.Color`, and three.js DROPS the
- * alpha — so every hero, card, image and button block rendered at FULL accent or
- * secondary in 3D instead of the intended tint, and warned about it every frame.
- */
+/** Opaque fill for a block, tinted by role. */
 function roleFace(role: BlockRole, palette: Palette): string {
   switch (role) {
     case "hero":
@@ -73,17 +52,6 @@ function roleFace(role: BlockRole, palette: Palette): string {
       return lerpColor(THEME.panel, palette.accent, 0.2);
     case "text":
       return shade(THEME.panel, 0.09);
-  }
-}
-
-function roleBorder(role: BlockRole, palette: Palette): string {
-  switch (role) {
-    case "image":
-      return rgba(palette.secondary, 0.55);
-    case "text":
-      return rgba(THEME.textDim, 0.55);
-    default:
-      return rgba(palette.accent, 0.55);
   }
 }
 
@@ -200,22 +168,22 @@ function drawGlyphs(
 
 export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: BrowserframeScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH } = layout;
   const palette = env.palette;
-  const { accent, accentGlow, secondary } = palette;
+  const { accent, accentGlow } = palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const key = scene.id + "-browser3d";
 
   const base = easeOutCubic(enterT(env, 380));
-  if (base <= 0) return;
+  const leave = departT(env, 380);
+  if (base <= 0 || leave <= 0) return;
 
   // `contentH` ran the window frame to ~90% of frame height in 9:16, so the bottom of
   // the browser chrome sat under the burned-in caption while ~45% of the window was
   // empty below its own content.
-  const rect = { x: contentX, y: contentY, w: contentW, h: Math.max(unit * 6, layout.safeBottom - contentY) };
-  
+  const winRect = { x: contentX, y: contentY, w: contentW, h: Math.max(unit * 6, layout.safeBottom - contentY) };
+
   type Anim = { show: number | null; paint: number | null; shifts: { beat: number; y: number }[] };
   const anims = new Map<string, Anim>(scene.blocks.map((b) => [b.id, { show: null, paint: null, shifts: [] }]));
   scene.steps.forEach((st, k) => {
@@ -231,167 +199,104 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     if (st.shift) anims.get(st.shift.block)?.shifts.push({ beat, y: st.shift.y });
   });
 
-  /**
-   * World size comes from the FRUSTUM, not from literals. `spreadX/spreadY` of 3.5/5.5
-   * only filled the rect at the aspect they were tuned for: once the viewport was clamped
-   * to the caption band the same block projected ~35% narrower, and the chrome bar — whose
-   * URL and phase chips are laid out in pixels from the projected window — no longer had
-   * room for both, so the chips printed over the URL. `frustumHalfExtent`
-   * (`three3d.ts:139`) is the documented fix for exactly this and had three callers.
-   */
   const usedRows = Math.max(MIN_ROWS, ...scene.blocks.map((b) => b.y + b.h));
-  const CAM_DIST = vertical ? 15 : 12;
-  const camFov = vertical ? 45 : 36;
-  const halfH = Math.tan((camFov * Math.PI) / 360) * CAM_DIST;
-  const halfW = halfH * (rect.w / rect.h);
-  const spreadX = halfW * WINDOW_FILL;
-  const spreadY = halfH * WINDOW_FILL;
+  // Pixel half-extents of the content area — no camera needed, this IS the frustum
+  // the removed on-axis camera would have produced (it was never tilted or moved).
+  const winCX = winRect.x + winRect.w / 2;
+  const winCY = winRect.y + winRect.h / 2;
+  const spreadXpx = (winRect.w / 2) * WINDOW_FILL;
+  const spreadYpx = (winRect.h / 2) * WINDOW_FILL;
+  const bob = Math.sin(env.elapsedMs / 2000) * unit * BOB_UNITS;
 
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(camFov, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-    
-    /**
-     * No ground grid and no shadow plane. Both are horizontal, the camera is on-axis, so
-     * they render EDGE-ON: a couple of faint horizontal bands running out past the left
-     * and right of the browser window and nothing else. They cost two draws and one
-     * shadow-map pass to produce an artifact.
-     */
-
-    // Browser back window
-    const browserGroup = makeBlock(spreadX * 2.0, spreadY * 2.0, 0.3, shade(THEME.panel, -0.35), shade(THEME.panel, 0.22));
-    s.add(browserGroup);
-
-    const models: { mesh: THREE.Group, block: typeof scene.blocks[0] }[] = [];
-    
-    for (const b of scene.blocks) {
-        // Grid is 12x12 inside the browser block
-        const bw = (b.w / GRID) * (spreadX * 2.0 * 0.95);
-        const bh = (b.h / usedRows) * (spreadY * 2.0 * 0.85); // leaves room for header
-        const cx = (b.x / GRID - 0.5) * (spreadX * 2.0 * 0.95) + bw / 2;
-        const cy = (0.5 - b.y / usedRows) * (spreadY * 2.0 * 0.85) - bh / 2 - (spreadY * 2.0 * 0.05); // shift down
-        
-        const g = makeBlock(bw, bh, 0.15, THEME.panel, accent);
-        g.position.set(cx, cy, 0.2); // stick out slightly from browser
-        s.add(g);
-        models.push({ mesh: g, block: b });
-    }
-
-    const update = (elapsedMs: number) => {
-      const gIn = easeOutCubic(enterT(env, 600));
-      
-      // The browser panel is NOT rotated, bobbed or tilted. It carried rotation.x/.y of
-      // +/-0.04 rad and a 0.15-unit bob, while the block meshes (added to the scene, not
-      // to this group) and every piece of 2D chrome stayed axis-aligned — so the panel
-      // slid and skewed behind content that could not follow it. `qa/ledger.json` →
-      // systemic `2d-layout-round-tripped-through-camera`: never scale, rotate or bob the
-      // 3D group afterwards, because the pixel chrome cannot follow it.
-      browserGroup.position.set(0, 0, 0);
-      browserGroup.rotation.set(0, 0, 0);
-
-      browserGroup.scale.setScalar(Math.max(0.001, easeOutBack(enterT(env, 500))));
-      
-      models.forEach(({ mesh, block }) => {
-        const a = anims.get(block.id)!;
-        const showBeat = a.show ?? a.paint ?? offset;
-        const ts = beatT(env.beats, showBeat, totalBeats, env.p);
-        
-        let gy = block.y;
-        for (const sh of a.shifts) {
-            const t = beatT(env.beats, sh.beat, totalBeats, env.p);
-            if (t <= 0) continue;
-            gy = gy + (sh.y - gy) * easeInOutCubic(clamp01((t - 0.2) / 0.55));
-        }
-
-        const bw = (block.w / GRID) * (spreadX * 2.0 * 0.95);
-        const bh = (block.h / usedRows) * (spreadY * 2.0 * 0.85);
-        const cx = (block.x / GRID - 0.5) * (spreadX * 2.0 * 0.95) + bw / 2;
-        const cy = (0.5 - gy / usedRows) * (spreadY * 2.0 * 0.85) - bh / 2 - (spreadY * 2.0 * 0.05);
-
-        mesh.visible = ts > 0 || gIn > 0; // if skeleton, it's visible but faint
-        const pop = ts > 0 ? easeOutBack(clamp01(ts / 0.3)) : 0;
-        
-        const tp = a.paint !== null ? beatT(env.beats, a.paint, totalBeats, env.p) : 0;
-        const painted = tp > 0;
-        const hydrate = easeOutCubic(clamp01(tp / 0.4));
-        const isActivePaint = a.paint !== null && active === a.paint;
-        
-        // No "roughly following the parent" any more — the parent no longer moves. z is
-        // fixed at 0.2 too: pushing the painted block to 0.3 moved it toward the camera,
-        // which scales its projection while the 2D glyphs are drawn from get2D(…, 0.2).
-        mesh.position.set(cx, cy, 0.2);
-        
-        // Convert to local scale of the block
-        mesh.scale.setScalar(Math.max(0.001, ts > 0 ? (0.9 + 0.1 * pop) : 0.9 * gIn));
-
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.MeshPhysicalMaterial;
-                mat.transparent = true;
-                if (!painted && ts <= 0) {
-                    mat.opacity = 0.1 * gIn;
-                    const idleFace = shade(THEME.panel, 0.09);
-                    mat.color.setStyle(idleFace);
-                    mat.emissive.setStyle(idleFace);
-                } else if (!painted && ts > 0) {
-                    mat.opacity = 0.4 * gIn;
-                    mat.color.setStyle(THEME.panel);
-                    mat.emissive.setStyle(THEME.panel);
-                } else {
-                    mat.opacity = 0.95 * gIn;
-                    const fill = roleFill(block.role, palette);
-                    if (fill) {
-                        const face = roleFace(block.role, palette);
-                        mat.color.setStyle(face);
-                        mat.emissive.setStyle(face);
-                    } else {
-                        mat.color.setStyle(THEME.panel);
-                        mat.emissive.setStyle(THEME.panel);
-                    }
-                }
-            }
-        });
-      });
-    };
-    return { scene: s, camera, update };
+  /** Pixel rect of block `b` at its (possibly shifted) row `gy`. */
+  const blockRect = (b: (typeof scene.blocks)[number], gy: number): Rect => {
+    const bw = (b.w / GRID) * (spreadXpx * 2 * 0.95);
+    const bh = (b.h / usedRows) * (spreadYpx * 2 * 0.85);
+    const cx = winCX + (b.x / GRID - 0.5) * (spreadXpx * 2 * 0.95) + bw / 2;
+    const cy = winCY + (0.5 - gy / usedRows) * (spreadYpx * 2 * 0.85) - bh / 2 - spreadYpx * 2 * 0.05 + bob;
+    return { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh, cx, cy };
   };
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
-  if (!cam) return;
-
-  const browserBob = Math.sin(env.elapsedMs / 2000) * 0.15;
-  const get2D = (x: number, y: number, z: number) => projectToRect(cam, new THREE.Vector3(x, y + browserBob, z), rect);
-  
-  // 2D overlays
   ctx.save();
-  ctx.globalAlpha = base;
+  ctx.globalAlpha = base * leave;
 
-  // URL Bar overlaid on top
-  const barTopL = get2D(-spreadX, spreadY, 0.2);
-  const barBotR = get2D(spreadX, spreadY * 0.85, 0.2);
-  const px0 = barTopL.x;
-  const pw = barBotR.x - barTopL.x;
-  const py0 = barBotR.y;
-  const barH = barBotR.y - barTopL.y;
+  // Browser window backing.
+  applyElevation(ctx, unit, "raised");
+  roundRect(ctx, winRect.x, winRect.y, winRect.w, winRect.h, unit * 0.6);
+  ctx.fillStyle = shade(THEME.panel, -0.35);
+  ctx.fill();
+  clearShadow(ctx);
+  roundRect(ctx, winRect.x, winRect.y, winRect.w, winRect.h, unit * 0.6);
+  ctx.strokeStyle = shade(THEME.panel, 0.22);
+  ctx.lineWidth = unit * 0.03;
+  ctx.stroke();
 
-  // macOS traffic lights are a real-world reference, not palette semantics: red/amber/green
-  // is what a browser window looks like. `#f87171` has no palette equivalent.
+  // Blocks: fill + glyphs.
+  for (const b of scene.blocks) {
+    const a = anims.get(b.id)!;
+    const showBeat = a.show ?? a.paint ?? offset;
+    const ts = beatT(env.beats, showBeat, totalBeats, env.p);
+    if (ts <= 0) continue;
+
+    let gy = b.y;
+    for (const sh of a.shifts) {
+      const t = beatT(env.beats, sh.beat, totalBeats, env.p);
+      if (t <= 0) continue;
+      gy = gy + (sh.y - gy) * easeInOutCubic(clamp01((t - 0.2) / 0.55));
+    }
+
+    const r = blockRect(b, gy);
+    const tp = a.paint !== null ? beatT(env.beats, a.paint, totalBeats, env.p) : 0;
+    const painted = tp > 0;
+    const pop = easeOutBack(clamp01(ts / 0.3));
+    const isActivePaint = a.paint !== null && active === a.paint;
+
+    ctx.save();
+    ctx.globalAlpha = base * leave * clamp01(ts * 4);
+    ctx.translate(r.cx, r.cy);
+    ctx.scale(0.9 + 0.1 * pop, 0.9 + 0.1 * pop);
+    ctx.translate(-r.cx, -r.cy);
+
+    applyElevation(ctx, unit, isActivePaint ? "floating" : "raised");
+    if (isActivePaint) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * 0.5;
+    }
+    roundRect(ctx, r.x, r.y, r.w, r.h, unit * 0.15);
+    ctx.fillStyle = painted ? roleFace(b.role, palette) : shade(THEME.panel, 0.09);
+    ctx.fill();
+    clearShadow(ctx);
+    roundRect(ctx, r.x, r.y, r.w, r.h, unit * 0.15);
+    ctx.strokeStyle = painted ? rgba(accent, 0.4) : rgba(THEME.textDim, 0.3);
+    ctx.lineWidth = unit * 0.025;
+    ctx.stroke();
+
+    drawGlyphs(ctx, b.role, r, unit, painted, env.elapsedMs, palette);
+    ctx.restore();
+  }
+
+  // URL bar.
+  const barTopY = winRect.y + winRect.h / 2 - spreadYpx + bob;
+  const barBotY = winRect.y + winRect.h / 2 - spreadYpx * 0.85 + bob;
+  const px0 = winCX - spreadXpx;
+  const pw = spreadXpx * 2;
+  const py0 = barBotY;
+  const bandH = barBotY - barTopY;
+
+  // macOS traffic lights are a real-world reference, not palette semantics.
   const lights = ["#f87171", THEME.warn, THEME.good] as const;
   lights.forEach((c, i) => {
     ctx.fillStyle = rgba(c, 0.5);
     ctx.beginPath();
-    ctx.arc(px0 + unit * 0.8 + i * unit * 0.6, py0 - Math.abs(barH) / 2, unit * 0.16, 0, Math.PI * 2);
+    ctx.arc(px0 + unit * 0.8 + i * unit * 0.6, py0 - Math.abs(bandH) / 2, unit * 0.16, 0, Math.PI * 2);
     ctx.fill();
   });
 
   const fx = px0 + unit * 2.8;
   const fw = pw - unit * 2.8 - unit * 0.6;
   const fh = unit * 1.05;
-  const fy = py0 - Math.abs(barH) / 2 - fh / 2;
-  
+  const fy = py0 - Math.abs(bandH) / 2 - fh / 2;
+
   roundRect(ctx, fx, fy, fw, fh, fh / 2);
   ctx.fillStyle = rgba(THEME.bgBottom, 0.7);
   ctx.fill();
@@ -400,9 +305,6 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
   ctx.lineWidth = unit * STROKE.thin;
   ctx.stroke();
 
-  // Badges are laid out right-to-left from the end of the bar, the URL left-to-right from
-  // its start, and nothing reserved space between them: on a narrower window the phase
-  // chips printed straight over the URL ("HTMLapdrsedcopaint").
   const badgeDefs: { text: string; beat: number }[] = [];
   scene.steps.forEach((st, k) => {
     if (st.badge) badgeDefs.push({ text: st.badge, beat: offset + k });
@@ -436,14 +338,13 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     ctx.fillRect(textX + cw2 + unit * 0.08, fy + fh * 0.22, unit * 0.07, fh * 0.56);
   }
 
-  // Badges
-  const shownBadges = visibleBadges;
+  // Badges.
   let bx = fx + fw - unit * 0.25;
-  for (let i = shownBadges.length - 1; i >= 0; i--) {
-    const b = shownBadges[i];
+  for (let i = visibleBadges.length - 1; i >= 0; i--) {
+    const b = visibleBadges[i];
     const bt = beatT(env.beats, b.beat, totalBeats, env.p);
     const pop = easeOutBack(clamp01(bt / 0.25));
-    const newest = i === shownBadges.length - 1;
+    const newest = i === visibleBadges.length - 1;
     ctx.font = `600 ${unit * 0.5}px ${FONT_MONO}`;
     const tw = ctx.measureText(b.text).width;
     const bw = tw + unit * 0.55;
@@ -451,7 +352,7 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     bx -= bw;
     const by = fy + (fh - bh) / 2;
     ctx.save();
-    ctx.globalAlpha = base * (newest ? 1 : 0.5) * clamp01(bt * 4);
+    ctx.globalAlpha = base * leave * (newest ? 1 : 0.5) * clamp01(bt * 4);
     ctx.translate(bx + bw / 2, by + bh / 2);
     ctx.scale(pop, pop);
     ctx.translate(-(bx + bw / 2), -(by + bh / 2));
@@ -467,51 +368,6 @@ export function paintBrowserframe(ctx: CanvasRenderingContext2D, scene: Browserf
     ctx.fillText(b.text, bx + bw / 2, by + bh / 2 + unit * 0.18);
     ctx.restore();
     bx -= unit * 0.2;
-  }
-
-  // 2D overlays on blocks (glyphs)
-  for (const b of scene.blocks) {
-    const a = anims.get(b.id)!;
-    const showBeat = a.show ?? a.paint ?? offset;
-    const ts = beatT(env.beats, showBeat, totalBeats, env.p);
-    if (ts <= 0) continue;
-
-    let gy = b.y;
-    for (const sh of a.shifts) {
-      const t = beatT(env.beats, sh.beat, totalBeats, env.p);
-      if (t <= 0) continue;
-      gy = gy + (sh.y - gy) * easeInOutCubic(clamp01((t - 0.2) / 0.55));
-    }
-
-    const bw3 = (b.w / GRID) * (spreadX * 2.0 * 0.95);
-    const bh3 = (b.h / usedRows) * (spreadY * 2.0 * 0.85);
-    const cx3 = (b.x / GRID - 0.5) * (spreadX * 2.0 * 0.95) + bw3 / 2;
-    const cy3 = (0.5 - gy / usedRows) * (spreadY * 2.0 * 0.85) - bh3 / 2 - (spreadY * 2.0 * 0.05);
-
-    const tl = get2D(cx3 - bw3 / 2, cy3 + bh3 / 2, 0.2);
-    const br = get2D(cx3 + bw3 / 2, cy3 - bh3 / 2, 0.2);
-    
-    const rRect: Rect = {
-      x: tl.x,
-      y: tl.y,
-      w: br.x - tl.x,
-      h: br.y - tl.y,
-      cx: (tl.x + br.x) / 2,
-      cy: (tl.y + br.y) / 2,
-    };
-
-    const tp = a.paint !== null ? beatT(env.beats, a.paint, totalBeats, env.p) : 0;
-    const painted = tp > 0;
-    const pop = easeOutBack(clamp01(ts / 0.3));
-
-    ctx.save();
-    ctx.globalAlpha = base * clamp01(ts * 4);
-    ctx.translate(rRect.cx, rRect.cy);
-    ctx.scale(0.9 + 0.1 * pop, 0.9 + 0.1 * pop);
-    ctx.translate(-rRect.cx, -rRect.cy);
-    
-    drawGlyphs(ctx, b.role, rRect, unit, painted, env.elapsedMs, palette);
-    ctx.restore();
   }
 
   ctx.restore();
