@@ -7,6 +7,7 @@ import {
   easeOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -68,13 +69,15 @@ function groupColor(group: number, palette: Palette): string {
  */
 export function paintGridFlood(ctx: CanvasRenderingContext2D, scene: GridFloodScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
   const isDfs = scene.mode === "dfs";
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
@@ -95,7 +98,7 @@ export function paintGridFlood(ctx: CanvasRenderingContext2D, scene: GridFloodSc
 
   const { rows, cols } = scene;
   const gap = unit * GAP_UNIT;
-  const bottom = vertical ? Math.min(contentY + contentH, layout.h * 0.9) : contentY + contentH;
+  const bottom = Math.min(contentY + contentH, safeBottom) - unit * 0.3;
   const availH = bottom - contentY - band - legendH;
   const cell = Math.max(
     unit * 0.7,
