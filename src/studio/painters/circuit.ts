@@ -7,6 +7,7 @@ import {
   easeOutCubic,
   easeOutBack,
   enterT,
+  departT,
   sub,
   shade,
   clamp01,
@@ -18,6 +19,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -61,7 +63,9 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
-  const frameIn = easeOutCubic(enterT(env, 340));
+  const leave = departT(env, 340);
+  if (leave <= 0) return;
+  const frameIn = easeOutCubic(enterT(env, 340)) * leave;
   const key = scene.id + "-circ3d";
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
@@ -205,7 +209,8 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
         const highlighted = hl.has(p.id);
         const energized = lit > 0 || (p.kind === "switch" && lever > 0);
         const breathe = lit > 0 && (p.kind === "bulb" || p.kind === "led") ? 1 + 0.05 * Math.sin(elapsedMs / 320) : 1;
-        mesh.scale.copy(base).multiplyScalar(Math.max(0.001, gIn) * breathe);
+        const hlPulse = highlighted && !energized ? 1 + 0.12 * Math.sin(elapsedMs / 480) : 1;
+        mesh.scale.copy(base).multiplyScalar(Math.max(0.001, gIn) * breathe * hlPulse);
 
         mesh.children.forEach((child) => {
           if (child instanceof THREE.Mesh) {
@@ -215,7 +220,12 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
             if (energized || highlighted) {
               mat.color.setStyle(accent);
               mat.emissive.setStyle(accent);
-              mat.emissiveIntensity = Math.max(0.2, lit * 0.8 * breathe);
+              // A highlighted-but-not-yet-energized part (e.g. an open switch
+              // called out before current flows) held a flat 0.2 intensity —
+              // the scene went fully static for its whole beat. Give it a
+              // slow breathing pulse instead so it stays visibly alive.
+              const idlePulse = 0.25 + 0.2 * Math.sin(elapsedMs / 480);
+              mat.emissiveIntensity = energized ? Math.max(0.2, lit * 0.8 * breathe) : idlePulse;
             } else {
               mat.color.setStyle(IDLE_FACE);
               mat.emissive.setStyle(IDLE_FACE);
@@ -238,6 +248,28 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
 
   const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: frameIn, stLit, stLever, hl: highlights, flowRamp }, env);
   const flat = !cam;
+
+  // Expanding pulse ring on a highlighted-but-not-yet-energized part (e.g. an
+  // open switch called out before current flows): the 3D material's own
+  // breathing pulse is too subtle a diff on a small board part to read as
+  // motion on its own, so add a screen-space ring (same convention as
+  // graphwalk.ts's frontier ring) as the primary, reliably-visible motion.
+  for (const id of highlights) {
+    const p = byId.get(id);
+    const c = centers.get(id);
+    if (!p || !c || (litOf(id) > 0 || (p.kind === "switch" && leverOf(id, p.kind) > 0))) continue;
+    const ringF = (env.elapsedMs % 1100) / 1100;
+    const baseR = ((p.kind === "bulb" || p.kind === "led" ? BULB_D : Math.max(NODE_W, NODE_H)) / 2) * unit;
+    const g = baseR * (0.15 + 0.7 * easeOutCubic(ringF));
+    ctx.save();
+    ctx.globalAlpha = (1 - ringF) * frameIn;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = unit * 0.08;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, baseR + g, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // Wires in 2D — drawn from the same pixel centers the 3D layer was mapped onto,
   // so they always meet the part regardless of camera/projection.
@@ -298,7 +330,7 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
       ctx.fillStyle = energized || highlighted ? accent : IDLE_FACE;
       ctx.fill();
       ctx.strokeStyle = THEME.textDim;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = unit * STROKE.thin;
       ctx.stroke();
       ctx.restore();
     });
@@ -333,7 +365,7 @@ export function paintCircuit(ctx: CanvasRenderingContext2D, scene: CircuitScene,
         ctx.shadowBlur = 0;
         roundRect(ctx, chipCx - cw2 / 2, chY, cw2, unit * 1.05, unit * 0.3);
         ctx.strokeStyle = rgba(accent, 0.6);
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = unit * STROKE.thin;
         ctx.stroke();
         ctx.fillStyle = THEME.text;
         ctx.textAlign = "center";
