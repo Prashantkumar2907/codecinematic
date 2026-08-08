@@ -4,12 +4,16 @@ import {
   THEME,
   FONT_SANS,
   easeInOutCubic,
+  easeOutCubic,
   clamp01,
   roundRect,
   drawSceneTitle,
   beatT,
   activeBeatIndex,
+  enterT,
+  departT,
   rgba,
+  STROKE,
 } from "./common";
 import { render3D, projectToRect, studioLights, color3, type ThreeBundle } from "./three3d";
 import type { PaintEnv } from "./index";
@@ -67,6 +71,9 @@ export function paintGlobe3d(ctx: CanvasRenderingContext2D, scene: Globe3dScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const key = scene.id;
+  const enter = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
@@ -212,9 +219,14 @@ export function paintGlobe3d(ctx: CanvasRenderingContext2D, scene: Globe3dScene,
     return { scene: s, camera, update };
   };
 
+  ctx.save();
+  ctx.globalAlpha = enter * leave;
   const cam = render3D(ctx, key, rect, build, env.elapsedMs);
+  ctx.restore();
 
   if (cam) {
+    ctx.save();
+    ctx.globalAlpha = enter * leave;
     // Labels projected from each revealed marker's world position.
     const stt = globeState.get(key);
     const groupRotY = stt ? yawFor(stt.fromLon) + (yawFor(stt.toLon) - yawFor(stt.fromLon)) * stt.ease : 0;
@@ -273,8 +285,9 @@ export function paintGlobe3d(ctx: CanvasRenderingContext2D, scene: Globe3dScene,
       ctx.fillText(a.label, sp.x, sp.y);
       ctx.restore();
     });
+    ctx.restore();
   } else {
-    drawGlobeFallback(ctx, scene, rect, revealed, curStep?.highlight ?? [], unit, accent, secondary, accentGlow);
+    drawGlobeFallback(ctx, scene, rect, revealed, curStep?.highlight ?? [], unit, accent, secondary, accentGlow, enter * leave);
   }
 
   ctx.textAlign = "start";
@@ -303,7 +316,7 @@ function drawMarkerLabel(
   // the chip away from it, a short leader keeps the two connected.
   if (Math.abs(chipY - y) > 0.5) {
     ctx.strokeStyle = rgba(accent, 0.4);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(bx, chipY);
@@ -313,7 +326,7 @@ function drawMarkerLabel(
   roundRect(ctx, bx, by, chipW, chipH, unit * 0.3);
   ctx.fill();
   ctx.strokeStyle = rgba(accent, isActive ? 0.95 : 0.45);
-  ctx.lineWidth = isActive ? 2 : 1;
+  ctx.lineWidth = unit * (isActive ? STROKE.base : STROKE.hair);
   ctx.stroke();
   // Leader dot.
   ctx.beginPath();
@@ -336,12 +349,14 @@ function drawGlobeFallback(
   unit: number,
   accent: string,
   secondary: string,
-  accentGlow: string
+  accentGlow: string,
+  alpha: number
 ) {
   const cx = rect.x + rect.w / 2;
   const cy = rect.y + rect.h / 2;
   const rad = Math.min(rect.w, rect.h) * 0.4;
   ctx.save();
+  ctx.globalAlpha = alpha;
   const g = ctx.createRadialGradient(cx - rad * 0.3, cy - rad * 0.3, rad * 0.1, cx, cy, rad);
   g.addColorStop(0, rgba(accent, 0.3));
   g.addColorStop(1, rgba(accent, 0.08));
@@ -350,13 +365,14 @@ function drawGlobeFallback(
   ctx.fillStyle = g;
   ctx.fill();
   ctx.strokeStyle = rgba(accent, 0.5);
-  ctx.lineWidth = 2;
+  ctx.lineWidth = unit * STROKE.base;
   ctx.stroke();
   // Graticule ellipses.
   for (let i = 1; i <= 3; i++) {
     ctx.beginPath();
     ctx.ellipse(cx, cy, rad, rad * (i / 4), 0, 0, Math.PI * 2);
     ctx.strokeStyle = rgba(accent, 0.18);
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.stroke();
     ctx.beginPath();
     ctx.ellipse(cx, cy, rad * (i / 4), rad, 0, 0, Math.PI * 2);
