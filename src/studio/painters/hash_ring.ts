@@ -8,6 +8,7 @@ import {
   easeInOutCubic,
   clamp01,
   enterT,
+  departT,
   roundRect,
   drawSceneTitle,
   fitFontSize,
@@ -132,7 +133,9 @@ export function paintHashRing(ctx: CanvasRenderingContext2D, scene: HashRingScen
   const activeIdx = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = activeIdx - offset;
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.5;
   const areaY = contentY + band;
@@ -157,6 +160,23 @@ export function paintHashRing(ctx: CanvasRenderingContext2D, scene: HashRingScen
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.restore();
+
+  // A slow radar sweep travels the ring continuously: without it, a scene
+  // sits fully static through its intro beat (before any node/key lands,
+  // the plain ring above is the only content on screen).
+  const sweepDeg = (env.elapsedMs / 20) % 360;
+  ctx.save();
+  ctx.globalAlpha = introIn * 0.55;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = unit * 0.22;
+  ctx.lineCap = "round";
+  ctx.shadowColor = accentGlow;
+  ctx.shadowBlur = unit * 0.6;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, canvasAngle(sweepDeg), canvasAngle(sweepDeg + 70));
+  ctx.stroke();
+  ctx.shadowBlur = 0;
   ctx.restore();
 
   const nodeInfo = scene.nodes.map((n) => {
