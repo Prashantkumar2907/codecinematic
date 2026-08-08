@@ -22,11 +22,10 @@ type Series = TrendScene["series"][number];
 
 const CURRENCY_RE = /^[₹$€£]$/;
 const CAPTION_SAFE_Y = 0.86;
-const MUTED_HEX = "#94a3b8";
 
 /** Series colour by its palette role. muted → the neutral slate used for reference lines. */
 function seriesColor(role: Series["role"], accent: string, secondary: string): string {
-  return role === "secondary" ? secondary : role === "muted" ? MUTED_HEX : accent;
+  return role === "secondary" ? secondary : role === "muted" ? THEME.textDim : accent;
 }
 
 /** Value label: currency symbols prefix (Indian grouping for ₹), % / units suffix.
@@ -120,7 +119,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
   const GRID_LINES = 3;
   for (let g = 0; g <= GRID_LINES; g++) {
     const gy = plotTop + (plotH * g) / GRID_LINES;
-    ctx.strokeStyle = rgba(MUTED_HEX, 0.08);
+    ctx.strokeStyle = rgba(THEME.textDim, 0.08);
     ctx.setLineDash([unit * 0.2, unit * 0.28]);
     ctx.beginPath();
     ctx.moveTo(contentX, gy);
@@ -130,7 +129,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
   ctx.setLineDash([]);
   // Baseline (or the zero line when the range straddles 0 — critical for gaps that go negative).
   const axisY = zeroInside ? zeroY : baseY;
-  ctx.strokeStyle = rgba(MUTED_HEX, zeroInside ? 0.4 : 0.28);
+  ctx.strokeStyle = rgba(THEME.textDim, zeroInside ? 0.4 : 0.28);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(contentX, axisY);
@@ -248,7 +247,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
       const chipY = midY - unit * 0.55;
       roundRect(ctx, chipX, chipY, cw + unit * 0.8, unit * 1.1, unit * 0.3);
       ctx.globalAlpha = introIn;
-      ctx.fillStyle = "#0a0e13";
+      ctx.fillStyle = THEME.bgBottom;
       ctx.fill();
       ctx.strokeStyle = accent;
       ctx.lineWidth = 1.5;
