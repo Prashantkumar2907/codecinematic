@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -16,6 +14,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -32,15 +31,8 @@ const TONE_COLORS: Record<GaugeScene["zones"][number]["tone"], string> = {
   danger: THEME.danger,
 };
 
-// 3D dial, authored at radius 1 and scaled to the pixel radius R by update().
-const CAM_FOV = 32;
-const CAM_HALF_H = 5;
 const TRACK_TUBE = 0.085;
-/** The unfilled track shares the zones' radius, so it must be thinner AND set
- *  back in z — coincident toruses z-fight into a dense radial stipple. */
-const TRACK_TUBE_SCALE = 0.7;
 const HUB_R = 0.15;
-const HUB_D = 0.11;
 const NEEDLE_LEN = 0.86;
 const NEEDLE_W = 0.055;
 const NEEDLE_D = 0.06;
@@ -92,37 +84,16 @@ const LEGEND_ROW_H_U = 2;
 const LEGEND_MAX_W_U = 14;
 const LEGEND_COL_W_U = 9;
 
-type GaugeCtx = {
-  scale: number;
-  posX: number;
-  posY: number;
-  trackIn: number;
-  zoneIn: number[];
-  tickIn: number[];
-  needleIn: number;
-  needleRad: number;
-  liveZone: number;
-  pulse: number;
-};
-
-function setGroupAlpha(group: THREE.Group, alpha: number) {
-  group.traverse((o) => {
-    const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
-    if (mat && !Array.isArray(mat)) {
-      mat.transparent = true;
-      mat.opacity = alpha;
-    }
-  });
-}
-
 export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, vertical } = layout;
-  const { accent, accentGlow, secondary } = env.palette;
+  const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const n = scene.readings.length;
   const totalBeats = offset + n;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ax = contentX;
@@ -211,92 +182,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
     return { x: p.x, y: p.y, align: (c > SIDE_ALIGN_COS ? "left" : c < -SIDE_ALIGN_COS ? "right" : "center") as CanvasTextAlign };
   };
 
-  // ---- 3D dial ---------------------------------------------------------------
-  const rect = { x: cx - dialHalfW, y: cy - dialTop, w: 2 * dialHalfW, h: usedH };
-  const pxPerWorld = rect.h / (2 * CAM_HALF_H);
-
-  const build = (): ThreeBundle<GaugeCtx> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 0.1, 100);
-    camera.position.set(0, 0, CAM_HALF_H / Math.tan(rad(CAM_FOV / 2)));
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const root = new THREE.Group();
-    s.add(root);
-
-    const arcMesh = (from: number, to: number, hex: string, emissive: number, tube: number) => {
-      const geo = new THREE.TorusGeometry(1, tube, 20, 96, rad(from - to));
-      const mat = new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(hex),
-        emissive: new THREE.Color(hex),
-        emissiveIntensity: emissive,
-        metalness: 0.3,
-        roughness: 0.22,
-        transparent: true,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.rotation.z = rad(to);
-      return mesh;
-    };
-
-    const track = arcMesh(A_START, A_END, THEME.textDim, 0.05, TRACK_TUBE * TRACK_TUBE_SCALE);
-    (track.material as THREE.MeshPhysicalMaterial).depthWrite = false;
-    track.position.z = -TRACK_TUBE;
-    root.add(track);
-
-    const zoneMeshes: THREE.Mesh[] = [];
-    let zoneStart = scene.min;
-    scene.zones.forEach((zn) => {
-      const mesh = arcMesh(v2a(zoneStart), v2a(zn.upTo), TONE_COLORS[zn.tone], 0.2, TRACK_TUBE);
-      root.add(mesh);
-      zoneMeshes.push(mesh);
-      zoneStart = zn.upTo;
-    });
-
-    const ticks: THREE.Group[] = [];
-    for (let i = 0; i < MINOR_TICKS; i++) {
-      const a = rad(A_START + ((A_END - A_START) * i) / (MINOR_TICKS - 1));
-      const tick = makeBlock(TICK_LEN, TICK_W, TICK_W, THEME.textDim, THEME.textDim);
-      tick.position.set(Math.cos(a) * TICK_R, Math.sin(a) * TICK_R, TRACK_TUBE * 0.5);
-      tick.rotation.z = a;
-      root.add(tick);
-      ticks.push(tick);
-    }
-
-    const needleGroup = new THREE.Group();
-    const needle = makeBlock(NEEDLE_LEN, NEEDLE_W, NEEDLE_D, accent, THEME.text);
-    needle.position.set(NEEDLE_LEN / 2, 0, 0);
-    needleGroup.add(needle);
-    needleGroup.position.z = TRACK_TUBE * 1.3;
-    root.add(needleGroup);
-
-    const hub = makeCylinder(HUB_R, HUB_D, THEME.panel, accent);
-    hub.rotation.x = Math.PI / 2;
-    hub.position.z = TRACK_TUBE * 1.9;
-    root.add(hub);
-
-    const update = (_elapsedMs: number, c?: GaugeCtx) => {
-      if (!c) return;
-      root.position.set(c.posX, c.posY, 0);
-      root.scale.setScalar(c.scale);
-      (track.material as THREE.MeshPhysicalMaterial).opacity = TRACK_OPACITY * c.trackIn;
-      zoneMeshes.forEach((mesh, i) => {
-        const mat = mesh.material as THREE.MeshPhysicalMaterial;
-        const live = i === c.liveZone;
-        mat.opacity = ZONE_OPACITY * (c.zoneIn[i] ?? 0) * (live ? 1 - ZONE_PULSE_GAIN + ZONE_PULSE_GAIN * c.pulse : 0.78);
-        mat.emissiveIntensity = live ? 0.28 + 0.22 * c.pulse : 0.16;
-      });
-      ticks.forEach((tick, i) => setGroupAlpha(tick, 0.7 * (c.tickIn[i] ?? 0)));
-      needleGroup.rotation.z = c.needleRad;
-      needleGroup.scale.set(Math.max(0.001, c.needleIn), 1, 1);
-      setGroupAlpha(needle, c.needleIn);
-      setGroupAlpha(hub, c.trackIn);
-    };
-
-    return { scene: s, camera, update };
-  };
-
+  // ---- dial, drawn directly in 2D — pixel geometry already decided it ----
   const trackIn = easeOutCubic(enterT(env, TRACK_IN_MS));
   const zoneIn = scene.zones.map((_, i) => easeOutCubic(enterT(env, ZONE_IN_MS, i * ZONE_STAGGER_MS)));
   const tickIn = Array.from({ length: MINOR_TICKS }, (_, i) =>
@@ -304,57 +190,59 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
   );
   const needleIn = easeOutCubic(enterT(env, NEEDLE_IN_MS, NEEDLE_DELAY_MS));
 
-  const cam = render3D<GaugeCtx>(
-    ctx,
-    scene.id + "-gauge3d",
-    rect,
-    build,
-    env.elapsedMs,
-    {
-      scale: R / pxPerWorld,
-      posX: (cx - (rect.x + rect.w / 2)) / pxPerWorld,
-      posY: -(cy - (rect.y + rect.h / 2)) / pxPerWorld,
-      trackIn,
-      zoneIn,
-      tickIn,
-      needleIn,
-      needleRad: rad(needleAngle),
-      liveZone,
-      pulse,
-    },
-    env
-  );
-
-  if (!cam) {
-    // WebGL-less fallback: the same dial, flat. Pixel geometry already decided it.
-    ctx.save();
-    ctx.lineWidth = R * TRACK_TUBE * 2;
+  ctx.save();
+  ctx.globalAlpha = leave;
+  ctx.lineWidth = R * TRACK_TUBE * 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, rad(-A_START), rad(-A_END));
+  ctx.strokeStyle = rgba(THEME.textDim, TRACK_OPACITY * trackIn);
+  ctx.stroke();
+  let flatStart = scene.min;
+  scene.zones.forEach((zn, i) => {
+    const live = i === liveZone;
     ctx.beginPath();
-    ctx.arc(cx, cy, R, rad(-A_START), rad(-A_END));
-    ctx.strokeStyle = rgba(THEME.textDim, TRACK_OPACITY * trackIn);
+    ctx.arc(cx, cy, R, rad(-v2a(flatStart)), rad(-v2a(zn.upTo)));
+    ctx.strokeStyle = rgba(TONE_COLORS[zn.tone], ZONE_OPACITY * (zoneIn[i] ?? 0) * (live ? 1 - ZONE_PULSE_GAIN + ZONE_PULSE_GAIN * pulse : 0.78));
+    if (live) {
+      ctx.shadowColor = rgba(TONE_COLORS[zn.tone], 0.5);
+      ctx.shadowBlur = unit * (0.3 + 0.5 * pulse);
+    } else {
+      ctx.shadowBlur = 0;
+    }
     ctx.stroke();
-    let flatStart = scene.min;
-    scene.zones.forEach((zn, i) => {
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, rad(-v2a(flatStart)), rad(-v2a(zn.upTo)));
-      ctx.strokeStyle = rgba(TONE_COLORS[zn.tone], ZONE_OPACITY * (zoneIn[i] ?? 0));
-      ctx.stroke();
-      flatStart = zn.upTo;
-    });
-    const tip = at(NEEDLE_LEN * needleIn, needleAngle);
-    ctx.lineWidth = R * NEEDLE_W;
-    ctx.lineCap = "round";
+    flatStart = zn.upTo;
+  });
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < MINOR_TICKS; i++) {
+    const ti = tickIn[i] ?? 0;
+    if (ti <= 0) continue;
+    const a = A_START + ((A_END - A_START) * i) / (MINOR_TICKS - 1);
+    const from = at(TICK_R - TICK_LEN / 2, a);
+    const to = at(TICK_R + TICK_LEN / 2, a);
+    ctx.lineWidth = R * TICK_W;
+    ctx.lineCap = "butt";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.7 * ti);
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(tip.x, tip.y);
-    ctx.strokeStyle = rgba(accent, needleIn);
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * HUB_R, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(THEME.panel, trackIn);
-    ctx.fill();
-    ctx.restore();
   }
+  const tip = at(NEEDLE_LEN * needleIn, needleAngle);
+  ctx.lineWidth = R * NEEDLE_W;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(tip.x, tip.y);
+  ctx.strokeStyle = rgba(accent, needleIn);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * HUB_R, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(THEME.panel, trackIn);
+  ctx.fill();
+  ctx.strokeStyle = rgba(accent, trackIn * 0.8);
+  ctx.lineWidth = R * HUB_R * 0.25;
+  ctx.stroke();
+  ctx.restore();
 
   // ---- reading markers on the arc --------------------------------------------
   scene.readings.forEach((rd, i) => {
@@ -370,7 +258,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * (0.5 + 0.4 * pulse);
     }
-    ctx.strokeStyle = rgba(accent, (i === k ? 0.95 : 0.4) * markerIn);
+    ctx.strokeStyle = rgba(accent, (i === k ? 0.95 : 0.4) * markerIn * leave);
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
@@ -386,7 +274,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
       const lp = radialLabel((v2a(zoneStart2) + v2a(zn.upTo)) / 2);
       const live = i === liveZone;
       ctx.save();
-      ctx.globalAlpha = labelIn;
+      ctx.globalAlpha = labelIn * leave;
       ctx.font = `700 ${zonePx}px ${FONT_SANS}`;
       ctx.textAlign = lp.align;
       ctx.textBaseline = "middle";
@@ -400,7 +288,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
   // ---- min / max labels ------------------------------------------------------
   const minmaxIn = easeOutCubic(enterT(env, CHROME_IN_MS, MINMAX_DELAY_MS));
   ctx.save();
-  ctx.globalAlpha = minmaxIn;
+  ctx.globalAlpha = minmaxIn * leave;
   ctx.font = `600 ${minmaxPx}px ${FONT_MONO}`;
   ctx.fillStyle = THEME.textFaint;
   ctx.textBaseline = "middle";
@@ -426,7 +314,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
     family: FONT_MONO,
   });
   ctx.save();
-  ctx.globalAlpha = readoutIn;
+  ctx.globalAlpha = readoutIn * leave;
   ctx.font = `800 ${vpx}px ${FONT_MONO}`;
   ctx.fillStyle = THEME.text;
   ctx.textAlign = "center";
@@ -442,7 +330,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
   const drawLabelChip = (label: string, alpha: number) => {
     if (alpha <= 0) return;
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     ctx.font = `600 ${chipPx}px ${FONT_SANS}`;
     const tw = Math.min(ctx.measureText(label).width, readoutW);
     roundRect(ctx, cx - tw / 2 - unit * 0.45, chipY - unit * 0.6, tw + unit * 0.9, unit * 1.2, unit * 0.34);
@@ -471,7 +359,7 @@ export function paintGauge(ctx: CanvasRenderingContext2D, scene: GaugeScene, env
     const isCurrent = k >= 0 && i === k;
     const rowY = legTop + unit * 0.25 + i * legendRowH + legendRowH / 2;
     ctx.save();
-    ctx.globalAlpha = rowIn * (isCurrent ? 1 : reached ? 0.72 : 0.3);
+    ctx.globalAlpha = rowIn * leave * (isCurrent ? 1 : reached ? 0.72 : 0.3);
     ctx.textBaseline = "middle";
     const dotR = unit * 0.22 * (isCurrent ? 1 + 0.14 * pulse : 1);
     if (isCurrent) {
