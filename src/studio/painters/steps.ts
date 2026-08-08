@@ -1,9 +1,10 @@
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba, shade } from "./common";
+import { THEME, FONT_SANS, easeOutBack, easeOutCubic, sub, wrapText, drawSceneTitle, beatT, activeBeatIndex, rgba, shade, departT, idle, roundRect } from "./common";
 import type { PaintEnv } from "./index";
 
 /** On 9:16 the bottom quarter is covered by the YouTube Shorts UI (CLAUDE_PROMPT.md:207). */
 const SHORTS_SAFE_BOTTOM = 0.75;
+const PULSE_MS = 2200;
 
 type StepsScene = Extract<Scene, { kind: "steps" }>;
 
@@ -15,6 +16,9 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const n = scene.steps.length;
@@ -40,7 +44,7 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
       const ghostIn = easeOutCubic(sub(env.p, 0, 0.12));
       if (ghostIn > 0) {
         ctx.save();
-        ctx.globalAlpha = 0.18 * ghostIn;
+        ctx.globalAlpha = 0.18 * ghostIn * leave;
         ctx.beginPath();
         ctx.arc(numX, cyc, numR, 0, Math.PI * 2);
         ctx.strokeStyle = accent;
@@ -64,7 +68,7 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
     if (i < n - 1) {
       const nextC = listTop + (i + 1) * rowGap + rowGap * 0.42;
       ctx.save();
-      ctx.globalAlpha = appear * 0.6;
+      ctx.globalAlpha = appear * 0.6 * leave;
       ctx.strokeStyle = rgba(accent, 0.35);
       ctx.lineWidth = unit * 0.08;
       ctx.beginPath();
@@ -75,13 +79,13 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
     }
 
     ctx.save();
-    ctx.globalAlpha = appear;
+    ctx.globalAlpha = appear * leave;
     ctx.translate(numX, cyc);
     ctx.scale(pop, pop);
     ctx.translate(-numX, -cyc);
     if (isCurrent) {
       ctx.shadowColor = accentGlow;
-      ctx.shadowBlur = unit * 0.9;
+      ctx.shadowBlur = unit * 0.9 * (0.7 + 0.3 * idle(env, PULSE_MS));
     }
     ctx.beginPath();
     ctx.arc(numX, cyc, numR, 0, Math.PI * 2);
@@ -98,8 +102,19 @@ export function paintSteps(ctx: CanvasRenderingContext2D, scene: StepsScene, env
     ctx.textAlign = "start";
     ctx.restore();
 
+    // The active row's whole text band breathes — the number's glow alone covers
+    // too little of the frame to register once a row settles and just holds.
+    if (isCurrent) {
+      ctx.save();
+      ctx.globalAlpha = appear * leave * (0.08 + 0.05 * idle(env, PULSE_MS));
+      roundRect(ctx, textX - unit * 0.3, cyc - rowGap * 0.42, contentX + contentW - textX + unit * 0.3, rowGap * 0.9, unit * 0.4);
+      ctx.fillStyle = accent;
+      ctx.fill();
+      ctx.restore();
+    }
+
     ctx.save();
-    ctx.globalAlpha = appear;
+    ctx.globalAlpha = appear * leave;
     const maxTextW = contentW - (textX - contentX);
     ctx.font = `${isCurrent ? 700 : 600} ${unit * 1.05}px ${FONT_SANS}`;
     ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
