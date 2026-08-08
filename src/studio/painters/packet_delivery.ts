@@ -8,6 +8,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -79,7 +80,9 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
@@ -139,7 +142,7 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
     const touched = activeStep >= 0 && stepTouches(scene.steps[activeStep], hop.id);
 
     ctx.save();
-    ctx.globalAlpha = clamp01(appear);
+    ctx.globalAlpha = clamp01(appear) * leave;
     isoBox3D(ctx, bx, by, w, hgt, depth, face, touched ? accentGlow : undefined);
     const bob = touched ? Math.sin(env.elapsedMs / 1200) * unit * 0.05 : 0;
     drawIcon(ctx, HOP_ICON[hop.kind], x, by + hgt * 0.38 + bob, hgt * 0.46, env, THEME.text);
@@ -151,7 +154,7 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
     ctx.fillText(hop.label, x, by + hgt * 0.8);
     if (touched) {
       const g = 0.4 + 0.6 * idle(env, 1500);
-      ctx.globalAlpha = clamp01(appear) * g * 0.7;
+      ctx.globalAlpha = clamp01(appear) * g * 0.7 * leave;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.09;
       roundRect(ctx, bx - unit * 0.18, by - unit * 0.18, w + unit * 0.36, hgt + unit * 0.36, unit * 0.45);
@@ -220,16 +223,24 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
       glowRing(ctx, pos(atI).x, pos(atI).y, cardW * 0.42, secondary, env, 1400);
     }
 
-    // Envelope, its payload pill, and its action caption all render at a fixed
-    // clearance above the hop row — otherwise the envelope sits exactly on top
-    // of a hop card at rest and collides with the card's own icon/label.
-    const envY = ep.y - cardH * 0.85;
+    // Envelope, its payload pill, and its action caption render at a fixed
+    // clearance PERPENDICULAR to the travel axis — never ALONG it. In
+    // vertical layout every hop sits on the same vertical line the envelope
+    // travels, so offsetting further along Y (as horizontal layout correctly
+    // does, lifting up) just relocates the collision: partway through any
+    // long hop-to-hop travel, that fixed Y-offset lands the caption exactly
+    // on the label band of whichever card is nearest (confirmed visually —
+    // "PACKET LOST" crossing directly over "Sender" mid-flight). Offsetting
+    // sideways instead clears every card unconditionally, since a card's
+    // footprint is bounded in X but the travel line has no width there.
+    const envX = vertical ? ep.x + cardW * 0.5 + unit * 1.5 : ep.x;
+    const envY = vertical ? ep.y : ep.y - cardH * 0.85;
 
     // Envelope.
     ctx.save();
     ctx.globalAlpha = introIn * alpha;
     const rot = lost > 0 ? lost * 0.5 : 0;
-    ctx.translate(ep.x, envY);
+    ctx.translate(envX, envY);
     if (rot) ctx.rotate(rot);
     drawEnvelope(ctx, 0, 0, ew, openT, tone, step.action === "retransmit" || step.action === "ack");
     ctx.restore();
@@ -242,20 +253,20 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
       const tw = ctx.measureText(payloadNow).width;
       const py = envY + ew * 0.5 + unit * 0.55;
       ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
-      roundRect(ctx, ep.x - tw / 2 - unit * 0.4, py - unit * 0.5, tw + unit * 0.8, unit * 1.0, unit * 0.3);
+      roundRect(ctx, envX - tw / 2 - unit * 0.4, py - unit * 0.5, tw + unit * 0.8, unit * 1.0, unit * 0.3);
       ctx.fill();
       ctx.strokeStyle = rgba(tone, 0.6);
       ctx.lineWidth = unit * 0.05;
-      roundRect(ctx, ep.x - tw / 2 - unit * 0.4, py - unit * 0.5, tw + unit * 0.8, unit * 1.0, unit * 0.3);
+      roundRect(ctx, envX - tw / 2 - unit * 0.4, py - unit * 0.5, tw + unit * 0.8, unit * 1.0, unit * 0.3);
       ctx.stroke();
       ctx.fillStyle = THEME.text;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(payloadNow, ep.x, py);
+      ctx.fillText(payloadNow, envX, py);
       ctx.restore();
     }
 
-    // Action caption above the envelope.
+    // Action caption on the far side of the envelope from the payload pill.
     ctx.save();
     ctx.globalAlpha = introIn * (0.5 + 0.5 * clamp01(alpha + 0.3));
     ctx.font = `800 ${unit * 0.66}px ${FONT_SANS}`;
@@ -263,7 +274,7 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     const badge = lost > 0.3 ? "✕ " + CAPTION[step.action] : CAPTION[step.action];
-    ctx.fillText(badge, ep.x, envY - ew * 0.5 - unit * 0.5);
+    ctx.fillText(badge, envX, envY - ew * 0.5 - unit * 0.5);
     ctx.restore();
   }
 
