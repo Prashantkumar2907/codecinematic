@@ -10,6 +10,7 @@ import {
   easeInOutCubic,
   easeOutBack,
   enterT,
+  departT,
   idle,
   roundRect,
   fitFontSize,
@@ -18,6 +19,7 @@ import {
   beatT,
   activeBeatIndex,
   glowRing,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -28,8 +30,6 @@ type Flight = { from?: Pt; to?: Pt; e: number; amount: number; label: string; up
 const DANGER = THEME.danger;
 const MIN_COIN_H_UNIT = 0.16;
 const MAX_COIN_H_UNIT = 0.85;
-// Captions sit in the bottom ~12% of vertical frames; keep stacks above it (see ledger.ts).
-const CAPTION_SAFE_Y = 0.88;
 const FLIGHT_COINS = 5;
 const FLIGHT_STAGGER = 0.12;
 // Last flying coin (offset 4*0.12) must still land at flight progress 1.
@@ -82,13 +82,15 @@ function peakCoins(scene: CoinStackScene): number {
  */
 export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom: layoutSafeBottom } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
@@ -104,7 +106,7 @@ export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackSc
   // Geometry: one shared baseline, coins stacking upward, laid in a single row.
   const n = scene.stacks.length;
   const areaY = contentY + band;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
+  const safeBottom = Math.min(contentY + contentH, layoutSafeBottom) - unit * 0.3;
   const areaH = safeBottom - areaY;
   const labelH = unit * (vertical ? 2.7 : 2.3);
   const topPad = unit * 1.7;
@@ -187,7 +189,12 @@ export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackSc
     const isActive = !!curStep && (curStep.from === stack.id || curStep.to === stack.id) && curStepT < 1;
     const enter = enterT(env, 360, i * 70);
     if (enter <= 0) return;
-    const popScale = 0.92 + 0.08 * easeOutBack(clamp01(enter));
+    // A slow whole-stack breathing scale, independent of any step's flight:
+    // without it the scene sits fully static through its intro beat (before
+    // the first coin flies, the top coin's own subtle glow sway was too
+    // small an area to register).
+    const breathe = 1 + 0.012 * idle(env, 1900, i * 0.5);
+    const popScale = (0.92 + 0.08 * easeOutBack(clamp01(enter))) * breathe;
     const appear = easeOutCubic(clamp01(enter * 1.4));
 
     ctx.save();
@@ -270,7 +277,7 @@ export function paintCoinStack(ctx: CanvasRenderingContext2D, scene: CoinStackSc
       ctx.fillStyle = THEME.bgBottom;
       ctx.fill();
       ctx.strokeStyle = rgba(tone, 0.6);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = unit * STROKE.thin;
       ctx.stroke();
       ctx.fillStyle = tone;
       ctx.textAlign = "center";
