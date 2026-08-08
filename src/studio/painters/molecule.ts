@@ -208,7 +208,7 @@ export function paintMolecule(ctx: CanvasRenderingContext2D, scene: MoleculeScen
             const dist = p1.distanceTo(p2);
             const group = new THREE.Group();
             
-            const bondColor = "#94a3b8";
+            const bondColor = THEME.textDim;
             const bondMat = new THREE.MeshPhysicalMaterial({
                 color: new THREE.Color(bondColor),
                 metalness: 0.5,
