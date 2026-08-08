@@ -1,8 +1,6 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import { tokenizeLine } from "../tokenize";
-import { THEME, FONT_MONO, FONT_SANS, easeOutCubic, clamp01, enterT, idle, roundRect, beatWindow, activeBeatIndex, rgba, shade } from "./common";
+import { THEME, FONT_MONO, FONT_SANS, easeOutCubic, clamp01, enterT, idle, roundRect, beatWindow, activeBeatIndex, rgba, shade, departT, applyElevation, clearShadow, RADIUS } from "./common";
 import type { PaintEnv } from "./index";
 
 type CodeScene = Extract<Scene, { kind: "code" }>;
@@ -10,12 +8,9 @@ type CodeScene = Extract<Scene, { kind: "code" }>;
 /** Fraction of a segment's beat spent typing; the rest holds for listening. */
 const TYPE_WITHIN_BEAT = 0.88;
 const BASE_COLS = 46;
-const BLOCK_DEPTH = 0.3;
 /** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16). */
 const SAFE_BOTTOM_SHORT = 0.75;
 const SAFE_BOTTOM_LONG = 0.94;
-/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
-const EDGE_ALPHA = 0.6;
 /** Traffic lights are a macOS reference, not palette colours — deliberately literal. */
 const TRAFFIC_LIGHTS = ["#ff5f57", "#febc2e", "#28c840"] as const;
 
@@ -75,9 +70,8 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
   const frameIn = easeOutCubic(enterT(env, 340));
-  if (frameIn <= 0) return;
-
-  const key = scene.id + "-code3d";
+  const leave = departT(env, 380);
+  if (frameIn <= 0 || leave <= 0) return;
 
   const fx = contentX;
   const fw = contentW;
@@ -99,58 +93,16 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
   const fh = Math.min(maxFh, barH + lineH * (lineCount + 1.2) + sbH);
   const fy = contentY + (bandH - fh) / 2;
   
-  // The 3D viewport is the editor window plus a hairline of room for its edge glow.
-  // It used to be the WHOLE FRAME with a hardcoded 7.5-wide block: at 9:16 the frustum
-  // half-width is only ~3.49, so the block (half-width 3.75) hung off both edges and
-  // dragged the pixel chrome with it through the scale transform below.
-  const rectPad = unit * 0.3;
-  const rect = { x: fx - rectPad, y: fy - rectPad, w: fw + rectPad * 2, h: fh + rectPad * 2 };
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, vertical ? 15 : 12);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, BLOCK_DEPTH / 2);
-    const block = makeBlock(fw / m.sx, fh / m.sy, BLOCK_DEPTH, THEME.panel, accent);
-    s.add(block);
-
-    const update = () => {
-      // No scale, bob or rotation: the chrome below is drawn in pixels on the block's
-      // own rect, so any transform here slides the two layers against each other.
-      const gIn = easeOutCubic(enterT(env, 600));
-      block.traverse((o) => {
-        const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if (!mat) return;
-        mat.transparent = true;
-        mat.opacity = gIn * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 0.95);
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
-  if (!cam) return;
-
   ctx.save();
-  ctx.globalAlpha = frameIn;
+  ctx.globalAlpha = frameIn * leave;
 
-  // Background is already drawn by 3D block, we only draw the UI elements and borders.
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-  roundRect(ctx, fx, fy, fw, fh, unit * 0.7);
+
+  applyElevation(ctx, unit, "raised");
+  roundRect(ctx, fx, fy, fw, fh, unit * RADIUS.lg);
+  ctx.fillStyle = THEME.panel;
+  ctx.fill();
+  clearShadow(ctx);
+  roundRect(ctx, fx, fy, fw, fh, unit * RADIUS.lg);
   ctx.strokeStyle = THEME.panelBorder;
   ctx.lineWidth = 1;
   ctx.stroke();
@@ -223,11 +175,15 @@ export function paintCode(ctx: CanvasRenderingContext2D, scene: CodeScene, env: 
       activeSegRange !== null && line.number >= activeSegRange.fromLine && line.number <= activeSegRange.toLine;
 
     if (isActive || isFocus || inActiveSegment) {
+      // Breathing, not flat: a full-width band at a fixed alpha still went fully
+      // still once typing paused mid-segment — the tiny blinking cursor and focus
+      // rail are both too small on their own to register at the motion-check grid.
+      const breathe = 0.8 + 0.35 * idle(env, 1800);
       ctx.fillStyle = isActive
-        ? rgba(accent, 0.07)
+        ? rgba(accent, 0.07 * breathe)
         : inActiveSegment
-          ? rgba(accent, 0.035)
-          : rgba(THEME.text, 0.025);
+          ? rgba(accent, 0.035 * breathe)
+          : rgba(THEME.text, 0.025 * breathe);
       ctx.fillRect(fx, y - lineH + fontPx * 0.35, fw, lineH);
       if (isFocus) {
         ctx.fillStyle = rgba(accent, 0.4 + 0.28 * idle(env, 2200));

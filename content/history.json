@@ -26,7 +26,16 @@
           }
         ],
         "Caching & Queues": [],
-        "Web Architecture": []
+        "Web Architecture": [
+          {
+            "date": "2026-08-08",
+            "topic": "How a request flows through a web system",
+            "title": "How a request flows through a web system — Wave-1 Demo",
+            "format": "long",
+            "slug": "2026-08-08-14-50-long-how-a-request-flows-through-a-web-system",
+            "status": "draft"
+          }
+        ]
       },
       "CS Fundamentals": {
         "Networking & the Internet": [],
