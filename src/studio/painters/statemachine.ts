@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -17,7 +15,7 @@ import {
   fitFontSize,
   beatT,
   activeBeatIndex,
-  variantOf,
+  departT,
   rgba,
   type Layout,
   shade,
@@ -65,8 +63,10 @@ function gridMap(states: StateNode[], layout: Layout, titleBand: number, rot: bo
   const areaY = layout.contentY + titleBand;
   const areaW = layout.contentW;
   // The caption band, not a one-unit shave: the bottom state used to run to 90% of
-  // frame height in 9:16, well under the burned-in caption.
-  const areaH = Math.max(layout.unit * 4, layout.safeBottom - areaY);
+  // frame height in 9:16, well under the burned-in caption. Also reserves the
+  // current-state ring's max outward growth (unit*0.67) so a bottom-row state's
+  // pulse can never cross safeBottom — measured -10.5px at p=0.6 without this.
+  const areaH = Math.max(layout.unit * 4, layout.safeBottom - areaY - layout.unit * 0.7);
   const cellW = areaW / GRID;
   const cellH = areaH / GRID;
   const maxYo = Math.max(...states.map((s) => s.y + 1));
@@ -103,14 +103,15 @@ function rectEdgePoint(r: Rect, toward: Pt): Pt {
   return { x: r.cx + dx * Math.min(s, 1), y: r.cy + dy * Math.min(s, 1) };
 }
 
-function curvePts(from: Rect, to: Rect, key: string, unit: number): Pt[] {
+function curvePts(from: Rect, to: Rect, unit: number): Pt[] {
   const a = rectEdgePoint(from, { x: to.cx, y: to.cy });
   const b = rectEdgePoint(to, { x: from.cx, y: from.cy });
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len = Math.hypot(dx, dy) || 1;
-  const side = variantOf(key, 2) === 0 ? 1 : -1;
-  const off = unit * 1.2 * side;
+  // One canonical curve direction under the phase's one-look-per-kind decision —
+  // the old per-edge coin flip added no information, both directions read the same.
+  const off = unit * 1.2;
   const c = { x: (a.x + b.x) / 2 + (-dy / len) * off, y: (a.y + b.y) / 2 + (dx / len) * off };
   const pts: Pt[] = [];
   for (let i = 0; i <= CURVE_SAMPLES - 1; i++) {
@@ -141,7 +142,11 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const introIn = easeOutCubic(enterT(env, 400));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  // Multiplied into the one entrance factor every alpha site already reads —
+  // every fade site in this file inherits departure without touching each one.
+  const introIn = easeOutCubic(enterT(env, 400)) * leave;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const rot = shouldRotate(scene.states, layout.vertical);
@@ -164,39 +169,6 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
   };
 
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const minX = Math.min(...scene.states.map((n) => n.x));
-  const maxX = Math.max(...scene.states.map((n) => n.x + 1));
-  const minY = Math.min(...scene.states.map((n) => n.y));
-  const maxY = Math.max(...scene.states.map((n) => n.y + 1));
-  const rangeX = Math.max(maxX - minX, 1);
-  const rangeY = Math.max(maxY - minY, 1);
-
-  const areaX = layout.contentX;
-  const areaY = layout.contentY + titleBand;
-  const areaW = layout.contentW;
-  const areaH = Math.max(layout.unit * 4, layout.safeBottom - areaY);
-  const rect = { x: areaX, y: areaY, w: areaW, h: areaH };
-
-  const spreadX = vertical ? 3.5 : 5.5;
-  const spreadZ = vertical ? 5.5 : 3.5;
-
-  const worldPos = (gx: number, gy: number) => {
-    const cx = (gx - minX) / rangeX - 0.5;
-    const cy = (gy - minY) / rangeY - 0.5;
-    return rot ? new THREE.Vector3(cy * spreadX * 2, 0, cx * spreadZ * 2) 
-               : new THREE.Vector3(cx * spreadX * 2, 0, cy * spreadZ * 2);
-  };
-
-  const key = scene.id + "-sm3d";
-  
   const startId = scene.states[0]?.id;
   const stepT = scene.steps.map((_, k) => beatT(env.beats, offset + k, totalBeats, env.p));
   let lastArrived = -1;
@@ -209,92 +181,13 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   });
   const currentId = lastArrived >= 0 ? scene.steps[lastArrived].go : startId;
 
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, 12);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, THEME.textDim);
-    const m = mappingAt(camera, SLAB_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-    
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, 0.22)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
-    
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models = scene.states.map((st) => {
-      // `accentGlow` is an rgba string; THREE.Color drops the alpha, so the "accent"
-      // state's edge rendered at full strength and the console warned every frame.
-      const blockColor = st.accent ? lerpColor(THEME.panel, accent, ACCENT_TINT) : shade(THEME.panel, IDLE_FACE_LIFT);
-      const edgeColor = st.accent ? accent : THEME.textDim;
-      const g = makeBlock(1, 1, SLAB_DEPTH, blockColor, edgeColor);
-      s.add(g);
-      return { id: st.id, mesh: g, state: st };
-    });
-
-    const update = (elapsedMs: number) => {
-      models.forEach(({ id, mesh, state }) => {
-        const isCurrent = id === currentId;
-        const isVisited = visited.has(id);
-        
-        let scale = 1;
-        scene.steps.forEach((st, k) => {
-          if (st.go !== id) return;
-          const t = stepT[k];
-          if (t >= ARRIVE && t < ARRIVE + 0.3) {
-            const popT = clamp01((t - ARRIVE) / 0.3);
-            scale = 1 + 0.15 * Math.sin(Math.PI * easeOutCubic(popT));
-          }
-        });
-
-        const pulse = isCurrent ? 1 + 0.018 * idle(env, 1600) : 1;
-        mesh.visible = introIn > 0;
-        
-        // Placed FROM the pixel rect, and never moved afterwards: the old bob and the
-        // +0.2 lift for the current state slid the slab out from under its own pill.
-        const pr = stateRect(state);
-        const c = toWorld(pr.cx, pr.cy);
-        mesh.position.set(c.x, c.y, 0);
-        mesh.scale.set(
-          (pr.w / m.sx) * Math.max(0.001, scale * pulse),
-          (pr.h / m.sy) * Math.max(0.001, scale * pulse),
-          1
-        );
-        
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.Material;
-                mat.transparent = true;
-                mat.opacity = (isVisited ? 1.0 : 0.5) * introIn;
-            }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, null, env);
-  if (!cam) return;
-
-  const pillH = unit * 1.5;
   const rects = new Map<string, { rect: Rect; fontPx: number }>();
   for (const s of scene.states) {
     // Bounded by the pill, not by the grid cell times 2.2: the label was fitted to a
     // width the state does not have and ran outside its own outline.
     const pillW = stateRect(s).w;
     const fontPx = fitFontSize(ctx, s.label, { maxW: pillW - unit * 0.6, startPx: unit * 0.7, minPx: unit * 0.34, weight: 700 });
-    ctx.font = `700 \${fontPx}px \${FONT_SANS}`;
+    ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
     
     rects.set(s.id, { rect: stateRect(s), fontPx });
   }
@@ -304,15 +197,15 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     const a = rects.get(e.from);
     const b = rects.get(e.to);
     if (!a || !b) continue;
-    const key = `\${e.from}>\${e.to}`;
-    edgePts.set(key, e.from === e.to ? loopPts(a.rect, unit) : curvePts(a.rect, b.rect, key, unit));
+    const key = `${e.from}>${e.to}`;
+    edgePts.set(key, e.from === e.to ? loopPts(a.rect, unit) : curvePts(a.rect, b.rect, unit));
   }
 
   const walk: { key: string; pts: Pt[]; toId: string }[] = [];
   {
     let curId = startId;
     for (const st of scene.steps) {
-      const key = `\${curId}>\${st.go}`;
+      const key = `${curId}>${st.go}`;
       let pts = st.go === curId ? loopPts((rects.get(curId) ?? [...rects.values()][0]).rect, unit) : edgePts.get(key);
       if (!pts) {
         const a = (rects.get(curId) ?? [...rects.values()][0]).rect;
@@ -332,7 +225,7 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
   });
 
   for (const e of scene.edges) {
-    const pts = edgePts.get(`\${e.from}>\${e.to}`);
+    const pts = edgePts.get(`${e.from}>${e.to}`);
     if (!pts) continue;
     ctx.save();
     ctx.globalAlpha = 0.22 * introIn;
@@ -367,13 +260,13 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
 
   for (const e of scene.edges) {
     if (!e.label) continue;
-    const pts = edgePts.get(`\${e.from}>\${e.to}`);
+    const pts = edgePts.get(`${e.from}>${e.to}`);
     if (!pts) continue;
-    const taken = arrivedKeys.has(`\${e.from}>\${e.to}`);
+    const taken = arrivedKeys.has(`${e.from}>${e.to}`);
     const mid = pointAlongPolyline(pts, 0.5);
     ctx.save();
     ctx.globalAlpha = (taken ? 0.9 : 0.4) * introIn;
-    ctx.font = `600 \${unit * (vertical ? 0.62 : 0.55)}px \${FONT_SANS}`;
+    ctx.font = `600 ${unit * (vertical ? 0.62 : 0.55)}px ${FONT_SANS}`;
     const tw = ctx.measureText(e.label).width;
     roundRect(ctx, mid.x - tw / 2 - unit * 0.32, mid.y - unit * 0.48, tw + unit * 0.64, unit * 0.96, unit * 0.26);
     ctx.fillStyle = THEME.bgBottom;
@@ -440,7 +333,7 @@ export function paintStatemachine(ctx: CanvasRenderingContext2D, scene: Statemac
     ctx.lineWidth = isCurrent ? unit * 0.13 : isVisited || s.accent ? unit * 0.09 : unit * 0.06;
     ctx.stroke();
 
-    ctx.font = `700 \${fontPx}px \${FONT_SANS}`;
+    ctx.font = `700 ${fontPx}px ${FONT_SANS}`;
     ctx.fillStyle = isVisited ? THEME.text : THEME.textDim;
     ctx.textAlign = "center";
     ctx.fillText(s.label, rect.cx, rect.cy + fontPx * 0.35);

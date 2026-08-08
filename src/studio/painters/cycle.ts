@@ -249,7 +249,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     const room = side > 0 ? contentX + contentW - finalX : finalX - contentX;
     const maxW = side === 0 ? Math.min(unit * 9, contentW * 0.6) : Math.max(unit * 2.2, room - unit * 0.5);
     const px = fitFontSize(ctx, node.label, { maxW, startPx: unit * (vertical ? 0.8 : 0.72), minPx: unit * 0.56, weight: 700 });
-    ctx.font = `700 \${px}px \${FONT_SANS}`;
+    ctx.font = `700 ${px}px ${FONT_SANS}`;
     let lines = [node.label];
     if (ctx.measureText(node.label).width > maxW) lines = wrapText(ctx, node.label, maxW).slice(0, 2);
     const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
@@ -319,7 +319,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     ctx.stroke();
     
     if (node.icon) {
-      ctx.font = `\${nodeR}px \${FONT_SANS}`;
+      ctx.font = `${nodeR}px ${FONT_SANS}`;
       ctx.textAlign = "center";
       ctx.fillText(node.icon, pos.x, pos.y + nodeR * 0.36);
       ctx.textAlign = "start";
@@ -357,7 +357,7 @@ export function paintCycle(ctx: CanvasRenderingContext2D, scene: CycleScene, env
     if (alpha <= 0) return;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = `500 \${unit * (vertical ? 0.8 : 0.78)}px \${FONT_SANS}`;
+    ctx.font = `500 ${unit * (vertical ? 0.8 : 0.78)}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
     

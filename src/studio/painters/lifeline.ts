@@ -262,16 +262,16 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
       minPx: unit * 0.4,
       weight: 700,
     });
-    ctx.font = `700 \${labelPx}px \${FONT_SANS}`;
+    ctx.font = `700 ${labelPx}px ${FONT_SANS}`;
     const lw = ctx.measureText(actor.label).width;
     ctx.fillStyle = isHot ? THEME.text : THEME.textDim;
     if (actor.icon) {
       const iconPx = unit * 0.85;
       const total = iconPx + unit * 0.25 + lw;
       const start = chipX - total / 2;
-      ctx.font = `\${iconPx}px \${FONT_SANS}`;
+      ctx.font = `${iconPx}px ${FONT_SANS}`;
       ctx.fillText(actor.icon, start, cyMid + iconPx * 0.35);
-      ctx.font = `700 \${labelPx}px \${FONT_SANS}`;
+      ctx.font = `700 ${labelPx}px ${FONT_SANS}`;
       ctx.fillText(actor.label, start + iconPx + unit * 0.25, cyMid + labelPx * 0.35);
     } else {
       ctx.fillText(actor.label, chipX - lw / 2, cyMid + labelPx * 0.35);
@@ -294,7 +294,7 @@ export function paintLifeline(ctx: CanvasRenderingContext2D, scene: LifelineScen
 
     ctx.save();
     ctx.globalAlpha = labelIn * (isCurrent ? 1 : PAST_ALPHA);
-    ctx.font = `600 \${unit * 0.62}px \${FONT_SANS}`;
+    ctx.font = `600 ${unit * 0.62}px ${FONT_SANS}`;
     const tw = ctx.measureText(msg.label).width;
     roundRect(ctx, projMid.x - tw / 2 - unit * 0.4, projMid.y - unit * 0.55, tw + unit * 0.8, unit * 1.1, unit * 0.3);
     ctx.fillStyle = THEME.bgBottom;
