@@ -1,7 +1,23 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, frustumHalfExtent, type ThreeBundle } from "./three3d";
 import type { Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, clamp01, wrapText, roundRect, beatT, beatWindow, rgba, shade, variantOf } from "./common";
+import {
+  THEME,
+  FONT_SANS,
+  easeOutBack,
+  easeOutCubic,
+  enterT,
+  idle,
+  clamp01,
+  wrapText,
+  roundRect,
+  beatT,
+  beatWindow,
+  rgba,
+  shade,
+  departT,
+  applyElevation,
+  clearShadow,
+  RADIUS,
+} from "./common";
 import type { PaintEnv } from "./index";
 
 type MythfactScene = Extract<Scene, { kind: "mythfact" }>;
@@ -11,33 +27,8 @@ const DANGER = "#f87171";
 /** Lowest usable baseline as a fraction of frame height; the 9:16 bottom band is
  *  covered by the Shorts UI. Matches bullets.ts / bigtext.ts / question.ts. */
 const SAFE_BOTTOM_SHORT = 0.75;
-/** Fraction of the visible frustum the card pair fills. */
-const FILL = 0.94;
-/** Gap between the two cards as a fraction of the span they share. */
-const GAP_FRAC = 0.1;
-const CARD_DEPTH = 0.5;
-/** Card faces are darkened this far toward black. studioLights' key light is the
- *  card's own colour at 1.5 intensity, so a lightly-shaded face renders as flat
- *  mid-saturation and white text on it loses contrast. */
+const GAP_UNITS = 0.7;
 const CARD_FACE_DARKEN = -0.86;
-/** Camera: front-on with a small rise, so a card's projected front face is an
- *  axis-aligned rectangle and its chrome can be placed on it exactly. */
-const CAM_RISE = 0.6;
-const CAM_DIST = 9;
-/** Entrance scale. A card already fills FILL of the frustum, so an easeOutBack
- *  overshoot past 1 would push it off frame and drag its text with it. */
-const CARD_ENTER_SCALE = 0.9;
-/** The myth card's share of the stack in the emphasis variant (payoff dominates). */
-const EMPHASIS_MYTH_FRAC = 0.4;
-const MYTH_EMISSIVE_IDLE = 0.06;
-const MYTH_EMISSIVE_BUST = 0.18;
-const MYTH_EMISSIVE_PULSE = 0.1;
-const FACT_EMISSIVE = 0.08;
-const FACT_EMISSIVE_PULSE = 0.1;
-/** How long the myth slab takes to go from idle to busted colour. */
-const BUST_RAMP_MS = 320;
-const BUST_SHAKE_MS = 350;
-/** How far the busted myth card recedes, as a fraction of its own opacity. */
 const MYTH_BUST_FADE = 0.22;
 const MYTH_TEXT_FADE = 0.18;
 /** Text block: chip band above the first baseline, line step, wrap ceiling. */
@@ -45,6 +36,10 @@ const CHIP_BAND = 2.3;
 const LINE_STEP = 1.34;
 const MAX_LINES = 5;
 const MIN_FONT_UNITS = 0.72;
+const BOB_AMPLITUDE_UNITS = 0.16;
+/** How long the myth card takes to go from idle to busted colour. */
+const BUST_RAMP_MS = 320;
+const BUST_SHAKE_MS = 350;
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -63,16 +58,17 @@ function chip(ctx: CanvasRenderingContext2D, x: number, y: number, label: string
 
 /**
  * Beat 0: the myth card appears. Beat 1: a ❌ stamps it and the fact card
- * reveals. Composition is seeded (scene id): 0 equal stacked cards,
- * 1 split side-by-side (horizontal; vertical falls back to stacked),
- * 2 emphasis stack where the payoff fact card dominates.
+ * reveals. Composition follows the ASPECT: long (16:9) has the horizontal room
+ * for the two cards side by side; short (9:16) stacks them — two intentional
+ * compositions rather than a per-scene coin flip (rubric v2 s10).
  */
 export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScene, env: PaintEnv) {
   const { layout } = env;
   const { h, unit, contentX, contentY, contentW, contentH, vertical } = layout;
-  const variant = variantOf(scene.id, 3);
-  const split = !vertical && variant === 1;
-  const emphasis = variant === 2;
+  const split = !vertical;
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const t1 = beatT(env.beats, 1, 2, env.p);
   // Bust choreography runs on absolute ms into beat 1 — beat-fraction timing
@@ -84,115 +80,32 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
   const factIn = easeOutCubic(clamp01((ms1 - 120) / 420));
   const bustRamp = busted ? easeOutCubic(clamp01(ms1 / BUST_RAMP_MS)) : 0;
 
-  const usableH = (vertical ? Math.min(contentY + contentH, h * SAFE_BOTTOM_SHORT) : contentY + contentH) - contentY;
-  const key = scene.id + "-mythfact3d";
-  const rect = { x: contentX, y: contentY, w: contentW, h: usableH };
+  // Reserve the bob's full excursion so a card's floating bottom edge can never
+  // cross into the caption band at any phase — safe-check caught -6.9px at p=0.6.
+  const bobReserve = unit * BOB_AMPLITUDE_UNITS * 2;
+  const usableH =
+    (vertical ? Math.min(contentY + contentH, h * SAFE_BOTTOM_SHORT) : contentY + contentH) - contentY - bobReserve;
+  const rect: Rect = { x: contentX, y: contentY, w: contentW, h: usableH };
 
-  /** Card geometry from the live frustum, so both aspects fit by construction and
-   *  the `emphasis` variant reaches the blocks instead of only the text rects. */
-  const metrics = (camera: THREE.PerspectiveCamera) => {
-    const { halfW, halfH } = frustumHalfExtent(camera, rect);
-    const spanW = halfW * 2 * FILL;
-    const spanH = halfH * 2 * FILL;
-    if (split) {
-      const gap = spanW * GAP_FRAC;
-      const cw = (spanW - gap) / 2;
-      return {
-        myth: { x: -(cw + gap) / 2, y: 0, w: cw, h: spanH },
-        fact: { x: (cw + gap) / 2, y: 0, w: cw, h: spanH },
+  const gap = unit * GAP_UNITS;
+  const cards: { myth: Rect; fact: Rect } = split
+    ? {
+        myth: { x: rect.x, y: rect.y, w: (rect.w - gap) / 2, h: rect.h },
+        fact: { x: rect.x + (rect.w - gap) / 2 + gap, y: rect.y, w: (rect.w - gap) / 2, h: rect.h },
+      }
+    : {
+        myth: { x: rect.x, y: rect.y, w: rect.w, h: (rect.h - gap) / 2 },
+        fact: { x: rect.x, y: rect.y + (rect.h - gap) / 2 + gap, w: rect.w, h: (rect.h - gap) / 2 },
       };
-    }
-    const gap = spanH * GAP_FRAC;
-    const mh = (spanH - gap) * (emphasis ? EMPHASIS_MYTH_FRAC : 0.5);
-    const fh = spanH - gap - mh;
-    return {
-      myth: { x: 0, y: spanH / 2 - mh / 2, w: spanW, h: mh },
-      fact: { x: 0, y: -spanH / 2 + fh / 2, w: spanW, h: fh },
-    };
-  };
 
-  // Both the mesh and the 2D chrome read their offsets from here, so the card and
-  // the text on it cannot drift apart.
-  const mythShake = busted && ms1 < BUST_SHAKE_MS ? Math.sin((ms1 / BUST_SHAKE_MS) * 28) * 0.12 * (1 - ms1 / BUST_SHAKE_MS) : 0;
-  const bobOf = (elapsedMs: number, phase: number) => Math.sin(elapsedMs / 1400 + phase) * 0.05;
-
-  const contextData = { mythIn, factIn, bustRamp };
-
-  const build = (): ThreeBundle<typeof contextData> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 34 : 26, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, CAM_RISE, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, DANGER, THEME.good);
-
-    const g = metrics(camera);
-    const mythBlock = makeBlock(g.myth.w, g.myth.h, CARD_DEPTH, shade(DANGER, CARD_FACE_DARKEN), DANGER);
-    const factBlock = makeBlock(g.fact.w, g.fact.h, CARD_DEPTH, shade(THEME.good, CARD_FACE_DARKEN), THEME.good);
-    s.add(mythBlock);
-    s.add(factBlock);
-
-    const enterScale = (t: number) => CARD_ENTER_SCALE + (1 - CARD_ENTER_SCALE) * t;
-    const faces = (block: THREE.Group, fn: (mat: THREE.MeshPhysicalMaterial) => void) =>
-      block.children.forEach((child) => {
-        if (child instanceof THREE.Mesh) fn(child.material as THREE.MeshPhysicalMaterial);
-      });
-
-    const update = (elapsedMs: number, data: typeof contextData) => {
-      const live = metrics(camera);
-
-      mythBlock.visible = data.mythIn > 0;
-      if (mythBlock.visible) {
-        mythBlock.position.set(live.myth.x + mythShake, live.myth.y + bobOf(elapsedMs, 0), 0);
-        const sc = enterScale(data.mythIn);
-        mythBlock.scale.set(sc, sc, 1);
-        faces(mythBlock, (mat) => {
-          mat.transparent = true;
-          mat.opacity = data.mythIn * (1 - MYTH_BUST_FADE * data.bustRamp);
-          mat.emissive.setStyle(DANGER);
-          // Ramped, not switched: flipping on the `busted` boolean turned the slab
-          // from near-black to full red inside one 33ms frame.
-          mat.emissiveIntensity =
-            MYTH_EMISSIVE_IDLE +
-            (MYTH_EMISSIVE_BUST - MYTH_EMISSIVE_IDLE) * data.bustRamp +
-            MYTH_EMISSIVE_PULSE * data.bustRamp * idle(env, 900);
-        });
-      }
-
-      factBlock.visible = data.factIn > 0;
-      if (factBlock.visible) {
-        factBlock.position.set(live.fact.x, live.fact.y + bobOf(elapsedMs, 2), 0);
-        const sc = enterScale(data.factIn);
-        factBlock.scale.set(sc, sc, 1);
-        faces(factBlock, (mat) => {
-          mat.transparent = true;
-          mat.opacity = data.factIn;
-          mat.emissive.setStyle(THEME.good);
-          mat.emissiveIntensity = FACT_EMISSIVE + FACT_EMISSIVE_PULSE * idle(env, 1200);
-        });
-      }
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, contextData, env);
-  if (!cam || !(cam instanceof THREE.PerspectiveCamera)) return;
-
-  const geo = metrics(cam);
-  /** Screen-space box of a card's front face. Exact for this front-on camera:
-   *  the projected face is axis-aligned, so one corner and the centre define it. */
-  const faceBox = (g: { x: number; y: number; w: number; h: number }, dx: number, dy: number) => {
-    const front = CARD_DEPTH / 2;
-    const mid = projectToRect(cam, new THREE.Vector3(g.x + dx, g.y + dy, front), rect);
-    const corner = projectToRect(cam, new THREE.Vector3(g.x + dx - g.w / 2, g.y + dy + g.h / 2, front), rect);
-    return { x: corner.x, y: corner.y, w: (mid.x - corner.x) * 2, h: (mid.y - corner.y) * 2 };
-  };
-  const mythR = faceBox(geo.myth, mythShake, bobOf(env.elapsedMs, 0));
-  const factR = faceBox(geo.fact, 0, bobOf(env.elapsedMs, 2));
+  const mythShake =
+    busted && ms1 < BUST_SHAKE_MS ? Math.sin((ms1 / BUST_SHAKE_MS) * 28) * unit * 0.5 * (1 - ms1 / BUST_SHAKE_MS) : 0;
+  const bobOf = (elapsedMs: number, phase: number) => Math.sin(elapsedMs / 1400 + phase) * unit * BOB_AMPLITUDE_UNITS;
+  const mythR = { ...cards.myth, x: cards.myth.x + mythShake, y: cards.myth.y + bobOf(env.elapsedMs, 0) };
+  const factR = { ...cards.fact, y: cards.fact.y + bobOf(env.elapsedMs, 2) };
 
   // Type scale is fitted to the SMALLER of the two cards so both read at the same
-  // size. fitFontSize only measures one line, so the fit has to be iterative: the
-  // constraint is the wrapped line count against the card's projected height.
+  // size. The constraint is the wrapped line count against the card's height.
   const padX = unit;
   const textW = Math.min(mythR.w, factR.w) - padX * 2;
   const boxH = Math.min(mythR.h, factR.h);
@@ -211,16 +124,32 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
   const lineStep = fontPx * LINE_STEP;
 
   /** Vertically centre chip + text as one group inside the card. */
-  const groupTop = (box: { y: number; h: number }, lines: number) => {
+  const groupTop = (box: Rect, lines: number) => {
     const groupH = unit * CHIP_BAND + fontPx + (lines - 1) * lineStep + fontPx * 0.25;
     return box.y + Math.max(unit * 0.4, (box.h - groupH) / 2);
   };
 
+  const drawCardFace = (r: Rect, accentColor: string, opacity: number) => {
+    ctx.save();
+    ctx.globalAlpha = opacity * leave;
+    applyElevation(ctx, unit, "raised");
+    roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.lg);
+    ctx.fillStyle = shade(accentColor, CARD_FACE_DARKEN);
+    ctx.fill();
+    clearShadow(ctx);
+    roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.lg);
+    ctx.strokeStyle = rgba(accentColor, 0.4);
+    ctx.lineWidth = unit * 0.045;
+    ctx.stroke();
+    ctx.restore();
+  };
+
   // ── Myth card ──────────────────────────────────────────────────────────────────
   if (mythIn > 0) {
+    drawCardFace(mythR, DANGER, mythIn * (1 - MYTH_BUST_FADE * bustRamp));
     const top = groupTop(mythR, mLines.length);
     ctx.save();
-    ctx.globalAlpha = mythIn * (1 - MYTH_TEXT_FADE * bustRamp);
+    ctx.globalAlpha = mythIn * (1 - MYTH_TEXT_FADE * bustRamp) * leave;
 
     chip(ctx, mythR.x + padX, top + unit, "MYTH", DANGER, unit);
 
@@ -249,6 +178,7 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
       const stampIn = easeOutBack(clamp01(ms1 / 380));
       const r = unit * 0.85;
       ctx.save();
+      ctx.globalAlpha *= leave;
       ctx.translate(mythR.x + mythR.w - unit * 1.9, top + unit);
       ctx.rotate(-0.12 * (1 - clamp01(ms1 / 400)));
       ctx.scale(Math.max(0.01, stampIn), Math.max(0.01, stampIn));
@@ -283,9 +213,10 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
 
   // ── Fact card ──────────────────────────────────────────────────────────────────
   if (factIn > 0) {
+    drawCardFace(factR, THEME.good, factIn);
     const top = groupTop(factR, fLines.length);
     ctx.save();
-    ctx.globalAlpha = factIn;
+    ctx.globalAlpha = factIn * leave;
 
     chip(ctx, factR.x + padX, top + unit, "FACT", THEME.good, unit);
 
@@ -294,6 +225,7 @@ export function paintMythfact(ctx: CanvasRenderingContext2D, scene: MythfactScen
     if (checkIn > 0) {
       const r = unit * 0.85;
       ctx.save();
+      ctx.globalAlpha *= leave;
       ctx.translate(factR.x + factR.w - unit * 1.9, top + unit);
       ctx.scale(Math.max(0.01, checkIn), Math.max(0.01, checkIn));
       ctx.shadowColor = rgba(THEME.good, 0.6);
