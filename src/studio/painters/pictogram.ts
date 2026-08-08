@@ -21,6 +21,7 @@ import {
   beatWindow,
   activeBeatIndex,
   stagger,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -211,6 +212,8 @@ export function paintPictogram(ctx: CanvasRenderingContext2D, scene: PictogramSc
   const totalBeats = offset + scene.groups.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const lastWin = beatWindow(env.beats, totalBeats - 1, totalBeats);
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const ax = contentX;
@@ -281,7 +284,7 @@ export function paintPictogram(ctx: CanvasRenderingContext2D, scene: PictogramSc
 
   const ghostFill = rgba(THEME.textDim, GHOST_ALPHA);
   const cascadeStep = GHOST_CASCADE_MS / Math.max(1, seats.length - 1);
-  const fieldIn = easeOutCubic(enterT(env, DUR.base));
+  const fieldIn = easeOutCubic(enterT(env, DUR.base)) * leave;
 
   ctx.save();
   seats.forEach((seat, i) => {
@@ -294,7 +297,7 @@ export function paintPictogram(ctx: CanvasRenderingContext2D, scene: PictogramSc
       pr = clamp01((groupTimes[gi] - (j / counts[gi]) * WAVE_SPAN) / POP_LEN);
     }
     if (pr < 1) {
-      ctx.globalAlpha = inT * (1 - pr);
+      ctx.globalAlpha = inT * (1 - pr) * leave;
       ctx.fillStyle = ghostFill;
       drawPerson(ctx, seat.x, seat.y, s * (0.86 + 0.14 * inT));
     }
@@ -305,7 +308,7 @@ export function paintPictogram(ctx: CanvasRenderingContext2D, scene: PictogramSc
     const liftedY = Math.max(seat.y - Math.sin(Math.PI * pr) * s * LIFT, box.y + (s * GLYPH_H) / 2);
     const breathe = gi === largest ? 1 - 0.08 * finalT * (1 - idle(env, 2600)) : 1;
     const pulse = gi === largest ? 1 + 0.05 * finalPulse : 1;
-    ctx.globalAlpha = inT * pr * breathe;
+    ctx.globalAlpha = inT * pr * breathe * leave;
     ctx.fillStyle = tints[gi % tints.length];
     drawPerson(ctx, seat.x, liftedY, s * (POP_FROM + (1 - POP_FROM) * easeOutBack(pr)) * pulse);
   });
