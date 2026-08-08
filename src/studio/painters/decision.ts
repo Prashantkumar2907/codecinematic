@@ -18,7 +18,7 @@ import {
   beatWindow,
   beatT,
   activeBeatIndex,
-  variantOf,
+  departT,
   rgba,
   type Layout,
 } from "./common";
@@ -115,7 +115,10 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
-  const introIn = easeOutCubic(enterT(env, 400));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  // Multiplied into the shared entrance factor every alpha site already reads.
+  const introIn = easeOutCubic(enterT(env, 400)) * leave;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const rot = shouldRotate(scene.nodes, layout.vertical);
@@ -144,8 +147,9 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
     const len = Math.hypot(dx, dy) || 1;
-    const side = variantOf(key, 2) === 0 ? 1 : -1;
-    const off = unit * 0.8 * side;
+    // One canonical curve direction under the phase's one-look-per-kind
+    // decision — the old per-edge coin flip added no information.
+    const off = unit * 0.8;
     const c = { x: (p0.x + p1.x) / 2 + (-dy / len) * off, y: (p0.y + p1.y) / 2 + (dx / len) * off };
     const pts: Pt[] = [];
     for (let i = 0; i <= CURVE_SAMPLES - 1; i++) {
@@ -225,7 +229,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     const prog = easeInOutCubic(clamp01(t / ARRIVE));
     const isCurrentBeat = active === offset + k;
     ctx.save();
-    ctx.globalAlpha = isCurrentBeat ? 1 : 0.85;
+    ctx.globalAlpha = (isCurrentBeat ? 1 : 0.85) * introIn;
     ctx.strokeStyle = accent;
     ctx.lineWidth = unit * 0.16;
     ctx.lineCap = "round";
@@ -372,7 +376,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
           const rt = clamp01((t - ARRIVE - j * 0.08) / 0.3);
           if (rt <= 0 || rt >= 1) continue;
           ctx.save();
-          ctx.globalAlpha = 0.6 * (1 - rt);
+          ctx.globalAlpha = 0.6 * (1 - rt) * introIn;
           ctx.strokeStyle = rgba(THEME.good, 0.9);
           ctx.lineWidth = unit * 0.08;
           ctx.beginPath();
@@ -392,7 +396,7 @@ export function paintDecision(ctx: CanvasRenderingContext2D, scene: DecisionScen
     const seg: Pt[] = [];
     for (let i = 0; i <= 8; i++) seg.push(pointAlongPolyline(chain, Math.max(f - 0.07 + (i / 8) * 0.07, 0)));
     ctx.save();
-    ctx.globalAlpha = 0.55 * Math.sin(Math.PI * f);
+    ctx.globalAlpha = 0.55 * Math.sin(Math.PI * f) * introIn;
     ctx.strokeStyle = SPARK;
     ctx.lineWidth = unit * 0.2;
     ctx.lineCap = "round";
