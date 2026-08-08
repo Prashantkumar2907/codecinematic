@@ -61,7 +61,7 @@ function scaledFrac(value: number, maxValue: number, log: boolean): number {
 /** Dark rounded chip used for every floating label in this scene. */
 function pillBg(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, border: string, alpha: number) {
   roundRect(ctx, x, y, w, h, r);
-  ctx.fillStyle = "rgba(9,14,20,0.86)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.86);
   ctx.fill();
   roundRect(ctx, x, y, w, h, r);
   ctx.strokeStyle = rgba(border, alpha);
@@ -90,8 +90,22 @@ export function paintScalecompare(ctx: CanvasRenderingContext2D, scene: Scalecom
   const ratioBandH = unit * (vertical ? 1.55 : 1.25);
   const areaTop = contentY + band + ratioBandH;
   // A verdict caption sits below the bars, so their floor must leave room for
-  // it instead of running to the very bottom of the content box.
-  const verdictH = scene.verdict ? unit * 2.4 : 0;
+  // it instead of running to the very bottom of the content box. Reserved
+  // height is measured from the actual wrapped line count (not a flat
+  // constant) so a longer verdict string still gets a floor that clears it.
+  const verdictLineH = unit * 1.25;
+  const verdictPadY = unit * 0.7;
+  const verdictGap = unit * 0.35;
+  let verdictLines: string[] = [];
+  let verdictBoxH = 0;
+  if (scene.verdict) {
+    ctx.save();
+    ctx.font = `700 ${unit * 0.9}px ${FONT_SANS}`;
+    verdictLines = wrapText(ctx, scene.verdict, contentW * 0.9);
+    ctx.restore();
+    verdictBoxH = verdictLines.length * verdictLineH + verdictPadY * 1.4;
+  }
+  const verdictH = scene.verdict ? verdictBoxH + verdictGap * 2 : 0;
   const bottom = vertical
     ? Math.min(contentY + contentH, layout.h * 0.86) - verdictH
     : contentY + contentH - verdictH;
@@ -182,7 +196,7 @@ export function paintScalecompare(ctx: CanvasRenderingContext2D, scene: Scalecom
     const r = rectFor(i, Math.max(scaledFrac(it.value, maxValue, log), MIN_VISUAL_FRAC));
     ctx.save();
     ctx.globalAlpha = 0.12 * introIn * easeOutCubic(ghostIn);
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.05;
     ctx.setLineDash([unit * 0.26, unit * 0.22]);
     roundRect(ctx, r.x, r.y, Math.max(r.w, unit * 0.3), Math.max(r.h, unit * 0.3), unit * 0.25);
@@ -310,10 +324,13 @@ export function paintScalecompare(ctx: CanvasRenderingContext2D, scene: Scalecom
       ctx.globalAlpha = t;
       ctx.textAlign = "center";
       ctx.font = `700 ${unit * 0.9}px ${FONT_SANS}`;
-      const ty = contentY + contentH - unit * (vertical ? 2.6 : 0.7);
-      const lines = wrapText(ctx, scene.verdict, contentW * 0.9);
-      const lineH = unit * 1.25;
+      const lines = verdictLines;
+      const lineH = verdictLineH;
       const totalH = lines.length * lineH;
+      // Anchor the box just below the bars' floor (bottom) instead of an
+      // independent offset from the content box's own edge — those two could
+      // disagree and let the bars run straight through the verdict box.
+      const ty = bottom + verdictGap + lineH * (lines.length - 0.25) + verdictPadY / 2;
       const startY = ty - (lines.length - 1) * lineH;
       ctx.translate(layout.w / 2, startY + totalH / 2 - lineH * 0.4);
       ctx.scale(0.85 + 0.15 * pop, 0.85 + 0.15 * pop);
