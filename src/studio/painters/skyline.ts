@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 import { introBeatCount, SKYLINE_BUILDINGS, type Scene } from "../schema";
 import {
   THEME,
@@ -14,8 +12,9 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
-  shade,
   hashStr,
+  shade,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -32,21 +31,26 @@ type Placed = {
   seed: number;
 };
 
-type SkylineContext = {
-  env: PaintEnv;
-  active: number;
-};
+/** Round-columned silhouette (mill/tower/dome/temple) vs a boxy one (hut/house/skyscraper/landmark). */
+const ROUND_KINDS: ReadonlySet<BuildingKind> = new Set(["mill", "tower", "dome", "temple"]);
+const BUILDING_FILL = 0.72;
+const MAX_H_FRAC = 0.85;
+/** THEME.panel sits within a few RGB steps of the background; lift a building's
+ *  face off it so a flat 2D fill reads as a solid silhouette without shading. */
+const FACE_LIFT = 0.14;
+const FACE_LIFT_ACTIVE = 0.24;
 
 export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
   const { accent, accentGlow, secondary } = env.palette;
-  const ms = env.elapsedMs;
   const offset = introBeatCount(scene);
   const nEras = scene.eras.length;
   const totalBeats = offset + nEras;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const ghostIn = easeOutCubic(enterT(env, 360));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
@@ -75,158 +79,102 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
   skyGlow.addColorStop(0, rgba(secondary, 0.05 + 0.09 * eraFrac));
   skyGlow.addColorStop(1, rgba(accent, 0.02 + 0.05 * eraFrac));
   ctx.save();
-  ctx.globalAlpha = easeOutCubic(enterT(env, 520));
+  ctx.globalAlpha = easeOutCubic(enterT(env, 520)) * leave;
   ctx.fillStyle = skyGlow;
   ctx.fillRect(contentX, areaTop, contentW, groundY - areaTop);
   ctx.restore();
 
-  const rect = { x: contentX, y: areaTop, w: contentW, h: groundY - areaTop };
+  const maxHpx = (groundY - areaTop) * MAX_H_FRAC;
 
-  // 3D coordinates system: X from -rangeX/2 to rangeX/2, Z fixed
-  const spreadX = vertical ? 3.5 : 5.5;
-  const spreadZ = vertical ? 5.5 : 3.5;
-  
-  const worldPos = (pixelX: number) => {
-    // Map from 2D pixel X to 3D world X
-    const cx = (pixelX - contentX) / contentW - 0.5;
-    return new THREE.Vector3(cx * spreadX * 2, 0, 0);
-  };
+  // Buildings, drawn directly in 2D — a flat silhouette skyline growing from the
+  // ground line, rather than a camera-viewed 3D block city. Each rises with the
+  // era it belongs to; the current era's buildings glow and bob gently.
+  placed.forEach((pl) => {
+    const beat = offset + pl.era;
+    const bt = beatT(env.beats, beat, totalBeats, env.p);
+    const cx = pl.slotX + pl.slotW / 2;
+    const w = pl.slotW * BUILDING_FILL;
+    const fullH = (pl.hUnits / 10) * maxHpx;
+    const round = ROUND_KINDS.has(pl.kind);
+    const isCurrentEra = active === beat;
 
-  const key = scene.id + "-skyline3d";
-
-  const build = (): ThreeBundle<SkylineContext> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 12 : 9, vertical ? 9 : 7);
-    camera.lookAt(0, 3, 0);
-    // studioLights() casts shadows from both its key and rim lights; a second
-    // shadow direction reads as a stray double shadow, so only the key light
-    // (added first) keeps castShadow here.
-    studioLights(s, accent, secondary);
-    s.children
-      .filter((o): o is THREE.DirectionalLight => o instanceof THREE.DirectionalLight)
-      .slice(1)
-      .forEach((light) => { light.castShadow = false; });
-
-    const grid = new THREE.GridHelper(spreadX * 3, 14, new THREE.Color(accent), new THREE.Color(shade(secondary, -0.6)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
-
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models = placed.map(pl => {
-      const g = new THREE.Group();
-      
-      const faceColor = THEME.panel;
-      // Plain hex: makeBlock/makeCylinder already apply opacity 0.6 to the edge
-      // material, so an rgba() string here would only make THREE.Color warn and
-      // drop the alpha it never uses.
-      const edgeColor = accent;
-      
-      const maxH_units = 5.0; // max logical height in 3D
-      const blockH = (pl.hUnits / 10) * maxH_units;
-      const blockW = (pl.slotW / contentW) * spreadX * 2 * 0.82; // roughly mapped
-      const blockD = blockW; // square base
-
-      let mesh: THREE.Group;
-      if (pl.kind === "dome" || pl.kind === "mill" || pl.kind === "tower" || pl.kind === "temple") {
-        mesh = makeCylinder(blockW/2, blockH, faceColor, edgeColor);
-        if (pl.kind === "dome") {
-           const dome = makeCylinder(blockW/3, blockH/2, faceColor, edgeColor);
-           dome.position.y = blockH/2 + blockH/4;
-           mesh.add(dome);
-        } else if (pl.kind === "temple") {
-           const step1 = makeCylinder(blockW*0.3, blockH/3, faceColor, edgeColor);
-           step1.position.y = blockH/2 + blockH/6;
-           mesh.add(step1);
-        }
-      } else {
-        mesh = makeBlock(blockW, blockH, blockD, faceColor, edgeColor);
-        if (pl.kind === "skyscraper") {
-           const antennae = makeCylinder(blockW*0.1, blockH*0.3, faceColor, edgeColor);
-           antennae.position.y = blockH/2 + blockH*0.15;
-           mesh.add(antennae);
-        }
+    let scaleY = 0.001;
+    let visible = false;
+    let alpha = 1;
+    if (env.p < beatWindow(env.beats, beat, totalBeats).start) {
+      visible = env.p > 0 || ghostIn > 0;
+      scaleY = 0.1 * (env.p > 0 ? 1 : ghostIn);
+      alpha = 0.3;
+    } else if (bt > 0) {
+      const stagger = pl.withinEra * 0.08;
+      const rise = easeOutBack(clamp01((bt - stagger) / 0.4));
+      if (rise > 0) {
+        visible = true;
+        scaleY = rise;
       }
-      
-      mesh.position.y = blockH/2 - 0.5; // sit on the ground
-      g.add(mesh);
-      
-      const centerPixelX = pl.slotX + pl.slotW/2;
-      g.position.copy(worldPos(centerPixelX));
-      
-      s.add(g);
-      return { id: pl.seed, group: g, pl };
-    });
+    }
+    if (!visible) return;
 
-    const update = (elapsedMs: number, ctxData: SkylineContext) => {
-      const { env: currentEnv, active: currentActive } = ctxData;
-      const currentGhostIn = easeOutCubic(enterT(currentEnv, 360));
-      
-      models.forEach(({ group, pl }) => {
-        const beat = offset + pl.era;
-        const bt = beatT(currentEnv.beats, beat, totalBeats, currentEnv.p);
-        
-        let t = 0;
-        let scaleY = 0.001;
-        let visible = false;
+    const bob = isCurrentEra && scaleY >= 1 ? unit * 0.12 * Math.abs(Math.sin(env.elapsedMs / 700 + pl.seed)) : 0;
 
-        if (currentEnv.p < beatWindow(currentEnv.beats, beat, totalBeats).start) {
-            // Faint ghost
-            visible = currentEnv.p > 0 || currentGhostIn > 0;
-            scaleY = 0.1 * (currentEnv.p > 0 ? 1 : currentGhostIn);
-            t = 0;
-        } else if (bt > 0) {
-            const stagger = pl.withinEra * 0.08;
-            const rise = easeOutBack(clamp01((bt - stagger) / 0.4));
-            if (rise > 0) {
-                visible = true;
-                scaleY = rise;
-                t = 1;
-            }
-        }
-        
-        const isCurrentEra = currentActive === beat;
-        let bob = 0;
-        if (isCurrentEra && t === 1) {
-            bob = 0.1 * Math.abs(Math.sin(elapsedMs / 700 + pl.seed));
-        }
+    ctx.save();
+    ctx.globalAlpha = alpha * leave;
+    ctx.translate(cx, groundY - bob);
+    ctx.scale(1, Math.max(0.001, scaleY));
+    ctx.translate(-cx, -(groundY - bob));
 
-        group.visible = visible;
-        group.scale.set(1, Math.max(0.001, scaleY), 1);
-        group.position.y = bob;
-        
-        // Emissive pulse for active era
-        group.traverse(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.MeshPhysicalMaterial;
-                if (mat.emissive) {
-                    mat.emissiveIntensity = isCurrentEra ? 0.3 + bob : 0.1;
-                }
-                mat.transparent = true;
-                mat.opacity = t === 0 ? 0.3 : 1.0;
-            }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
+    if (isCurrentEra && scaleY >= 1) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * (0.5 + 0.3 * (bob / (unit * 0.12)));
+    }
+    ctx.fillStyle = shade(THEME.panel, isCurrentEra && scaleY >= 1 ? FACE_LIFT_ACTIVE : FACE_LIFT);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = Math.max(1, unit * 0.05);
 
-  const contextData: SkylineContext = { env, active };
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, contextData, env);
+    const top = groundY - bob - fullH;
+    if (round) {
+      const r = w / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - r, groundY - bob);
+      ctx.lineTo(cx - r, top + r);
+      ctx.arc(cx, top + r, r, Math.PI, 0);
+      ctx.lineTo(cx + r, groundY - bob);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      if (pl.kind === "dome") {
+        const dr = r * 0.6;
+        ctx.beginPath();
+        ctx.arc(cx, top + r - dr * 0.7, dr, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else if (pl.kind === "temple") {
+        const tw = w * 0.45;
+        const th = fullH * 0.12;
+        roundRect(ctx, cx - tw / 2, top - th, tw, th, th * 0.3);
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else {
+      roundRect(ctx, cx - w / 2, top, w, fullH, Math.min(unit * 0.2, w * 0.15));
+      ctx.fill();
+      ctx.stroke();
+      if (pl.kind === "skyscraper") {
+        ctx.beginPath();
+        ctx.moveTo(cx, top);
+        ctx.lineTo(cx, top - fullH * 0.16);
+        ctx.lineWidth = Math.max(1, unit * 0.045);
+        ctx.stroke();
+      }
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  });
 
   const landIn = easeOutCubic(enterT(env, 420));
   ctx.save();
-  ctx.globalAlpha = landIn;
+  ctx.globalAlpha = landIn * leave;
   ctx.strokeStyle = rgba(accent, 0.6);
   ctx.lineWidth = unit * 0.08;
   ctx.lineCap = "round";
@@ -238,7 +186,7 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
 
   // Era "when" chip (+ optional stat), crossfading per beat.
   const eraIdx = active >= offset ? active - offset : -1;
-  
+
   scene.eras.forEach((era, ei) => {
     const beat = offset + ei;
     const t = beatT(env.beats, beat, totalBeats, env.p);
@@ -247,21 +195,21 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
       if (t <= 0) return;
     }
     if (!isCur) return;
-    
+
     // Calculate center of buildings in this era
     let eraTotalX = 0;
     let eraCount = 0;
-    placed.forEach(pl => {
-       if (pl.era === ei) {
-           eraTotalX += pl.slotX + pl.slotW/2;
-           eraCount++;
-       }
+    placed.forEach((pl) => {
+      if (pl.era === ei) {
+        eraTotalX += pl.slotX + pl.slotW / 2;
+        eraCount++;
+      }
     });
-    const avgX = eraCount > 0 ? eraTotalX / eraCount : contentX + contentW/2;
-    
+    const avgX = eraCount > 0 ? eraTotalX / eraCount : contentX + contentW / 2;
+
     const pop = easeOutBack(clamp01(t / 0.25));
     ctx.save();
-    ctx.globalAlpha = clamp01(t * 4);
+    ctx.globalAlpha = clamp01(t * 4) * leave;
     ctx.font = `800 ${unit * 0.72}px ${FONT_MONO}`;
     const whenW = ctx.measureText(era.when).width;
     let totalW = whenW + unit * 1.2;
@@ -271,11 +219,11 @@ export function paintSkyline(ctx: CanvasRenderingContext2D, scene: SkylineScene,
       statW = ctx.measureText(era.stat).width + unit * 1.0;
       totalW += statW + unit * 0.4;
     }
-    
-    let chipCx = avgX - totalW/2;
+
+    let chipCx = avgX - totalW / 2;
     // Keep in bounds
     chipCx = Math.max(contentX, Math.min(contentX + contentW - totalW, chipCx));
-    
+
     ctx.translate(chipCx + totalW / 2, chipRowY + chipRowH / 2);
     ctx.scale(pop, pop);
     ctx.translate(-(chipCx + totalW / 2), -(chipRowY + chipRowH / 2));
