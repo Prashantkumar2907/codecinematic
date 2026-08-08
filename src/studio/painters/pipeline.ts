@@ -17,6 +17,7 @@ import {
   activeBeatIndex,
   lerpColor,
   rgba,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -37,6 +38,14 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const ghostIn = easeOutCubic(enterT(env, 420));
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  // Saved once for the whole scene and restored at the end, not left bare: the
+  // engine draws its overlay (progress bar, captions) right after this call in
+  // the same frame, and an un-restored dimmed alpha would leak into it.
+  ctx.save();
+  ctx.globalAlpha = leave;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   // Vertical: keep the last station above the caption band (bottom ~14%).
@@ -118,7 +127,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
     const itemInside = isActive && t >= 0.45 && t < 0.8;
 
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * leave;
     const border = isActive ? accent : rgba(THEME.textDim, 0.5);
 
     let roofX: number, roofY: number, roofW: number, roofH: number;
@@ -185,7 +194,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
     }
 
     if (isPast) {
-      ctx.globalAlpha = Math.min(1, alpha * 1.8);
+      ctx.globalAlpha = Math.min(1, alpha * 1.8) * leave;
       ctx.fillStyle = THEME.good;
       ctx.beginPath();
       ctx.arc(roofX + roofW - unit * 0.12, roofY + unit * 0.05, unit * 0.2, 0, Math.PI * 2);
@@ -205,7 +214,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
     ].forEach(({ lag, a }) => {
       const gp = lerp(from, to, easeInOutCubic(clamp01((t - lag) / 0.45)));
       ctx.save();
-      ctx.globalAlpha = a;
+      ctx.globalAlpha = a * leave;
       ctx.fillStyle = accent;
       ctx.beginPath();
       ctx.arc(gp.x, gp.y, unit * 0.26, 0, Math.PI * 2);
@@ -251,7 +260,7 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
     for (let d = 0; d < 3; d++) {
       const a = env.elapsedMs / 300 + (d * Math.PI * 2) / 3;
       ctx.save();
-      ctx.globalAlpha = 0.9 * win;
+      ctx.globalAlpha = 0.9 * win * leave;
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.7;
       ctx.fillStyle = THEME.text;
@@ -262,4 +271,5 @@ export function paintPipeline(ctx: CanvasRenderingContext2D, scene: PipelineScen
     }
   }
   ctx.textAlign = "start";
+  ctx.restore();
 }
