@@ -98,6 +98,34 @@ const BLEED_HARD_DELTA = 70;
  */
 const SAFE_PS = [0.02, 0.06, 0.12, 0.2, 0.3, 0.4, 0.5, 0.6, 0.675, 0.75, 0.85, 0.93, 1.0];
 
+const DIFF_W = 64;
+const DIFF_H = 36;
+
+/** Downscaled luma of a frame, at the grid scripts/render-audit.mjs diffs video at. */
+function lumaGrid(sctx: CanvasRenderingContext2D, source: HTMLCanvasElement): Float64Array {
+  sctx.clearRect(0, 0, DIFF_W, DIFF_H);
+  sctx.drawImage(source, 0, 0, DIFF_W, DIFF_H);
+  const px = sctx.getImageData(0, 0, DIFF_W, DIFF_H).data;
+  const out = new Float64Array(DIFF_W * DIFF_H);
+  for (let q = 0, j = 0; q < px.length; q += 4, j++) {
+    out[j] = 0.299 * px[q] + 0.587 * px[q + 1] + 0.114 * px[q + 2];
+  }
+  return out;
+}
+
+function meanAbsDiff(a: Float64Array, b: Float64Array): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  return sum / a.length;
+}
+
+function makeDiffCtx(): CanvasRenderingContext2D {
+  const c = document.createElement("canvas");
+  c.width = DIFF_W;
+  c.height = DIFF_H;
+  return c.getContext("2d", { willReadFrequently: true })!;
+}
+
 type KindEntry = { scene: Scene; script: SceneScript; richness: number };
 
 /**
@@ -287,6 +315,20 @@ type ProbeWindow = Window & {
     motifs?: number[];
     subject?: string;
   }) => Promise<Record<string, number[]>>;
+  __PROBE_MOTION?: (a: {
+    kind: SceneKind;
+    sceneId?: string;
+    aspect?: AspectName;
+    samples?: number;
+  }) => Promise<{
+    kind: SceneKind;
+    aspect: AspectName;
+    durationMs: number;
+    samples: number;
+    diffs: number[];
+    paintMs: number[];
+    failed: string | null;
+  } | null>;
 };
 
 export default function Probe() {
@@ -492,36 +534,63 @@ export default function Probe() {
       full.width = dims.width;
       full.height = dims.height;
       const fctx = full.getContext("2d")!;
-      const small = document.createElement("canvas");
-      small.width = 64;
-      small.height = 36;
-      const sctx = small.getContext("2d", { willReadFrequently: true })!;
+      const sctx = makeDiffCtx();
       const palette = paletteForSubject(subject ?? "Coding");
       const out: Record<string, number[]> = {};
       for (const motif of motifs) {
         let prev: Float64Array | null = null;
         const diffs: number[] = [];
         for (let i = 0; i < frames; i++) {
-          const ms = (i / fps) * 1000;
-          drawBackground(fctx, dims.width, dims.height, ms, palette, motif);
-          sctx.clearRect(0, 0, 64, 36);
-          sctx.drawImage(full, 0, 0, 64, 36);
-          const px = sctx.getImageData(0, 0, 64, 36).data;
-          const cur = new Float64Array(64 * 36);
-          for (let q = 0, j = 0; q < px.length; q += 4, j++) {
-            cur[j] = 0.299 * px[q] + 0.587 * px[q + 1] + 0.114 * px[q + 2];
-          }
-          if (prev) {
-            let sum = 0;
-            for (let j = 0; j < cur.length; j++) sum += Math.abs(cur[j] - prev[j]);
-            diffs.push(sum / cur.length);
-          }
+          drawBackground(fctx, dims.width, dims.height, (i / fps) * 1000, palette, motif);
+          const cur = lumaGrid(sctx, full);
+          if (prev) diffs.push(meanAbsDiff(cur, prev));
           prev = cur;
         }
         out[`motif${motif}`] = diffs;
       }
       win.__PROBE_DONE = true;
       return out;
+    };
+
+    /**
+     * Per-frame motion of ONE painter across its own timeline, plus paint cost.
+     *
+     * render-audit measures the finished video, where the progress bar and the
+     * captions repaint over a frozen scene and hide it. Here neither exists, so a
+     * flat stretch means the painter itself stopped.
+     */
+    win.__PROBE_MOTION = async ({ kind, sceneId, aspect = "short", samples = 60 }) => {
+      await ensureStudioFonts();
+      resetThree3D();
+      const entry = lookup(kind, sceneId);
+      if (!entry) return null;
+      const dims = ASPECTS[aspect];
+      const full = document.createElement("canvas");
+      full.width = dims.width;
+      full.height = dims.height;
+      const fctx = full.getContext("2d")!;
+      const sctx = makeDiffCtx();
+      const durationMs = sceneDurationMs(entry);
+
+      const diffs: number[] = [];
+      const paintMs: number[] = [];
+      let prev: Float64Array | null = null;
+      let failed: string | null = null;
+      for (let i = 0; i < samples; i++) {
+        const p = i / (samples - 1);
+        const t0 = performance.now();
+        try {
+          paintInto(fctx, entry, dims, p, p * durationMs);
+        } catch (err) {
+          failed = err instanceof Error ? err.message : String(err);
+          break;
+        }
+        paintMs.push(performance.now() - t0);
+        const cur = lumaGrid(sctx, full);
+        if (prev) diffs.push(meanAbsDiff(cur, prev));
+        prev = cur;
+      }
+      return { kind, aspect, durationMs, samples, diffs, paintMs, failed };
     };
 
     win.__PROBE_FILMSTRIP = async ({ kind, sceneId, aspect = "short", cols = 4, rows = 4, cellW = DEFAULT_CELL_W, fromMs, toMs }) => {

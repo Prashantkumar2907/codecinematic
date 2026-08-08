@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "filmstrip": "node scripts/filmstrip.mjs",
     "edge-audit": "node scripts/edge-audit.mjs",
-    "edge-check": "node scripts/edge-check.mjs"
+    "edge-check": "node scripts/edge-check.mjs",
+    "motion-check": "node scripts/motion-check.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
