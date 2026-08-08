@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -27,6 +25,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  departT,
 } from "./common";
 import { drawIcon } from "./icons";
 import type { PaintEnv } from "./index";
@@ -46,22 +45,11 @@ type ShowdownScene = Extract<Scene, { kind: "showdown" }>;
  * `2d-layout-round-tripped-through-camera`. Nothing may move a slab after
  * placement; the pixel chrome cannot follow it.
  */
-const SLAB_DEPTH = 0.12;
-/**
- * A box silhouette is square, so its corners poke outside the rounded border its
- * chrome draws — visible as four nubs and a second, offset outline around every
- * card. Insetting the slab by `radius * (1 - 1/sqrt2)` lands each corner exactly
- * on the arc, and `makeBlock`'s own wireframe is hidden so each element carries
- * exactly one outline.
- */
-const CORNER_COVER = 1 - Math.SQRT1_2;
 const CARD_RADIUS = RADIUS.md;
 const ROW_RADIUS = RADIUS.sm;
 const FACE_TINT = 0.22;
 /** `THEME.panel` is within 4 RGB steps of the background; lift an idle slab off it. */
 const IDLE_FACE_LIFT = 0.09;
-const CAM_FOV = 40;
-const CAM_DIST = 10;
 
 /**
  * Every emphasis multiplier is <= 1, so a slab can never grow past the pixel rect
@@ -80,6 +68,7 @@ const CARD_IN_MS = 460;
 const ROW_IN_MS = 560;
 const VS_IN_MS = 520;
 const PULSE_MS = 1900;
+const EXIT_MS = 380;
 
 /** Height held clear above the cards so the victor's crown can never reach the title. */
 const CROWN_LANE_UNITS = 1.5;
@@ -126,7 +115,6 @@ type Slab = {
   visible: boolean;
   cx: number;
   cy: number;
-  /** Drawn size of the element; the slab itself is inset by `CORNER_COVER`. */
   w: number;
   h: number;
   radius: number;
@@ -143,6 +131,8 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
   const verdictBeat = scene.sayVerdict ? offset + nRounds : -1;
   const totalBeats = offset + nRounds + (scene.sayVerdict ? 1 : 0);
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
+  const leave = departT(env, EXIT_MS);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true });
 
@@ -287,88 +277,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
     face: st.face,
   }));
 
-  // ─── 3D layer ──────────────────────────────────────────────────────────────
-  const rect = {
-    x: blockX,
-    y: cardsTop,
-    w: blockW,
-    h: Math.max(unit, rowsTop + rowPitch * nRounds - cardsTop),
-  };
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const key = scene.id + "-showdown3d";
-
-  // Per-slab state travels through render3D's `context`: `build` runs once per key,
-  // so `update` reading `active`/`env.p` from this scope froze the whole scorecard
-  // at frame 0.
-  const build = (): ThreeBundle<{ cards: Slab[]; rows: Slab[] }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(CAM_FOV, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, SLAB_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-
-    // Unit slabs scaled per frame from the pixel rect, so a layout change needs no
-    // rebuild and the slab is always exactly the card or row it belongs to.
-    const mk = () => {
-      const g = makeBlock(1, 1, SLAB_DEPTH, THEME.panel, THEME.textDim);
-      // The ground plane and grid are gone (both horizontal, so an on-axis camera
-      // saw them edge-on as two lit bands), which leaves nothing to receive a
-      // shadow — and the shadow camera's default frustum does not reach the slabs
-      // at the edges of a 16:9 rect anyway.
-      g.traverse((o) => {
-        o.castShadow = false;
-        o.receiveShadow = false;
-        if (o instanceof THREE.LineSegments) o.visible = false;
-      });
-      s.add(g);
-      return g;
-    };
-    const cards = [mk(), mk()];
-    const rowBlocks = scene.rounds.map(() => mk());
-
-    const place = (g: THREE.Group, st: Slab | undefined) => {
-      g.visible = !!st?.visible;
-      if (!st?.visible) return;
-      const inset = st.radius * CORNER_COVER * 2;
-      const c = toWorld(st.cx, st.cy);
-      g.position.set(c.x, c.y, 0);
-      g.scale.set(Math.max(0.001, st.w - inset) / m.sx, Math.max(0.001, st.h - inset) / m.sy, 1);
-      g.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          const mat = o.material as THREE.MeshPhysicalMaterial;
-          mat.transparent = true;
-          mat.opacity = st.opacity;
-          mat.color.set(st.face);
-          mat.emissive.set(st.face);
-        }
-      });
-    };
-
-    const update = (_elapsedMs: number, data?: { cards: Slab[]; rows: Slab[] }) => {
-      cards.forEach((g, i) => place(g, data?.cards[i]));
-      rowBlocks.forEach((g, i) => place(g, data?.rows[i]));
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { cards: cardSlabs, rows: rowSlabs }, env);
-  // Without WebGL the slabs never composite. Every rect is pixel-space either way,
-  // so fill the bodies in 2D rather than shipping outlines on the bare background.
-  const flat = !cam;
-
-  // ─── fighters ──────────────────────────────────────────────────────────────
+  // ─── fighters, slab bodies filled directly in 2D ────────────────────────────
   sides.forEach((s, i) => {
     const slab = cardSlabs[i];
     if (!slab.visible) return;
@@ -378,12 +287,10 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
     const y0 = cardCy - ch / 2;
 
     ctx.save();
-    ctx.globalAlpha = s.opacity;
-    if (flat) {
-      roundRect(ctx, x0, y0, cw, ch, slab.radius);
-      ctx.fillStyle = s.face;
-      ctx.fill();
-    }
+    ctx.globalAlpha = s.opacity * leave;
+    roundRect(ctx, x0, y0, cw, ch, slab.radius);
+    ctx.fillStyle = s.face;
+    ctx.fill();
     if (s.hot) {
       ctx.shadowColor = s.glow;
       ctx.shadowBlur = unit * GLOW.base * (0.7 + 0.4 * idle(env, PULSE_MS));
@@ -399,7 +306,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
     if (s.info.icon && iconPop > 0.02) {
       const iconS = Math.min(unit * 1.4, ch * 0.3);
       ctx.save();
-      ctx.globalAlpha = s.opacity * iconPop;
+      ctx.globalAlpha = s.opacity * iconPop * leave;
       drawIcon(ctx, s.info.icon, s.cx, y0 + ch * 0.26, iconS * iconPop, env, s.color);
       ctx.restore();
     }
@@ -432,7 +339,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
       const crownT = easeOutBack(clamp01(verdictT * 1.4));
       const crownS = Math.min(unit * 1.2, crownLane * 0.9);
       ctx.save();
-      ctx.globalAlpha = clamp01(verdictT * 2);
+      ctx.globalAlpha = clamp01(verdictT * 2) * leave;
       ctx.translate(s.cx, cardsTop - crownLane * 0.45);
       const sc = Math.max(0.01, crownT) * (1 + 0.05 * (idle(env, PULSE_MS) - 0.5));
       ctx.scale(sc, sc);
@@ -450,6 +357,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
     const vsR = unit * VS_R_UNITS;
     const pulse = 1 + 0.06 * (idle(env, PULSE_MS) - 0.5);
     ctx.save();
+    ctx.globalAlpha = leave;
     ctx.translate(blockX + blockW / 2, cardCy);
     ctx.scale(vsIn * pulse, vsIn * pulse);
     ctx.shadowColor = accentGlow;
@@ -484,12 +392,10 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
     const laneW = unit * 0.5 + pillR * 2 + unit * 0.3;
 
     ctx.save();
-    ctx.globalAlpha = st.opacity;
-    if (flat) {
-      roundRect(ctx, x0, y0, rw, rh, slab.radius);
-      ctx.fillStyle = st.face;
-      ctx.fill();
-    }
+    ctx.globalAlpha = st.opacity * leave;
+    roundRect(ctx, x0, y0, rw, rh, slab.radius);
+    ctx.fillStyle = st.face;
+    ctx.fill();
     roundRect(ctx, x0, y0, rw, rh, slab.radius);
     ctx.strokeStyle = rgba(st.isCurrent ? accent : THEME.textDim, st.isCurrent ? 0.85 : 0.35);
     ctx.lineWidth = unit * (st.isCurrent ? STROKE.base : STROKE.thin);
@@ -526,7 +432,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
     const drawMark = (side: "left" | "right", glyph: string, tone: string, strong: boolean) => {
       const px = side === "left" ? x0 + unit * 0.5 + pillR : x0 + rw - unit * 0.5 - pillR;
       ctx.save();
-      ctx.globalAlpha = st.opacity * (strong ? 1 : 0.65);
+      ctx.globalAlpha = st.opacity * (strong ? 1 : 0.65) * leave;
       ctx.translate(px, st.cy);
       ctx.scale(markScale, markScale);
       ctx.beginPath();
@@ -554,7 +460,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
         const to = { x: target.cx, y: cardCy + cardH * 0.3 };
         const e = easeOutCubic(st.landed);
         ctx.save();
-        ctx.globalAlpha = st.opacity * (1 - st.landed * 0.4);
+        ctx.globalAlpha = st.opacity * (1 - st.landed * 0.4) * leave;
         ctx.font = `900 ${Math.min(unit * 0.85, rh * 0.7)}px ${FONT_MONO}`;
         ctx.fillStyle = target.color;
         ctx.textAlign = "center";
@@ -572,7 +478,7 @@ export function paintShowdown(ctx: CanvasRenderingContext2D, scene: ShowdownScen
       const isDraw = leftScore === rightScore;
       const tone = isDraw ? THEME.warn : leftWins ? accent : secondary;
       ctx.save();
-      ctx.globalAlpha = t;
+      ctx.globalAlpha = t * leave;
       ctx.font = `800 ${unit * VERDICT_FONT_UNITS}px ${FONT_SANS}`;
       const textW = Math.max(...verdictLines.map((l) => ctx.measureText(l).width));
       const boxW = Math.min(contentW, textW + unit * 3);
