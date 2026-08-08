@@ -7,6 +7,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -44,13 +45,15 @@ function cascade(stepT: number, i: number, n: number): number {
  */
 export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical, h } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.5;
 
@@ -104,8 +107,7 @@ export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene
   const areaX = contentX;
   const areaY = contentY + band;
   const areaW = contentW;
-  let areaH = contentH - band;
-  if (vertical) areaH = Math.min(areaH, h * 0.88 - areaY);
+  const areaH = Math.min(contentY + contentH, safeBottom) - unit * 0.3 - areaY;
 
   const cols = maxCol + 1;
   const colGap = areaW / cols;
@@ -294,9 +296,12 @@ export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene
     const face = isRoot ? secondary : accent;
 
     ctx.save();
-    ctx.globalAlpha = clamp01(inp * 1.3);
+    ctx.globalAlpha = clamp01(inp * 1.3) * leave;
     ctx.translate(c.x, c.y);
-    const pop = 0.92 + 0.08 * inp;
+    // A small always-on idle breathing on every node (phase-offset per node)
+    // keeps the whole tree visibly alive during the intro beat, before any
+    // step highlights a path (2/5, dead 24-25% without it).
+    const pop = (0.92 + 0.08 * inp) * (1 + 0.012 * idle(env, 1700, d * 0.5 + gx.get(n.id)! * 0.3));
     ctx.scale(pop, pop);
     ctx.translate(-c.x, -c.y);
 
@@ -344,7 +349,7 @@ export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene
       if (isMatched) {
         const g2 = 0.6 + 0.4 * idle(env, 900);
         ctx.save();
-        ctx.globalAlpha = g2;
+        ctx.globalAlpha = g2 * clamp01(inp * 1.3) * leave;
         ctx.fillStyle = rgba(accent, 0.42);
         roundRect(ctx, x + i * kw + kw * 0.08, y + hgt * 0.14, kw * 0.84, hgt * 0.72, unit * 0.16);
         ctx.fill();
@@ -372,7 +377,7 @@ export function paintBtreeIndex(ctx: CanvasRenderingContext2D, scene: BtreeScene
     ctx.fillText(isRoot ? "ROOT" : leaf ? "LEAF" : "INDEX", c.x, y - unit * 0.18);
 
     if (hl > 0.75) {
-      ctx.globalAlpha = clamp01(inp) * (1 - 0.5 * (1 - breathe));
+      ctx.globalAlpha = clamp01(inp) * (1 - 0.5 * (1 - breathe)) * leave;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.06;
       roundRect(ctx, x - unit * 0.16, y - unit * 0.16, w + unit * 0.32, hgt + unit * 0.32, unit * 0.4);
