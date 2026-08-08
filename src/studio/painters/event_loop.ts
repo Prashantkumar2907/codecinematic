@@ -8,6 +8,7 @@ import {
   clamp01,
   sub,
   enterT,
+  departT,
   idle,
   drawSceneTitle,
   fitFontSize,
@@ -84,11 +85,12 @@ export function paintEventLoop(ctx: CanvasRenderingContext2D, scene: EventLoopSc
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
-  let availH = contentH - band;
-  if (vertical) availH = Math.min(availH, layout.h * 0.86 - (contentY + band));
+  const availH = Math.min(contentY + contentH, layout.safeBottom) - unit * 0.3 - (contentY + band);
   const cx = contentX + contentW / 2;
   const cy = contentY + band + availH / 2;
 
