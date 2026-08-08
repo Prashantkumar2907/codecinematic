@@ -141,7 +141,7 @@ export function paintNeuralNetwork(ctx: CanvasRenderingContext2D, scene: NNScene
         const pb = nodePos(b + 1, bi, sizeB);
         ctx.save();
         ctx.globalAlpha = introIn * 0.14;
-        ctx.strokeStyle = "rgba(148,163,184,0.85)";
+        ctx.strokeStyle = rgba(THEME.textDim, 0.85);
         ctx.lineWidth = unit * 0.032;
         ctx.beginPath();
         ctx.moveTo(pa.x, pa.y);
@@ -247,7 +247,7 @@ export function paintNeuralNetwork(ctx: CanvasRenderingContext2D, scene: NNScene
       ctx.shadowBlur = 0;
       ctx.beginPath();
       ctx.arc(p.x, p.y, nodeR, 0, Math.PI * 2);
-      ctx.strokeStyle = isActivated ? accent : "rgba(148,163,184,0.45)";
+      ctx.strokeStyle = isActivated ? accent : rgba(THEME.textDim, 0.45);
       ctx.lineWidth = isActivated ? unit * 0.09 : unit * 0.05;
       ctx.stroke();
 
@@ -309,7 +309,7 @@ function drawStepChip(
   ctx.shadowColor = glowColor;
   ctx.shadowBlur = unit * 0.5;
   roundRect(ctx, x - w / 2, y - h / 2, w, h, unit * 0.24);
-  ctx.fillStyle = "#0a0e13";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.9);
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.strokeStyle = color;
