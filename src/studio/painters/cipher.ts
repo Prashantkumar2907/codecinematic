@@ -8,6 +8,7 @@ import {
   easeOutCubic,
   easeOutBack,
   enterT,
+  departT,
   shade,
   clamp01,
   roundRect,
@@ -51,12 +52,14 @@ function digestHex(text: string, seed: number): string {
 
 export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, secondary, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const frameIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const frameIn = easeOutCubic(enterT(env, 380)) * leave;
   const key = scene.id + "-ciph3d";
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
@@ -87,7 +90,11 @@ export function paintCipher(ctx: CanvasRenderingContext2D, scene: CipherScene, e
   const gridX = contentX + marginSide;
   const gridW = Math.max(unit * 4, contentW - marginSide * 2);
   const gridTop = areaY + marginTop;
-  const gridH = Math.max(unit * 4, areaH - marginTop - marginBottom);
+  // Bounded by safeBottom, not just areaH: at 9:16 contentH runs under the
+  // caption band, and the output row's bob + baseline offset need margin
+  // beyond that to never intrude (measured 0.5px clearance before this).
+  const gridBottomMax = Math.min(areaY + areaH, safeBottom) - unit * 1.3;
+  const gridH = Math.max(unit * 4, Math.min(areaH - marginTop - marginBottom, gridBottomMax - gridTop));
   const colX = (i: number, total: number) => (total === 1 ? gridX + gridW / 2 : gridX + (i / (total - 1)) * gridW);
   const rowY = (row: number) => gridTop + ((row - rowMin) / (rowMax - rowMin)) * gridH;
   const pixelPos = (i: number, row: number, total: number): { x: number; y: number } => ({ x: colX(i, total), y: rowY(row) });
