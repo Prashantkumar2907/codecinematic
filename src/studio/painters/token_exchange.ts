@@ -32,8 +32,11 @@ const MIN_SLOTS = 4;
 const ASSEMBLE_FRAC = 0.32;
 /** Fraction of a step's beat spent in flight before the landing effect (verify badge / expiry stamp) plays. */
 const TRAVEL_END = 0.7;
-/** THEME has no error color (only `good`/`warn`) — scoped here for invalid/expired tokens. */
-const DENY = "#f87171";
+
+/** Dark ink on a bright accent-tone badge — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
+/** Dark accent-tinted panel fill — same convention as cipher.ts's `INK_FILL`. */
+const INK_FILL = "#0e2433";
 
 const ROLE_ICON: Record<Actor["role"], string> = {
   client: "client",
@@ -135,7 +138,7 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
           { x: fromX, y },
           { x: toX, y },
         ];
-    const lineColor = step.action === "expire" ? DENY : step.action === "issue" ? secondary : accent;
+    const lineColor = step.action === "expire" ? THEME.danger : step.action === "issue" ? secondary : accent;
 
     ctx.save();
     ctx.globalAlpha = rowAlpha;
@@ -196,9 +199,9 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
         ctx.arc(x0 + i * segW, cardY, unit * 0.05, 0, Math.PI * 2);
         ctx.fill();
       }
-      drawIcon(ctx, "shield", x0 + 2 * segW + segW / 2, cardY, cardH * 0.6, env, "#eaf3ff");
+      drawIcon(ctx, "shield", x0 + 2 * segW + segW / 2, cardY, cardH * 0.6, env, THEME.text);
       roundRect(ctx, x0, cardY - cardH / 2, cardW, cardH, r);
-      ctx.strokeStyle = isCurrent ? accent : "rgba(148,163,184,0.5)";
+      ctx.strokeStyle = isCurrent ? accent : rgba(THEME.textDim, 0.5);
       ctx.lineWidth = isCurrent ? unit * 0.07 : unit * 0.045;
       if (isCurrent) {
         ctx.shadowColor = accentGlow;
@@ -231,7 +234,7 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
       const badgeP = clamp01((landingP - 0.5) / 0.5);
       if (badgeP > 0) {
         const pop = easeOutBack(badgeP);
-        const color = step.valid ? THEME.good : DENY;
+        const color = step.valid ? THEME.good : THEME.danger;
         ctx.save();
         ctx.globalAlpha = rowAlpha;
         ctx.translate(cardX, cardY - cardH * 1.1);
@@ -240,7 +243,7 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
         ctx.arc(0, 0, unit * 0.36, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
-        ctx.strokeStyle = "#08131f";
+        ctx.strokeStyle = INK_ON_ACCENT;
         ctx.lineWidth = unit * 0.09;
         ctx.lineCap = "round";
         ctx.beginPath();
@@ -276,12 +279,12 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
         ctx.rotate(-0.2);
         const stampW = cardW * 0.94;
         roundRect(ctx, -stampW / 2, -unit * 0.32, stampW, unit * 0.64, unit * 0.12);
-        ctx.strokeStyle = DENY;
+        ctx.strokeStyle = THEME.danger;
         ctx.lineWidth = unit * 0.06;
         ctx.stroke();
         const px = fitFontSize(ctx, "EXPIRED", { maxW: stampW * 0.9, startPx: unit * 0.55, minPx: unit * 0.32, weight: 800 });
         ctx.font = `800 ${px}px ${FONT_SANS}`;
-        ctx.fillStyle = DENY;
+        ctx.fillStyle = THEME.danger;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("EXPIRED", 0, unit * 0.03);
@@ -297,10 +300,13 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
       ctx.globalAlpha = rowAlpha * labelIn;
       ctx.font = `600 ${unit * 0.55}px ${FONT_SANS}`;
       const tw = ctx.measureText(text).width;
-      const ly = cardY - cardH * 1.9;
+      // The naive offset (1.9 card-heights above the card) crowds the actor
+      // chips for early rows in dense scenes, where the first slot sits close
+      // to the lifelines' start — floor it just below the lifelines instead.
+      const ly = Math.max(cardY - cardH * 1.9, lifelinesTop + unit * 0.55);
       ctx.textAlign = "center";
       roundRect(ctx, cardX - tw / 2 - unit * 0.35, ly - unit * 0.5, tw + unit * 0.7, unit * 0.95, unit * 0.28);
-      ctx.fillStyle = "rgba(10,14,19,0.85)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.85);
       ctx.fill();
       ctx.strokeStyle = THEME.panelBorder;
       ctx.lineWidth = 1;
@@ -334,13 +340,13 @@ export function paintTokenExchange(ctx: CanvasRenderingContext2D, scene: TokenEx
       ctx.shadowOffsetY = 3;
     }
     roundRect(ctx, cx - chipW / 2, chipY, chipW, chipH, chipH / 2);
-    ctx.fillStyle = isHot ? "#0e2433" : THEME.panel;
+    ctx.fillStyle = isHot ? INK_FILL : THEME.panel;
     ctx.fill();
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
     roundRect(ctx, cx - chipW / 2, chipY, chipW, chipH, chipH / 2);
-    ctx.strokeStyle = isHot ? accent : "rgba(148,163,184,0.55)";
+    ctx.strokeStyle = isHot ? accent : rgba(THEME.textDim, 0.55);
     ctx.lineWidth = isHot ? unit * 0.1 : unit * 0.06;
     ctx.stroke();
 
