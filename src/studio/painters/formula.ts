@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -20,11 +18,10 @@ import {
   lerpColor,
   STROKE,
   RADIUS,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
-const SLAB_DEPTH = 0.12;
-const GRID_WORLD = 26;
 const IDLE_FACE_LIFT = 0.09;
 const ACTIVE_TINT = 0.24;
 
@@ -52,8 +49,9 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
   const totalBeats = offset + scene.terms.length + (scene.sayResult ? 1 : 0);
   const resultBeat = scene.sayResult ? totalBeats - 1 : -1;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const frameIn = easeOutCubic(enterT(env, 400));
-  const key = scene.id + "-frmla3d";
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const frameIn = easeOutCubic(enterT(env, 400)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
@@ -96,14 +94,6 @@ export function paintFormula(ctx: CanvasRenderingContext2D, scene: FormulaScene,
     cx: contentX + (i + 0.5) * tilePitch,
     cy: rowCY,
   });
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
 
   /**
    * No 3D layer. Each term's tile was a slab placed from a pixel rect on an even pitch,
