@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -22,6 +20,9 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  departT,
+  applyElevation,
+  clearShadow,
 } from "./common";
 import { drawIcon, isVectorIcon } from "./icons";
 import type { PaintEnv } from "./index";
@@ -72,7 +73,9 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const key = scene.id + "-tree3d";
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.5;
 
@@ -159,62 +162,6 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
     };
   });
 
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const build = (): ThreeBundle<{ nodes: NodeState[] }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, 12);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, SLAB_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-
-    const models = scene.nodes.map(() => {
-      const g = makeBlock(1, 1, SLAB_DEPTH, THEME.panel, THEME.textDim);
-      s.add(g);
-      return g;
-    });
-
-    // Every value that moves with the beat arrives through `data`; `build` runs once and
-    // its closure is frozen at frame 0.
-    const update = (_elapsedMs: number, data?: { nodes: NodeState[] }) => {
-      models.forEach((group, i) => {
-        const st = data?.nodes[i];
-        group.visible = !!st?.visible;
-        if (!st?.visible) return;
-        const c = toWorld(st.cx, st.cy);
-        group.position.set(c.x, c.y, 0);
-        group.scale.set((st.w / m.sx) * st.scale, (st.h / m.sy) * st.scale, 1);
-        group.traverse((o) => {
-          if (o instanceof THREE.LineSegments) {
-            const mat = o.material as THREE.LineBasicMaterial;
-            mat.transparent = true;
-            mat.opacity = EDGE_OPACITY * st.opacity;
-            mat.color.set(st.edge);
-          } else if (o instanceof THREE.Mesh) {
-            const mat = o.material as THREE.MeshPhysicalMaterial;
-            mat.transparent = true;
-            mat.opacity = st.opacity;
-            mat.color.set(st.face);
-            mat.emissive.set(st.face);
-          }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { nodes: states }, env);
-  const flat = !cam;
-
   // Connectors are pure pixel elbows between the two node boxes, drawn before the slabs
   // composite so a run that passes a sibling is hidden by it. They used to be drawn
   // between projected ground points, which sent them straight through the node boxes.
@@ -237,6 +184,7 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
       unit * 0.8
     );
     ctx.save();
+    ctx.globalAlpha = leave;
     ctx.strokeStyle = rgba(THEME.textDim, 0.65);
     ctx.lineWidth = unit * 0.12;
     ctx.lineCap = "round";
@@ -246,7 +194,7 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
 
     if (ap > 0.15) {
       ctx.save();
-      ctx.globalAlpha = clamp01((ap - 0.15) / 0.3);
+      ctx.globalAlpha = clamp01((ap - 0.15) / 0.3) * leave;
       ctx.fillStyle = accent;
       ctx.beginPath();
       ctx.arc(pr.cx, pr.y + pr.h, unit * 0.15, 0, Math.PI * 2);
@@ -264,26 +212,28 @@ export function paintTree(ctx: CanvasRenderingContext2D, scene: TreeScene, env: 
     const isActive = (revealStepOf.get(n.id) ?? 0) === activeStep;
 
     ctx.save();
-    ctx.globalAlpha = st.opacity;
+    ctx.globalAlpha = st.opacity * leave;
     ctx.translate(r.cx, r.cy);
     ctx.scale(st.scale, st.scale);
     ctx.translate(-r.cx, -r.cy);
 
-    if (flat) {
-      roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.md);
-      ctx.fillStyle = t.face;
-      ctx.fill();
-    }
+    // The active node's fill breathes — the border glow alone covers too little
+    // of the frame to register once the reveal settles and just holds.
+    const breathe = isActive ? 0.7 + 0.3 * idle(env, PULSE_MS) : 1;
+    applyElevation(ctx, unit, isActive ? "floating" : "raised");
+    roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.md);
+    ctx.fillStyle = isActive ? lerpColor(THEME.panel, t.edge, ROOT_TINT * breathe) : t.face;
+    ctx.fill();
+    clearShadow(ctx);
     if (isActive) {
       ctx.shadowColor = accentGlow;
-      ctx.shadowBlur = unit * GLOW.base * (0.7 + 0.3 * idle(env, PULSE_MS));
+      ctx.shadowBlur = unit * GLOW.base * breathe;
     }
     roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.md);
     ctx.strokeStyle = rgba(t.edge, isActive ? 0.95 : 0.4);
     ctx.lineWidth = unit * (isActive ? STROKE.base : STROKE.thin);
     ctx.stroke();
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
+    clearShadow(ctx);
 
     let textCX = r.cx;
     let textMaxW = r.w - unit * 0.6;
