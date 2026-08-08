@@ -375,7 +375,7 @@ export function stagger(
  * and departure is delegated entirely to the engine's 420 ms crossfade — which
  * is why scenes feel like they pile up rather than resolve.
  */
-export function exitT(env: { elapsedMs: number; durationMs?: number }, durMs = DUR.base): number {
+export function exitT(env: { elapsedMs: number; durationMs?: number }, durMs: number = DUR.base): number {
   const total = env.durationMs ?? 0;
   if (!(total > 0)) return 1;
   return 1 - clamp01((env.elapsedMs - (total - durMs)) / Math.max(1, durMs));
@@ -504,12 +504,12 @@ export function beatPulse(
 }
 
 /** Entrance with a wind-up. `anticipate` was in the toolkit and used by 0 painters. */
-export function anticipateT(env: TimeEnv, durMs = DUR.base, delayMs = 0): number {
+export function anticipateT(env: TimeEnv, durMs: number = DUR.base, delayMs = 0): number {
   return anticipate(enterT(env, durMs, delayMs));
 }
 
 /** Entrance with spring settle. `easeSpring` was used by 1 painter. */
-export function springT(env: TimeEnv, durMs = DUR.slow, delayMs = 0): number {
+export function springT(env: TimeEnv, durMs: number = DUR.slow, delayMs = 0): number {
   return easeSpring(enterT(env, durMs, delayMs));
 }
 
@@ -518,7 +518,7 @@ export function springT(env: TimeEnv, durMs = DUR.slow, delayMs = 0): number {
  * replaced the crossfade with hard cuts, anything without this simply vanishes
  * at the cut.
  */
-export function departT(env: TimeEnv, durMs = DUR.base): number {
+export function departT(env: TimeEnv, durMs: number = DUR.base): number {
   return easeInOutCubic(exitT(env, durMs));
 }
 
