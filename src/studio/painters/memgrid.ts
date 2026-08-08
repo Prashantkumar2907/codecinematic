@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -15,7 +13,8 @@ import {
   drawSceneTitle,
   beatT,
   activeBeatIndex,
-  rgba, shade,} from "./common";
+  rgba, shade, departT, applyElevation, clearShadow,
+} from "./common";
 import type { PaintEnv } from "./index";
 
 type MemgridScene = Extract<Scene, { kind: "memgrid" }>;
@@ -42,8 +41,6 @@ function stateAt(scene: MemgridScene, k: number): { values: (string | undefined)
   return { values, wroteAt, freedAt };
 }
 
-const CAM_DIST = 9;
-const CELL_DEPTH = 0.5;
 const CELL_GAP_UNITS = 0.6;
 const CELL_MAX_H_UNITS = 5.0;
 const CELL_LIFT_UNITS = 0.28;
@@ -53,8 +50,6 @@ const CELL_FACE_LIFT = 0.16;
 const IDLE_EMISSIVE = 0.06;
 const OCCUPIED_EMISSIVE = 0.16;
 const WRITE_EMISSIVE = 0.32;
-/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
-const EDGE_ALPHA = 0.6;
 /** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16). */
 const SAFE_BOTTOM_SHORT = 0.75;
 const SAFE_BOTTOM_LONG = 0.94;
@@ -75,7 +70,9 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
   const t = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
-  const key = scene.id + "-mg3d";
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.35;
   const areaY = contentY + band;
@@ -109,16 +106,6 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
     };
   };
 
-  const rect = { x: contentX, y: areaY, w: contentW, h: gridH };
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
   const cur = stateAt(scene, activeStep);
   const prev = stateAt(scene, activeStep - 1);
   const step = activeStep >= 0 ? scene.steps[activeStep] : null;
@@ -143,54 +130,6 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
   });
   type CellState = (typeof cellStates)[number];
 
-  const build = (): ThreeBundle<{ cells: CellState[] }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, CELL_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-    const idleFace = shade(THEME.panel, CELL_FACE_LIFT);
-
-    const models = scene.cells.map(() => {
-      const g = makeBlock(cellW / m.sx, cellH / m.sy, CELL_DEPTH, idleFace, accent);
-      s.add(g);
-      return g;
-    });
-
-    const update = (_elapsedMs: number, data: { cells: CellState[] }) => {
-      models.forEach((mesh, i) => {
-        const st = data.cells[i];
-        mesh.visible = !!st && st.appear > 0.01;
-        if (!st || !mesh.visible) return;
-
-        const box = cellRect(i, st.lift);
-        const c = toWorld(box.x + box.w / 2, box.y + box.h / 2);
-        mesh.position.set(c.x, c.y, 0);
-
-        mesh.traverse((o) => {
-          const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
-          if (!mat) return;
-          mat.transparent = true;
-          mat.opacity = st.appear * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 1);
-          if (!(o instanceof THREE.Mesh)) return;
-          const pm = mat as THREE.MeshPhysicalMaterial;
-          // accentSoft/secondary here used to be handed to setStyle as rgba() strings,
-          // which drops the alpha and renders the colour at full strength.
-          const face = st.writing ? accent : st.occupied ? secondary : idleFace;
-          pm.color.setStyle(face);
-          pm.emissive.setStyle(face);
-          pm.emissiveIntensity = st.writing ? WRITE_EMISSIVE : st.occupied ? OCCUPIED_EMISSIVE : IDLE_EMISSIVE;
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { cells: cellStates }, env);
-  if (!cam) return;
 
   const longestVal = [...scene.cells.map((c) => c.value ?? ""), ...scene.steps.flatMap((s) => s.write.map((w) => w.value))].reduce(
     (a, b) => (b.length > a.length ? b : a),
@@ -217,13 +156,34 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
     const freeing = st.freeing;
     const value = cur.values[i];
 
-    // Same rect the slab was mapped onto — no projection round-trip.
     const box = cellRect(i, st.lift);
     const x = box.x;
     const y = box.y;
 
     ctx.save();
-    ctx.globalAlpha = appear;
+    ctx.globalAlpha = appear * leave;
+
+    // Cell fill: same face logic the removed 3D slab used to carry as
+    // colour + emissive, now a direct 2D fill + glow. Occupied cells breathe —
+    // a static glow across the whole grid went still (58%) the moment writes
+    // and frees for the step finished, which for most of a beat is most cells.
+    const idleFace = shade(THEME.panel, CELL_FACE_LIFT);
+    const face = writing ? accent : st.occupied ? secondary : idleFace;
+    const breathe = st.occupied ? 0.75 + 0.35 * idle(env, 2000, i * 0.4) : 1;
+    const emissive = (writing ? WRITE_EMISSIVE : st.occupied ? OCCUPIED_EMISSIVE : IDLE_EMISSIVE) * breathe;
+    applyElevation(ctx, unit, st.lift > 0 ? "floating" : "raised");
+    if (emissive > IDLE_EMISSIVE) {
+      ctx.shadowColor = writing ? accentGlow : rgba(secondary, 0.4);
+      ctx.shadowBlur = unit * emissive * 2.2;
+    }
+    roundRect(ctx, x, y, cell2DW, cell2DH, unit * 0.3);
+    ctx.fillStyle = face;
+    ctx.fill();
+    clearShadow(ctx);
+    roundRect(ctx, x, y, cell2DW, cell2DH, unit * 0.3);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = unit * 0.03;
+    ctx.stroke();
 
     if (highlights.has(i) || (writing && t < 0.6)) {
       ctx.shadowColor = accentGlow;
@@ -237,7 +197,7 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
 
     if (freeing && t < 0.15) {
       ctx.save();
-      ctx.globalAlpha = appear * (1 - t / 0.15);
+      ctx.globalAlpha = appear * leave * (1 - t / 0.15);
       roundRect(ctx, x, y, cell2DW, cell2DH, unit * 0.3);
       ctx.fillStyle = rgba(THEME.warn, 0.25);
       ctx.fill();
@@ -262,7 +222,7 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
       } else {
         const pop = easeOutBack(clamp01((t - 0.3) / 0.28));
         ctx.save();
-        ctx.globalAlpha = appear * clamp01((t - 0.3) * 4);
+        ctx.globalAlpha = appear * leave * clamp01((t - 0.3) * 4);
         ctx.translate(cx, cy - vpx * 0.35);
         ctx.scale(pop, pop);
         ctx.fillStyle = THEME.text;
@@ -272,7 +232,7 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
     } else if (freeing) {
       const out = clamp01(t * 1.4);
       ctx.save();
-      ctx.globalAlpha = appear * (1 - out);
+      ctx.globalAlpha = appear * leave * (1 - out);
       ctx.fillStyle = THEME.textDim;
       ctx.fillText(prev.values[i] ?? "", cx, cy + easeOutCubic(out) * unit * 0.45);
       ctx.restore();
@@ -309,7 +269,7 @@ export function paintMemgrid(ctx: CanvasRenderingContext2D, scene: MemgridScene,
     const pop = isFresh ? easeOutBack(clamp01(t * 2.5)) : 1;
 
     ctx.save();
-    ctx.globalAlpha = isFresh ? clamp01(t * 3) : 1;
+    ctx.globalAlpha = (isFresh ? clamp01(t * 3) : 1) * leave;
     ctx.translate(cx, ny);
     ctx.scale(pop, pop);
     ctx.translate(-cx, -ny);
