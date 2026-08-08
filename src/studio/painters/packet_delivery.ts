@@ -142,7 +142,7 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
     ctx.globalAlpha = clamp01(appear);
     isoBox3D(ctx, bx, by, w, hgt, depth, face, touched ? accentGlow : undefined);
     const bob = touched ? Math.sin(env.elapsedMs / 1200) * unit * 0.05 : 0;
-    drawIcon(ctx, HOP_ICON[hop.kind], x, by + hgt * 0.38 + bob, hgt * 0.46, env, "#eaf3ff");
+    drawIcon(ctx, HOP_ICON[hop.kind], x, by + hgt * 0.38 + bob, hgt * 0.46, env, THEME.text);
     const labelPx = fitFontSize(ctx, hop.label, { maxW: w * 0.88, startPx: unit * 0.74, minPx: unit * 0.5, weight: 700 });
     ctx.font = `700 ${labelPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.text;
@@ -241,7 +241,7 @@ export function paintPacketDelivery(ctx: CanvasRenderingContext2D, scene: Packet
       ctx.font = `700 ${unit * 0.62}px ${FONT_MONO}`;
       const tw = ctx.measureText(payloadNow).width;
       const py = envY + ew * 0.5 + unit * 0.55;
-      ctx.fillStyle = "rgba(8,14,20,0.82)";
+      ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
       roundRect(ctx, ep.x - tw / 2 - unit * 0.4, py - unit * 0.5, tw + unit * 0.8, unit * 1.0, unit * 0.3);
       ctx.fill();
       ctx.strokeStyle = rgba(tone, 0.6);
@@ -344,7 +344,7 @@ function drawEnvelope(ctx: CanvasRenderingContext2D, ex: number, ey: number, ew:
     ctx.strokeStyle = rgba(faceHex, 0.5);
     ctx.lineWidth = Math.max(1, ew * 0.02);
     ctx.stroke();
-    ctx.strokeStyle = "rgba(11,16,22,0.45)";
+    ctx.strokeStyle = rgba(THEME.panel, 0.45);
     ctx.lineWidth = Math.max(1, ew * 0.018);
     for (let i = 0; i < 3; i++) {
       const yy = ly + lh * (0.28 + i * 0.22);
