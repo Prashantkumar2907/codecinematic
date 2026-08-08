@@ -158,7 +158,7 @@ export function paintVectorSpace(ctx: CanvasRenderingContext2D, scene: VectorSpa
     if (!revealInfo.has(a.id) || !revealInfo.has(b.id)) return;
     const dStep = distanceStep.get(i)!;
     const local = dStep === activeStep ? easeOutCubic(clamp01(stepT * 1.4)) : 1;
-    drawDistance(ctx, px(a.x), py(a.y), px(b.x), py(b.y), d.label, unit, secondary, local * introIn);
+    drawDistance(ctx, px(a.x), py(a.y), px(b.x), py(b.y), d.label, unit, secondary, local * introIn, rect);
   });
 
   scene.points.forEach((p) => {
@@ -170,7 +170,7 @@ export function paintVectorSpace(ctx: CanvasRenderingContext2D, scene: VectorSpa
       if (ghostIn <= 0) return;
       ctx.save();
       ctx.globalAlpha = 0.14 * introIn * easeOutCubic(ghostIn);
-      ctx.strokeStyle = "rgba(148,163,184,0.9)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.9);
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.2, unit * 0.16]);
       ctx.beginPath();
@@ -227,7 +227,7 @@ function drawAxes(
 ) {
   ctx.save();
   ctx.globalAlpha = introIn;
-  ctx.strokeStyle = "rgba(148,163,184,0.14)";
+  ctx.strokeStyle = rgba(THEME.textDim, 0.14);
   ctx.lineWidth = 1;
   const DIVS = 6;
   for (let i = 1; i < DIVS; i++) {
@@ -236,7 +236,7 @@ function drawAxes(
     const gy = rect.y + (i / DIVS) * rect.h;
     ctx.beginPath(); ctx.moveTo(rect.x, gy); ctx.lineTo(rect.x + rect.w, gy); ctx.stroke();
   }
-  ctx.strokeStyle = "rgba(148,163,184,0.4)";
+  ctx.strokeStyle = rgba(THEME.textDim, 0.4);
   ctx.lineWidth = 1.4;
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
   if (minX <= 0 && maxX >= 0) {
@@ -337,7 +337,8 @@ function drawDistance(
   label: string | undefined,
   unit: number,
   color: string,
-  alpha: number
+  alpha: number,
+  rect: { x: number; y: number; w: number; h: number }
 ) {
   if (alpha <= 0) return;
   ctx.save();
@@ -351,11 +352,19 @@ function drawDistance(
   ctx.stroke();
   ctx.setLineDash([]);
   if (label) {
-    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const my = (y1 + y2) / 2;
     ctx.font = `700 ${unit * 0.56}px ${FONT_MONO}`;
     const tw = ctx.measureText(label).width;
+    const chipHalfW = tw / 2 + unit * 0.3;
+    // A point pair near the plot's left edge (e.g. "man"/"woman" close to
+    // the y-axis) centred the chip on their raw midpoint, letting it run
+    // past the plot and straight through the rotated y-axis label. Only
+    // the left edge carries that hazard (the x-axis label sits below the
+    // plot, not to the right) — clamping both sides pulled a right-side
+    // chip inward too, colliding with a left-side chip instead.
+    const mx = Math.max(rect.x + chipHalfW + unit * 0.15, (x1 + x2) / 2);
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = "rgba(9,13,18,0.82)";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
     roundRect(ctx, mx - tw / 2 - unit * 0.3, my - unit * 0.5, tw + unit * 0.6, unit * 0.9, unit * 0.25);
     ctx.fill();
     ctx.strokeStyle = rgba(color, 0.5);
@@ -387,7 +396,7 @@ function drawLabelChip(
   const chipH = unit * 1.05;
   const bx = x + unit * 0.5;
   const by = y - chipH / 2 - unit * 0.55;
-  ctx.fillStyle = "rgba(9,13,18,0.82)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
   roundRect(ctx, bx, by, chipW, chipH, unit * 0.28);
   ctx.fill();
   ctx.globalAlpha = active ? 0.95 : 0.5;
