@@ -1,7 +1,5 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import type { Scene } from "../schema";
-import { THEME, FONT_MONO, FONT_SANS, easeOutCubic, enterT, idle, clamp01, roundRect, rgba, shade } from "./common";
+import { THEME, FONT_MONO, FONT_SANS, easeOutCubic, enterT, idle, clamp01, roundRect, rgba, shade, departT, applyElevation, clearShadow, RADIUS } from "./common";
 import type { PaintEnv } from "./index";
 
 type TerminalScene = Extract<Scene, { kind: "terminal" }>;
@@ -26,10 +24,6 @@ const MIN_HEIGHT_FRAC = 0.78;
 const isCmd = (l: string) => l.trimStart().startsWith("$");
 const cmdBody = (l: string) => l.trimStart().replace(/^\$\s*/, "");
 
-type TerminalContext = {
-  env: PaintEnv;
-};
-
 export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
@@ -37,9 +31,8 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   const good = THEME.good;
 
   const frameIn = easeOutCubic(enterT(env, 420));
-  if (frameIn <= 0) return;
-
-  const key = scene.id + "-terminal3d";
+  const leave = departT(env, 380);
+  if (frameIn <= 0 || leave <= 0) return;
 
   // Type metrics first: they depend only on the window WIDTH, so the window can then
   // be sized to its own content instead of always filling the band and running its
@@ -73,70 +66,8 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
     h: rectH,
   };
 
-  // ── 3D layer ───────────────────────────────────────────────────────────────
-  // The window chrome below is an axis-aligned pixel rect, so the slab must project
-  // to one: axis-aligned camera, upright window, front face sized from the frustum.
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const build = (): ThreeBundle<TerminalContext> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, WIN_DEPTH / 2);
-    const blockW = (rect.w * FILL) / m.sx;
-    const blockH = (rect.h * FILL) / m.sy;
-
-    const g = makeBlock(blockW, blockH, WIN_DEPTH, THEME.bgBottom, accent);
-
-    // Glass sheet on the face we are looking at, not on top of a flat slab.
-    const glassGeo = new THREE.BoxGeometry(blockW * GLASS_INSET, blockH * GLASS_INSET, 0.05);
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.1,
-      roughness: 0.1,
-      metalness: 0.8,
-      clearcoat: 1.0,
-    });
-    const glass = new THREE.Mesh(glassGeo, glassMat);
-    glass.position.z = WIN_DEPTH / 2 + 0.025;
-    g.add(glass);
-
-    s.add(g);
-
-    const update = (elapsedMs: number, ctxData: TerminalContext) => {
-      // No scale or bob: both would move the slab out from under the pixel-pinned
-      // chrome. The idle life is in the emissive breath instead.
-      const alpha = easeOutCubic(enterT(ctxData.env, 420));
-      g.traverse((child) => {
-        if (!(child instanceof THREE.Mesh)) return;
-        const mat = child.material as THREE.MeshPhysicalMaterial;
-        mat.transparent = true;
-        if (mat.emissive) mat.emissiveIntensity = 0.15 + 0.06 * idle({ elapsedMs }, 1400);
-        if (child.geometry.type !== "EdgesGeometry") mat.opacity = 0.8 * alpha;
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const contextData: TerminalContext = { env };
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, contextData, env);
-  if (!cam) return;
-
-  // The window chrome sits exactly on the projected front face.
-  const faceM = mappingAt(cam, WIN_DEPTH / 2);
-  const fx = faceM.o.x - fw / 2;
-  const fy = faceM.o.y - fh / 2;
+  const fx = rect.x + (rect.w - fw) / 2;
+  const fy = rect.y + (rect.h - fh) / 2;
 
   const CPS = 26;
   const CMD_TAIL_MS = 260;
@@ -153,9 +84,16 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   }
 
   ctx.save();
-  ctx.globalAlpha = frameIn;
+  ctx.globalAlpha = frameIn * leave;
+
+  applyElevation(ctx, unit, "raised");
+  roundRect(ctx, fx, fy, fw, fh, radius);
+  ctx.fillStyle = THEME.bgBottom;
+  ctx.fill();
+  clearShadow(ctx);
 
   // Title bar
+  ctx.save();
   roundRect(ctx, fx, fy, fw, barH + radius, radius);
   ctx.clip();
   const barGrad = ctx.createLinearGradient(0, fy, 0, fy + barH);
@@ -166,9 +104,12 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   ctx.fillStyle = rgba(THEME.text, 0.1);
   ctx.fillRect(fx, fy, fw, Math.max(1, unit * 0.06));
   ctx.restore();
-  
-  ctx.save();
-  ctx.globalAlpha = frameIn;
+
+  roundRect(ctx, fx, fy, fw, fh, radius);
+  ctx.strokeStyle = THEME.panelBorder;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
   ctx.strokeStyle = rgba(THEME.bgBottom, 0.5);
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -238,11 +179,11 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
       if (shown < body.length) typingCursor = end;
       lastCmdEnd = end;
     } else {
-      ctx.globalAlpha = frameIn * clamp01(local / 180);
+      ctx.globalAlpha = frameIn * leave * clamp01(local / 180);
       ctx.font = `500 ${fontPx}px ${FONT_MONO}`;
       ctx.fillStyle = THEME.textDim;
       ctx.fillText(line, textX, y);
-      ctx.globalAlpha = frameIn;
+      ctx.globalAlpha = frameIn * leave;
     }
   });
 
@@ -256,7 +197,15 @@ export function paintTerminal(ctx: CanvasRenderingContext2D, scene: TerminalScen
   if (cursor) {
     const c = cursor as { x: number; y: number };
     const blink = typingCursor ? 1 : 0.3 + 0.7 * idle(env, 900);
-    ctx.globalAlpha = frameIn * blink;
+    // A full-width breathing band under the cursor's row, not just the blink: the
+    // cursor rect alone is ~15px wide and fell below the motion-check grid once
+    // typing finished (the type budget caps at 62% of the beat, so idle time is
+    // common) — dead 56%, still up to 76%.
+    ctx.globalAlpha = frameIn * leave * (0.06 + 0.14 * idle(env, 1800));
+    ctx.fillStyle = accent;
+    ctx.fillRect(fx, c.y - fontPx * 0.9, fw, fontPx * 1.1);
+
+    ctx.globalAlpha = frameIn * leave * blink;
     ctx.fillStyle = accent;
     ctx.fillRect(c.x + charW * 0.1, c.y - fontPx * 0.82, charW * 0.6, fontPx * 0.98);
   }
