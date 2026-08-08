@@ -23,6 +23,8 @@ import type { PaintEnv } from "./index";
 type TapeScene = Extract<Scene, { kind: "turing_tape" }>;
 
 const WRITE_END = 0.42;
+/** Dark ink on a bright accent-tone badge — same convention as cipher.ts's `INK_ON_ACCENT`. */
+const INK_ON_ACCENT = "#06121a";
 
 /** Head index before each step executes; positions[n] is the final resting index. */
 function headPositions(scene: TapeScene): number[] {
@@ -129,7 +131,7 @@ export function paintTuringTape(ctx: CanvasRenderingContext2D, scene: TapeScene,
     ctx.fill();
     ctx.shadowBlur = 0;
     if (!known) ctx.setLineDash([unit * 0.22, unit * 0.2]);
-    ctx.strokeStyle = known ? rgba(accent, 0.6) : "rgba(148,163,184,0.35)";
+    ctx.strokeStyle = known ? rgba(accent, 0.6) : rgba(THEME.textDim, 0.35);
     ctx.lineWidth = known ? unit * 0.07 : unit * 0.05;
     roundRect(ctx, x - cellW / 2 + unit * 0.08, tapeY, cellW - unit * 0.16, cellH, unit * 0.28);
     ctx.stroke();
@@ -223,7 +225,10 @@ export function paintTuringTape(ctx: CanvasRenderingContext2D, scene: TapeScene,
 
   const label = stateAt(scene, Math.max(activeStep, 0));
   if (label) {
-    const chipY = headAnchorY - unit * 0.75 + bob;
+    // The head triangle spans roughly [headAnchorY-0.42u, headAnchorY+0.05u];
+    // at the old -0.75u offset the chip's own bottom edge (chipY+0.55u) cut
+    // into the triangle's top, hiding part of the head pointer behind it.
+    const chipY = headAnchorY - unit * 1.05 + bob;
     const chipPop = easeOutBack(enterT(env, 300, 160));
     ctx.save();
     ctx.globalAlpha = introIn * clamp01(chipPop * 3);
@@ -238,7 +243,7 @@ export function paintTuringTape(ctx: CanvasRenderingContext2D, scene: TapeScene,
     ctx.fillStyle = accent;
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = "#06121a";
+    ctx.fillStyle = INK_ON_ACCENT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, centerX, chipY + unit * 0.03);
