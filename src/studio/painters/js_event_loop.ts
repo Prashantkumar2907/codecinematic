@@ -11,6 +11,7 @@ import {
   easeInOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   lerpColor,
   shade,
@@ -116,7 +117,9 @@ export function paintJsEventLoop(ctx: CanvasRenderingContext2D, scene: JsEventLo
    * motion axis asks for siblings on a small offset rather than simultaneous.
    */
   const REGION_COUNT = 4;
-  const regionIn = (i: number) => easeOutCubic(enterT(env, 420, stagger(i, REGION_COUNT)));
+  const leave = departT(env, 420);
+  if (leave <= 0) return;
+  const regionIn = (i: number) => easeOutCubic(enterT(env, 420, stagger(i, REGION_COUNT))) * leave;
   const introIn = regionIn(REGION_COUNT - 1);
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
