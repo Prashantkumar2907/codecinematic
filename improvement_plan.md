@@ -1204,6 +1204,159 @@ narration (a visual change on every beat), continuity into the next scene.
 
 ---
 
+### Phase 19 — Authored motion: close the gap between "passes QA" and "feels like video"
+
+> **Execution:** `PHASE19-RUNBOOK.md` is the operating doc — one task card per session, every check a
+> command with an expected output. This section is the spec and the *why*; the runbook is the *how*.
+> Rubric v2 lives in the runbook §4 and supersedes `ANIMATION-QA-PROMPT.md` Part C for this phase.
+
+**The contradiction this phase exists to resolve.** `qa/LEDGER.md` records **111 of 111 painters
+`passed`** (closed out 2026-08-08). By the project's own ship gate the animation work is finished. The
+owner's verdict on watching the output is that it still reads as a slide deck, and wants the bar raised to
+"a video-editor's built-in preset" / the explainer channels that earn millions of views.
+
+Both statements are true, because **the gate measures defect absence, not authored motion.** Four of the
+five rubric axes (containment, typography, cleanliness, palette) ask *"is it broken?"*. The fifth, motion
+quality, contains the line *"**Settles.** By p≈0.95 the scene is composed and readable"*
+(`ANIMATION-QA-PROMPT.md` Part C §3) — it **rewards a scene for stopping**. A painter can score 5/5 by
+fading in cleanly and then freezing for twelve seconds.
+
+**The measurement that settles it.** Phase 9.0 built a real motion toolkit into `painters/common.ts` as
+pure additions. Adoption across the 111 painter modules, measured 2026-08-08:
+
+| helper | adopted | what it does |
+|---|---|---|
+| `enterT` | **106 / 111** | absolute-time entrance, ~380 ms, then hold |
+| `easeOutCubic` | 103 / 111 | |
+| `idle` | 85 / 111 | imported by 78, per §6a mostly not used for secondary motion |
+| `safeBottom` | 36 / 111 | |
+| `lerpColor` | 18 / 111 | |
+| `stagger` | 9 / 111 | sibling cascade |
+| `revealT` | **4 / 111** | duration-aware reveal — the actual fix for dead hold |
+| `easeSpring` | **1 / 111** | |
+| `anticipate` | **0 / 111** | |
+| `exitT` | **0 / 111** | **nothing in this library ever leaves** |
+
+Re-measure with: `cd src/studio/painters && grep -lw exitT *.ts | wc -l`.
+
+That table is the whole diagnosis. **The library implements exactly one motion idea — arrive in the first
+380 ms, then hold still until the cut.** `enterT` is absolute-time *by design* (`common.ts:410`, and §6b
+already flagged it), so on a 12-second beat the animation occupies 3% of the runtime and 97% is a static
+card. Nothing anticipates, nothing exits, siblings mostly land on the same tick. `exitT` and `anticipate`
+were built in 9.0 and adopted by zero painters — the toolkit landed, the vocabulary did not.
+
+The repo caught the symptom itself and filed it as residual: *"the card is fully assembled by ~p=0.6 and
+the last ~40% of the beat is unchanged — `revealT` delays a reveal but does not spread one across the whole
+hold"* (`PROGRESS.md` row 7.2, which explicitly assigns it to 9.x; 9.x closed without addressing it).
+
+**This phase is Phase 9 §6f, which was specced and never executed.** §6f called for expressive axes above
+the existing five — staging, anticipation & follow-through, camera language, rhythm against narration,
+continuity into the next scene. No `PROGRESS.md` row was ever opened for it. It is the single unexecuted
+item of the animation programme, and it is exactly the item that separates "not broken" from "authored".
+
+**Owner decisions taken 2026-08-08, recorded here so they are not relitigated:**
+
+0. **Fewer kinds, at a much higher bar — 50, not 111.** The owner's call: *"rebuild only 50 but of the
+   best kind."* Evidence supports cutting harder than the instinct suggested — 9.x measured only **36 of
+   110 kinds ever used** across 91 scripts / 842 scenes, and `VARIETY_RULE` needs just ≥3 distinct kinds
+   in a short and ≥6 in a long. 50 is therefore a generous margin, not a compromise. The set is fixed in
+   `PHASE19-RUNBOOK.md` §5 and is built from measured kit reach: the 15 `CORE_KINDS`, plus all 21 kinds
+   with reach ≥4 subject kits, plus 12 high-traffic coding kinds (the corpus is 84/91 coding), plus
+   `vocab` and `terrain` to give English and Geography their signature. Every one of the 19 subjects
+   retains ≥4 signature kinds beyond CORE.
+   Note the accepted limitation in decision 0-bis: the menu keeps all 111, so these 50 raise the ceiling
+   of what a video *can* contain faster than they raise its average. The expressive gate also rises:
+   floor sections ≥4, expressive sections **=5**. "Good enough" is what produced the 7/10 ceiling.
+
+0-bis. **The other 61 stay in the menu — proposed, then declined by the owner.** Measured 2026-08-08:
+   `CORE_KINDS` ∪ every `SUBJECT_KIT` = **111 of 111**, so the model can pick any kind (9.x's closing act
+   working as designed). The proposal was to drop the 61 unrebuilt kinds from the menu while leaving them
+   registered, so only rebuilt work could ship. **Owner declined; all 111 remain selectable.**
+   The consequence is accepted and recorded rather than argued: until the 50 are rebuilt, a video can mix
+   rebuilt and unrebuilt kinds, so *average* output improves more slowly than the rebuilt kinds do.
+   If revisited, the cheap version is a soft preference, not a removal — `buildSceneShape()` already emits
+   a "FEATURED FOR THIS SUBJECT — lean on these" list separate from the full menu (`prompt.ts:203`).
+
+0-ter. **Design system before painters; sound deferred.** Motion mechanics applied to undesigned shapes
+   is precisely the 7/10 ceiling — the painters draw procedural rounded rects, lines and emoji icons, and
+   no easing curve makes that read as authored artwork. A visual-language card (depth, shadow, texture,
+   icon treatment, per-aspect composition) runs **before** the first painter rebuild. **Per-aspect
+   composition becomes its own rubric section** (§4 s10): 9:16 and 16:9 each get an intentional
+   composition, scored separately — not one layout checked for clipping in both.
+   **Sound is explicitly deferred to Phase 20** at the owner's decision (animation first). Recorded so it
+   is not mistaken for an oversight: there is no music bed (`public/` holds only a README) and no SFX
+   layer at all, while `engine.ts`'s `scheduleMusic` plumbing sits unused. It is the cheapest remaining
+   gain once the animation work lands, and it is worth roughly 1-1.5 of the missing points.
+
+1. **2D-first.** 58 of 111 painters call `render3D`. The ledger's single largest systemic defect class is
+   `2d-layout-round-tripped-through-camera` (10 painters → 17 during 9.x alone); the recurring polish note
+   across batches is *"dropped the bob / wobble / rotation"*; and the **highest-scoring row in the entire
+   ledger** — `question`, 5/5/4/5/4 — was reached by *"rewritten fully 2D, no three.js, no camera"*
+   (`a88c120`). The benchmark channels are 2D motion graphics. **Rebuild the common kinds as pure 2D;
+   retain three.js only where the third dimension is the teaching content itself** (`orbit`, `molecule`,
+   `globe3d`, `iso3d`, `terrain`). This also returns frame budget, which Stage 2 immediately spends.
+2. **One canonical look per kind.** The variant system goes. Scope is smaller than assumed: `variantOf` is
+   used by **10 painters** (`bigtext`, `diagram`, `compare`, `decision`, `mythfact`, `quote`, `question`,
+   `stat`, `statemachine`, plus the helper in `common.ts`), not all 111. Engine-level variety
+   (`BG_MOTIFS`, intro variant) is out of scope — it is per-video, not per-kind.
+
+**19a. Re-baseline before changing anything.** `qa/RENDER.md` is dated **26-28 July**, before nearly all
+polish, and its two worst rows (96.4% frozen) are the `paintBigtext` save-leak videos from row 2.9 — a
+fixed bug, not current quality. Render one long + one short on current `main` and re-run
+`node scripts/render-audit.mjs --all`. **Fix the metric's blind spot first:** `drawBackground` drifts its
+radial glows every frame, so a fully frozen painter still scores non-zero motion and the "frozen %" is a
+floor, not a truth. Diff against a background-only reference so the number describes the *content*.
+
+**19b. Rubric v2 and the missing per-painter metric.** Keep the five defect axes as a floor — they are
+what got the library to zero edge bleed and they must not regress. Above them add §6f's expressive axes,
+and **delete the "Settles" criterion**, which currently rewards the defect. Then build the instrument that
+does not exist: `render-audit` measures dead stretches only on whole rendered videos, so **no per-painter
+motion measurement exists anywhere.** Drive `__PROBE_FILMSTRIP` across a scene's timeline, diff
+consecutive frames, and emit a motion-energy curve per kind — turning "feels dead" into a ranked
+worst-first list instead of eyeballing 111 contact sheets. Capture delivered fps in the same pass (see
+19f). Same discipline as `safe-check.mjs`: teeth-test it by injecting a known freeze and confirming it is
+caught before trusting a single number.
+
+**19c. A scene timeline, not just an entrance (`painters/common.ts`).** Today a painter knows only
+"how far into the entrance am I". Give every scene four explicit phases — **enter → develop → emphasise →
+exit**:
+- `develop` must genuinely occupy the middle of the beat. This is what §6b's duration-aware sibling was
+  for, and `revealT` at 4/111 is why it never arrived.
+- `emphasise` binds to real beat windows (`env.beats`) so a visual change lands on **every narrated
+  point**, not just the first. This is §6f's "rhythm against narration".
+- `exit` makes `exitT` real. Departure is currently delegated entirely to the engine, and since Phase 10
+  deleted the crossfade in favour of hard cuts, **elements now simply vanish at the cut** — 10.x made this
+  strictly worse and nobody noticed, because no axis scores departure.
+- Camera language per §6a-bis: a move must shift the camera **and** re-derive the pixel mapping in the same
+  call, or 2D chrome detaches. `bigtext.ts`'s local Ken Burns push-in is the model to generalise.
+
+This is ~1,500 lines of shared code against ~40,000 lines of painters — the same leverage argument that
+made 9.0 correct, applied to the half of the toolkit that never got adopted.
+
+**19d. One gold reference painter.** Author `bigtext` — it opens nearly every video — to the target
+standard using only 19c primitives, and make it the template every other painter is ported against.
+Doing this *before* the sweep is what stops 111 painters drifting apart again; 9.x's own evidence is that
+without a reference the library accumulated 25 corner radii and 20 entrance durations.
+
+**19e. The 50, common kinds first.** The full set and its working order are fixed in
+`PHASE19-RUNBOOK.md` §5. It starts with `CORE_KINDS` (`prompt.ts:151`) — the owner's "used in all
+subjects" set — ordered by measured traffic from 9.x (`compare` 50 scenes, `diagram` 49, `chart` 33,
+`table` 18) ahead of structural reach, then the 35 signature kinds by kit reach (`cycle`/`radar`/`gauge`
+12, `chain` 11, `dialogue` 10, `bracket` 9, `storyboard`/`showdown` 8). Collapse the variants (decision 2)
+in the same commit as the kind's rebuild — not as a separate sweep.
+
+**Re-scoring is not optional.** All 111 rows currently certify against rubric v1. A row that passed v1 says
+nothing about v2, and `PROGRESS.md` 9.x already documents that wave-1 rows *"certify less than they
+appear to"* — `quote` and `timeline` were never individually re-scored after the caption-band sweep.
+
+**19f. Frame budget, as a running constraint.** Rendering is real-time capture at 30 fps
+(`engine.ts:66,640`). Continuous motion across 111 painters costs frame time, and a dropped frame reads as
+judder — the precise opposite of the goal. **Nothing currently measures delivered fps**; row 10.x audited
+bitrate and resolution and explicitly found "no defect", which is not the same as having measured frame
+delivery. Fold it into 19b's instrument and treat a frame-budget regression as a ship blocker, not a note.
+
+---
+
 ## 5. Per-subject playbooks (all 19)
 
 **What already exists in code — extend it, don't contradict it.** All 19 subjects have a
@@ -1410,6 +1563,7 @@ Typecheck baseline is **99** (`qa/ledger.json` → `typecheckBaseline`, confirme
 | **17** | Gold exemplars | cheap, highest-leverage content fix; plumbing already exists, unused |
 | **9** | Animation craft | central vocabulary, then traffic tiers |
 | **10** | Whole-video look | typography, transitions, encode |
+| **19** | Authored motion | executes Phase 9 §6f, the one unexecuted animation item; needs 9-10 landed first |
 | **12** | Narration & voice | starts with a capability spike; can run parallel to 9-10 |
 | **16** | Post-render measurement | once there is something worth measuring |
 | **13** | Craft templates + per-submodule `creatorBrief` | **research first** — the dedicated pass failed and must be redone |
