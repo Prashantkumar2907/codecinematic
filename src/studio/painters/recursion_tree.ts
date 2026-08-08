@@ -196,7 +196,7 @@ export function paintRecursionTree(ctx: CanvasRenderingContext2D, scene: Recursi
     ctx.save();
     ctx.globalAlpha = introIn * (1 - closed * 0.55);
     ctx.strokeStyle =
-      pruneOf(n.id) > 0 ? rgba(PRUNE_RED, 0.7) : acceptOf(n.id) > 0 ? rgba(THEME.good, 0.6) : "rgba(148,163,184,0.8)";
+      pruneOf(n.id) > 0 ? rgba(PRUNE_RED, 0.7) : acceptOf(n.id) > 0 ? rgba(THEME.good, 0.6) : rgba(THEME.textDim, 0.8);
     ctx.lineWidth = unit * 0.06;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -285,7 +285,7 @@ export function paintRecursionTree(ctx: CanvasRenderingContext2D, scene: Recursi
         ? { fill: rgba(accent, 0.24), border: accent, text: THEME.text }
         : state === "onstack"
         ? { fill: rgba(accent, 0.1), border: rgba(accent, 0.55), text: THEME.text }
-        : { fill: THEME.panel, border: "rgba(148,163,184,0.35)", text: THEME.textDim };
+        : { fill: THEME.panel, border: rgba(THEME.textDim, 0.35), text: THEME.textDim };
 
     const settledAlpha = state === "pruned" ? 0.45 + 0.5 * prune : state === "closed" ? 0.8 : 1;
     ctx.save();
