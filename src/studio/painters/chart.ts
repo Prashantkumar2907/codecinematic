@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { line as d3line, area as d3area, curveMonotoneX } from "d3-shape";
 import { introBeatCount, type Scene } from "../schema";
 import {
@@ -19,6 +17,9 @@ import {
   flowDots,
   rgba,
   shade,
+  departT,
+  applyElevation,
+  clearShadow,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -53,15 +54,20 @@ function valueLabel(value: number, unit: string | undefined, t: number): string 
 
 /** Dispatch by mode; "bars" (default) keeps the original horizontal bar chart. */
 export function paintChart(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv) {
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
   const mode = scene.mode ?? "bars";
-  if (mode === "bars") return paintBars(ctx, scene, env);
-  if (mode === "column") return paintColumn(ctx, scene, env);
-  if (mode === "line" || mode === "area") return paintLineArea(ctx, scene, env, mode === "area");
-  return paintPie(ctx, scene, env, mode === "donut");
+  ctx.save();
+  ctx.globalAlpha = leave;
+  if (mode === "bars") paintBars(ctx, scene, env, leave);
+  else if (mode === "column") paintColumn(ctx, scene, env, leave);
+  else if (mode === "line" || mode === "area") paintLineArea(ctx, scene, env, mode === "area", leave);
+  else paintPie(ctx, scene, env, mode === "donut");
+  ctx.restore();
 }
 
 /** Horizontal bar chart: one bar grows (with a counting value) per beat. */
-function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv) {
+function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv, leave: number) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
   const { accent, accentGlow } = env.palette;
@@ -108,7 +114,7 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
         const rowY = listTop + i * rowGap;
         const barY = rowY + unit * 1.15;
         ctx.save();
-        ctx.globalAlpha = GHOST_A * ghostIn;
+        ctx.globalAlpha = GHOST_A * ghostIn * leave;
         ctx.font = `600 ${labelPx}px ${FONT_SANS}`;
         ctx.fillStyle = THEME.textDim;
         ctx.fillText(item.label, trackX, rowY + unit * 0.75);
@@ -127,7 +133,7 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
     const barY = rowY + unit * 1.15;
 
     ctx.save();
-    ctx.globalAlpha = appear * (isCurrent || active < offset + i ? 1 : 0.62);
+    ctx.globalAlpha = appear * (isCurrent || active < offset + i ? 1 : 0.62) * leave;
 
     ctx.font = `${isCurrent ? 700 : 600} ${labelPx}px ${FONT_SANS}`;
     ctx.fillStyle = isCurrent ? THEME.text : THEME.textDim;
@@ -163,130 +169,81 @@ function paintBars(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintE
 }
 
 /** Vertical columns: one bar grows up per beat, value chip riding its top. */
-function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv) {
+function paintColumn(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv, leave: number) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
-  const { accent, secondary } = env.palette;
+  const { accent } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.items.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const key = scene.id + "-col3d";
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const n = scene.items.length;
   const maxVal = Math.max(...scene.items.map((i) => i.value), 1e-9);
 
-  const plotTop = contentY + band;
-  const rect = { x: contentX, y: plotTop, w: contentW, h: Math.max(unit * 4, safeBottom - plotTop) };
-  const spread = vertical ? 2.8 : 4.0;
-  // Taller bars in 9:16: an orthographic frustum has to match the rect aspect, so in a
-  // portrait plot the width is the binding constraint and a 3.5-tall block left the
-  // lower half of the band empty.
-  const maxBarH3D = vertical ? 4.6 : 3.5;
-  const ghostIn = easeOutCubic(enterT(env, 420));
-
-  const colX = (i: number) => (n === 1 ? 0 : -spread + (i / (n - 1)) * spread * 2);
-
-  /** Per-bar height in world units, eased. Travels through context — see below. */
-  const heights = scene.items.map((item, i) => {
-    const t = beatT(env.beats, offset + i, totalBeats, env.p);
-    if (t <= 0) return 0;
-    return Math.max(0.01, maxBarH3D * (item.value / maxVal) * easeOutBack(clamp01(t * 1.6)));
-  });
-
-  const build = (): ThreeBundle<{ heights: number[] }> => {
-    const s = new THREE.Scene();
-    /**
-     * Orthographic, not perspective. A chart may not distort the thing it measures:
-     * under the old perspective camera at (0, 4, 11) the near column rendered visibly
-     * wider than the far one, so two equal values did not look equal. Parallel
-     * projection also makes `projectToRect` affine, so the 2D value chips and x-axis
-     * labels land exactly on their columns instead of near them.
-     */
-    const worldHalfW = spread + 0.7;
-    const worldHalfH = (maxBarH3D + 0.9) / 2;
-    const worldCY = maxBarH3D / 2;
-    const rectAspect = rect.w / rect.h;
-    const halfW = Math.max(worldHalfW, worldHalfH * rectAspect);
-    const halfH = Math.max(worldHalfH, worldHalfW / rectAspect);
-    const camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 100);
-    // The tilt keeps the tops and side faces visible. Under parallel projection it costs
-    // no width accuracy, and it foreshortens every bar by the same cos(θ), so relative
-    // heights stay honest too.
-    camera.position.set(0, worldCY + 3.2, 10);
-    camera.lookAt(0, worldCY, 0);
-    studioLights(s, accent, secondary);
-
-    const grid = new THREE.GridHelper(spread * 3.5, 10, new THREE.Color(accent), new THREE.Color(shade(accent, -0.62)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.3;
-    s.add(grid);
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spread * 4, spread * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models = scene.items.map((_item, i) => {
-      const g = makeBlock(0.85, 1.0, 0.85, accent, shade(accent, 0.86));
-      g.position.set(colX(i), 0, 0);
-      s.add(g);
-      return g;
-    });
-
-    // Heights arrive as data. Read from the enclosing scope they were frame-0 values
-    // for the life of the scene — `build` runs once per key and `liveEnv` only
-    // refreshes `env` (`qa/ledger.json` → systemic `frozen-painter-local-output-array`).
-    const update = (_elapsedMs: number, data?: { heights: number[] }) => {
-      models.forEach((m, i) => {
-        const h = data?.heights[i] ?? 0;
-        m.visible = h > 0;
-        if (!m.visible) return;
-        m.scale.y = h;
-        m.position.y = h / 2;
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { heights }, env);
-  if (!cam) return; // Fallback could be added, but we assume WebGL works for devstudio
-
-  // Draw 2D labels projected from 3D coords
-  const labelPx = unit * (vertical ? 0.8 : 0.72);
+  const labelH = unit * 1.4;
+  const plotTop = contentY + band + unit * 1.1; // room for the value chip above the tallest column
+  const baseY = safeBottom - labelH;
+  const maxH = Math.max(unit, baseY - plotTop);
+  const gap = unit * (vertical ? 0.6 : 0.9);
+  const colW = Math.min(unit * (vertical ? 2.6 : 3.2), (contentW - gap * (n - 1)) / n);
+  const rowW = colW * n + gap * (n - 1);
+  const startX = contentX + (contentW - rowW) / 2;
+  const labelPx = unit * (vertical ? 0.74 : 0.7);
   const valuePx = unit * (vertical ? 0.85 : 0.78);
+  const ghostIn = easeOutCubic(enterT(env, 420));
 
   scene.items.forEach((item, i) => {
     const t = beatT(env.beats, offset + i, totalBeats, env.p);
-    const grow = easeOutCubic(clamp01(t * 1.6));
-    const isCurrent = active === offset + i;
-
-    // Label at bottom
-    const baseWorld = new THREE.Vector3(colX(i), 0, 0);
-    const baseP = projectToRect(cam, baseWorld, rect);
+    const cx = startX + i * (colW + gap) + colW / 2;
 
     ctx.save();
-    ctx.globalAlpha = t <= 0 ? GHOST_A * ghostIn : easeOutCubic(Math.min(1, t * 3));
-    ctx.font = `${isCurrent ? 700 : 600} ${labelPx}px ${FONT_SANS}`;
-    ctx.fillStyle = t <= 0 ? THEME.textDim : isCurrent ? THEME.text : THEME.textDim;
+    ctx.font = `600 ${labelPx}px ${FONT_SANS}`;
     ctx.textAlign = "center";
-    ctx.fillText(item.label, baseP.x, baseP.y + unit * 1.5);
+    ctx.fillStyle = t <= 0 ? THEME.textFaint : active === offset + i ? THEME.text : THEME.textDim;
+    ctx.globalAlpha = (t <= 0 ? 0.3 * ghostIn : 1) * leave;
+    ctx.fillText(item.label, cx, baseY + unit * 0.95);
+    ctx.restore();
 
-    if (t > 0) {
-      // Chip rides the same height the slab was given, so the two cannot disagree.
-      const topP = projectToRect(cam, new THREE.Vector3(colX(i), heights[i], 0), rect);
-      ctx.font = `800 ${valuePx}px ${FONT_SANS}`;
-      ctx.fillStyle = THEME.text;
-      ctx.fillText(valueLabel(item.value, item.unit, grow), topP.x, topP.y - unit * 0.7);
+    if (t <= 0) {
+      if (ghostIn > 0) {
+        ctx.save();
+        ctx.globalAlpha = GHOST_TRACK_A * ghostIn * leave;
+        roundRect(ctx, cx - colW / 2, baseY - unit * 0.3, colW, unit * 0.3, unit * 0.1);
+        ctx.fillStyle = THEME.textDim;
+        ctx.fill();
+        ctx.restore();
+      }
+      return;
     }
+
+    const grow = easeOutCubic(clamp01(t * 1.6));
+    const growBar = easeOutBack(clamp01(t * 1.6));
+    const isCurrent = active === offset + i;
+    const h = Math.max(unit * 0.3, maxH * (item.value / maxVal) * growBar);
+
+    ctx.save();
+    ctx.globalAlpha = easeOutCubic(Math.min(1, t * 3)) * leave;
+    applyElevation(ctx, unit, isCurrent ? "floating" : "raised");
+    const grad = ctx.createLinearGradient(0, baseY - h, 0, baseY);
+    grad.addColorStop(0, accent);
+    grad.addColorStop(1, rgba(accent, isCurrent ? 0.55 : 0.35));
+    ctx.fillStyle = grad;
+    roundRect(ctx, cx - colW / 2, baseY - h, colW, h, Math.min(colW, h) * 0.22);
+    ctx.fill();
+    clearShadow(ctx);
+
+    const text = valueLabel(item.value, item.unit, grow);
+    ctx.font = `800 ${valuePx}px ${FONT_SANS}`;
+    ctx.fillStyle = THEME.text;
+    ctx.fillText(text, cx, baseY - h - unit * 0.4);
     ctx.restore();
   });
+  ctx.textAlign = "start";
 }
 
 /** Line / area chart: a point plots per beat, segments draw on, tip carries a value chip. */
-function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv, area: boolean) {
+function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEnv, area: boolean, leave: number) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, safeBottom, vertical } = layout;
   const { accent, accentGlow } = env.palette;
@@ -310,7 +267,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
 
   // Baseline.
   ctx.save();
-  ctx.globalAlpha = ghostIn;
+  ctx.globalAlpha = ghostIn * leave;
   ctx.strokeStyle = THEME.panelBorder;
   ctx.lineWidth = unit * STROKE.thin;
   ctx.beginPath();
@@ -336,8 +293,11 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
     ctx.save();
     ctx.beginPath();
     areaGen(shown);
+    // A slow breathing opacity on the fill — the area otherwise goes fully still
+    // once settled, and the fill covers enough of the frame for it to register.
+    const breathe = 0.35 + 0.06 * idle(env, 2600);
     const grad = ctx.createLinearGradient(0, plotTop, 0, baseY);
-    grad.addColorStop(0, rgba(accent, 0.35));
+    grad.addColorStop(0, rgba(accent, breathe));
     grad.addColorStop(1, rgba(accent, 0.02));
     ctx.fillStyle = grad;
     ctx.fill();
@@ -358,8 +318,10 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
     ctx.stroke();
     ctx.restore();
     // A packet glides along the settled curve, giving the trend continuous life.
-    const allIn = shown.length === n;
-    if (allIn) flowDots(ctx, shown.map((p) => ({ x: p.x, y: p.y })), env, { count: 2, speedMs: 2600, r: unit * 0.13, color: accent });
+    // Travels the drawn portion of the curve from the second point onward, not just
+    // once the whole series has arrived — a chart with 6+ points otherwise sits
+    // motionless for most of the scene waiting for the last beat.
+    flowDots(ctx, shown.map((p) => ({ x: p.x, y: p.y })), env, { count: 2, speedMs: 2600, r: unit * 0.13, color: accent });
   }
 
   // Dots, x labels, and the value chip on the newest point.
@@ -368,7 +330,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
     if (p.t <= 0) {
       if (ghostIn > 0) {
         ctx.save();
-        ctx.globalAlpha = 0.3 * ghostIn;
+        ctx.globalAlpha = 0.3 * ghostIn * leave;
         ctx.font = `600 ${labelPx}px ${FONT_SANS}`;
         ctx.fillStyle = THEME.textFaint;
         ctx.textAlign = "center";
@@ -381,7 +343,7 @@ function paintLineArea(ctx: CanvasRenderingContext2D, scene: ChartScene, env: Pa
     const appear = easeOutCubic(Math.min(1, p.t * 3));
     const isCurrent = active === offset + p.i;
     ctx.save();
-    ctx.globalAlpha = appear;
+    ctx.globalAlpha = appear * leave;
     if (isCurrent) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.7;
@@ -451,6 +413,8 @@ function paintPie(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEn
 
   let ang = -Math.PI / 2; // start at 12 o'clock
   let runningTotal = 0;
+  let currentArc = { a0: 0, a1: 0, ox: 0, oy: 0 };
+  let hasCurrent = false;
   const labels: { x: number; y: number; text: string; pct: number; on: boolean }[] = [];
 
   scene.items.forEach((item, i) => {
@@ -494,8 +458,29 @@ function paintPie(ctx: CanvasRenderingContext2D, scene: ChartScene, env: PaintEn
         on: sweep > 0.6,
       });
     }
+    if (isCurrent && t > 0) {
+      currentArc = { a0, a1, ox, oy };
+      hasCurrent = true;
+    }
     ang += slice; // advance by the FULL slice so positions stay stable
   });
+
+  // Continuous life on the active wedge — bars pulses its max bar, donut counts its
+  // centre total up; pie had neither, so once all slices land it goes fully still.
+  if (hasCurrent) {
+    ctx.save();
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = unit * (0.5 + 0.4 * idle(env, 1800));
+    ctx.beginPath();
+    ctx.arc(cx + currentArc.ox, cy + currentArc.oy, R, currentArc.a0, currentArc.a1);
+    if (donut) ctx.arc(cx + currentArc.ox, cy + currentArc.oy, rInner, currentArc.a1, currentArc.a0, true);
+    else ctx.lineTo(cx + currentArc.ox, cy + currentArc.oy);
+    ctx.closePath();
+    ctx.strokeStyle = THEME.text;
+    ctx.lineWidth = unit * 0.05;
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // Donut centre: running total counts up as slices arrive.
   if (donut) {
