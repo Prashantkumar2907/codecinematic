@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -20,6 +18,9 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  departT,
+  applyElevation,
+  clearShadow,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -42,6 +43,7 @@ const CELL_PAD_X = 0.16;
 const CELL_PAD_Y = 0.14;
 const ROW_MAX_UNITS = 3.2;
 const PULSE_MS = 2400;
+const SHIMMER_MS = 2200;
 
 type CellState = {
   visible: boolean;
@@ -101,6 +103,9 @@ export function paintTable(ctx: CanvasRenderingContext2D, scene: TableScene, env
     return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
   };
 
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+
   const frameIn = easeOutCubic(enterT(env, 380));
   const idleFace = shade(THEME.panel, IDLE_FACE_LIFT);
 
@@ -133,13 +138,17 @@ export function paintTable(ctx: CanvasRenderingContext2D, scene: TableScene, env
     for (let c = 0; c < nCols; c++) {
       const rc = cellRect(c, r + 1);
       const tone = diffTone(scene.rows[r].cells[c] ?? "");
+      // The active row's tint breathes continuously — a static tint left the whole
+      // scene motionless for most of each row's hold once its entrance settled,
+      // which is the entire visible body of the table for most of the scene.
+      const breathe = 0.85 + 0.25 * idle(env, PULSE_MS);
       const face =
         tone === "good"
           ? lerpColor(THEME.panel, GOOD, TONE_TINT)
           : tone === "danger"
             ? lerpColor(THEME.panel, DANGER, TONE_TINT)
             : isCurrent
-              ? lerpColor(THEME.panel, accent, CURRENT_TINT)
+              ? lerpColor(THEME.panel, accent, CURRENT_TINT * breathe)
               : isHighlighted
                 ? lerpColor(THEME.panel, accent, HIGHLIGHT_TINT)
                 : idleFace;
@@ -161,63 +170,6 @@ export function paintTable(ctx: CanvasRenderingContext2D, scene: TableScene, env
       });
     }
   }
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  // Cell state travels through render3D's `context`: `update` used to read `active` from
-  // this scope, which `build`'s closure captures on frame 0, so the current-row
-  // highlight never moved for the whole scene.
-  const build = (): ThreeBundle<{ cells: CellState[] }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, vertical ? 15 : 12);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, SLAB_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-
-    const models = cells.map(() => {
-      const g = makeBlock(1, 1, SLAB_DEPTH, THEME.panel, THEME.textDim);
-      s.add(g);
-      return g;
-    });
-
-    const update = (_elapsedMs: number, data?: { cells: CellState[] }) => {
-      models.forEach((group, i) => {
-        const st = data?.cells[i];
-        group.visible = !!st?.visible;
-        if (!st?.visible) return;
-        const c = toWorld(st.cx, st.cy);
-        group.position.set(c.x, c.y, 0);
-        group.scale.set((st.w / m.sx) * st.scale, (st.h / m.sy) * st.scale, 1);
-        group.traverse((o) => {
-          if (o instanceof THREE.LineSegments) {
-            const mat = o.material as THREE.LineBasicMaterial;
-            mat.transparent = true;
-            mat.opacity = EDGE_OPACITY * st.opacity;
-            mat.color.set(st.edge);
-          } else if (o instanceof THREE.Mesh) {
-            const mat = o.material as THREE.MeshPhysicalMaterial;
-            mat.transparent = true;
-            mat.opacity = st.opacity;
-            mat.color.set(st.face);
-            mat.emissive.set(st.face);
-          }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { cells: cells.map((c) => c.state) }, env);
-  const flat = !cam;
 
   // Text is fitted to the cell it is drawn in. It used to be fitted to
   // `contentW / nCols * 0.9`, which is wider than the cell, so long values ran past
@@ -244,16 +196,16 @@ export function paintTable(ctx: CanvasRenderingContext2D, scene: TableScene, env
     const isHighlighted = !isHeader && scene.rows[rowIdx].highlight;
 
     ctx.save();
-    ctx.globalAlpha = state.opacity;
+    ctx.globalAlpha = state.opacity * leave;
     ctx.translate(cr.cx, cr.cy);
     ctx.scale(state.scale, state.scale);
     ctx.translate(-cr.cx, -cr.cy);
 
-    if (flat) {
-      roundRect(ctx, cr.x, cr.y, cr.w, cr.h, unit * RADIUS.sm);
-      ctx.fillStyle = state.face;
-      ctx.fill();
-    }
+    applyElevation(ctx, unit, isCurrent ? "floating" : "raised");
+    roundRect(ctx, cr.x, cr.y, cr.w, cr.h, unit * RADIUS.sm);
+    ctx.fillStyle = state.face;
+    ctx.fill();
+    clearShadow(ctx);
     if (isCurrent) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * GLOW.base * (0.7 + 0.3 * idle(env, PULSE_MS));
@@ -282,9 +234,34 @@ export function paintTable(ctx: CanvasRenderingContext2D, scene: TableScene, env
     ctx.restore();
   });
 
+  // A shimmer sweeps across the active row continuously — the per-cell breathing
+  // tint alone changes too little of the frame to register as motion once a row
+  // has settled, and this is the entire visible body of the table for most of
+  // the scene's runtime.
+  const activeRow = active - offset;
+  // During the intro beat (before any row is "current") sweep the header
+  // instead — the header is fully visible from frameIn onward, and otherwise
+  // the intro beat is a dead stretch with nothing moving at all.
+  if (activeRow < nRows) {
+    const rowY = activeRow >= 0 ? gridTop + (activeRow + 1) * rowH : gridTop;
+    const phase = (env.elapsedMs % SHIMMER_MS) / SHIMMER_MS;
+    const sweepX = contentX + phase * contentW;
+    ctx.save();
+    ctx.globalAlpha = leave;
+    roundRect(ctx, contentX, rowY + padY / 2, contentW, rowH - padY, unit * RADIUS.sm);
+    ctx.clip();
+    const grad = ctx.createLinearGradient(sweepX - unit * 2, 0, sweepX + unit * 2, 0);
+    grad.addColorStop(0, rgba(accent, 0));
+    grad.addColorStop(0.5, rgba(accent, 0.16));
+    grad.addColorStop(1, rgba(accent, 0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(contentX, rowY, contentW, rowH);
+    ctx.restore();
+  }
+
   if (scene.caption) {
     ctx.save();
-    ctx.globalAlpha = easeOutCubic(enterT(env, 420, 650));
+    ctx.globalAlpha = easeOutCubic(enterT(env, 420, 650)) * leave;
     ctx.font = `500 ${unit * 0.8}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
