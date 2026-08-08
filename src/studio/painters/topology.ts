@@ -7,6 +7,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   roundRect,
   drawSceneTitle,
   fitFontSize,
@@ -62,7 +63,9 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const map = layoutNodes(scene.nodes, layout, band);
@@ -197,7 +200,10 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
     const recT = isReceiver ? rxT : 0;
     const lit = isFocus || wasMarked || recT > 0.05;
 
-    let scale = easeOutBack(clamp01(nodeIn * 1.2));
+    // A small always-on idle breathing on every node (phase-offset per node)
+    // keeps the whole topology visibly alive during the intro beat, before
+    // any step has a focus and the stronger isFocus/isReceiver pulses kick in.
+    let scale = easeOutBack(clamp01(nodeIn * 1.2)) * (1 + 0.035 * Math.sin(env.elapsedMs / 1300 + ni * 1.1));
     if (isFocus) scale *= 1 + 0.05 * Math.sin(env.elapsedMs / 900) * easeOutCubic(clamp01(stepT * 2));
     if (isReceiver) scale *= 1 + 0.08 * Math.sin(Math.PI * recT);
 
@@ -343,12 +349,12 @@ export function paintTopology(ctx: CanvasRenderingContext2D, scene: TopologyScen
 
 /** Uniform (aspect-preserved) layout of grid nodes, centred below the title. */
 function layoutNodes(nodes: TNode[], layout: Layout, band: number): Map<string, NodeLayout> {
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, safeBottom } = layout;
   const maxR = unit * 1.6;
   const areaX = contentX + maxR;
   const areaY = contentY + band + maxR;
   const areaW = contentW - maxR * 2;
-  const bottom = vertical ? Math.min(contentY + contentH, layout.h * 0.88) : contentY + contentH;
+  const bottom = Math.min(contentY + contentH, safeBottom) - unit * 0.3;
   const areaH = bottom - areaY - maxR - unit;
   const xs = nodes.map((n) => n.x);
   const ys = nodes.map((n) => n.y);
