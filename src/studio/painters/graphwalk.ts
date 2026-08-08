@@ -7,6 +7,7 @@ import {
   easeOutCubic,
   easeInOutCubic,
   enterT,
+  departT,
   clamp01,
   roundRect,
   drawSceneTitle,
@@ -17,6 +18,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  STROKE,
   type Layout,
 } from "./common";
 import type { PaintEnv } from "./index";
@@ -83,7 +85,7 @@ function drawWeightChip(ctx: CanvasRenderingContext2D, x: number, y: number, tex
   ctx.fillStyle = INK_PANEL;
   ctx.fill();
   ctx.strokeStyle = THEME.panelBorder;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = unit * STROKE.hair;
   ctx.stroke();
   ctx.fillStyle = THEME.textDim;
   ctx.textAlign = "center";
@@ -101,6 +103,9 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const fade = introIn * leave;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const { map } = layoutNodes(scene.nodes, layout, titleBand);
@@ -165,7 +170,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
 
     ctx.save();
     ctx.lineCap = "round";
-    ctx.globalAlpha = GHOST_EDGE * introIn;
+    ctx.globalAlpha = GHOST_EDGE * fade;
     ctx.strokeStyle = rgba(THEME.textDim, 0.9);
     ctx.lineWidth = unit * 0.08;
     ctx.beginPath();
@@ -176,7 +181,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
 
     if (bothVisited) {
       ctx.save();
-      ctx.globalAlpha = 0.7 * introIn;
+      ctx.globalAlpha = 0.7 * fade;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.13;
       ctx.lineCap = "round";
@@ -207,7 +212,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
       const f = prog < 1 ? prog : (env.elapsedMs % 1400) / 1400;
       const dot = pointAlongPolyline(pts, f);
       ctx.save();
-      ctx.globalAlpha = prog < 1 ? 1 : 0.9 * Math.sin(Math.PI * f);
+      ctx.globalAlpha = (prog < 1 ? 1 : 0.9 * Math.sin(Math.PI * f)) * leave;
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.9;
       ctx.fillStyle = SPARK;
@@ -228,7 +233,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
       ctx.lineWidth = unit * 0.34;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.globalAlpha = 0.9 * introIn;
+      ctx.globalAlpha = 0.9 * fade;
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * (1.0 + 0.5 * Math.sin(env.elapsedMs / 1000));
       strokePolylineProgress(ctx, pts, prog);
@@ -237,7 +242,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
         const f = (env.elapsedMs % 2000) / 2000;
         const dot = pointAlongPolyline(pts, f);
         ctx.save();
-        ctx.globalAlpha = 0.95 * Math.sin(Math.PI * f);
+        ctx.globalAlpha = 0.95 * Math.sin(Math.PI * f) * leave;
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 1.1;
         ctx.fillStyle = SPARK;
@@ -255,7 +260,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
     const a = map.get(e.from);
     const b = map.get(e.to);
     if (!a || !b) continue;
-    drawWeightChip(ctx, (a.x + b.x) / 2, (a.y + b.y) / 2, String(e.weight), unit, introIn * 0.85);
+    drawWeightChip(ctx, (a.x + b.x) / 2, (a.y + b.y) / 2, String(e.weight), unit, fade * 0.85);
   }
 
   // Nodes on top.
@@ -281,7 +286,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
       const ringF = (env.elapsedMs % 1300) / 1300;
       const g = nl.r * (0.08 + 0.5 * easeOutCubic(ringF));
       ctx.save();
-      ctx.globalAlpha = 0.5 * (1 - ringF) * introIn;
+      ctx.globalAlpha = 0.5 * (1 - ringF) * fade;
       ctx.strokeStyle = secondary;
       ctx.lineWidth = unit * 0.08;
       ctx.beginPath();
@@ -291,7 +296,7 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
     }
 
     ctx.save();
-    ctx.globalAlpha = (isVisited ? 1 : isFrontier ? 0.9 : GHOST_NODE) * introIn * clamp01(nodeIn * 2);
+    ctx.globalAlpha = (isVisited ? 1 : isFrontier ? 0.9 : GHOST_NODE) * fade * clamp01(nodeIn * 2);
     ctx.translate(nl.x, nl.y);
     ctx.scale(scale, scale);
     ctx.translate(-nl.x, -nl.y);
@@ -338,14 +343,14 @@ export function paintGraphwalk(ctx: CanvasRenderingContext2D, scene: GraphwalkSc
     if (changing && d.prev) {
       // Old value slides up and fades out.
       ctx.save();
-      ctx.globalAlpha = (1 - changeT) * introIn;
+      ctx.globalAlpha = (1 - changeT) * fade;
       drawDistChip(ctx, nl.x, cy - unit * 0.5 * changeT, d.prev, unit, accent, false);
       ctx.restore();
     }
     const pop = changing ? easeOutBack(changeT) : 1;
     const good = changing && changeT < 0.7;
     ctx.save();
-    ctx.globalAlpha = (changing ? changeT : 1) * introIn;
+    ctx.globalAlpha = (changing ? changeT : 1) * fade;
     ctx.translate(nl.x, cy);
     ctx.scale(pop, pop);
     ctx.translate(-nl.x, -cy);
