@@ -123,9 +123,9 @@ export function paintParliamentArc(ctx: CanvasRenderingContext2D, scene: Parliam
     seats.forEach((s) => {
       ctx.beginPath();
       ctx.arc(s.x, s.y, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(148,163,184,0.12)";
+      ctx.fillStyle = rgba(THEME.textDim, 0.12);
       ctx.fill();
-      ctx.strokeStyle = "rgba(148,163,184,0.22)";
+      ctx.strokeStyle = rgba(THEME.textDim, 0.22);
       ctx.lineWidth = Math.max(1, dotR * 0.18);
       ctx.stroke();
     });
@@ -221,7 +221,7 @@ export function paintParliamentArc(ctx: CanvasRenderingContext2D, scene: Parliam
     const tw = ctx.measureText(text).width;
     ctx.globalAlpha = ghostIn;
     roundRect(ctx, flagX - tw / 2 - unit * 0.3, flagY - unit * 0.95, tw + unit * 0.6, unit * 0.95, unit * 0.26);
-    ctx.fillStyle = "#0a0e13";
+    ctx.fillStyle = rgba(THEME.bgBottom, 0.9);
     ctx.fill();
     ctx.strokeStyle = lineColor;
     ctx.lineWidth = unit * 0.06;
