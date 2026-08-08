@@ -1,37 +1,36 @@
 import type { Scene } from "../schema";
 import {
-  THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, clamp01, wrapText, roundRect, rgba,
-  variantOf, fitFontSize, glowRing,
+  THEME, FONT_SANS, easeOutBack, easeOutCubic, enterT, idle, clamp01, wrapText, roundRect,
+  fitFontSize, glowRing, departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
 type QuestionScene = Extract<Scene, { kind: "question" }>;
 
 /**
- * Seeded composition (scene id): 0 a large pulsing "?" over centered text with
- * expanding rings, 1 a calmer mark with an accent underline hugging the last
- * line, 2 spotlight background with a giant faint "?" watermark and no small
- * mark. All three share one measured, top-to-bottom stack — mark, question,
- * hint, CTA — computed from the actual text before anything is drawn, so a
- * long question can never collide with the CTA the way a fixed-offset layout
- * would.
+ * One canonical composition under the phase's one-look-per-kind decision: a
+ * large pulsing "?" over centered text with expanding rings — the variant
+ * with the most continuous motion of the three that existed (the calmer
+ * underline mark and the static watermark both scored low on occupancy once
+ * settled). One measured, top-to-bottom stack — mark, question, hint, CTA —
+ * computed from the actual text before anything is drawn, so a long question
+ * can never collide with the CTA the way a fixed-offset layout would.
  *
- * Deliberately pure 2D. The previous version rendered a three.js "glossy
- * backboard" panel behind the card, projected through an off-axis camera the
- * same way `rect` maps the panel onto the screen — but the floating "?" mark
- * was projected through that SAME camera from a different world position, so
- * it landed wherever the projection error carried it (off the left edge on
- * one variant, mid-sentence on another): the exact "2d-layout-round-tripped-
- * through-camera" systemic bug already named in qa/ledger.json, just never
- * caught here because the QA fixture's question text was short enough to
- * never need the hint/CTA stack to move. A pixel-only layout can't drift.
+ * Deliberately pure 2D. The previous three.js version rendered a "glossy
+ * backboard" panel projected through an off-axis camera the same way `rect`
+ * maps the panel onto the screen — but the floating "?" mark was projected
+ * through that SAME camera from a different world position, so it landed
+ * wherever the projection error carried it: the "2d-layout-round-tripped-
+ * through-camera" systemic bug. A pixel-only layout can't drift.
  */
 export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScene, env: PaintEnv) {
   const { layout } = env;
   const { w, unit, contentW, contentY, safeH } = layout;
   const { accent, accentGlow } = env.palette;
-  const variant = variantOf(scene.id, 3);
   const cx = w / 2;
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const measure = (scale: number) => {
     const qMaxPx = unit * 1.55 * scale;
@@ -49,8 +48,8 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
     }
     const hintLineH = hintPx * 1.32;
 
-    const markH = variant === 2 ? 0 : unit * (variant === 1 ? 2.2 : 3.0) * scale;
-    const markGap = variant === 2 ? 0 : unit * 0.7 * scale;
+    const markH = unit * 3.0 * scale;
+    const markGap = unit * 0.7 * scale;
     const gapToHint = unit * 0.85 * scale;
     const gapToCta = unit * 1.05 * scale;
 
@@ -74,50 +73,31 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
 
   const startY = Math.max(contentY, contentY + (safeH - m.total) / 2);
 
-  // Giant faint watermark behind everything, variant 2 only — decorative, not
-  // part of the measured stack.
-  if (variant === 2) {
-    const wmIn = easeOutCubic(enterT(env, 600));
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.globalAlpha = 0.07 * wmIn;
-    ctx.font = `900 ${unit * 11}px ${FONT_SANS}`;
-    ctx.fillStyle = accent;
-    ctx.fillText("?", cx, startY + m.total * 0.55);
-    ctx.restore();
-    const spot = ctx.createRadialGradient(cx, startY + m.total * 0.4, 0, cx, startY + m.total * 0.4, Math.min(w, layout.h) * 0.55);
-    spot.addColorStop(0, rgba(accent, 0.14 * wmIn));
-    spot.addColorStop(1, rgba(accent, 0));
-    ctx.fillStyle = spot;
-    ctx.fillRect(0, 0, w, layout.h);
-  }
-
   let cursor = startY;
 
-  // ── Small pulsing "?" mark (variants 0 and 1) ───────────────────────────
-  if (variant !== 2) {
+  // ── Pulsing "?" mark with expanding rings ────────────────────────────────
+  {
     const markIn = easeOutBack(enterT(env, 450));
     const markCy = cursor + m.markH / 2;
     const pulse = 1 + 0.03 * Math.sin(env.elapsedMs / 320);
     ctx.save();
+    ctx.globalAlpha *= leave;
     ctx.textAlign = "center";
     ctx.translate(cx, markCy);
-    if (variant === 0) {
-      const ringPhase = (env.elapsedMs % 2200) / 2200;
-      for (const off of [0, 0.5]) {
-        const rp = (ringPhase + off) % 1;
-        ctx.beginPath();
-        ctx.arc(0, 0, unit * (1.4 + rp * 2.8), 0, Math.PI * 2);
-        ctx.strokeStyle = accent;
-        ctx.globalAlpha = 0.35 * (1 - rp) * markIn;
-        ctx.lineWidth = unit * 0.08;
-        ctx.stroke();
-      }
+    const ringPhase = (env.elapsedMs % 2200) / 2200;
+    for (const off of [0, 0.5]) {
+      const rp = (ringPhase + off) % 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, unit * (1.4 + rp * 2.8), 0, Math.PI * 2);
+      ctx.strokeStyle = accent;
+      ctx.globalAlpha = 0.35 * (1 - rp) * markIn * leave;
+      ctx.lineWidth = unit * 0.08;
+      ctx.stroke();
     }
-    ctx.globalAlpha = clamp01(markIn);
+    ctx.globalAlpha = clamp01(markIn) * leave;
     ctx.scale(pulse, pulse);
     ctx.rotate(0.05 * Math.sin(env.elapsedMs / 700));
-    const markPx = variant === 0 ? unit * 3.4 : unit * 2.2;
+    const markPx = unit * 3.4;
     ctx.font = `900 ${markPx}px ${FONT_SANS}`;
     ctx.shadowColor = accentGlow;
     ctx.shadowBlur = unit * 0.7;
@@ -134,29 +114,10 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
   ctx.fillStyle = THEME.text;
   m.qLines.forEach((line, i) => {
     const tIn = easeOutCubic(enterT(env, 350, 200 + i * 110));
-    ctx.globalAlpha = tIn;
+    ctx.globalAlpha = tIn * leave;
     ctx.fillText(line, cx, cursor + i * m.qLineH + m.qLineH * 0.82 + (1 - tIn) * unit * 0.6);
   });
   ctx.restore();
-
-  // Accent underline hugging the last question line — variant 1 only.
-  if (variant === 1) {
-    const lastLine = m.qLines[m.qLines.length - 1];
-    ctx.save();
-    ctx.font = `800 ${m.qPx}px ${FONT_SANS}`;
-    const lw = ctx.measureText(lastLine).width;
-    const uIn = easeOutCubic(enterT(env, 350, 250 + m.qLines.length * 110));
-    const uy = cursor + (m.qLines.length - 1) * m.qLineH + m.qLineH * 0.98;
-    ctx.globalAlpha = uIn;
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = unit * 0.1;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(cx - (lw / 2) * uIn, uy);
-    ctx.lineTo(cx + (lw / 2) * uIn, uy);
-    ctx.stroke();
-    ctx.restore();
-  }
   cursor += m.qBlockH;
 
   // ── Hint ─────────────────────────────────────────────────────────────────
@@ -164,7 +125,7 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
     cursor += m.gapToHint;
     ctx.save();
     // Duration-aware: the hint should land only once the question has been read.
-    ctx.globalAlpha = easeOutCubic(Math.max(enterT(env, 350, 600), env.p > 0.35 ? 1 : 0));
+    ctx.globalAlpha = easeOutCubic(Math.max(enterT(env, 350, 600), env.p > 0.35 ? 1 : 0)) * leave;
     ctx.font = `500 ${m.hintPx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
@@ -183,7 +144,7 @@ export function paintQuestion(ctx: CanvasRenderingContext2D, scene: QuestionScen
     const bob = (idle(env, 2400) - 0.5) * unit * 0.16 * clamp01(ctaT);
 
     ctx.save();
-    ctx.globalAlpha = Math.min(1, ctaIn);
+    ctx.globalAlpha = Math.min(1, ctaIn) * leave;
     ctx.translate(cx, by + m.ctaH / 2 + bob);
     ctx.scale(Math.max(0.001, ctaIn), Math.max(0.001, ctaIn));
 
