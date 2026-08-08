@@ -5,6 +5,7 @@ import {
   easeOutCubic,
   easeInOutCubic,
   enterT,
+  departT,
   idle,
   sub,
   clamp01,
@@ -16,6 +17,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  STROKE,
   type Layout,
 } from "./common";
 import type { PaintEnv } from "./index";
@@ -39,7 +41,7 @@ function gridMap(parts: Part[], layout: Layout, titleBand: number): GridMap {
   const areaX = layout.contentX;
   const areaY = layout.contentY + titleBand;
   const areaW = layout.contentW;
-  const areaH = layout.contentH - titleBand;
+  const areaH = Math.min(layout.contentY + layout.contentH, layout.safeBottom) - layout.unit * 0.3 - areaY;
   const cellW = areaW / GRID;
   const cellH = areaH / GRID;
   const minX = Math.min(...parts.map((p) => p.x));
@@ -320,7 +322,7 @@ function drawCompass(ctx: CanvasRenderingContext2D, x: number, y: number, s: num
  */
 export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene: BlueprintScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
@@ -332,17 +334,21 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
   const areaX = contentX;
   const areaY = contentY + titleBand;
   const areaW = contentW;
-  const areaH = contentH - titleBand;
+  // Bounded by safeBottom, not just contentH: at 9:16 contentH runs under the
+  // caption band, which is where a bottom-row label chip used to land.
+  const areaH = Math.min(contentY + contentH, safeBottom) - unit * 0.3 - areaY;
   const map = gridMap(scene.parts, layout, titleBand);
   const reveals = revealSteps(scene);
 
-  const gridIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const gridIn = easeOutCubic(enterT(env, 380)) * leave;
 
   // Blueprint sheet: faint grid + a double border frame.
   ctx.save();
   ctx.globalAlpha = gridIn;
   ctx.strokeStyle = rgba(accent, 0.06);
-  ctx.lineWidth = 1;
+  ctx.lineWidth = unit * STROKE.hair;
   const gStep = unit * 1.2;
   for (let gx = areaX; gx <= areaX + areaW + 0.5; gx += gStep) {
     ctx.beginPath();
@@ -360,7 +366,7 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
   ctx.lineWidth = unit * 0.06;
   ctx.strokeRect(areaX, areaY, areaW, areaH);
   ctx.strokeStyle = rgba(accent, 0.1);
-  ctx.lineWidth = 1;
+  ctx.lineWidth = unit * STROKE.hair;
   ctx.strokeRect(areaX + unit * 0.28, areaY + unit * 0.28, areaW - unit * 0.56, areaH - unit * 0.56);
   ctx.restore();
 
@@ -386,6 +392,10 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.setLineDash([unit * 0.3, unit * 0.3]);
+      // Marching-ants crawl on the ghost outlines: without it the whole sheet
+      // sits fully static through the intro beat, before the first part's
+      // reveal gives it anything else to animate.
+      ctx.lineDashOffset = -((env.elapsedMs / 45) % (unit * 0.6));
       drawOutline(ctx, part.shape, r, 1, unit);
       ctx.setLineDash([]);
       ctx.restore();
@@ -396,7 +406,7 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
     const detailIn = easeOutCubic(clamp01((t - 0.35) / 0.4));
     const highlighted = highlights.has(part.id);
     const dimmed = !highlighted && highlights.size > 0;
-    const alpha = clamp01(t * 3) * (highlighted ? 1 : dimmed ? DIM_ALPHA : 0.85);
+    const alpha = clamp01(t * 3) * (highlighted ? 1 : dimmed ? DIM_ALPHA : 0.85) * leave;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -426,7 +436,7 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
     // Shimmer crawl over the active highlighted outline.
     if (highlighted && !inTail && drawProg >= 1) {
       ctx.save();
-      ctx.globalAlpha = 0.24;
+      ctx.globalAlpha = 0.24 * leave;
       ctx.strokeStyle = SPARK;
       ctx.lineWidth = unit * 0.05;
       ctx.setLineDash([unit * 0.5, unit * 0.9]);
@@ -470,6 +480,7 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
       }
       const leadIn = easeOutCubic(sub(tA, 0.05 + i * 0.05, 0.25));
       if (leadIn > 0) {
+        ctx.globalAlpha = leave;
         ctx.strokeStyle = rgba(accent, 0.5);
         ctx.lineWidth = unit * 0.045;
         strokePolylineProgress(ctx, [fromPt, toPt], leadIn);
@@ -480,12 +491,12 @@ export function paintArchitectureBlueprint(ctx: CanvasRenderingContext2D, scene:
       }
       const chipIn = easeOutCubic(sub(tA, 0.18 + i * 0.05, 0.18));
       if (chipIn > 0) {
-        ctx.globalAlpha = chipIn;
+        ctx.globalAlpha = chipIn * leave;
         roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.32);
         ctx.fillStyle = INK_PANEL;
         ctx.fill();
         ctx.strokeStyle = rgba(accent, 0.55);
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = unit * STROKE.hair;
         ctx.stroke();
         ctx.fillStyle = THEME.text;
         ctx.textAlign = "center";
