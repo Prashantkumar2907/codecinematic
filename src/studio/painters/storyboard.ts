@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -18,6 +16,8 @@ import {
   activeBeatIndex,
   enterT,
   rgba,
+  departT,
+  clearShadow,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -31,25 +31,15 @@ function chooseGrid(n: number, vertical: boolean): { rows: number; cols: number 
   return vertical ? { rows: 3, cols: 2 } : { rows: 2, cols: 3 };
 }
 
-/** Axis-aligned camera: a tilted one keystones each slab while the panel art and
- *  caption are axis-aligned pixel rects, so their margins never match the slab. */
-const CAM_DIST = 9;
-const PANEL_DEPTH = 0.6;
 /** Slab inset inside its grid cell, and the art/caption inset inside the slab. */
 const CELL_FILL = 0.98;
 const INNER_INSET_UNITS = 0.42;
 /** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16). */
 const SAFE_BOTTOM_SHORT = 0.75;
 const SAFE_BOTTOM_LONG = 0.94;
-const GLASS_INSET = 0.98;
 /** Slab face, lifted off THEME.panel so the extrusion catches the studio lights. */
 const GHOST_ALPHA = 0.3;
 const PANEL_FACE_LIFT = 0.16;
-
-type StoryboardContext = {
-  env: PaintEnv;
-  active: number;
-};
 
 export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: StoryboardScene, env: PaintEnv) {
   const { layout } = env;
@@ -60,6 +50,8 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
   const ghostIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaX = contentX;
@@ -75,9 +67,7 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
   const cellW = (areaW - (cols - 1) * gap) / cols;
   const cellH = (areaH - (rows - 1) * gap) / rows;
 
-  const rect = { x: areaX, y: areaY, w: areaW, h: areaH };
-
-  /** The pixel grid is authoritative; the slabs are mapped onto it. */
+  /** The pixel grid is authoritative; every card fills its cell exactly. */
   const cellRect = (k: number) => {
     const row = Math.floor(k / cols);
     const col = k % cols;
@@ -89,108 +79,13 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
     };
   };
 
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-
-  const key = scene.id + "-storyboard3d";
-
-  const build = (): ThreeBundle<StoryboardContext> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, PANEL_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-
-    const models = scene.panels.map((panel, k) => {
-      const cell = cellRect(k);
-      const bw = cell.w / m.sx;
-      const bh = cell.h / m.sy;
-      const g = makeBlock(bw, bh, PANEL_DEPTH, shade(THEME.panel, PANEL_FACE_LIFT), accent);
-
-      const glassGeo = new THREE.BoxGeometry(bw * GLASS_INSET, bh * GLASS_INSET, 0.05);
-      const glassMat = new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.1,
-        roughness: 0.1,
-        metalness: 0.8,
-        clearcoat: 1.0,
-      });
-      const glass = new THREE.Mesh(glassGeo, glassMat);
-      glass.position.z = PANEL_DEPTH / 2 + 0.025;
-      g.add(glass);
-
-      const c = toWorld(cell.x + cell.w / 2, cell.y + cell.h / 2);
-      g.position.set(c.x, c.y, 0);
-      s.add(g);
-      return { id: k, group: g };
-    });
-
-    const update = (elapsedMs: number, ctxData: StoryboardContext) => {
-      const { env: currentEnv, active: currentActive } = ctxData;
-      const currentGhostIn = easeOutCubic(enterT(currentEnv, 380));
-      
-      models.forEach(({ id, group }) => {
-        const t = beatT(currentEnv.beats, offset + id, totalBeats, currentEnv.p);
-        const isActive = currentActive === offset + id && !inTail;
-        
-        let scale = 0.001;
-        let visible = false;
-
-        // Scale stays at 1 in every state. The slab is mapped onto an exact pixel cell
-        // and the socket outline, art and caption are drawn in that cell, so any scale
-        // shows up as a double outline; the entrance and the reveal are opacity only.
-        if (currentEnv.p < beatWindow(currentEnv.beats, offset + id, totalBeats).start) {
-            visible = currentEnv.p > 0 || currentGhostIn > 0;
-            scale = 1;
-        } else if (t > 0) {
-            visible = true;
-            scale = 1;
-        }
-
-        // Life comes from the emissive breath, not a position bob: moving the slab
-        // slides it out from under the pixel-pinned art and caption.
-        const breath = isActive ? 0.12 * idle({ elapsedMs }, 1400) : 0;
-
-        group.visible = visible;
-        group.scale.set(Math.max(0.001, scale), Math.max(0.001, scale), 1);
-        
-        group.traverse(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.MeshPhysicalMaterial;
-                if (mat.emissive) {
-                    mat.emissiveIntensity = isActive ? 0.3 + breath : 0.1;
-                }
-                mat.transparent = true;
-                if (child.geometry.type !== 'EdgesGeometry') {
-                   mat.opacity = t <= 0 ? GHOST_ALPHA * currentGhostIn : (isActive ? 1.0 : 0.8);
-                }
-            }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const contextData: StoryboardContext = { env, active };
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, contextData, env);
-  if (!cam) return;
-
   const frameIn = easeOutCubic(enterT(env, 380));
   if (frameIn <= 0) {
     ctx.textAlign = "start";
     return;
   }
 
-  const drawIcons = (panel: Panel, x: number, y: number, artW: number, artH: number, t: number, drift: number) => {
+  const drawIcons = (panel: Panel, x: number, y: number, artW: number, artH: number, t: number, drift: number, iconLeave: number) => {
     const icons = panel.icons;
     const n = icons.length;
     const cxA = x + artW / 2;
@@ -212,7 +107,7 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
       const pos = positions[i];
       const kb = 1 + drift * 0.04;
       ctx.save();
-      ctx.globalAlpha = clamp01((t - i * 0.08) / 0.2);
+      ctx.globalAlpha = clamp01((t - i * 0.08) / 0.2) * iconLeave;
       ctx.font = `${pos.size * Math.max(0.01, pop) * kb}px ${FONT_SANS}`;
       ctx.textAlign = "center";
       // Adding shadow for better contrast against 3D blocks
@@ -252,7 +147,11 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
     if (!revealed) {
       if (ghostIn > 0) {
         ctx.save();
-        ctx.globalAlpha = ghostIn * 0.2;
+        ctx.globalAlpha = ghostIn * GHOST_ALPHA * leave;
+        roundRect(ctx, cell.x, cell.y, cell.w, cell.h, rr);
+        ctx.fillStyle = shade(THEME.panel, PANEL_FACE_LIFT);
+        ctx.fill();
+        ctx.globalAlpha = ghostIn * 0.2 * leave;
         ctx.strokeStyle = rgba(THEME.textDim, 0.5);
         ctx.lineWidth = unit * 0.06;
         ctx.setLineDash([unit*0.2, unit*0.2]);
@@ -264,9 +163,23 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
     }
 
     const entrance = clamp01(t / 0.2);
+    // The card face, drawn directly in 2D — active panels breathe on the border glow,
+    // the same "life without moving the slab" the removed 3D emissive breath gave.
+    const breath = isActive ? 0.12 * idle(env, 1400) : 0;
     ctx.save();
-    ctx.globalAlpha = frameIn * entrance;
-    
+    ctx.globalAlpha = frameIn * entrance * leave;
+    roundRect(ctx, cell.x, cell.y, cell.w, cell.h, rr);
+    ctx.fillStyle = shade(THEME.panel, PANEL_FACE_LIFT);
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = unit * 0.05;
+    if (isActive) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * (0.4 + breath * 2);
+    }
+    ctx.stroke();
+    clearShadow(ctx);
+
     // Fade in an overlay for the panel to make text readable
     ctx.fillStyle = isActive ? rgba(shade(THEME.panel, PANEL_FACE_LIFT), 0.6) : rgba(THEME.panel, 0.4);
     roundRect(ctx, innerX, innerY, innerW, innerH, rr);
@@ -285,7 +198,7 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
     ctx.save();
     roundRect(ctx, innerX, innerY, innerW, innerH - captionH, rr);
     ctx.clip();
-    drawIcons(panel, innerX + unit * 0.2, innerY + unit * 0.2, innerW - unit * 0.4, artH - unit * 0.4, t, drift);
+    drawIcons(panel, innerX + unit * 0.2, innerY + unit * 0.2, innerW - unit * 0.4, artH - unit * 0.4, t, drift, leave);
     ctx.restore();
 
     // Caption band sliding up from the bottom.
@@ -295,7 +208,7 @@ export function paintStoryboard(ctx: CanvasRenderingContext2D, scene: Storyboard
       ctx.save();
       roundRect(ctx, innerX, innerY, innerW, innerH, rr);
       ctx.clip();
-      ctx.globalAlpha = frameIn * capT;
+      ctx.globalAlpha = frameIn * capT * leave;
       ctx.fillStyle = isActive ? rgba(accent, 0.4) : rgba(THEME.panel, 0.8);
       ctx.fillRect(innerX, bandY, innerW, captionH + rr);
       ctx.strokeStyle = isActive ? rgba(accent, 0.8) : rgba(THEME.textDim, 0.4);
