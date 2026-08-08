@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -20,8 +19,8 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  departT,
 } from "./common";
-import { render3D, studioLights, makeBlock, makeCylinder, type ThreeBundle } from "./three3d";
 import type { PaintEnv } from "./index";
 
 type DayclockScene = Extract<Scene, { kind: "dayclock" }>;
@@ -34,40 +33,19 @@ function pinFrac(at: string, face: DayclockScene["face"]): number {
   return hours / span;
 }
 
-// On-axis camera, fixed regardless of aspect — pxPerWorld is derived from the
-// rendered rect (below), never the other way round. Matches gauge.ts/race.ts.
-const CAM_FOV = 30;
-const CAM_HALF_H = 5;
-
-// Dial built at normalized radius 1 and scaled to the pixel radius R by the
-// per-frame context, so 2D chrome and the 3D dial can never disagree.
-const RIM_R = 0.9;
-const RIM_TUBE = 0.016;
-const BASE_H = 0.065;
+// Dial proportions, as multiples of the pixel radius R.
 const TICK_MAJOR_LEN = 0.194;
 const TICK_MINOR_LEN = 0.097;
 const TICK_MAJOR_W = 0.032;
 const TICK_MINOR_W = 0.016;
-const TICK_DEPTH = 0.016;
 const TICK_INSET = 0.032;
 const HUB_R = 0.097;
-const HUB_H = 0.129;
 const MINUTE_LEN = 0.78;
 const MINUTE_W = 0.032;
 const HOUR_LEN = 0.52;
 const HOUR_W = 0.065;
-const HOUR_H = 0.048;
 const PIN_R = 0.097;
 const PIN_DROP_DIST = 0.65;
-
-// Small z-depth stacking (+z = toward camera), purely for draw/shadow order —
-// the dial has no ground plane any more so there is no "height", only depth.
-const Z_RIM = 0.05;
-const Z_TICK = 0.05;
-const Z_MINUTE = 0.1;
-const Z_HOUR = 0.13;
-const Z_HUB = 0.16;
-const Z_PIN = 0.1;
 
 // Radial reach of the active pin's icon/chip, as multiples of the dial radius
 // R — scales with the dial itself instead of a hardcoded world span, so both
@@ -81,33 +59,21 @@ const READOUT_R_MULT = 1.8;
 const READOUT_PAD_U = 1.0;
 
 const MUTED = shade(THEME.textDim, -0.35);
-const TICK_EDGE = shade(THEME.panel, -0.4);
-
-type DayclockCtx = {
-  scale: number;
-  posX: number;
-  posY: number;
-  faceIn: number;
-  master: number;
-  settled: boolean;
-  k: number;
-  t: number;
-};
 
 export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, contentH } = layout;
-  const { accent, accentGlow, secondary } = env.palette;
+  const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.pins.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
-  const key = scene.id + "-dayclock3d";
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + titleBand;
   const availH = contentH - titleBand;
-  const rect = { x: contentX, y: areaY, w: contentW, h: availH };
 
   const faceIn = easeOutCubic(enterT(env, 380));
   if (faceIn <= 0) {
@@ -148,182 +114,107 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
   const sweepE = easeInOutCubic(clamp01(t / 0.55));
   const master = prevFrac + delta * sweepE;
   const settled = k < 0 || t > 0.6;
+  const tremor = settled ? 0.0012 * Math.sin(env.elapsedMs / 320) : 0;
+  const hourFrac = (master % 1) + tremor;
+  const minuteFrac = ((master * cycles) % 1) + tremor;
 
-  const build = (): ThreeBundle<DayclockCtx> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 0.1, 100);
-    camera.position.set(0, 0, CAM_HALF_H / Math.tan((CAM_FOV * Math.PI) / 360));
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
+  // ---- dial, drawn directly in 2D — pixel geometry already decided it --------
+  ctx.save();
+  ctx.globalAlpha = faceIn * leave;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = THEME.panel;
+  ctx.fill();
+  ctx.strokeStyle = shade(THEME.panel, 0.22);
+  ctx.lineWidth = Math.max(1, R * 0.016);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.9, 0, Math.PI * 2);
+  ctx.strokeStyle = shade(THEME.panel, 0.22);
+  ctx.lineWidth = Math.max(1, R * 0.012);
+  ctx.stroke();
 
-    const root = new THREE.Group();
-    s.add(root);
-
-    // Clock face base — a cylinder's axis is Y by default; rotating it onto Z
-    // turns its flat cap into the camera-facing dial (same trick as the hub
-    // below, and as gauge.ts's own hub).
-    const base = makeCylinder(1, BASE_H, THEME.panel, shade(THEME.panel, 0.22));
-    base.rotation.x = Math.PI / 2;
-    root.add(base);
-
-    // Inner rim — a torus already lies in the XY plane by default, so it needs
-    // no rotation to face the camera, only a small forward offset off the base.
-    const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(RIM_R, RIM_TUBE, 16, 64),
-      new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(shade(THEME.panel, 0.22)),
-        metalness: 0.2,
-        roughness: 0.5,
-        clearcoat: 0.8,
-      })
-    );
-    rim.position.z = Z_RIM;
-    root.add(rim);
-
-    // Ticks. rotation.z = -2*pi*frac points the block's long (local Y) axis at
-    // angleOf(frac), matching how the hands are aimed below.
-    const nTicks = scene.face === "12h" ? 12 : 24;
-    const majorEvery = scene.face === "12h" ? 3 : 6;
-    for (let i = 0; i < nTicks; i++) {
-      const frac = i / nTicks;
-      const major = i % majorEvery === 0;
-      const angle = angleOf(frac);
-      const tickL = major ? TICK_MAJOR_LEN : TICK_MINOR_LEN;
-      const tickW = major ? TICK_MAJOR_W : TICK_MINOR_W;
-      const rIn = 1 - tickL / 2 - TICK_INSET;
-      const tick = makeBlock(tickW, tickL, TICK_DEPTH, major ? THEME.textDim : MUTED, TICK_EDGE);
-      tick.position.set(Math.cos(angle) * rIn, -Math.sin(angle) * rIn, Z_TICK);
-      tick.rotation.z = -2 * Math.PI * frac;
-      root.add(tick);
-    }
-
-    // Hub
-    const hub = new THREE.Mesh(
-      new THREE.CylinderGeometry(HUB_R, HUB_R, HUB_H, 32),
-      new THREE.MeshPhysicalMaterial({ color: new THREE.Color(accent), metalness: 0.3, roughness: 0.2 })
-    );
-    hub.rotation.x = Math.PI / 2;
-    hub.position.z = Z_HUB;
-    root.add(hub);
-
-    // makeBlock centres its box on its own origin, so a hand rotated about that
-    // origin would sweep through the hub. Offset the arm inside a pivot group by
-    // half its length instead — translating the geometry would leave the baked
-    // EdgesGeometry behind. Rest pose (rotation.z = 0) points local +Y, i.e.
-    // angleOf(0) — the same 12-o'clock reference the ticks are aimed from.
-    const handOnPivot = (w: number, thick: number, len: number, z: number) => {
-      const pivot = new THREE.Group();
-      const arm = makeBlock(w, len, thick, accent, accent);
-      arm.position.y = len / 2;
-      pivot.add(arm);
-      pivot.position.z = z;
-      root.add(pivot);
-      return pivot;
-    };
-
-    const minuteHand = handOnPivot(MINUTE_W, MINUTE_W, MINUTE_LEN, Z_MINUTE);
-    const hourHand = handOnPivot(HOUR_W, HOUR_H, HOUR_LEN, Z_HOUR);
-
-    // Pins
-    const pinMeshes: THREE.Group[] = [];
-    const pinBaseY: number[] = [];
-    scene.pins.forEach((pin) => {
-      const angle = angleOf(pinFrac(pin.at, scene.face));
-      const baseY = -Math.sin(angle);
-      pinBaseY.push(baseY);
-
-      const pGroup = new THREE.Group();
-      pGroup.position.set(Math.cos(angle), baseY, Z_PIN);
-
-      const pinBody = new THREE.Mesh(
-        new THREE.SphereGeometry(PIN_R, 24, 24),
-        new THREE.MeshPhysicalMaterial({
-          color: new THREE.Color(accent),
-          emissive: new THREE.Color(accent),
-          emissiveIntensity: 0.2,
-          metalness: 0.2,
-          roughness: 0.3,
-          clearcoat: 0.8,
-        })
-      );
-      pGroup.add(pinBody);
-      root.add(pGroup);
-      pinMeshes.push(pGroup);
-    });
-
-    const update = (elapsedMs: number, c?: DayclockCtx) => {
-      if (!c) return;
-      const { faceIn, master, settled, k, t } = c;
-      root.scale.setScalar(c.scale);
-      root.position.set(c.posX, c.posY, 0);
-
-      base.scale.setScalar(Math.max(0.001, faceIn));
-
-      const tremor = settled ? 0.0012 * Math.sin(elapsedMs / 320) : 0;
-      const hourFrac = (master % 1) + tremor;
-      const minuteFrac = ((master * cycles) % 1) + tremor;
-
-      hourHand.rotation.z = -hourFrac * Math.PI * 2;
-      minuteHand.rotation.z = -minuteFrac * Math.PI * 2;
-
-      scene.pins.forEach((pin, i) => {
-        const mesh = pinMeshes[i];
-        const baseY = pinBaseY[i];
-        if (i < k) {
-          mesh.scale.setScalar(0.5);
-          mesh.position.y = baseY;
-          mesh.visible = true;
-          (mesh.children[0] as THREE.Mesh).material = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(MUTED) });
-        } else if (i === k && (offset + i === active && !inTail)) {
-          const drop = easeOutBack(clamp01((t - 0.4) / 0.4));
-          mesh.scale.setScalar(Math.max(0.001, drop));
-          mesh.position.y = baseY + (1 - drop) * PIN_DROP_DIST; // falls in from above
-          mesh.visible = drop > 0;
-          const hot = active === offset + k && !inTail;
-          const mat = (mesh.children[0] as THREE.Mesh).material as THREE.MeshPhysicalMaterial;
-          mat.color.setStyle(accent);
-          mat.emissive.setStyle(accent);
-          mat.emissiveIntensity = hot ? 0.5 + 0.3 * Math.sin(elapsedMs / 260) : 0.2;
-        } else {
-          mesh.visible = false;
-        }
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const pxPerWorld = rect.h / (2 * CAM_HALF_H);
-  const cam = render3D<DayclockCtx>(
-    ctx,
-    key,
-    rect,
-    build,
-    env.elapsedMs,
-    {
-      scale: R / pxPerWorld,
-      posX: (cx - (rect.x + rect.w / 2)) / pxPerWorld,
-      posY: -(cy - (rect.y + rect.h / 2)) / pxPerWorld,
-      faceIn,
-      master,
-      settled,
-      k,
-      t,
-    },
-    env
-  );
-
-  if (!cam) {
-    ctx.textAlign = "start";
-    return;
+  const nTicks = scene.face === "12h" ? 12 : 24;
+  const majorEvery = scene.face === "12h" ? 3 : 6;
+  ctx.lineCap = "butt";
+  for (let i = 0; i < nTicks; i++) {
+    const frac = i / nTicks;
+    const major = i % majorEvery === 0;
+    const angle = angleOf(frac);
+    const tickL = major ? TICK_MAJOR_LEN : TICK_MINOR_LEN;
+    const tickW = major ? TICK_MAJOR_W : TICK_MINOR_W;
+    const rOut = 1 - TICK_INSET;
+    const rIn = rOut - tickL;
+    const from = pixelAt(angle, rIn);
+    const to = pixelAt(angle, rOut);
+    ctx.strokeStyle = major ? THEME.textDim : MUTED;
+    ctx.lineWidth = Math.max(1, tickW * R);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
   }
 
-  // ---- 2D overlays: pure pixel math ------------------------------------------
-  // The camera is on-axis and the 3D group's scale/position are derived from
-  // this same (cx, cy, R), so `pixelAt` always lands exactly on the 3D dial —
-  // an affine mapping, not a per-point projection.
+  ctx.lineCap = "round";
+  const hourEnd = pixelAt(angleOf(hourFrac), HOUR_LEN);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(1, HOUR_W * R);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(hourEnd.x, hourEnd.y);
+  ctx.stroke();
+
+  const minuteEnd = pixelAt(angleOf(minuteFrac), MINUTE_LEN);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(1, MINUTE_W * R);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(minuteEnd.x, minuteEnd.y);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, HUB_R * R, 0, Math.PI * 2);
+  ctx.fillStyle = accent;
+  ctx.fill();
+
+  // Pins: past pins mute in place, the newly active one drops in from above,
+  // the current one pulses so the dial keeps something alive while it holds.
+  scene.pins.forEach((pin, i) => {
+    const angle = angleOf(pinFrac(pin.at, scene.face));
+    if (i < k) {
+      const p = pixelAt(angle, 1);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, PIN_R * R * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = MUTED;
+      ctx.fill();
+    } else if (i === k && offset + i === active && !inTail) {
+      const drop = easeOutBack(clamp01((t - 0.4) / 0.4));
+      if (drop <= 0) return;
+      const hot = active === offset + k && !inTail;
+      const pulse = hot ? 0.5 + 0.3 * Math.sin(env.elapsedMs / 260) : 0.2;
+      const rest = pixelAt(angle, 1);
+      // Falls straight down (pixel-Y only) from above onto its resting spot on
+      // the rim, matching the removed 3D pin's world-Y-only drop.
+      const p = { x: rest.x, y: rest.y - (1 - drop) * PIN_DROP_DIST * R };
+      ctx.save();
+      ctx.globalAlpha *= drop;
+      if (hot) {
+        ctx.shadowColor = accentGlow;
+        ctx.shadowBlur = R * 0.3 * pulse;
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, PIN_R * R * Math.max(0.001, drop), 0, Math.PI * 2);
+      ctx.fillStyle = accent;
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+  ctx.restore();
+
+  // ---- 2D chrome: numbers, active pin label/icon, digital readout -----------
   const numbers = scene.face === "12h" ? ["12", "3", "6", "9"] : ["0", "6", "12", "18"];
   ctx.save();
-  ctx.globalAlpha = faceIn;
+  ctx.globalAlpha = faceIn * leave;
   ctx.font = `700 ${unit * 0.7}px ${FONT_SANS}`;
   ctx.fillStyle = THEME.textDim;
   ctx.textAlign = "center";
@@ -349,7 +240,7 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
           y: clampRange(ipRaw.y, areaY + iconHalf, areaY + availH - iconHalf),
         };
         ctx.save();
-        ctx.globalAlpha = faceIn * drop;
+        ctx.globalAlpha = faceIn * drop * leave;
         ctx.font = `${unit * 1.1}px ${FONT_SANS}`;
         ctx.textAlign = "center";
         ctx.fillText(pin.icon, ip.x, ip.y + unit * 0.32);
@@ -380,7 +271,7 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
         chipY = clampRange(chipY, areaY, areaY + availH - chipH);
 
         ctx.save();
-        ctx.globalAlpha = faceIn * chipT;
+        ctx.globalAlpha = faceIn * chipT * leave;
         if (hot) {
           ctx.shadowColor = accentGlow;
           ctx.shadowBlur = unit * 0.5;
@@ -408,7 +299,7 @@ export function paintDayclock(ctx: CanvasRenderingContext2D, scene: DayclockScen
   const drawTime = (text: string, alpha: number, dy = 0) => {
     if (alpha <= 0) return;
     ctx.save();
-    ctx.globalAlpha = faceIn * alpha;
+    ctx.globalAlpha = faceIn * alpha * leave;
     ctx.font = `800 ${unit * 1.5}px ${FONT_MONO}`;
     ctx.fillStyle = THEME.text;
     ctx.textAlign = "center";
