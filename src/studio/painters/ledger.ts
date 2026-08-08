@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -13,6 +11,7 @@ import {
   sub,
   roundRect,
   shade,
+  lerpColor,
   fitFontSize,
   drawSceneTitle,
   drawArrowhead,
@@ -21,7 +20,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
-  type Layout,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -34,27 +33,19 @@ const COIN_STAGGER = 0.09;
 const COIN_SPEED = 1 + (COINS - 1) * COIN_STAGGER;
 const SETTLED_ARC_ALPHA = 0.13;
 const ARC_SAMPLES = 24;
-const CAPTION_SAFE_Y = 0.86;
 // Perpendicular bow offset for a transfer's connector curve, capped as a fraction of the
 // chord itself. Portrait 3-4 party layouts pack party cards close enough that a fixed
-// unit*2 bow (measured: 90px) can be 2.5x the gap between two facing card edges (measured:
-// 35px for the Bilal->Chetan chord at short aspect), which draws a bulge that dangles
-// past both cards instead of a bow between them. Capping by chord length keeps the curve
-// visually attached regardless of aspect or party count.
+// unit*2 bow can dangle past both cards instead of bowing between them. Capping by chord
+// length keeps the curve visually attached regardless of aspect or party count.
 const ARC_BOW_UNITS = 2;
 const ARC_BOW_MAX_FRAC = 0.55;
-// Idle (uninvolved) party-block face/edge, matching the shade(THEME.panel, lift) +
-// THEME.textDim convention other 3D painters use for an unlit block (e.g. memgrid.ts,
+// Idle (uninvolved) party card face/edge, matching the shade(THEME.panel, lift) +
+// THEME.textDim convention other painters use for an unlit block (e.g. memgrid.ts,
 // callstack.ts) instead of a hand-rolled hex.
 const IDLE_FACE_LIFT = 0.12;
 const IDLE_FACE = shade(THEME.panel, IDLE_FACE_LIFT);
-// Matches the shade(THEME.panel, 0.22) grid-line convention used by bits.ts/cycle.ts/
-// statemachine.ts instead of the "#31435a" literal several other painters still hardcode.
-const GRID_LINE_LIFT = 0.22;
-// Was a literal `1.5` (absolute px) regardless of unit — fine at this file's current
-// unit=45 for both aspects, but breaks the "no absolute px stroke widths" rule the moment
-// a frame's unit differs. unit*0.033 reproduces the same ~1.5px stroke at unit=45.
 const CHIP_BORDER_UNITS = 0.033;
+const CARD_TINT = 0.28;
 
 function transferArc(a: Rect, b: Rect, unit: number): Pt[] {
   const dx = b.cx - a.cx;
@@ -103,115 +94,63 @@ function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, text: str
   ctx.restore();
 }
 
+/**
+ * Flat 2D party layout. The removed 3D scatter placed parties at fixed world
+ * offsets (2 side-by-side or stacked, 3 as one-far-two-near, 4 as a 2x2 grid)
+ * viewed through a tilted camera — no genuine 3D spatial content, just a
+ * network of balance cards, so the same qualitative arrangement is reproduced
+ * directly in pixel space: one function, no camera, no projection.
+ */
+function partyCenters(n: number, vertical: boolean, gx0: number, gx1: number, gy0: number, gy1: number): Pt[] {
+  const midX = (gx0 + gx1) / 2;
+  const midY = (gy0 + gy1) / 2;
+  if (n <= 2) {
+    if (vertical) return [{ x: midX, y: gy0 }, { x: midX, y: gy1 }];
+    return [{ x: gx0, y: midY }, { x: gx1, y: midY }];
+  }
+  if (n === 3) {
+    return [{ x: midX, y: gy0 }, { x: gx0, y: gy1 }, { x: gx1, y: gy1 }];
+  }
+  return [{ x: gx0, y: gy0 }, { x: gx1, y: gy0 }, { x: gx0, y: gy1 }, { x: gx1, y: gy1 }];
+}
+
 export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
-  const { accent, accentGlow, secondary } = env.palette;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
+  const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.transfers.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
-  const key = scene.id + "-ldgr3d";
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
 
   const ax = contentX;
   const ay = contentY + band;
   const aw = contentW;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
   const ah = safeBottom - ay;
-  const rect = { x: ax, y: ay, w: aw, h: ah };
-  
+
   const nParties = scene.parties.length;
-  const spreadX = vertical ? 3.0 : 5.0;
-  const spreadZ = vertical ? 5.0 : 3.0;
+  const cw = vertical ? contentW * 0.44 : unit * 6.4;
+  const ch = vertical ? unit * 4.0 : unit * 3.6;
+  const marginX = cw / 2 + unit * 0.4;
+  // The glow-party card's shadowBlur blooms up to unit*1.25 past its own edge and
+  // is not clipped by the fill it hangs off, so the bottom row needs that reserved
+  // above safeBottom, not just the card's own half-height.
+  const marginY = ch / 2 + unit * 1.4;
+  const gx0 = ax + marginX;
+  const gx1 = ax + aw - marginX;
+  const gy0 = ay + marginY;
+  const gy1 = ay + ah - marginY;
 
-  const worldPos = (i: number) => {
-    if (nParties === 2) return vertical 
-        ? new THREE.Vector3(0, 0, i === 0 ? -spreadZ : spreadZ) 
-        : new THREE.Vector3(i === 0 ? -spreadX : spreadX, 0, 0);
-    if (nParties === 3) {
-        if (i === 0) return new THREE.Vector3(0, 0, -spreadZ);
-        if (i === 1) return new THREE.Vector3(-spreadX, 0, spreadZ);
-        if (i === 2) return new THREE.Vector3(spreadX, 0, spreadZ);
-    }
-    // 4 parties
-    if (i === 0) return new THREE.Vector3(-spreadX, 0, -spreadZ);
-    if (i === 1) return new THREE.Vector3(spreadX, 0, -spreadZ);
-    if (i === 2) return new THREE.Vector3(-spreadX, 0, spreadZ);
-    return new THREE.Vector3(spreadX, 0, spreadZ);
-  };
-
-  const blockW = (spreadX * 2.0) / 2 * 0.9;
-  const blockD = (spreadZ * 2.0) / 2 * 0.9;
-
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, vertical ? 15 : 12, vertical ? 12 : 10);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const grid = new THREE.GridHelper(Math.max(spreadX, spreadZ) * 3, 14, new THREE.Color(accent), new THREE.Color(shade(THEME.panel, GRID_LINE_LIFT)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -0.5;
-    s.add(grid);
-
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadZ * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -0.5;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
-
-    const models: { mesh: THREE.Group, idx: number, pid: string }[] = [];
-    scene.parties.forEach((p, i) => {
-        const g = makeBlock(blockW, 0.6, blockD, IDLE_FACE, THEME.textDim);
-        g.position.copy(worldPos(i));
-        s.add(g);
-        models.push({ mesh: g, idx: i, pid: p.id });
-    });
-
-    const update = (elapsedMs: number, ctxData: { p: number, active: number, tints: Record<string, string>, pulses: Record<string, number> }) => {
-      const enterAll = enterT(env, 350, 0);
-      models.forEach(({ mesh, idx, pid }) => {
-        const enter = enterT(env, 350, idx * 70);
-        const appear = easeOutCubic(clamp01(enter * 1.5));
-        const pop = Math.max(0.001, appear * (ctxData.pulses[pid] || 1));
-        
-        mesh.scale.setScalar(pop);
-        mesh.visible = appear > 0.01;
-        
-        const base = worldPos(idx);
-        const bob = Math.sin(elapsedMs / 1200 + idx * 0.5) * 0.1;
-        mesh.position.y = base.y + bob;
-
-        const involved = !!ctxData.tints[pid];
-        const tint = ctxData.tints[pid];
-
-        mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh) {
-                const mat = child.material as THREE.MeshPhysicalMaterial;
-                mat.transparent = true;
-                mat.opacity = appear * 0.9;
-                
-                if (involved && tint) {
-                    mat.color.setStyle(tint);
-                    mat.emissive.setStyle(tint);
-                    mat.emissiveIntensity = 0.2;
-                } else {
-                    mat.color.setStyle(IDLE_FACE);
-                    mat.emissive.setStyle(IDLE_FACE);
-                    mat.emissiveIntensity = 0.1;
-                }
-            }
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
+  const centers = partyCenters(nParties, vertical, gx0, gx1, gy0, gy1);
+  const rects = new Map<string, Rect>();
+  scene.parties.forEach((party, i) => {
+    const c = centers[i];
+    rects.set(party.id, { x: c.x - cw / 2, y: c.y - ch / 2, w: cw, h: ch, cx: c.x, cy: c.y });
+  });
+  const anchorFor = (id: string): Rect | undefined => rects.get(id);
 
   const wholes = scene.parties.every((p) => Number.isInteger(p.start)) && scene.transfers.every((t) => Number.isInteger(t.amount));
   const u = scene.unit.trim();
@@ -229,7 +168,7 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
   const tints: Record<string, string> = {};
   let glowParty: string | null = null;
   let lastSettled = -1;
-  
+
   scene.transfers.forEach((tr, k) => {
     const t = beatT(env.beats, offset + k, totalBeats, env.p);
     if (t <= 0) return;
@@ -252,46 +191,6 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
     }
   });
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { p: env.p, active, tints, pulses }, env);
-  if (!cam) return;
-
-  const centers = scene.parties.map((p, i) => projectToRect(cam, worldPos(i), rect));
-  const cw = vertical ? contentW * 0.44 : unit * 6.4;
-  const ch = vertical ? unit * 4.4 : unit * 4;
-  const rects = new Map<string, Rect>();
-  const partyIndex = new Map(scene.parties.map((p, i) => [p.id, i]));
-  scene.parties.forEach((party, i) => {
-    const c = centers[i];
-    rects.set(party.id, { x: c.x - cw / 2, y: c.y - ch / 2, w: cw, h: ch, cx: c.x, cy: c.y });
-  });
-  // `rects` (cw x ch) is a LABEL footprint sized to hold icon+name+amount text —
-  // contentW*0.44 in portrait — and has no relation to the rendered 3D slab's own
-  // size (blockW/blockD, a much smaller world-space box under the tilted camera
-  // above). A transfer's near-edge anchor computed from the label rect is correct
-  // BY that rect's own definition, but for two adjacent parties the connector's
-  // chord (~35px, measured) sits entirely inside the visual gap between the much
-  // smaller slabs, reading as a fully detached arc. (A first attempt anchored this
-  // to the party's idle bob instead — disproved by direct coordinate logging: the
-  // bob was real but not the cause, since even the pre-bob static anchor already
-  // floated clear of the slab.) Fixed by deriving each party's anchor from the
-  // ACTUAL projected slab half-extent, not the label rect — one extra projection
-  // per axis, the same technique the on-axis-converted painters use to keep pixel
-  // chrome and 3D geometry in agreement.
-  const slabHalf = scene.parties.map((_, i) => {
-    const c = worldPos(i);
-    const px = projectToRect(cam, new THREE.Vector3(c.x + blockW / 2, c.y, c.z), rect);
-    const pz = projectToRect(cam, new THREE.Vector3(c.x, c.y, c.z + blockD / 2), rect);
-    const base = centers[i];
-    return { hx: Math.abs(px.x - base.x), hy: Math.abs(pz.y - base.y) };
-  });
-  const anchorFor = (id: string): Rect | undefined => {
-    const r = rects.get(id);
-    const i = partyIndex.get(id);
-    if (!r || i === undefined) return r;
-    const { hx, hy } = slabHalf[i];
-    return { x: r.cx - hx, y: r.cy - hy, w: hx * 2, h: hy * 2, cx: r.cx, cy: r.cy };
-  };
-
   let activeArc: { pts: Pt[]; tr: LedgerScene["transfers"][number]; t: number } | null = null;
 
   scene.transfers.forEach((tr, k) => {
@@ -306,12 +205,12 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
     ctx.lineCap = "round";
     if (isActive) {
       activeArc = { pts, tr, t };
-      ctx.globalAlpha = 0.3;
+      ctx.globalAlpha = 0.3 * leave;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * 0.12;
       strokePolylineProgress(ctx, pts, easeOutCubic(clamp01(t / 0.15)));
     } else {
-      ctx.globalAlpha = SETTLED_ARC_ALPHA;
+      ctx.globalAlpha = SETTLED_ARC_ALPHA * leave;
       ctx.strokeStyle = accent;
       ctx.fillStyle = accent;
       ctx.lineWidth = unit * 0.12;
@@ -324,7 +223,7 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
       if (k === lastSettled) {
         const f = (env.elapsedMs % 2200) / 2200;
         const dot = pointAlongPolyline(pts, f);
-        ctx.globalAlpha = 0.45 * Math.sin(Math.PI * f);
+        ctx.globalAlpha = 0.45 * Math.sin(Math.PI * f) * leave;
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.5;
         ctx.fillStyle = THEME.text;
@@ -343,29 +242,43 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
     if (enter <= 0) return;
     const appear = easeOutCubic(clamp01(enter * 1.5));
     const involved = !!tints[party.id];
-    const bob = Math.sin(env.elapsedMs / 1200 + i * 0.5) * unit * 1.5;
+    const tint = tints[party.id];
+    const pulse = pulses[party.id] ?? 1;
+    const bob = Math.sin(env.elapsedMs / 1200 + i * 0.5) * unit * 0.6;
 
     ctx.save();
-    ctx.globalAlpha = appear;
+    ctx.globalAlpha = appear * leave;
     ctx.translate(r.cx, r.cy - bob);
-    
+    ctx.scale(pulse, pulse);
+    ctx.translate(-r.cx, -(r.cy - bob));
+
+    // Card, drawn directly in 2D — replaces the removed 3D slab, same idle/tint
+    // colour states.
     if (party.id === glowParty) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * (0.9 + 0.35 * Math.sin(env.elapsedMs / 260));
     }
+    roundRect(ctx, r.cx - r.w / 2, r.cy - bob - r.h / 2, r.w, r.h, unit * 0.34);
+    ctx.fillStyle = involved ? lerpColor(IDLE_FACE, tint, CARD_TINT) : IDLE_FACE;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    roundRect(ctx, r.cx - r.w / 2, r.cy - bob - r.h / 2, r.w, r.h, unit * 0.34);
+    ctx.strokeStyle = involved ? rgba(tint, 0.7) : rgba(THEME.textDim, 0.35);
+    ctx.lineWidth = unit * (involved ? 0.07 : 0.04);
+    ctx.stroke();
 
     ctx.textAlign = "center";
     const header = party.icon ? `${party.icon} ${party.label}` : party.label;
     const hpx = fitFontSize(ctx, header, { maxW: r.w - unit * 0.7, startPx: unit * 0.82, minPx: unit * 0.55, weight: 700 });
     ctx.font = `700 ${hpx}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textDim;
-    ctx.fillText(header, 0, -unit * 0.2);
+    ctx.fillText(header, r.cx, r.cy - bob - unit * 0.2);
 
     const balText = fmt(balances.get(party.id) ?? party.start);
     const bpx = fitFontSize(ctx, balText, { maxW: r.w - unit * 0.8, startPx: unit * 1.05, minPx: unit * 0.6, weight: 800, family: FONT_MONO });
     ctx.font = `800 ${bpx}px ${FONT_MONO}`;
     ctx.fillStyle = tints[party.id] ?? THEME.text;
-    ctx.fillText(balText, 0, unit * 1.0);
+    ctx.fillText(balText, r.cx, r.cy - bob + unit * 1.0);
     ctx.textAlign = "start";
     ctx.restore();
   });
@@ -379,7 +292,7 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
         const f = clamp01(tt * COIN_SPEED - j * COIN_STAGGER);
         if (f <= 0 || f >= 1) continue;
         const dot = pointAlongPolyline(pts, f);
-        ctx.globalAlpha = Math.sin(Math.PI * f);
+        ctx.globalAlpha = Math.sin(Math.PI * f) * leave;
         ctx.fillStyle = accent;
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.7;
@@ -392,13 +305,13 @@ export function paintLedger(ctx: CanvasRenderingContext2D, scene: LedgerScene, e
     const minusA = easeOutCubic(sub(t, 0.05, 0.1)) * (1 - sub(t, 0.32, 0.16));
     if (minusA > 0) {
       const at = pointAlongPolyline(pts, 0.07);
-      drawChip(ctx, at.x, at.y - unit * 0.85, fmt(-tr.amount), unit, minusA, THEME.danger);
+      drawChip(ctx, at.x, at.y - unit * 0.85, fmt(-tr.amount), unit, minusA * leave, THEME.danger);
     }
     const fc = clamp01(tt * COIN_SPEED - (COIN_STAGGER * (COINS - 1)) / 2);
     if (fc > 0 && fc < 1) {
       const at = pointAlongPolyline(pts, fc);
       const alpha = Math.min(1, fc * 6, (1 - fc) * 6);
-      drawChip(ctx, at.x, at.y - unit * 0.85, tr.label ?? `+${fmt(tr.amount)}`, unit, alpha, THEME.good);
+      drawChip(ctx, at.x, at.y - unit * 0.85, tr.label ?? `+${fmt(tr.amount)}`, unit, alpha * leave, THEME.good);
     }
   }
   ctx.textAlign = "start";
