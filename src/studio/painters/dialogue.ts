@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -14,6 +12,9 @@ import {
   activeBeatIndex,
   enterT,
   rgba,
+  roundRect,
+  departT,
+  idle,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -22,19 +23,9 @@ type DialogueScene = Extract<Scene, { kind: "dialogue" }>;
 const TYPING_FRAC = 0.22;
 const REACT_AT = 0.7;
 
-/** Straight-on camera. Any tilt makes the pixel↔world mapping below non-affine,
- *  which is what desynchronised the bubbles from their text. */
-const CAM_DIST = 9;
-const PANEL_Z = 0;
-const PANEL_DEPTH = 0.25;
-/** Bubbles float clear of the panel's front face so they cannot z-fight it. */
-const BUBBLE_Z = 0.3;
-const BUBBLE_DEPTH = 0.18;
-/** Incoming bubbles are the accent darkened toward black. Passing accentSoft — an
- *  rgba() string — made THREE.Color drop the alpha and render full accent. */
+/** Incoming bubbles are the accent darkened toward black. */
 const INCOMING_FACE_DARKEN = -0.62;
 const REACTION_DISC_LIFT = 0.16;
-/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
 const EDGE_ALPHA = 0.6;
 
 type BubbleMetrics = { lines: string[]; w: number; h: number };
@@ -49,7 +40,8 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const cur = Math.min(active - offset, n - 1);
   const tCur = cur >= 0 ? beatT(env.beats, offset + cur, totalBeats, env.p) : 0;
-  const key = scene.id + "-dialogue3d";
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const panelIn = easeOutCubic(enterT(env, 340));
   if (panelIn <= 0) {
@@ -139,7 +131,7 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
         bx = fromLeft ? innerX : innerX + innerW - bubbleW;
         by = slotBottom - bubbleH;
         scale = easeOutCubic(clamp01(t / 0.05));
-        opacity = panelIn * scale;
+        opacity = panelIn * scale * leave;
       } else {
         const popT = i === cur ? clamp01((t - TYPING_FRAC) / 0.14) : 1;
         scale = popT < 1 ? 0.4 + 0.6 * easeOutBack(popT) : 1;
@@ -147,7 +139,7 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
         bubbleH = metrics[i].h;
         bx = fromLeft ? innerX : innerX + innerW - bubbleW;
         by = slotBottom - bubbleH;
-        opacity = panelIn * clamp01(popT * 2);
+        opacity = panelIn * clamp01(popT * 2) * leave;
       }
     }
 
@@ -163,94 +155,20 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
     };
   });
 
-  // ── 3D layer ───────────────────────────────────────────────────────────────
-  // The 2D layout above is authoritative. The 3D layer aligns to IT, not the other
-  // way round: an axis-aligned camera makes projectToRect affine on any z=const
-  // plane, so pixel↔world is an exact invertible mapping and every slab's front
-  // face lands on the pixel rect the text is drawn in. The previous build mapped
-  // pixels into world linearly and then projected back through a tilted, wobbling
-  // camera, which does not round-trip.
-  const rect = { x: panelX, y: panelY, w: panelW, h: panelH };
-
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-  type Mapping = ReturnType<typeof mappingAt>;
-  const toWorld = (m: Mapping, px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-
-  const build = (): ThreeBundle<{ panelIn: number; bubbleStates: typeof bubbleStates }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 42 : 34, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const panelM = mappingAt(camera, PANEL_Z + PANEL_DEPTH / 2);
-    const panelBlock = makeBlock(rect.w / panelM.sx, rect.h / panelM.sy, PANEL_DEPTH, THEME.panel, accent);
-    panelBlock.position.set(0, 0, PANEL_Z);
-    s.add(panelBlock);
-
-    const bubbleM = mappingAt(camera, BUBBLE_Z + BUBBLE_DEPTH / 2);
-    // Geometry is built at each bubble's resting size; the live size (typing stub vs
-    // full bubble) is reached by scaling, so the mesh always matches its pixel rect.
-    const bubbleMeshes = scene.messages.map((msg, i) => {
-      const fromLeft = msg.from === "left";
-      const bubble = makeBlock(
-        metrics[i].w / bubbleM.sx,
-        metrics[i].h / bubbleM.sy,
-        BUBBLE_DEPTH,
-        fromLeft ? shade(THEME.panel, 0.14) : shade(accent, INCOMING_FACE_DARKEN),
-        fromLeft ? THEME.textDim : accent
-      );
-      bubble.position.z = BUBBLE_Z;
-      s.add(bubble);
-      return bubble;
-    });
-
-    /** Fade faces AND the edge wireframe. makeBlock parents the LineSegments under
-     *  the mesh, so a faces-only fade left a fully-opaque outline hanging in the air
-     *  while the slab it belongs to was still transparent. */
-    const fade = (block: THREE.Group, alpha: number) =>
-      block.traverse((o) => {
-        const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if (!mat) return;
-        mat.transparent = true;
-        mat.opacity = alpha * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 1);
-      });
-
-    const update = (_elapsedMs: number, data: { panelIn: number; bubbleStates: typeof bubbleStates }) => {
-      fade(panelBlock, data.panelIn);
-
-      bubbleMeshes.forEach((bubble, i) => {
-        const state = data.bubbleStates[i];
-        bubble.visible = !!state?.visible;
-        if (!state?.visible) return;
-
-        const c = toWorld(bubbleM, state.bx + state.w / 2, state.by + state.h / 2);
-        bubble.position.set(c.x, c.y, BUBBLE_Z);
-        bubble.scale.set(
-          Math.max(0.001, (state.w / bubbleM.sx / (metrics[i].w / bubbleM.sx)) * state.scale),
-          Math.max(0.001, (state.h / bubbleM.sy / (metrics[i].h / bubbleM.sy)) * state.scale),
-          1
-        );
-
-        fade(bubble, state.opacity);
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { panelIn, bubbleStates }, env);
-  if (!cam) return;
+  // ── Panel background, drawn directly in 2D ──────────────────────────────────
+  ctx.save();
+  ctx.globalAlpha = panelIn * leave;
+  roundRect(ctx, panelX, panelY, panelW, panelH, unit * 0.4);
+  ctx.fillStyle = THEME.panel;
+  ctx.fill();
+  ctx.strokeStyle = rgba(accent, EDGE_ALPHA);
+  ctx.lineWidth = unit * 0.05;
+  ctx.stroke();
+  ctx.restore();
 
   // ── Header overlay in 2D HUD ───────────────────────────────
   ctx.save();
-  ctx.globalAlpha = panelIn;
+  ctx.globalAlpha = panelIn * leave;
 
   const aR = unit * 0.85;
   const leftAv = { x: panelX + pad + aR, y: panelY + headerH / 2 };
@@ -295,7 +213,7 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
     const av = scene.messages[pendingIdx].from === "left" ? leftAv : rightAv;
     const pulse = 0.6 + 0.4 * Math.sin(env.elapsedMs / 400);
     ctx.save();
-    ctx.globalAlpha = panelIn * (0.55 + 0.45 * pulse);
+    ctx.globalAlpha = panelIn * leave * (0.55 + 0.45 * pulse);
     ctx.fillStyle = THEME.good;
     ctx.shadowColor = rgba(THEME.good, 0.6);
     ctx.shadowBlur = unit * 0.3 * pulse;
@@ -325,7 +243,7 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
     ctx.save();
     ctx.font = `800 ${unit * 1.3}px ${FONT_SANS}`;
     ctx.fillStyle = THEME.textFaint;
-    ctx.globalAlpha = panelIn * (0.5 + 0.2 * Math.sin(env.elapsedMs / 600));
+    ctx.globalAlpha = panelIn * leave * (0.5 + 0.2 * Math.sin(env.elapsedMs / 600));
     ctx.textAlign = "center";
     ctx.fillText("· · ·", panelX + panelW / 2, headerBottom + (panelH - headerH) / 2 + unit * 0.3);
     ctx.restore();
@@ -345,6 +263,18 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
     ctx.translate(cx, cy);
     ctx.scale(state.scale, state.scale);
     ctx.translate(-cx, -cy);
+
+    // The most-recently-landed bubble breathes on its fill alpha — once the pop-in
+    // settles this is the only large-area element still visibly alive between messages.
+    const breathe = i === cur ? 0.88 + 0.24 * idle(env, 1600, i) : 1;
+    roundRect(ctx, bx, by, state.w, state.h, unit * 0.5);
+    ctx.fillStyle = fromLeft ? shade(THEME.panel, 0.14) : shade(accent, INCOMING_FACE_DARKEN);
+    ctx.globalAlpha = state.opacity * breathe;
+    ctx.fill();
+    ctx.globalAlpha = state.opacity;
+    ctx.strokeStyle = rgba(fromLeft ? THEME.textDim : accent, EDGE_ALPHA);
+    ctx.lineWidth = unit * 0.04;
+    ctx.stroke();
 
     if (state.isTyping) {
       ctx.fillStyle = THEME.textDim;
@@ -419,6 +349,7 @@ export function paintDialogue(ctx: CanvasRenderingContext2D, scene: DialogueScen
   const fade = ctx.createLinearGradient(0, headerBottom, 0, headerBottom + unit * 1.2);
   fade.addColorStop(0, THEME.panel);
   fade.addColorStop(1, rgba(THEME.panel, 0));
+  ctx.globalAlpha = leave;
   ctx.fillStyle = fade;
   ctx.fillRect(panelX + unit * 0.1, headerBottom, panelW - unit * 0.2, unit * 1.2);
 
