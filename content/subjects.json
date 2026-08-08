@@ -5,6 +5,7 @@
       "label": "Coding",
       "audience": "software engineers from junior to staff, global English-speaking",
       "style": "mechanism-first engineering teaching; use runnable code only where code itself is the lesson (syntax, an algorithm, an API, a bug) — for conceptual/theory topics show the mechanism visually instead of a code listing",
+      "archetype": "mechanism-built",
       "modules": [
         {
           "id": "frontend",
@@ -417,6 +418,7 @@
       "label": "History",
       "audience": "students (school to UPSC aspirants) and history-curious viewers worldwide; Indian history in depth plus world history",
       "style": "story-driven; causes and consequences over rote dates; timelines and maps as diagrams; make it feel like a thriller, cite the numbers that stun",
+      "archetype": "narrative",
       "modules": [
         {
           "id": "ancient-india",
@@ -666,6 +668,7 @@
       "label": "Geography",
       "audience": "students and exam aspirants (school, SSC, UPSC) plus map-curious viewers worldwide",
       "style": "map-first thinking; explain WHY places are the way they are; use diagrams for physical processes and charts for rankings",
+      "archetype": "place",
       "modules": [
         {
           "id": "india-physical",
@@ -834,6 +837,7 @@
       "label": "Math & Aptitude",
       "audience": "students and job-exam aspirants (SSC, Banking, CAT, placement tests) plus anyone who enjoys number tricks",
       "style": "trick-first: show the slow way, then the fast way; every video ends with one practice problem; use worked examples as text blocks",
+      "archetype": "procedure",
       "modules": [
         {
           "id": "speed-math",
@@ -958,6 +962,7 @@
       "label": "Science",
       "audience": "students and curious viewers of all ages worldwide, English",
       "style": "everyday-phenomena first (why does X happen?), then the principle; diagrams for mechanisms; one wow-fact per video",
+      "archetype": "mechanism-natural",
       "modules": [
         {
           "id": "physics",
@@ -1060,6 +1065,7 @@
       "label": "Money & Finance",
       "audience": "young earners and students learning to manage money; Indian instruments (₹, SIP, PPF, UPI) with globally useful concepts",
       "style": "numbers made visceral with real rupee examples; no stock tips, only concepts; always show the compounding math",
+      "archetype": "money",
       "modules": [
         {
           "id": "personal-finance",
@@ -1162,6 +1168,7 @@
       "label": "English & Communication",
       "audience": "learners improving English for exams, interviews and confidence — India-first, useful worldwide",
       "style": "one rule or pattern per video with 3 real usage examples; common Indian-English mistakes handled kindly",
+      "archetype": "language",
       "modules": [
         {
           "id": "grammar",
@@ -1300,6 +1307,7 @@
       "label": "GK & Amazing Facts",
       "audience": "general viewers and exam aspirants who love did-you-know content, India-first with global reach",
       "style": "hook with the unbelievable fact, then explain the mechanism behind it; end with a quiz question",
+      "archetype": "object-fact",
       "modules": [
         {
           "id": "india-gk",
@@ -1406,6 +1414,7 @@
       "label": "Psychology & the Mind",
       "audience": "curious viewers worldwide who want to understand their own mind; no jargon, no prior knowledge",
       "style": "name the bias or effect, make the viewer feel it with a relatable everyday scenario, then reveal the experiment and the numbers behind it; one practical takeaway per video; never preachy, never clinical advice",
+      "archetype": "self",
       "modules": [
         {
           "id": "biases-decisions",
@@ -1520,6 +1529,7 @@
       "label": "Business & Startups",
       "audience": "students, professionals and founders worldwide curious how companies really make money; Indian and global cases",
       "style": "case-first: open with a real company and a stunning number, dissect the model with diagrams; explain incentives, moats and unit economics, not buzzwords; mix Indian (Jio, UPI, Zomato) and global (Apple, Netflix) stories",
+      "archetype": "money",
       "modules": [
         {
           "id": "business-models",
@@ -1638,6 +1648,7 @@
       "label": "Health & Body",
       "audience": "everyday people worldwide who want to understand their own body; evidence-based education, never medical advice",
       "style": "mechanism-first: show what actually happens inside the body, bust one popular myth per video with the strongest evidence, hedge uncertain numbers with 'about'; explain, never prescribe; no miracle claims",
+      "archetype": "mechanism-natural",
       "modules": [
         {
           "id": "body-systems",
@@ -1738,6 +1749,7 @@
       "label": "Philosophy & Big Ideas",
       "audience": "thoughtful viewers worldwide; zero prior philosophy needed",
       "style": "start from a modern, concrete dilemma, then bring in the thinker or school that cracks it; thought experiments as diagrams; real, correctly attributed quotes only; end with a question people will argue about",
+      "archetype": "object-fact",
       "modules": [
         {
           "id": "life-philosophies",
@@ -1836,6 +1848,7 @@
       "label": "Life Skills & Productivity",
       "audience": "students and young professionals worldwide building the real-world skills school never taught",
       "style": "one skill per video with a concrete method: show the failure mode first, then the fix as copyable steps; practical over motivational, no platitudes; end with a 24-hour challenge",
+      "archetype": "procedure",
       "modules": [
         {
           "id": "learning-how-to-learn",
@@ -1928,6 +1941,7 @@
       "label": "Mythology & Epics",
       "audience": "story-lovers worldwide; Indian epics told with depth plus world mythologies",
       "style": "storytelling-first like a gripping narrator; timelines and family-tree diagrams; respect the tradition while separating story, symbolism and history; end with the lesson or an open question",
+      "archetype": "narrative",
       "modules": [
         {
           "id": "indian-epics",
@@ -2016,6 +2030,7 @@
       "label": "Polity & Governance",
       "audience": "UPSC, State PSC and government-exam aspirants plus curious citizens — India-first",
       "style": "exam-precise: cite exact Articles, Amendments and landmark cases; always explain the WHY behind a provision, not just the fact",
+      "archetype": "institution",
       "modules": [
         {
           "id": "constitution-basics",
@@ -2153,6 +2168,7 @@
       "label": "Mindset & Self-Growth",
       "audience": "students and young professionals working on confidence, speaking and personal growth — India-first, useful worldwide",
       "style": "transformation-first with zero platitudes: name the real psychological mechanism, then give a concrete drill the viewer can do today",
+      "archetype": "self",
       "modules": [
         {
           "id": "mindset-foundations",
@@ -2233,6 +2249,7 @@
       "label": "Economy",
       "audience": "UPSC/PSC aspirants and anyone decoding India's economy — India-first",
       "style": "exam-precise and current: define the term, show the mechanism with a real Indian example and number, cite the body/act (RBI, SEBI, FRBM); hedge estimates with 'around'",
+      "archetype": "money",
       "modules": [
         {
           "id": "basics",
@@ -2360,6 +2377,7 @@
       "label": "Environment & Ecology",
       "audience": "UPSC/PSC aspirants and eco-curious citizens — India-first",
       "style": "mechanism + policy: explain the ecological process, then the Indian law/convention/institution (Wildlife Act, CITES, NGT); accurate species/figures, hedge when unsure",
+      "archetype": "mechanism-natural",
       "modules": [
         {
           "id": "ecology",
@@ -2477,6 +2495,7 @@
       "label": "Art & Culture",
       "audience": "UPSC/PSC aspirants and culture-curious viewers — Indian heritage in depth",
       "style": "vivid and precise: name the dynasty/period/patron, the defining features and one iconic example; distinguish styles clearly; dates and names accurate",
+      "archetype": "object-fact",
       "modules": [
         {
           "id": "architecture",

@@ -50,23 +50,16 @@ const SCENE_TAIL_MS = 750;
 /* Shorts live or die on pace — trim the pauses between beats and scenes. */
 const SHORT_INTER_BEAT_GAP_MS = 140;
 const SHORT_SCENE_TAIL_MS = 450;
-const TRANSITION_MS = 420;
 const END_HOLD_MS = 600;
-/* Branded intro sting / outro end-card. Shorts get NO intro — the hook must own
- * second zero or the swipe is lost — and no outro either: Shorts have no end
- * screens and any non-content tail costs the loop. Long-form needs >= 5 s of
- * tail or YouTube will not let an end screen (subscribe / next video / playlist)
- * be attached at all, which is why this was 0 and drawOutro was unreachable. */
+/* Branded intro sting. Shorts get NONE — the hook must own second zero or the
+ * swipe is lost. No outro card either, on any format: the video ends right
+ * after its content. */
 const INTRO_MS_LONG = 900;
-const OUTRO_MS_LONG = 5200;
-const OUTRO_MS_SHORT = 0;
 
-/** Intro/outro extents for a format — page.tsx uses this to offset SRT captions
- *  and YouTube chapter timestamps so they match the final video timeline. */
-export function introOutroMs(format: "short" | "long"): { introMs: number; outroMs: number } {
-  return format === "long"
-    ? { introMs: INTRO_MS_LONG, outroMs: OUTRO_MS_LONG }
-    : { introMs: 0, outroMs: OUTRO_MS_SHORT };
+/** Intro extent for a format — page.tsx uses this to offset SRT captions and
+ *  YouTube chapter timestamps so they match the final video timeline. */
+export function introMsFor(format: "short" | "long"): number {
+  return format === "long" ? INTRO_MS_LONG : 0;
 }
 const VIDEO_BPS = 12_000_000;
 const AUDIO_BPS = 192_000;
@@ -315,44 +308,6 @@ function drawIntro(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
     ctx.fillRect(-underW / 2, unit * 1.7, underW, unit * 0.16);
     ctx.restore();
   }
-  ctx.restore();
-  ctx.textAlign = "start";
-  ctx.textBaseline = "alphabetic";
-}
-
-/** Outro end-card: the last frame dims, brand + a Subscribe pill pop in. */
-function drawOutro(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, brand: string, palette: Palette) {
-  const unit = Math.min(w, h) / 24;
-  const inP = easeInOutCubic(clamp01(t / 0.4));
-  ctx.save();
-  ctx.fillStyle = rgba("#05070a", 0.72 * inP);
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalAlpha = inP;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `900 ${unit * 1.5}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(brand, w / 2, h * 0.42 - unit * 1.4);
-  // Subscribe pill pops with a slight overshoot, then breathes.
-  const pillPop = clamp01((t - 0.25) / 0.3);
-  const s = pillPop < 1 ? 0.7 + 0.3 * (1 + 1.7 * Math.pow(pillPop - 1, 3) + 1.7 * Math.pow(pillPop - 1, 2)) : 1 + 0.02 * Math.sin(t * 24);
-  const pillW = unit * 8.6;
-  const pillH = unit * 1.9;
-  ctx.translate(w / 2, h * 0.42 + unit * 0.6);
-  ctx.scale(Math.max(0.01, s), Math.max(0.01, s));
-  ctx.fillStyle = "#e11d48";
-  ctx.beginPath();
-  const r = pillH / 2;
-  ctx.roundRect ? ctx.roundRect(-pillW / 2, -pillH / 2, pillW, pillH, r) : ctx.rect(-pillW / 2, -pillH / 2, pillW, pillH);
-  ctx.fill();
-  ctx.font = `800 ${unit * 0.92}px ${FONT_SANS}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("SUBSCRIBE", 0, unit * 0.04);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = inP * 0.85;
-  ctx.font = `600 ${unit * 0.72}px ${FONT_SANS}`;
-  ctx.fillStyle = THEME.textDim;
-  ctx.fillText("new videos daily", w / 2, h * 0.42 + unit * 2.6);
   ctx.restore();
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
@@ -633,7 +588,7 @@ export function runPlan(
 ): RenderHandle {
   const { width, height } = plan;
   // Captions default on: karaoke for shorts (muted autoplay), pop for long-form.
-  const captionStyle: CaptionStyle = opts.captionStyle ?? (plan.script.format === "short" ? "karaoke" : "pop");
+  const captionStyle: CaptionStyle = opts.captionStyle ?? (plan.script.format === "short" ? "word" : "pop");
   const captionPos: CaptionPos = opts.captionPos ?? "bottom";
   canvas.width = width;
   canvas.height = height;
@@ -645,22 +600,14 @@ export function runPlan(
   // Built once: `activeCaption` reads it every frame to drive the highlight off
   // real speech rhythm instead of a linear ramp.
   const wordsByBeatId = new Map(plan.audio.filter((a) => a.words?.length).map((a) => [a.beatId, a.words!]));
-  // One background motif per video, one transition style per scene boundary —
-  // both deterministic so a re-render of the same script looks identical.
+  // One background motif per video, deterministic so a re-render of the same
+  // script looks identical.
   const motif = variantOf(`${plan.script.topic}|${plan.script.subject}`, BG_MOTIFS);
   const introVariant = variantOf(`intro:${plan.script.topic}|${plan.brand}`, 4);
-  // Each scene owns the transition it ARRIVES on, keyed by its own id so the
-  // choice is deterministic. Index 0 is intentionally never read: the first
-  // scene arrives out of the intro, not out of another scene.
-  const transitions = plan.script.scenes.map((s) => variantOf(`tr:${s.id}`, 4));
-  const { introMs, outroMs } = introOutroMs(plan.script.format);
+  const introMs = introMsFor(plan.script.format);
   const contentMs = totalDurationMs(plan.timings);
-  const total = introMs + contentMs + outroMs;
+  const total = introMs + contentMs;
   const sceneCount = plan.script.scenes.length;
-  const sceneCanvas = document.createElement("canvas");
-  sceneCanvas.width = width;
-  sceneCanvas.height = height;
-  const sceneCtx = sceneCanvas.getContext("2d")!;
 
   let cancelled = false;
   let recorder: MediaRecorder | null = null;
@@ -776,51 +723,9 @@ export function runPlan(
       let idx = plan.timings.findIndex((t) => elapsed < t.startMs + t.durationMs);
       if (idx === -1) idx = sceneCount - 1;
 
+      // Hard cut between scenes — no dissolve/push/wipe. Pro explainers cut
+      // rather than fade, and a cut never risks a frozen incoming frame.
       paintAt(ctx, idx, elapsed);
-
-      // The transition runs over the INCOMING scene's first frames: the outgoing
-      // scene is finished, so holding its last frame and clearing it away is
-      // correct, whereas the reverse — which this used to do — painted the
-      // incoming scene at p=0/elapsedMs=0 for the whole 420 ms and turned every
-      // scene boundary into a dissolve onto a frozen still.
-      const timing = plan.timings[idx];
-      const sinceStart = elapsed - timing.startMs;
-      if (idx > 0 && sinceStart < TRANSITION_MS) {
-        const e = easeInOutCubic(clamp01(sinceStart / TRANSITION_MS));
-        const prev = plan.timings[idx - 1];
-        paintAt(sceneCtx, idx - 1, prev.startMs + prev.durationMs);
-        const mode = transitions[idx];
-        ctx.save();
-        if (mode === 1) {
-          // push: the outgoing scene slides off to the left
-          ctx.drawImage(sceneCanvas, -e * width, 0);
-        } else if (mode === 2) {
-          // wipe: the incoming scene is revealed left-to-right behind an accent edge
-          ctx.beginPath();
-          ctx.rect(width * e, 0, width * (1 - e), height);
-          ctx.clip();
-          ctx.drawImage(sceneCanvas, 0, 0);
-          ctx.restore();
-          ctx.save();
-          if (e > 0) {
-            ctx.fillStyle = palette.accentGlow;
-            ctx.fillRect(width * e - 2, 0, 4, height);
-          }
-        } else if (mode === 3) {
-          // zoom-fade: the outgoing scene pushes past the lens to 1.05x as it goes
-          const s = 1 + 0.05 * e;
-          ctx.globalAlpha = 1 - e;
-          ctx.translate(width / 2, height / 2);
-          ctx.scale(s, s);
-          ctx.translate(-width / 2, -height / 2);
-          ctx.drawImage(sceneCanvas, 0, 0);
-        } else {
-          // classic crossfade with a slight sink
-          ctx.globalAlpha = 1 - e;
-          ctx.drawImage(sceneCanvas, 0, e * layout.unit * 0.4);
-        }
-        ctx.restore();
-      }
 
       drawOverlay(ctx, width, height, videoElapsed / total, plan.brand, palette);
       if (captionStyle !== "off") {
@@ -830,8 +735,6 @@ export function runPlan(
       }
       if (introMs > 0 && videoElapsed < introMs) {
         drawIntro(ctx, width, height, videoElapsed / introMs, plan.brand, palette, introVariant);
-      } else if (outroMs > 0 && videoElapsed >= introMs + contentMs) {
-        drawOutro(ctx, width, height, (videoElapsed - introMs - contentMs) / outroMs, plan.brand, palette);
       }
       lastPaintAt = performance.now();
       // Hidden tabs stop automatic canvas capture; force this paint into the recording.

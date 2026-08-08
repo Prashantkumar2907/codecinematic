@@ -20,6 +20,10 @@ export type Subject = {
   label: string;
   audience: string;
   style: string;
+  /** One of the 10 episode-archetype clusters in CLAUDE_PROMPT.md §6 — shares a
+   *  gold exemplar pair and an act-structure shape with every other subject on
+   *  the same archetype. */
+  archetype: string;
   modules: Module[];
 };
 

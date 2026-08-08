@@ -218,16 +218,38 @@ async function resolveSlots(item, slotNames) {
 }
 
 /**
- * Gold exemplars, keyed by `<subject>/<module>/<submodule>/<format>` and falling
- * back to `<subject>/<format>`, all lower-cased.
+ * Gold exemplars, keyed by `<subject>/<module>/<submodule>/<format>`, falling
+ * back to `<subject>/<format>`, falling back to `<archetype>/<format>` (the
+ * episode-archetype cluster a subject belongs to — CLAUDE_PROMPT.md §6), all
+ * lower-cased.
  *
  * `exemplarScript` has been accepted by the generate route and threaded into the
  * prompt since before this file existed, and was written by NO caller anywhere in
  * the repo — the most reliable quality lever in the app was built and switched
  * off (improvement_plan.md Phase 17). This is the caller.
+ *
+ * The archetype tier exists because authoring one gold pair per subject (19 x 2
+ * = 38 scripts) would mostly duplicate the SAME act structure with different
+ * vocabulary — the plan's own case for archetypes over per-subject arcs
+ * (improvement_plan.md §0b). One pair per archetype cluster (10 x 2 = 20) covers
+ * every subject transitively through its `subjects.json` `archetype` field.
  */
 const EXEMPLAR_DIR = path.join(ROOT, "content/exemplars");
 let exemplarCache = null;
+let subjectArchetypeCache = null;
+
+function loadSubjectArchetypes() {
+  if (subjectArchetypeCache) return subjectArchetypeCache;
+  subjectArchetypeCache = new Map();
+  try {
+    const raw = readFileSync(path.join(ROOT, "content/subjects.json"), "utf8");
+    const subjects = JSON.parse(raw)?.subjects ?? [];
+    for (const s of subjects) if (s.id && s.archetype) subjectArchetypeCache.set(s.id, s.archetype);
+  } catch {
+    console.log("      content/subjects.json unreadable — archetype exemplar fallback disabled");
+  }
+  return subjectArchetypeCache;
+}
 
 function loadExemplars() {
   if (exemplarCache) return exemplarCache;
@@ -248,6 +270,9 @@ function loadExemplars() {
       if (!exemplarCache.has(key(s.subject, s.format))) {
         exemplarCache.set(key(s.subject, s.format), raw);
       }
+      if (s.archetype && !exemplarCache.has(key(s.archetype, s.format))) {
+        exemplarCache.set(key(s.archetype, s.format), raw);
+      }
     } catch {
       console.log(`      exemplar ${f} is unreadable — skipped`);
     }
@@ -257,8 +282,13 @@ function loadExemplars() {
 
 function exemplarFor(item, format) {
   const all = loadExemplars();
-  const exact = `${item.subject}/${item.module}/${item.submodule}/${format}`.toLowerCase();
-  return all.get(exact) ?? all.get(`${item.subject}/${format}`.toLowerCase()) ?? undefined;
+  const key = (...parts) => parts.join("/").toLowerCase();
+  const archetype = loadSubjectArchetypes().get(item.subject);
+  return (
+    all.get(key(item.subject, item.module, item.submodule, format)) ??
+    all.get(key(item.subject, format)) ??
+    (archetype ? all.get(key(archetype, format)) : undefined)
+  );
 }
 
 async function generate(item, format, topic, model, directives) {

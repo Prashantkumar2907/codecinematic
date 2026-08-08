@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type SceneScript, type Scene, type SceneTiming, type VerifyResult, ASPECTS, sceneScriptSchema } from "@/studio/schema";
-import { computeTimings, runPlan, introOutroMs, type RenderHandle, type BeatAudio, type CaptionStyle, type CaptionPos, CAPTION_STYLES, CAPTION_POSITIONS } from "@/studio/engine";
+import { computeTimings, runPlan, introMsFor, type RenderHandle, type BeatAudio, type CaptionStyle, type CaptionPos, CAPTION_STYLES, CAPTION_POSITIONS } from "@/studio/engine";
 import { buildSrt } from "@/studio/captions";
 import { ensureStudioFonts } from "@/studio/fonts";
 import { fetchNarration, verifyScript, VOICE_OPTIONS } from "@/studio/pipeline";
@@ -482,7 +482,7 @@ export default function Studio() {
       form.append("video", new File([videoBlob], "video.webm", { type: "video/webm" }));
       form.append("script", JSON.stringify(withChapters));
       if (timings) {
-        const srt = buildSrt(script, timings, introOutroMs(script.format).introMs);
+        const srt = buildSrt(script, timings, introMsFor(script.format));
         if (srt.trim()) form.append("captions", new File([srt], "captions.srt", { type: "application/x-subrip" }));
       }
       try {

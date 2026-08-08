@@ -5,10 +5,10 @@
  * 1,616-line file.
  *
  * These stay out of `lib/` deliberately: `descriptionWithChapters` needs
- * `introOutroMs` from the engine, and the engine pulls in canvas, so a server
+ * `introMsFor` from the engine, and the engine pulls in canvas, so a server
  * route importing it from `lib/` would break.
  */
-import { introOutroMs } from "@/studio/engine";
+import { introMsFor } from "@/studio/engine";
 import type { Scene, SceneScript, SceneTiming } from "@/studio/schema";
 
 /** YouTube ignores chapters closer together than ~10 s, and needs 3 to show any. */
@@ -22,7 +22,7 @@ export function fmtTime(totalSeconds: number): string {
 
 export function descriptionWithChapters(script: SceneScript, timings: SceneTiming[]): string {
   const base = script.meta.description.split("\n\nChapters:")[0].trimEnd();
-  const { introMs } = introOutroMs(script.format);
+  const introMs = introMsFor(script.format);
   const marks: { atS: number; label: string }[] = [];
   const atS = (i: number) => Math.floor((introMs + timings[i].startMs) / 1000);
   if (script.sections?.length) {

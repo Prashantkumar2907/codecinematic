@@ -168,25 +168,25 @@ const CORE_KINDS = [
 
 /** Extra kinds unlocked per subject.id (added to CORE_KINDS). */
 const SUBJECT_KIT: Record<string, string[]> = {
-  coding: ["code", "terminal", "iso3d", "trace", "memgrid", "callstack", "bits", "lifeline", "browserframe", "js_event_loop", "statemachine", "decision", "cycle", "pipeline", "graphwalk", "matrix", "threads", "queueflow", "cipher", "circuit", "formula", "radar", "zoomladder"],
-  history: ["chain", "race", "zoomladder", "dialogue", "skyline", "storyboard", "dayclock", "constellation", "ledger", "calendar"],
-  geography: ["terrain", "cycle", "zoomladder", "race", "skyline", "calendar", "sankey", "gauge", "radar", "constellation", "curves"],
-  math: ["code", "trace", "formula", "curves", "probability", "matrix", "race", "buckets", "radar", "gauge"],
-  science: ["orbit", "cycle", "zoomladder", "curves", "formula", "bodymap", "circuit", "constellation", "dayclock", "gauge", "chain", "radar", "terrain"],
-  finance: ["code", "ledger", "sankey", "gauge", "race", "buckets", "basket", "curves", "formula", "pictogram", "cycle"],
+  coding: ["code", "terminal", "iso3d", "trace", "memgrid", "callstack", "bits", "lifeline", "browserframe", "js_event_loop", "statemachine", "decision", "cycle", "pipeline", "graphwalk", "matrix", "threads", "queueflow", "cipher", "circuit", "formula", "radar", "zoomladder", "btree_index", "codediff", "commit_dag", "consensus_quorum", "container_sandbox", "control_loop", "dom_event_flow", "dp_table_fill", "event_loop", "eventbus", "flamegraph", "grid_flood", "hash_ring", "layers", "lsm_compaction", "matrix_convolution", "neural_network", "object_heap", "packet_delivery", "partitioned_log", "recursion_tree", "server_rack", "slidingwindow", "spatial_index", "sysarch", "telemetry_trace", "token_exchange", "topology", "trafficflow", "turing_tape", "vdom_diff", "vector_space"],
+  history: ["chain", "race", "zoomladder", "dialogue", "skyline", "storyboard", "dayclock", "constellation", "ledger", "calendar", "geomap", "tactical_map", "scroll"],
+  geography: ["terrain", "cycle", "zoomladder", "race", "skyline", "calendar", "sankey", "gauge", "radar", "constellation", "curves", "fluidflow", "geomap", "globe3d", "layers"],
+  math: ["code", "trace", "formula", "curves", "probability", "matrix", "race", "buckets", "radar", "gauge", "geometry", "numberline"],
+  science: ["orbit", "cycle", "zoomladder", "curves", "formula", "bodymap", "circuit", "constellation", "dayclock", "gauge", "chain", "radar", "terrain", "ecosystem_web", "fluidflow", "globe3d", "molecule", "layers", "neural_network", "matrix_convolution"],
+  finance: ["code", "ledger", "sankey", "gauge", "race", "buckets", "basket", "curves", "formula", "pictogram", "cycle", "coin_stack"],
   english: ["vocab", "dialogue", "storyboard", "radar", "bracket"],
-  gk: ["race", "zoomladder", "pictogram", "dayclock", "bracket", "constellation", "radar", "skyline", "calendar", "gauge", "showdown"],
+  gk: ["race", "zoomladder", "pictogram", "dayclock", "bracket", "constellation", "radar", "skyline", "calendar", "gauge", "showdown", "scalecompare", "jigsaw_puzzle"],
   psychology: ["cycle", "dialogue", "chain", "storyboard", "radar", "gauge", "probability", "showdown", "bracket"],
-  business: ["ledger", "race", "pipeline", "sankey", "dialogue", "showdown", "skyline", "bracket", "gauge", "radar"],
+  business: ["ledger", "race", "pipeline", "sankey", "dialogue", "showdown", "skyline", "bracket", "gauge", "radar", "domino_cascade"],
   health: ["bodymap", "cycle", "gauge", "pictogram", "chain", "zoomladder", "formula", "buckets", "dayclock", "radar", "curves"],
-  philosophy: ["dialogue", "chain", "showdown", "storyboard", "bracket", "cycle"],
+  philosophy: ["dialogue", "chain", "showdown", "storyboard", "bracket", "cycle", "jigsaw_puzzle"],
   lifeskills: ["cycle", "dialogue", "showdown", "bracket", "gauge", "chain", "storyboard", "calendar"],
-  polity: ["statemachine", "decision", "pictogram", "chain", "dialogue", "ledger", "showdown", "bracket"],
-  economy: ["ledger", "sankey", "gauge", "race", "buckets", "basket", "pictogram", "cycle", "curves", "chain", "radar", "showdown"],
-  environment: ["cycle", "terrain", "gauge", "pictogram", "chain", "sankey", "bodymap", "calendar", "radar", "zoomladder", "curves", "constellation"],
-  artculture: ["schematic", "dialogue", "storyboard", "dayclock", "calendar", "radar", "skyline", "constellation"],
+  polity: ["statemachine", "decision", "pictogram", "chain", "dialogue", "ledger", "showdown", "bracket", "parliament_arc", "scroll"],
+  economy: ["ledger", "sankey", "gauge", "race", "buckets", "basket", "pictogram", "cycle", "curves", "chain", "radar", "showdown", "coin_stack", "trendgraph"],
+  environment: ["cycle", "terrain", "gauge", "pictogram", "chain", "sankey", "bodymap", "calendar", "radar", "zoomladder", "curves", "constellation", "ecosystem_web", "globe3d", "layers"],
+  artculture: ["schematic", "dialogue", "storyboard", "dayclock", "calendar", "radar", "skyline", "constellation", "architecture_blueprint", "canvas_reveal", "sheet_music"],
   mindset: ["cycle", "dialogue", "chain", "showdown", "bracket", "storyboard", "gauge", "calendar"],
-  mythology: ["chain", "dialogue", "storyboard", "cycle", "constellation", "bracket", "dayclock"],
+  mythology: ["chain", "dialogue", "storyboard", "cycle", "constellation", "bracket", "dayclock", "scroll"],
 };
 
 /**
@@ -622,7 +622,7 @@ Propose the 10 BEST video topics for this sub-module right now, ordered from mos
 - answer a question the audience actually types into YouTube
 - teach ONE mechanism/idea deeply (not "top 10 tips")
 - have a hook angle that creates curiosity
-- can be taught visually with diagrams/examples in 60s (short) or 8 minutes (long)
+- can be taught visually with diagrams/examples in 60s (short) or 7-11 minutes (long)
 - vary the title shapes across the 10 — mix "Why X ...", "How X actually works", "X vs Y", "The X
   mistake everyone makes", "What happens when ..." — never 10 titles with the same shape
 - format titles as "Punchy headline: the specifics" — the part BEFORE the colon is <=6 words and

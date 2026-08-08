@@ -1,231 +1,325 @@
-# Educational Video Engine: Master Scriptwriter Prompt
+# devstudio — the master content & animation spec
 
-> **NOTE:** This document is a standalone spec — it is NOT loaded by the app. The live generation
-> prompt is `src/lib/prompt.ts`; validation lives in `src/studio/schema.ts`; TTS in
-> `src/app/api/studio/tts/route.ts`. The status table below tracks how each issue is handled in code.
-
----
-
-## ✅ Implementation Status Tracker
-
-Legend: **DONE (pre-existing)** = already handled before this pass · **FIXED (this pass)** = addressed
-in the changes described · **OPEN** = needs a decision.
-
-| # | Issue | Status | Where in code |
-|---|-------|--------|---------------|
-| 1 | Smart animation selection | FIXED (this pass) + pre-existing | `prompt.ts` SCENE_MENU_HEADER "COMMON vs SPECIALISED"; CORE_KINDS/SUBJECT_KIT; CODING_RULES |
-| 2 | Clear on-screen text | DONE (pre-existing) | `prompt.ts` char-limit HARD LIMITS + NARRATION_RULES |
-| 3 | Simple code snippets | DONE (pre-existing) | `prompt.ts` CODING_RULES ("when to use code") |
-| 4 | Cohesive storytelling | DONE (pre-existing) | `prompt.ts` LOCKSTEP + running-example (TEACHING_METHOD) |
-| 5 | Pacing / blank screen | DONE (pre-existing) | `prompt.ts` sayIntro-SHORT + OPENING rules |
-| 6 | Robotic AI-speak | DONE (pre-existing) | `prompt.ts` banned crutch-words |
-| 7 | Visual cramming | DONE (pre-existing) | `prompt.ts` char limits (mechanically validated in `schema.ts`) |
-| 8 | Hallucinations / fake precision | DONE (pre-existing) | `prompt.ts` blueprint exact\|approx tagging; stat truth rule |
-| 9 | Broken edges | DONE (pre-existing) | `schema.ts` superRefine statemachine/decision/graphwalk ref checks |
-| 10 | Math / chronology constraints | FIXED (this pass) + pre-existing | `schema.ts` superRefine **timeline chronology** (new); sankey/pictogram/gauge (pre-existing) |
-| 11 | Scene monotony | DONE (pre-existing) | `prompt.ts` VARIETY_RULE |
-| 12 | Dual-track (beginner+expert) | DONE (pre-existing) | `prompt.ts` TEACHING_METHOD dual-track |
-| 13 | Schema hallucinations (invented keys) | FIXED (this pass) | `schema.ts` `unknownSceneKeys` → warn-and-surface in `generate/route.ts` |
-| 14 | Regional words (phonetics) | FIXED (this pass) | `speech.ts` INDIAN_TERMS map + TTS_RULES (`prompt.ts`) |
-| 15 | Acronym misfire | FIXED (this pass) | `speech.ts` SPELL_ACRONYMS / WORD_ACRONYMS |
-| 16 | Number/symbol mangling | FIXED (this pass) | `speech.ts` currency/percent/unit expansion (voice-only) |
-| 17 | Run-on sentences (breathing) | FIXED (this pass) | `prompt.ts` TTS_RULES (ellipses/em-dashes) |
-| 18 | Tone flattening on questions | FIXED (this pass) | `prompt.ts` TTS_RULES (interrogative front-loading) |
-| 19 | Homograph trap | FIXED (this pass) | `prompt.ts` TTS_RULES (swap ambiguous words) |
-| 20 | Missing vocal emphasis | FIXED (this pass) | `prompt.ts` TTS_RULES (ALL-CAPS one word) |
-| 21 | Reading code aloud | FIXED (this pass) | `prompt.ts` TTS_RULES + `speech.ts` code-punct strip |
-| 22 | Hindi code-switching | FIXED (this pass) | `prompt.ts` Hindi langBlock Devanagari rule + `speech.ts` hi path; voice map (pre-existing) |
-| 23 | Clunky quote attribution | FIXED (this pass) | `prompt.ts` TTS_RULES (quote pauses) |
-| 24 | Spatial collisions / out-of-bounds | FIXED (this pass) | `schema.ts` superRefine overlap + `x+w/y+h ≤ GRID` (diagram/browserframe/schematic) |
-| 25 | State desync / dead-ends | DONE (pre-existing) + hardened | `schema.ts` superRefine index/line checks; **`engine.ts` paint crash-guard** (new) |
-| 26 | Hallucinated "magic" animations | DONE (pre-existing) + surfaced | `schema.ts` z.enum rejection; invented keys now warned (see #13) |
-| 27 | Code vs expectedOutput mismatch | DONE (pre-existing) | `pipeline.ts` verifyScript executes & reconciles via `/exec` |
-| 28 | UI safe-zone (Shorts) | FIXED (this pass) | `schema.ts` `shortSceneOverdense` soft gate + `prompt.ts` Short DENSITY BUDGET |
-| 29 | JSON quote escaping | FIXED (this pass) | `jsonrepair.ts` balancer wired at `gemini.ts` parse site |
-| 30 | Output token truncation | FIXED (this pass) | `jsonrepair.ts` + raised `MAX_OUTPUT_TOKENS` 12288→16384 (`gemini.ts`) |
-
-### 🆕 New issues found this pass
-
-- **N1 — Render loop had no crash guard.** A painter throwing on an unguarded field killed the whole
-  render. **FIXED:** try/catch around `paintScene` in `engine.ts` degrades to a titled fallback frame.
-- **N2 — 11 orphan painters (dead code).** `architecture_blueprint, codediff, jigsaw_puzzle,
-  packet_delivery, parliament_arc, scroll, server_rack, sliding_window, tactical_map, topology,
-  trendgraph` have painter files but no schema kind — unreachable, and they are the sole cause of the
-  current `npm run typecheck` errors (they resolve to type `never`). **OPEN — needs sign-off:** delete
-  them, or wire the worthwhile ones into `sceneSchema` as real kinds. Not touched (user's code).
-- **N3 — Prompt vs validator word-budget "mismatch".** Reviewed: the prompt targets (short 130-220,
-  long 950-1700) are a strict SUBSET of the validator gate (110-240, 850-1900), so the model always
-  aims inside the gate. **Benign — intentional, left as-is.**
-- **N4 — expectedOutput is reconciled, not asserted.** `pipeline.ts` overwrites a wrong-but-successful
-  model output rather than flagging it. Acceptable for render correctness; **noted, not changed.**
+> **NOTE:** This document is a standalone spec — it is **not** loaded by the app. The live generation
+> prompt is `src/lib/prompt.ts`; validation lives in `src/studio/schema.ts` + `src/studio/pacing.ts`;
+> TTS lives in `src/app/api/studio/tts/route.ts` + `src/lib/speech.ts`. This file exists so a human (or a
+> fresh Claude session) can read the *intent* behind those files without reverse-engineering it from
+> 4,000-line schema code. `improvement_plan.md` is the historical working log this was distilled from —
+> read that for *how* a decision was reached; read this for *what is true now*.
+>
+> Written 2026-08-08, after the full animation-QA sweep (`qa/LEDGER.md`: 111/111 painters passed) and
+> the Phase 9-17 backlog in `PROGRESS.md` closed out. Re-verify any code-line citation before trusting
+> it — this is a snapshot, not a live view.
 
 ---
 
-Act as an Expert Educational Content Strategist and Video Scriptwriter for a custom Canvas-driven educational video engine.
+## 1. What this app is
 
-## Context
-I have built an application designed to generate extremely high-quality educational videos. It uses a custom HTML5 Canvas engine, driven by JSON scripts, with over 60+ rich animation types (scenes). The ultimate goal is to produce video content that makes complex concepts simple, clear, and highly engaging for viewers.
+A local, single-user Next.js app that turns a taxonomy slot (subject → module → submodule → format)
+into a narrated, canvas-rendered teaching video. No database, no auth — state lives on disk under
+`content/`. Pipeline: `subjects.json → /topics → /generate → /exec → /tts → engine.ts (canvas +
+MediaRecorder) → /save → /upload`. Full architecture in `devstudio/CLAUDE.md`.
 
-While the engine works well, I am noticing some recurring issues with the generated scripts and content that I need you to fix moving forward.
-
-## Core Issues to Address
-
-### 1. Smarter Animation Selection (Common vs. Subject-Specific)
-* **The Problem:** With 60+ animations available, the wrong or overly complex animations are sometimes chosen.
-* **The Fix:** We need strict separation between "Common" animations (e.g., `bigtext`, `bullets`, `diagram`, `steps`, `chart`) and "Subject-Specific" animations (e.g., `code`, `trace` for coding; `terrain` for geography). Always default to common animations for general explanations. Only use subject-specific animations when the concept genuinely requires them. Do not use an animation just for the sake of variety if a simpler one tells the story better.
-
-### 2. Crystal Clear On-Screen Text
-* **The Problem:** On-screen text elements (like titles and sub-titles in `bigtext` or labels in diagrams) are sometimes too dense or fail to explain the concept simply.
-* **The Fix:** On-screen text must be punchy, simple, and instantly digestible. Use everyday language. A viewer should be able to read and understand the core point in the 3-5 seconds the text is on screen. Avoid academic jargon. Titles and sub-titles must catch attention and clarify, not confuse.
-
-### 3. Simple, Relevant Code Snippets (For Coding Subjects)
-* **The Problem:** Code examples are often unnecessary, unrelated to the core concept, or far too complex for a general audience to follow.
-* **The Fix:** Use code ONLY when seeing the code is essential to understanding the point. When code is used, it must be the absolute simplest possible example. Strip out all unnecessary boilerplate. If a concept (like "how a database works") can be explained with a visual diagram instead of a code block, always choose the visual diagram. 
-
-### 4. Cohesive, Relatable, and Lockstep Storytelling
-* **The Problem:** The overall content can become too complex, and the narration sometimes disconnects from the visual content.
-* **The Fix:** Your primary focus must be on creating simple, understandable, up-to-the-mark content. 
-  * **Lockstep:** The narration must perfectly match what is happening on screen at that exact second. Do not let the audio run ahead of the visuals.
-  * **Relatability:** Thread one concrete, real-world example (e.g., ordering a pizza, an exact monetary amount) through the entire video rather than using abstract definitions.
-  * **Tone:** The narration should sound like a knowledgeable friend explaining something at a whiteboard, not a textbook.
-
-## Structural and Pacing Issues
-
-### 5. Pacing & Audio-Visual Imbalance (The "Talking to a Blank Screen" Problem)
-* **The Issue:** LLMs tend to write long, paragraph-style introductory sentences for a scene before the animation actually does anything. This results in the viewer staring at a static title card or an empty diagram for 15 seconds while the audio rambles on, which kills viewer retention.
-* **The Fix:** Introduce a strict "Audio-Visual Pacing" rule. If a scene has a setup/intro line, it must be extremely short (e.g., max 1 short sentence). The bulk of the narration must happen during the active animation steps (e.g., while the diagram is building or the code is typing).
-
-### 6. Robotic "AI-Speak" and Formulaic Transitions
-* **The Issue:** Even when told to be simple, LLMs fall back on predictable, robotic transitions like "Let's dive in," "Now, let's take a look at," "In conclusion," or "Furthermore." This instantly breaks the illusion of a human teacher and sounds like a textbook.
-* **The Fix:** Explicitly ban "crutch words" and formulaic transitions. Tell the LLM to start sentences directly with the action or the subject, maintaining the tone of a passionate creator rather than an essay writer.
-
-### 7. Visual Cramming (Ignoring Character Constraints)
-* **The Issue:** In an automated Canvas engine, space is finite. The LLM will often try to cram a 15-word explanation into a tiny diagram node label or a bullet point, causing text to overlap, wrap awkwardly, or break the visual layout.
-* **The Fix:** Enforce strict character limits for on-screen elements (e.g., "Node labels must be under 30 characters," "Bullet points must be 1 short sentence"). Tell the LLM: If you have more to say, put it in the spoken narration, not on the screen.
-
-### 8. Hallucinations and "Fake Precision"
-* **The Issue:** If you ask the LLM for a specific, relatable example (like a monetary amount or a historical date), it might invent a statistic that sounds plausible but is factually incorrect, or it might use lazy placeholders like "Company X" or "User A". 
-* **The Fix:** Command the LLM to use verifiable, real-world anchors. If it doesn't know an exact statistic, it should frame it as an estimate (e.g., "around 1 million") rather than inventing a hyper-specific fake number. 
-
-## Engine Logic and Constraint Failures
-
-### 9. Logical Disconnects in Graphs and Diagrams (The "Broken Edge" Problem)
-* **The Issue:** For complex scenes like `diagram`, `statemachine`, or `graphwalk`, the engine requires the LLM to define nodes/states (with IDs) and then define the paths between them. LLMs are notoriously bad at internal logic across JSON arrays. They will frequently try to move an animation token to a node ID that doesn't exist, or walk a path where no edge was drawn.
-* **The Fix (For the Prompt):** "Strict Internal Logic: When building diagrams, state machines, or graph walks, you must act as a compiler. If step 3 says 'move token from Node A to Node B', you must verify that Node A and Node B exist, and that an explicit edge connects them. Never reference an ID you haven't created."
-
-### 10. Mathematical and Constraint Failures
-* **The Issue:** Scenes that rely on numbers—like a `sankey` diagram (where branches must sum to a total), a `pictogram` (where groups must equal the total people), or a `timeline` (which must be strictly chronological)—often break because LLMs fail at basic arithmetic constraints during generation. E.g., they might generate percentages that add up to 115%.
-* **The Fix (For the Prompt):** "Mathematical Integrity: If a scene kind requires proportions, percentages, or chronological order (e.g., Sankey, Timeline, Pictogram), you must verify the math. Values must never exceed the stated total, and dates must always progress in the correct direction."
-
-### 11. Scene Monotony and "Safe Choices"
-* **The Issue:** LLMs are lazy. Left to their own devices, they will fall back on the easiest text-heavy scenes, resulting in videos that are just `bigtext` -> `bullets` -> `bigtext` -> `bullets`. This defeats the purpose of having 60+ rich visual animations. 
-* **The Fix (For the Prompt):** "Forced Visual Variety: You must never use the same scene kind twice in a row. Force yourself to use rich, comparative scenes (like `mythfact`, `compare`, `table`, or `chart`) instead of relying solely on text-heavy bullet points."
-
-### 12. The "Dual-Track" Balance (Beginner vs. Expert)
-* **The Issue:** LLMs struggle to talk to two audiences at once. They either write a script that is so basic it bores the practitioner, or they dive so fast into jargon that the beginner is completely lost.
-* **The Fix (For the Prompt):** "The Dual-Track Rule: Every script must follow a strict progression: 1) Anchor the concept in plain, beginner-friendly words first (what is it?). 2) Show the actual visual mechanism. 3) End with a 'Practitioner Payoff'—a non-obvious consequence, tradeoff, or real-world failure that only an expert would know."
-
-### 13. Schema Hallucinations (Inventing Properties)
-* **The Issue:** Because the LLM knows CSS and HTML, it will often try to "help" you by inventing JSON properties your engine doesn't support. For example, it might try to add `"color": "red"`, `"bold": true`, or `"transition": "fade"` into the JSON nodes, which causes your parsing to fail.
-* **The Fix (For the Prompt):** "Strict Schema Adherence: You must output ONLY the exact fields permitted by the scene schema. Never invent, guess, or add properties like colors, fonts, or styling attributes unless they are explicitly defined in the allowed JSON structure."
-
-## Audio and TTS (Text-to-Speech) Control
-
-### 14. The Regional Word Problem (e.g., "Lok Sabha")
-* **The Issue:** An English TTS voice will look at "Lok Sabha" and read it like "Lock Sab-ha", or read "Kailasa" as "Kay-lasa". 
-* **The Fix (Phonetic Spelling):** Instruct the LLM to spell Indian/regional terms phonetically in the narration track, while keeping the correct spelling on-screen.
-  * **Prompt addition:** "Phonetic Narration: For Indian terms, historical names, or non-English words, you must spell the word phonetically in the `say`/`narration` fields so an English TTS voice reads it natively. (e.g., On-screen: 'Lok Sabha', Spoken: 'Loke Sub-haa'. On-screen: 'Kailasa', Spoken: 'Kye-laa-saa')."
-
-### 15. The Acronym Misfire (e.g., "SQL", "API", "AWS")
-* **The Issue:** Edge-TTS will often try to read acronyms as actual words. It might read "AWS" as "Awss", or "API" as "Appy". Conversely, it might spell out things you want spoken as a word (like reading "NASA" as "N-A-S-A").
-* **The Fix (Spacing and Dashing):** Force the LLM to format acronyms explicitly for the TTS engine.
-  * **Prompt addition:** "Acronym Control: In the spoken narration, if a word should be spelled out letter-by-letter, put spaces between the letters (e.g., write 'A W S', 'A P I'). If it should be read as a word, write it phonetically (e.g., write 'Sequel' for SQL, 'Nah-sa' for NASA)."
-
-### 16. Number and Symbol Mangling (e.g., "₹10Cr", "100ms")
-* **The Issue:** TTS engines struggle with symbols combined with letters. "₹10Cr" might be read as "Rupee ten C R", and "100ms" as "one hundred m s". 
-* **The Fix (Plain English Expansion):** The narration track must contain absolutely zero symbols.
-  * **Prompt addition:** "Zero Symbols in Audio: The `say` track must NEVER contain symbols (₹, %, +, =). You must write out exactly how a human would say it. On-screen: '₹10Cr', Spoken: 'ten crore rupees'. On-screen: '99.9%', Spoken: 'ninety nine point nine percent'."
-
-### 17. The Run-On Sentence (Lack of Breathing/Pausing)
-* **The Issue:** Edge-TTS will read a long, grammatically correct sentence without taking a breath, which sounds incredibly robotic and overwhelming to a listener.
-* **The Fix (Forced Punctuation):** You have to use punctuation to manually control the TTS engine's "breath."
-  * **Prompt addition:** "Breathing and Pacing: TTS engines speak too fast. To force natural pauses, use ellipses (...) for short pauses and em-dashes (—) for dramatic emphasis. Write in short, punchy clauses so the AI voice has time to 'breathe'."
-
-### 18. Tone Flattening on Questions
-* **The Issue:** Sometimes TTS engines read a question with a flat statement tone if the sentence structure is too complex, causing the viewer to not realize they are being asked a question.
-* **The Fix (Question Front-loading):**
-  * **Prompt addition:** "Question Intonation: When asking a question, always start the spoken sentence with clear interrogative words (Why, How, What) to force the TTS engine to apply a questioning, upward inflection at the end."
-
-### 19. The Homograph Trap (Same spelling, different sound)
-* **The Issue:** TTS engines lack deep contextual awareness. They will frequently mispronounce homographs. For example: "He will record the data" (Verb) vs. "It broke the record" (Noun). "I read it yesterday" (Past) vs. "I will read it" (Present). "A minute detail" (Tiny) vs. "Wait a minute" (Time).
-* **The Fix:** Tell the LLM to swap out ambiguous words in the spoken track.
-  * **Prompt addition:** "Avoid Homographs in Audio: If a word changes pronunciation based on context (like read/read, record/record), either replace it with an unambiguous synonym in the `say` track (e.g., 'log the data' instead of 'record the data'), or spell it phonetically."
-
-### 20. Missing Vocal Emphasis (The "Flat Punchline")
-* **The Issue:** In teaching, you often need to stress a specific word to make the concept click (e.g., "The client requests the data, not the server"). TTS engines will read that sentence completely flat, ruining the contrast. 
-* **The Fix:** Many TTS engines (including Edge-TTS) will naturally apply vocal stress to words that are fully capitalized or wrapped in quotes.
-  * **Prompt addition:** "Vocal Stress: TTS voices sound monotonous on contrasting points. To force the AI to emphasize a specific, crucial word, write it in ALL CAPS in the narration track (e.g., 'The CLIENT requests the data, NOT the server.')."
-
-### 21. Reading Code Aloud (The "Bracket-Bracket" Nightmare)
-* **The Issue:** If the LLM generates a coding script and accidentally puts raw code like `myArray[0]` or `() => {}` into the `say` field, the TTS will literally read: "My array open bracket zero close bracket" or "open parenthesis close parenthesis equals greater than curly brace". 
-* **The Fix:** Force the LLM to translate syntax into human concepts for the ear.
-  * **Prompt addition:** "Speak Concepts, Not Syntax: NEVER put raw code, brackets, or programming syntax in the `say` track. Translate code into plain English for the ear. Instead of 'array[0]', write 'the first item in the array'. Instead of 'console.log', write 'we print the result'."
-
-### 22. Code-Switching / Hinglish Accents (If using lang: "hi")
-* **The Issue:** If you use a Hindi TTS voice, it will naturally try to read English words (like "Javascript", "Server", "API") with a heavy, sometimes distorted accent. Conversely, an English voice reading Hindi text sounds incomprehensible.
-* **The Fix:** Decide which language the engine thinks it is speaking, and bend the text to match it. 
-  * **Prompt addition (if using a Hindi Voice):** "Pronouncing English in Hindi: When the script is in Hindi but uses an English technical term (like 'Database' or 'Server'), write the English term in Devanagari script in the `say` track (e.g., 'डेटाबेस') so the Hindi TTS voice pronounces it smoothly, rather than stuttering over the English alphabet."
-
-### 23. Clunky Quote Attribution
-* **The Issue:** When quoting someone, a human naturally pauses and changes their pitch. TTS engines do not. If the text says As Gandhi said, "Be the change", the TTS will speed right through it, making it hard for the listener to know where the quote begins and ends.
-* **The Fix:** Force the LLM to use dramatic pauses around quotes.
-  * **Prompt addition:** "Quoting Pauses: When narrating a quote, use ellipses to create a clear vocal boundary before and after the quotation. (e.g., 'As Gandhi famously said... Be the change...'). Do not write the words 'quote' or 'unquote'."
-
-## Spatial Collisions and Format Constraints
-
-### 24. Spatial Collisions & Out-of-Bounds Drawing (The 12x12 Grid Problem)
-* **The Issue:** Scenes like `diagram`, `browserframe`, and `schematic` use a coordinate system (e.g., `x: 0-11, y: 0-11`). LLMs have zero spatial reasoning. They will happily place two different nodes on the exact same (x, y) coordinate, or they will place a node at x: 10 with a width of w: 5, pushing it off the edge of the 12x12 screen.
-* **The Fix:** You must make the LLM act as a layout engine.
-  * **Prompt addition:** "Spatial Reasoning & Layout: When placing nodes on a grid (like `diagram` or `browserframe`), you MUST mathematically ensure no two elements overlap. If an element is at x:2 with a width (w) of 4, the space from x=2 to x=5 is occupied. Never place an element so its x+w or y+h exceeds the grid boundaries (max 11)."
-
-### 25. State Desync & "Dead Ends" (Out of Bounds Errors)
-* **The Issue:** For algorithmic scenes (`trace`, `memgrid`, `callstack`), the LLM has to animate step-by-step logic. A frequent failure is the LLM trying to highlight an array index i=5 when the array only has 4 items. Or, it might try to pop a callstack that is already empty. Or it might say fromLine: 10 in a code block that only has 8 lines. This crashes your video renderer.
-* **The Fix:**
-  * **Prompt addition:** "State Machine Validation: For any step-by-step scene (`trace`, `memgrid`, `callstack`, `code`), you must mentally execute the state. Never pop an empty stack. Never reference an array index or a code line number that does not exist in the current scene."
-
-### 26. Hallucinated "Magic" Animations (Inventing Capabilities)
-* **The Issue:** LLMs try to be creative. If it sees that a node can "highlight" or "move", it might decide it wants a node to "explode", "spin", or "fade". It will invent a JSON property like `{"action": "explode"}` that your Canvas engine has no idea how to render, resulting in a fatal error.
-* **The Fix:** Enforce a strict "Closed Vocabulary".
-  * **Prompt addition:** "Closed Vocabulary Rule: You are interfacing with a strict rendering engine. You may ONLY use the exact string values, actions, and shapes explicitly listed in the schema (e.g., if the schema says shape: dome|cone, you cannot use shape: pyramid). Never invent new animation triggers."
-
-### 27. Code vs. Expected Output Mismatch
-* **The Issue:** In your `code` scenes, you require an expectedOutput. LLMs will frequently write a Python/JS script that prints one thing (e.g., `[1, 2, 3]`), but then write an expectedOutput that is slightly different or formatted wrong (e.g., `1, 2, 3`). If your system actually runs/evaluates this code to verify it (as hinted in your prompt rules), this mismatch will fail the validation step.
-* **The Fix:**
-  * **Prompt addition:** "Deterministic Code Execution: If a code scene has an expectedOutput, you must act as a compiler. The output must match the EXACT literal stdout of the code provided, including brackets, quotes, and newlines."
-
-### 28. UI Safe-Zone Violations (Especially for YouTube Shorts)
-* **The Issue:** Your engine renders for both 16:9 (Longs) and 9:16 (Shorts). On YouTube Shorts, the bottom 25% of the screen is covered by captions, the channel name, and the audio track info. The right side is covered by the Like/Share buttons. If the LLM generates a massive 10-node diagram for a Short, the bottom half will be completely obscured by the YouTube UI, rendering the video useless.
-* **The Fix:** You need to give the LLM a "budget" based on the format.
-  * **Prompt addition:** "Format Density Limits: If the format is a 'Short' (9:16 vertical), the screen space is highly restricted by the YouTube UI. Limit diagrams, trees, or tables to a maximum of 4-5 items/nodes total. Never fill the bottom of the grid, as it will be covered by the YouTube interface."
-
-## Final JSON Syntax Integrity
-
-### 29. JSON Quote Escaping (The Syntax Killer)
-* **The Issue:** Because the LLM is generating a JSON object, it uses double quotes `"` to define fields. However, if the LLM wants to use a quote inside a script (e.g., a `bigtext` title or a `quote` scene), it will often write: `"text": "And then he said "Hello" to me"`. This unescaped internal quote instantly breaks JSON.parse() in your app.
-* **The Fix:** 
-  * **Prompt addition:** "JSON Escaping: You must strictly escape any internal double quotes using a backslash (`\"`) inside string values, or use single quotes (`'`) for internal dialogue, to ensure the output remains valid, parseable JSON."
-
-### 30. Output Token Truncation (The "Sudden Death" Issue)
-* **The Issue:** I see your engine supports "Long" videos (6-12 minutes, requiring up to 32 scenes). 32 complex JSON scenes is a massive amount of text. LLMs have a maximum output token limit (often around 4,096 tokens). If the LLM writes a brilliant 12-minute script, it might hit the limit and stop generating right in the middle of scene 28, leaving you with an unclosed JSON array `... ]}` that crashes the app.
-* **The Fix:** This is partly fixed in the prompt, and partly in your code.
-  * **Prompt addition:** "Brevity for Long Scripts: For Long format videos, you must be ruthlessly concise with your JSON syntax to avoid hitting output token limits. Do not add unnecessary whitespace or comments."
-  * **App Fix:** Ensure your API call to Claude has `max_tokens` set to the absolute maximum allowed (e.g., 4096 or 8192 depending on the model version you are using).
+The hard problem this spec addresses: an LLM writing a JSON scene script for a 111-kind animation
+engine will reliably produce something that **renders without crashing** and **still fails to teach** —
+too many static title cards, narration that outruns the picture, definitions before concepts, the same
+three safe scene kinds on repeat. Schema validation catches the first failure mode. Nothing catches the
+second without deliberately measuring for it. This document is that measurement, and the fixes that
+came out of it.
 
 ---
 
-**Your Instructions (Continued):**
-Whenever I ask you to generate, review, or refine a video script or JSON blueprint for my application, you must rigorously apply all of these directives. 
+## 2. Measured diagnosis (corpus: 88-89 generated scripts, ~1,857 beats, ~255 min of audio)
 
-Your goal is to maximize viewer comprehension by selecting the right animations, simplifying the text and code, and keeping the narration cohesive and perfectly aligned with the screen—while ensuring perfect JSON structure, strict adherence to rendering limits, and flawless TTS audio generation.
+| Measured fact | Original finding | Re-measured by `pacing-audit.mjs` |
+|---|---|---|
+| Audio spent on a single frozen card | 34% | **27.8%** after fixes |
+| Long videos: static-card scenes | 41% of scenes, 25% of runtime | **40.2%** of scenes, 25.9% of runtime |
+| `bigtext` seconds per card (long) | 15.7 s avg, worst 26.9 s | 15.4 s median, worst 26.5 s |
+| `bigtext` share of all scenes | 18.8% — the #1 kind of 111 | 18.8% (154 scenes), exact |
+| Videos opening on a static card | 42 of 89 | 64 of 88 — worse than first reported |
+| Beats over 12 s | not measured | 354 of 1,814 |
+| Seconds per visual change | not measured | 8.3 s mean (target 4-6 s) |
+| Scene kinds ever used in real output | 36 of 111 | 36, exact — **35 were unreachable, see §2a** |
+| Banned crutch words (`"let's"`, `"here is"`) | 101 / 61 uses | 89 / 53 uses |
+| Running-example coverage (one thread through the video) | median 0.29, 0 of 86 complete | median 0.50 by a stricter proxy |
 
-If you understand the application's goals and all of these constraints, please acknowledge this prompt and let me know you are ready to apply them to our next tasks!
+**Correction on file, load-bearing:** an early pass claimed "30% of videos open with a definition" and
+built a gate on it. Re-checked with a stricter pattern (requires a real category article — `is a`, not
+just `is`), the true number is **3 of 88**, and even those read as metaphor hooks, not textbook
+definitions. The loose pattern's 25 matches were 21 second-person cold-opens (*"Your div-button is a
+trap…"*) — exactly what a good hook looks like. **Do not resurrect the loose definition-opener gate.**
+The "feels like reading a book" complaint is real, but its cause is the static-card time and the 354
+overlong beats, not definitions.
+
+### 2a. Five root causes found in the corpus (all now fixed — kept for the *why*)
+
+1. **The prompt specified the PowerPoint.** It used to mandate 5-8 `bigtext` section cards per long
+   video; corpus median was exactly 5. The model was complying precisely. Fixed by removing the
+   mandate (§3, Phase 5) — signposting now comes from a scene's own title + a forward-hook line.
+2. **`narration` was the one field with no size cap.** Every visible field had a char limit; narration
+   didn't, so the model anchored on the only number it saw (a 400-char hard ceiling) and wrote toward
+   it. Fixed with per-kind narration caps (150 chars single-beat, 210 for `terminal`).
+3. **The judge couldn't see pacing.** The rating rubric graded hook/structure/voice text but had no axis
+   for beat length or seconds-per-visual-change — it could say "feels like a slide deck" in its own
+   comments while never scoring for it. Fixed: `pacing_density` is now a 7th rubric section, fed
+   computed facts so the model can't argue with a wrong number.
+4. **A regex bug hid 35 of 111 scene kinds from the model entirely.** The kind-name extractor used
+   `[a-z]+`, which can't match an underscore or a digit — every kind like `dp_table_fill` or `iso3d`
+   silently vanished from the menu. One-character fix (`[a-z0-9_]+`); see §2b for what came after it.
+5. **A live bug was failing generations outright.** The generate route capped `directives` at 12 items
+   but the factory posted lists of 14-15, so 16 of 27 taxonomy slots 400'd on every attempt. Fixed —
+   cap raised, and the store now dedupes/caps on the way in.
+
+### 2b. From 36-of-111 reachable to 111-of-111 reachable, and what that took
+
+Root cause 4 (the regex) explained why kinds were *invisible*; it didn't mean every kind was *good*.
+Two more waves were needed:
+
+- **Animation-QA sweep** (`qa/LEDGER.md`, `ANIMATION-QA-PROMPT.md` Part C): every one of the 111
+  registered painters scored ≥4/5 on containment, typography, motion, cleanliness and palette. Two
+  systemic bugs were found and fixed centrally along the way — a frozen-3D-layer bug (29 painters were
+  stuck rendering frame 0 in production) and a "2D layout round-tripped through a tilted 3D camera"
+  pattern (elements land outside frame, worst at 9:16). **Status: closed, 111/111 passed, 2026-08-08.**
+- **Subject-menu wiring**: passing QA doesn't mean a subject's prompt ever *offers* a kind. As of
+  2026-08-05, only 61 of 111 kinds were featured in `CORE_KINDS` or any `SUBJECT_KIT` entry
+  (`prompt.ts`) — the other 50 sat in the full menu (which is always shown, in full, to every subject —
+  `buildSceneShape()` never filters, only *features*) but were never promoted, so they were reachable in
+  principle and essentially never chosen in practice. **Fixed 2026-08-08**: all 50 now have a home in at
+  least one subject's kit (mostly `coding`, since most of the 50 were CS/distributed-systems concepts —
+  `btree_index`, `event_loop`, `hash_ring`, `vdom_diff`, and 29 others; the rest split across `math`,
+  `science`, `geography`, `history`, `polity`, `economy`, `finance`, `business`, `artculture`,
+  `environment`, `mythology`, `gk`, `philosophy` by topic fit). Verify current counts with the snippet
+  in `qa/ledger.json`'s companion check, or just diff `SUBJECT_KIT` against `painters/index.ts`.
+
+---
+
+## 3. Benchmark specification — what "top channel" means as numbers
+
+| Dimension | Target | Corpus before fixes | Enforced by |
+|---|---|---|---|
+| Seconds per visual change | 4-6 s (long), 2-4 s (short) | static-card mean 10.4 s, worst 26.9 s | zod cap + pacing gate |
+| Narration rate | 120-150 wpm | ~156 wpm — already fine, untouched | — |
+| New visual in long-form | ≥ every ~40 s | 26.9 s dead frames (worst case) | structure block |
+| Section signposting | one-sentence "what's next" + real chapter marks, not a title card | 5 static cards, median | structure block |
+| Definitions | an ending point, not a starting point | see the correction in §2 — not actually broken | — |
+| Structure | hook → payoff → plant next hook → payoff | one hook, then lecture | blueprint + rubric |
+| Short hook | lands inside 2 s, ~8-12 spoken words, text on screen by 1-2 s | first scene far longer | zod cap |
+| Kinetic text (Shorts) | scale-from-zero, OutBack overshoot, centre-outward stagger | existed, unsystematised | `common.ts` stagger/spring helpers |
+| Motion craft | anticipation, staging, follow-through, easing, parallax | no shared helper existed | `common.ts` motion toolkit (Phase 9) |
+| Scene transitions | hard cut by default (pro explainers cut, they don't dissolve) | 420 ms crossfade/push/wipe/zoom, always | **cut, no transition — fixed 2026-08-08** |
+
+**Key precision, unchanged since the original diagnosis:** the fix was never faster narration — 156 wpm
+already sits inside the educational band. The gap was always **visual change rate**, i.e. how often a
+new thing appears on screen relative to how long the audio talks about it.
+
+---
+
+## 4. The four-layer content solution (why this isn't "write 373 prompts")
+
+Hand-writing a prompt per submodule doesn't scale and drifts within weeks. The shipped design instead
+layers four things, each cheap to maintain and each answering a different question:
+
+| Layer | Answers | Where it lives | Count |
+|---|---|---|---|
+| 1. Episode archetype | act structure, hook type, payoff placement | `CHANNEL_ARCS` (`prompt.ts`) | one per subject, 19; the underlying *shape* clusters into 10 (§6 below) |
+| 2. Subject voice | audience, register, accuracy bar | `subjects.json` `audience`/`style` | 19 |
+| 3. Module/submodule lane brief | what this slice covers, what it must not drift into | `subjects.json` module/submodule `style` | 93 modules / 373 submodules |
+| 4. Gold exemplar pair | one hand-authored short + long, shown as a few-shot example | `content/exemplars/*.json`, threaded via `exemplarScript` | one pair per archetype cluster, see §6 |
+| + cached research | "how do the highest-viewed videos on this exact topic structure themselves" | `content/briefs.json` (`creatorBrief`) | 373, one-time, cached forever |
+
+**Why archetypes, not 19 independent arcs:** a coding how-it-works episode and a science mechanism
+episode share the same shape — pain → what it is → mechanism → practitioner payoff → challenge. Writing
+19 arcs where 10 shapes exist creates drift with no gain. §6 has the cluster table.
+
+**Why gold exemplars are the highest-leverage lever available:** rules cannot express *voice* — this
+plan's own corpus has 89 "let's" against an explicit ban. Examples can. The plumbing
+(`exemplarScript` in `generate/route.ts` → `prompt.ts`) existed for a long time with **zero callers**;
+`scripts/content-factory.mjs` is now the caller (loads `content/exemplars/*.json`, keyed
+`<subject>/<module>/<submodule>/<format>` falling back to `<subject>/<format>`).
+
+---
+
+## 5. Animation: the system, not the 111 outputs
+
+The premium feel a hand-animated explainer has — springs with damping, anticipation, follow-through,
+staggers — comes from infrastructure, not from polishing each painter file individually. Before Phase 9,
+the shared layer (`common.ts` + `three3d.ts` + `icons.ts`) was 3.6% of all painter code and contained
+three easing curves; every painter hand-rolled its own bob, ghost-entrance and colour literals.
+
+What Phase 9 built once, centrally, so a *new* painter is born smooth instead of needing a polish pass:
+an easing family (spring with damping, `anticipate`, quad/quint in-out), `stagger()` with direction,
+`lerpColor()`, the `DUR`/`RADIUS`/`STROKE`/`GLOW` design scales, `drawGhost()`/`drawCard()` primitives,
+and a caption-aware `layout.safeBottom` (one field, fixes 23 painters that were each re-deriving the
+Shorts caption clamp under a different name and a different — usually wrong — value).
+
+**Current state: 111/111 painters pass the 5-axis ship gate** (`qa/LEDGER.md`, ship gate = every axis
+≥4/5). Two systemic bug classes were found and fixed across many painters at once rather than one at a
+time — see §2b. `npx tsc --noEmit` is clean (0 errors, down from a 99-error baseline).
+
+**Whole-video look (Phase 10), current state:**
+- **Transitions**: hard cut only. The old 420 ms crossfade/push/wipe/zoom-fade system was decorative and
+  is gone — `engine.ts` now paints the incoming scene directly with no dissolve.
+- **Outro / end screen**: removed on every format, by product decision. (It had been re-enabled for
+  long-form only, at 5.2 s with a brand + Subscribe pill — that shipped before this rewrite. Deleted on
+  request; videos now end right after their content on both formats.)
+- **On-screen watermark/progress bar**: kept, deliberately, on every frame.
+- **Captions**: Shorts default to the one-word-at-a-time kinetic style (`"word"`); long-form defaults to
+  `"pop"`. (Previously Shorts defaulted to karaoke; changed because Shorts convention is closer to the
+  scale-from-zero kinetic style already built for that caption mode.)
+- **Typography**: the display face (Plus Jakarta Sans) is genuinely loaded (`fonts.ts`,
+  `ensureStudioFonts`), not a system-stack fallback — confirmed by fetching the live Google Fonts CSS.
+  That family only ships up to weight 800; requests for weight 900 (26 sites) silently resolve to the
+  real 800 face with no visible defect, and are deliberately left alone rather than mass-edited.
+- **Encode**: 12 Mbps video / 192 kbps audio / 30 fps / true 1080×1920 and 1920×1080 canvases (`ASPECTS`
+  in `schema.ts`) — all above YouTube's own 1080p30 recommendation. The backgrounded-tab watchdog
+  (`engine.ts`, `setInterval` + `requestFrame()`) already prevents the render-stalls-forever failure
+  mode. Audited 2026-08-08, no defect found, nothing changed.
+
+---
+
+## 6. Long-form: 10 archetype clusters over 19 subjects
+
+Clustered by *what the viewer is being asked to do* — follow a mechanism, follow a procedure, follow a
+story — because that's what changes the act structure, not the department name.
+
+| # | Cluster | Subjects | Opens on | Payoff sits at |
+|---|---|---|---|---|
+| 1 | Mechanism — how a built system runs | coding | the pain / the outage | the production trade-off |
+| 2 | Mechanism — how a natural system runs | science, health, environment | one real scene or number | what measurably changes |
+| 3 | Procedure — how to solve or do it | math, lifeskills | the moment the method is needed | the shortcut an expert uses |
+| 4 | Language — how to say it | english | the sentence that failed or won | the upgraded natural version |
+| 5 | Narrative — what happened | history, mythology | a specific dawn, person, decision | the trace still visible today |
+| 6 | Place — why it's like that there | geography | the anomaly | who lives differently because of it |
+| 7 | Money — who pays and what it costs | finance, economy, business | the viewer's own pocket | the counterintuitive consequence |
+| 8 | Institution — the rules and who they bind | polity | the clash where it got tested | the design logic, what it prevents |
+| 9 | Self — why you do that | psychology, mindset | a behaviour the viewer recognises in themselves | the one lever they can pull |
+| 10 | Object & fact — what this thing is | artculture, gk, philosophy | one object, or one claim worth disbelieving | what to look for next time |
+
+Common act structure: **cold open → promise → stakes → roadmap → 4-6 teaching sections → mistakes →
+payoff → question**, with a forward-hook line at every section boundary (a plain "and that changes
+everything once you add X" beats a title card every time).
+
+**Gold exemplars, mapped to this table:** one hand-authored short + long per cluster is the minimum
+viable coverage — 20 scripts, not 38 (19 subjects × 2 formats), because the lookup falls back through
+an archetype tier before giving up. See `content/exemplars/` for what's authored and
+`scripts/exemplar-check.mjs --all` to verify every one still passes the exact gates a generated script
+must pass.
+
+**Exam-first vs curiosity-first** is a second, independent axis (from each subject's own `audience`
+string, not a guess) — it changes the ending shape (answerable exam question vs argue-worthy
+consequence), not the archetype. Exam-first: polity, economy, environment, artculture, gk, math,
+geography, history, english. Curiosity-first: coding, science, finance, psychology, business, health,
+philosophy, lifeskills, mythology, mindset.
+
+---
+
+## 7. Per-subject playbooks
+
+| Subject | Benchmark channels | Hook archetype | Signature kinds |
+|---|---|---|---|
+| coding | Fireship, ByteByteGo, NeetCode, 3Blue1Brown | the 3 AM outage / the interview filter | code→terminal, trace, lifeline, memgrid, callstack |
+| history | OverSimplified, Kings and Generals | cold-open in the moment, dated and named | timeline, chain, tactical_map, storyboard, race |
+| geography | RealLifeLore, Atlas Pro | the anomaly — the place that shouldn't exist | terrain, geomap, globe3d, cycle, zoomladder |
+| english | English with Lucy, mmmEnglish | the moment the language fails or wins | vocab, dialogue, storyboard, compare |
+| polity | (propose: Study IQ / Drishti IAS-grade + explainer clarity) | the clash — the case where the provision got tested | statemachine, decision, parliament_arc, scroll |
+| economy | Economics Explained + Indian explainers | open in the viewer's pocket (₹100 buys ₹94 of what it used to) | ledger, sankey, gauge, buckets, basket, coin_stack, trendgraph |
+| environment | Veritasium-adjacent | one real scene, one number moving the wrong way | cycle, terrain, gauge, pictogram, chain, ecosystem_web, globe3d |
+| artculture | (propose: museum-guide channels) | one object described so vividly you see it | schematic, architecture_blueprint, canvas_reveal, sheet_music |
+| math | 3Blue1Brown, Numberphile, Mathologer | the slow way, then the trick | formula, curves, numberline, geometry, probability |
+| science | Veritasium, Kurzgesagt, Steve Mould | the everyday phenomenon nobody questions | bodymap, orbit, circuit, zoomladder, molecule, neural_network |
+| finance | Ben Felix, Two Cents + Indian personal-finance channels | the rupee number that stings | ledger, basket, buckets, curves, coin_stack |
+| gk | Vsauce, Half as Interesting, RealLifeLore | the unbelievable fact, then the mechanism | race, pictogram, bracket, showdown, skyline, scalecompare, jigsaw_puzzle |
+| psychology | Veritasium (behavioural), SciShow Psych | make the viewer feel the bias before naming it | cycle, dialogue, probability, storyboard |
+| business | Wendover Productions, Company Man, Think School | a company and a stunning number | ledger, sankey, race, pipeline, skyline, domino_cascade |
+| health | Institute of Human Anatomy, Kurzgesagt | the myth everyone repeats | bodymap, dayclock, buckets, curves |
+| philosophy | Philosophy Tube, Wireless Philosophy | a modern concrete dilemma, not a definition | dialogue, showdown, storyboard, decision, jigsaw_puzzle |
+| lifeskills | Ali Abdaal, Matt D'Avella, Struthless | the failure mode first, with rep counts | steps, cycle, calendar, showdown |
+| mythology | Overly Sarcastic Productions, Crash Course Mythology | drop into the scene mid-story | storyboard, chain, tree, constellation, cycle, scroll |
+| mindset | Ali Abdaal, Improvement Pill, Struthless | the hyper-specific painful moment | cycle, showdown, storyboard, calendar |
+
+Unticked/proposed channel rows are general-knowledge suggestions, not verified research — treat them as
+a starting point, not settled fact, if a future session wants to firm them up.
+
+---
+
+## 8. Issue tracker
+
+Legend: **FIXED** = verified in code · **OPEN** = a real, live gap, not yet addressed · **WON'T FIX** =
+considered and deliberately left. Numbering kept stable from the original draft of this document so old
+references don't dangle; new findings are appended with an `N` prefix.
+
+| # | Issue | Status | Where |
+|---|---|---|---|
+| 1 | Smart animation selection (common vs specialised) | FIXED | `prompt.ts` SCENE_MENU_HEADER + CORE_KINDS/SUBJECT_KIT, all 111 kinds now featured somewhere (§2b) |
+| 2 | Clear on-screen text | FIXED | `prompt.ts` char-limit HARD LIMITS + NARRATION_RULES |
+| 3 | Simple, relevant code snippets | FIXED | `prompt.ts` CODING_RULES ("when to use code") |
+| 4 | Cohesive, lockstep storytelling | FIXED | `prompt.ts` LOCKSTEP + running-example rule (TEACHING_METHOD) |
+| 5 | Pacing / talking-to-a-blank-screen | FIXED | mandated section cards removed (Phase 5); `sayIntro` capped short |
+| 6 | Robotic AI-speak / formulaic transitions | FIXED | `prompt.ts` banned crutch-words + BANNED OPENERS |
+| 7 | Visual cramming (character constraints) | FIXED | char limits, mechanically validated in `schema.ts` |
+| 8 | Hallucinations / fake precision | FIXED | blueprint exact\|approx tagging; "around" rule for uncertain figures |
+| 9 | Broken edges (dangling node/state refs) | FIXED | `schema.ts` superRefine ref checks (statemachine/decision/graphwalk) |
+| 10 | Math / chronology constraints (sankey, timeline, pictogram) | FIXED | `schema.ts` superRefine chronology + sum checks |
+| 11 | Scene monotony / safe choices | FIXED | `prompt.ts` VARIETY_RULE (≥3 kinds short / ≥6 long) |
+| 12 | Dual-track (beginner + expert) | FIXED | `prompt.ts` TEACHING_METHOD dual-track rule |
+| 13 | Schema hallucinations (invented JSON keys) | FIXED | `schema.ts` `unknownSceneKeys` warn-and-surface |
+| 14 | Regional word mispronunciation (e.g. "Lok Sabha") | FIXED | `lexicon.ts` — 158-entry Indian pronunciation lexicon, voice-gated |
+| 15 | Acronym misfire (SQL, API, AWS) | FIXED | `speech.ts` SPELL_ACRONYMS / WORD_ACRONYMS |
+| 16 | Number/symbol mangling (₹10Cr, 100ms) | FIXED | `speech.ts` currency/percent/unit expansion, voice-only |
+| 17 | Run-on sentences, no breathing room | FIXED | TTS_RULES (ellipses/em-dashes) + `unbrokenClause` gate |
+| 18 | Tone flattening on questions | FIXED | TTS_RULES interrogative front-loading |
+| 19 | Homograph trap (record/record, read/read) | FIXED | TTS_RULES — swap to an unambiguous synonym |
+| 20 | Missing vocal emphasis | FIXED | `*word*` emphasis marker → em-dash pause (never ALL CAPS, which a TTS voice spells out letter-by-letter if it's also a real acronym) |
+| 21 | Reading code aloud ("array bracket zero") | FIXED | TTS_RULES + `speech.ts` code-punctuation strip |
+| 22 | Hindi code-switching on English technical terms | FIXED | `normalizeHindi()` — Devanagari expansion, not a 2-rule stub |
+| 23 | Clunky quote attribution | FIXED | TTS_RULES quote-pause convention |
+| 24 | Spatial collisions / out-of-bounds (12×12 grid) | FIXED | `schema.ts` superRefine overlap + boundary checks |
+| 25 | State desync / dead-ends (pop empty stack, bad line ref) | FIXED | superRefine index/line checks; 7 painters that ignored `env.beats` re-locked to beat windows (Phase 7.1) |
+| 26 | Hallucinated "magic" animations (invented actions) | FIXED | strict `z.enum` rejection of unlisted values |
+| 27 | Code vs `expectedOutput` mismatch | FIXED | `pipeline.ts` `verifyScript` actually executes and reconciles |
+| 28 | UI safe-zone violations on Shorts | FIXED | `shortSceneOverdense` soft gate + caption-aware `layout.safeBottom` (§5) |
+| 29 | JSON quote escaping | FIXED | `jsonrepair.ts` balancer |
+| 30 | Output token truncation | FIXED | `jsonrepair.ts` + raised `GEMINI_MAX_OUTPUT_TOKENS` |
+| N1 | Render loop had no crash guard | FIXED | try/catch around `paintScene` in `engine.ts`, degrades to a titled fallback frame |
+| N2 | ~~"11 orphan painters, dead code"~~ | **CORRECTED — this was never true.** All painter files map 1:1 to a real `SceneKind` in `painters/index.ts`; there are zero orphans. The real defect was root cause 4 (§2a): 35 REGISTERED kinds were invisible to the model due to a regex bug, not dead code — fixed by widening the regex, not by deletion. |
+| N3 | Prompt vs validator word-budget mismatch, **and** a third duration figure | **CORRECTED.** The short/long word targets are a subset of the validator gate by design — fine. But `prompt.ts`'s topic-proposal prompt separately said "8 minutes" for long-form while the structure block said "6-12 min" and the calibrated word budget implies 7-11 min. Fixed 2026-08-08: the topic prompt now says "7-11 minutes," matching the other two. |
+| N4 | `expectedOutput` is reconciled, not asserted | WON'T FIX | `pipeline.ts` overwrites a wrong-but-successful model output rather than flagging it — acceptable for render correctness, noted for awareness |
+| N5 | 18 multi-beat scene kinds allow `.min(1)` on their step/item array | **OPEN** | a 1-element "multi-beat" scene is a disguised static card the schema can't distinguish from a real one — e.g. `diagram` (`schema.ts`), `chain`, `gauge`. Not yet audited kind-by-kind; would need either a per-kind `.min(2)` (risks rejecting a genuinely simple scene) or a soft gate that flags it without hard-failing. |
+| N6 | `enhanceVideoMeta` re-writes `meta` after validation without re-validating, and drops `freeOnly` | **OPEN** | `videoMeta.ts` — one sub-call can bill a key during a free-only run |
+| N7 | `refine`/`regen-scene` routes run no soft gates | **OPEN** | a UI refine or scene regen can silently push a shipped script out of word budget or introduce adjacent bigtexts — the gates only run in `/generate` |
+| N8 | `compare` scene's on-screen items are voiceless | **OPEN** | up to 8 items with no narration beat backing them (`schema.ts`) |
+| N9 | Learned directives can override `NARRATION_RULES` with no cap | **OPEN** | `prompt.ts` — one bad directive currently outranks the whole rule set it's supposed to refine |
+| N10 | Soft gates are skipped entirely when a script is schema-invalid | **OPEN** | they sit in an `else` branch in `generate/route.ts` — a never-valid script gets zero content feedback, only schema errors |
+| N11 | No MP4 deliverable | **OPEN** | output is webm-only; YouTube accepts it, Instagram/TikTok/X/WhatsApp do not. `ffmpeg-static` is already a dependency, already used with a working H.264 recipe in the unrelated news pipeline — reusing it for studio output is a contained follow-up |
+| N12 | Rendering is real-time, single-threaded, with no dropped-frame telemetry | **OPEN**, structural | a 10-minute video takes 10 minutes wall-clock; a good render is indistinguishable from a subtly bad one without watching it. `README.md` already names the real fix (offline frame-by-frame encode via WebCodecs), which would also unlock 4K/60fps — out of scope for a prompt/content pass |
+| N13 | 2D and 3D layers are lit from opposite sides | **OPEN**, needs a decision | `common.ts` isoBox hardcodes light-from-upper-left; `three3d.ts` studioLights puts the key upper-right. Fixing it is a judgement call about which direction wins across 111 painters, not a patch |
+| N14 | Ship gate and automated containment audit can disagree | **WON'T FIX as a process gap, watch for it** | a kind can read `passed` in `qa/LEDGER.md` while `qa/AUDIT.md`'s pixel-level edge-bleed check still flags it — this was true historically for `steps`/`quiz`; re-run `npm run edge-audit` before trusting a ledger row blindly on a kind you haven't personally re-checked |
+
+---
+
+## 9. Known issues this spec does not fix
+
+Carried forward from the working log, still true, recorded here so nobody re-discovers them from
+scratch: the render pipeline is single-threaded real-time with no dropped-frame telemetry (N12); no MP4
+export path (N11); the 2D/3D lighting mismatch (N13); `.min(1)` degenerate-card risk on 18 multi-beat
+kinds (N5); `refine`/`regen-scene` bypassing soft gates (N7); learned directives with no override cap
+(N9). None of these block shipping a video today — all are listed so a future session spends its budget
+on something real instead of re-finding what's already known.
+
+---
+
+## 10. How to extend this app without breaking it
+
+- **New scene kind**: touches exactly three places — the union in `schema.ts`, a module in `painters/`,
+  and the `painters` record in `painters/index.ts` (re-exported as `ALL_SCENE_KINDS`, so QA tooling
+  enumerates the real registry and can't drift). Then feature it in at least one `SUBJECT_KIT` or it
+  will sit in the full menu, technically reachable, and never actually get picked — see §2b.
+- **New subject**: add to `subjects.json` (taxonomy + `audience`/`style`), pick the closest cluster from
+  §6 for its `CHANNEL_ARCS` entry, add a `SUBJECT_KIT` list of featured kinds, and — if it's going to
+  carry real volume — author a gold exemplar pair for its cluster if one doesn't exist yet.
+- **New painter, in general**: copy `painters/steps.ts` as the reference implementation — zero `enterT`
+  ambient drift, 100% beat-driven, balanced `save()`/`restore()`. Use the `common.ts` motion toolkit
+  (§5) rather than hand-rolling easing, staggers or a bob.
+- **Before shipping any prompt change**: re-run `node scripts/exemplar-check.mjs --all` — the gold
+  exemplars are the one thing in the repo that must keep passing every gate a generated script does.
