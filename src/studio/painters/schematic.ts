@@ -7,6 +7,7 @@ import {
   easeOutCubic,
   easeInOutCubic,
   enterT,
+  departT,
   idle,
   shade,
   sub,
@@ -18,6 +19,7 @@ import {
   beatWindow,
   activeBeatIndex,
   rgba,
+  STROKE,
   type Layout,
 } from "./common";
 import type { PaintEnv } from "./index";
@@ -28,12 +30,12 @@ type ShapeName = Part["shape"];
 type Rect = { x: number; y: number; w: number; h: number };
 
 const GRID = 12;
-const DIM_ALPHA = 0.4;
-/** Idle (unlit) part face — matches `table.ts`/`bits.ts`/`circuit.ts`'s
- *  idle-face convention rather than a one-off near-black hex, which under
- *  this scene's studio lighting rendered every unhighlighted part almost
- *  invisible against the background. */
-const IDLE_FACE = shade(THEME.panel, 0.09);
+const DIM_ALPHA = 0.55;
+/** Idle (unlit) part face. Unlike `table.ts`/`bits.ts`/`circuit.ts`, this file's
+ *  shapes carry no separate wireframe edge colour, so at their 0.09 lift the
+ *  fill read as near-invisible against the dark background — bumped higher
+ *  since here the fill lift is the only thing keeping an idle part legible. */
+const IDLE_FACE = shade(THEME.panel, 0.45);
 const INK_PANEL = THEME.bgBottom;
 
 type GridMap = { ox: number; oy: number; cw: number; ch: number };
@@ -217,6 +219,8 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
   const key = scene.id + "-schm3d";
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
@@ -261,8 +265,8 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
 
   const build = (): ThreeBundle => {
     const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(vertical ? 4 : 5, vertical ? 6 : 8, vertical ? 12 : 14);
+    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 44, 1, 0.1, 100);
+    camera.position.set(vertical ? 4 : 6, vertical ? 6 : 6.5, vertical ? 12 : 16);
     camera.lookAt(0, (spanY * scale3D) / 2, 0);
     studioLights(s, accent, secondary);
 
@@ -301,36 +305,40 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
         models.push({ partId: part.id, group: g, yOffset: g.position.y });
     });
 
-    const update = (elapsedMs: number, ctxData: { gIn: number, p: number, activeIdx: number, inTail: boolean, highlights: Set<string> }) => {
-      const { gIn, p, activeIdx, inTail, highlights } = ctxData;
+    const update = (elapsedMs: number, ctxData: { gIn: number, p: number, activeIdx: number, inTail: boolean, highlights: Set<string>, leave: number }) => {
+      const { gIn, p, activeIdx, inTail, highlights, leave } = ctxData;
       
-      models.forEach(m => {
+      models.forEach((m, i) => {
           const stepK = reveals.get(m.partId) ?? 0;
           const t = beatT(env.beats, offset + stepK, totalBeats, p);
-          
+
           if (t <= 0) {
               m.group.visible = false;
           } else {
               m.group.visible = true;
               const prog = easeInOutCubic(clamp01(t / 0.45));
-              
+
               const isHighlighted = highlights.has(m.partId);
               const isDimmed = !isHighlighted && highlights.size > 0;
-              
+
               // pop in from below
               m.group.position.y = m.yOffset - (1 - prog) * 2.0;
-              
+
               // scale effect
               m.group.scale.setScalar(prog * gIn);
 
-              const bob = isHighlighted && !inTail ? Math.sin(elapsedMs / 400) * 0.1 : 0;
-              m.group.position.y += bob;
+              // A small continuous idle bob keeps every revealed part alive
+              // even when nothing is highlighted (e.g. the outro tail), on
+              // top of the stronger highlight bob.
+              const idleBob = Math.sin(elapsedMs / 1100 + i * 1.3) * 0.035;
+              const hiBob = isHighlighted && !inTail ? Math.sin(elapsedMs / 400) * 0.1 : 0;
+              m.group.position.y += hiBob + idleBob;
               
               m.group.traverse(child => {
                   if (child instanceof THREE.Mesh) {
                       const mat = child.material as THREE.MeshPhysicalMaterial;
                       mat.transparent = true;
-                      mat.opacity = gIn * (isHighlighted ? 1 : isDimmed ? DIM_ALPHA : 0.9);
+                      mat.opacity = gIn * leave * (isHighlighted ? 1 : isDimmed ? DIM_ALPHA : 0.9);
                       if (isHighlighted) {
                           mat.color.setStyle(accent);
                           mat.emissive.setStyle(accent);
@@ -338,7 +346,10 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
                       } else {
                           mat.color.setStyle(IDLE_FACE);
                           mat.emissive.setStyle(IDLE_FACE);
-                          mat.emissiveIntensity = 0.1;
+                          // A slow emissive breath keeps idle parts visibly alive
+                          // (positional bob alone is too small an area/amplitude
+                          // once nothing is highlighted, e.g. the outro tail).
+                          mat.emissiveIntensity = 0.08 + 0.07 * Math.sin(elapsedMs / 1300 + i * 1.7);
                       }
                   }
               });
@@ -351,7 +362,7 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
 
   const highlights = activeStep >= 0 && !inTail ? new Set(scene.steps[Math.min(activeStep, scene.steps.length - 1)]?.highlight ?? []) : new Set<string>();
 
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: gridIn, p: env.p, activeIdx: active, inTail, highlights }, env);
+  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIn: gridIn, p: env.p, activeIdx: active, inTail, highlights, leave }, env);
   
   if (!cam) {
      // Fallback to 2D
@@ -399,21 +410,22 @@ export function paintSchematic(ctx: CanvasRenderingContext2D, scene: SchematicSc
       
       const leadIn = easeOutCubic(sub(tA, 0.05 + i * 0.05, 0.25));
       if (leadIn > 0) {
+        ctx.globalAlpha = leave;
         ctx.strokeStyle = rgba(accent, 0.8);
         ctx.lineWidth = unit * 0.06;
         ctx.setLineDash([unit * 0.3, unit * 0.2]);
         strokePolylineProgress(ctx, [fromPt, toPt], leadIn);
         ctx.setLineDash([]);
       }
-      
+
       const chipIn = easeOutCubic(sub(tA, 0.18 + i * 0.05, 0.18));
       if (chipIn > 0) {
-        ctx.globalAlpha = chipIn;
+        ctx.globalAlpha = chipIn * leave;
         roundRect(ctx, chipX, chipY, chipW, chipH, unit * 0.32);
         ctx.fillStyle = INK_PANEL;
         ctx.fill();
         ctx.strokeStyle = rgba(accent, 0.55);
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = unit * STROKE.hair;
         ctx.stroke();
         ctx.fillStyle = THEME.text;
         ctx.textAlign = "center";
