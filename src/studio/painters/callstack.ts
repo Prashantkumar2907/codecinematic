@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -16,7 +14,8 @@ import {
   drawSceneTitle,
   beatT,
   activeBeatIndex,
-  rgba, shade} from "./common";
+  rgba, shade, departT, applyElevation, clearShadow,
+} from "./common";
 import type { PaintEnv } from "./index";
 
 type CallstackScene = Extract<Scene, { kind: "callstack" }>;
@@ -33,8 +32,6 @@ function stackAt(scene: CallstackScene, k: number): Frame[] {
   return st;
 }
 
-const CAM_DIST = 9;
-const FRAME_DEPTH = 0.5;
 const ROW_GAP_UNITS = 0.22;
 const ROW_MAX_H_UNITS = 4.6;
 /** Lowest usable baseline as a fraction of frame height (Shorts UI band on 9:16).
@@ -47,8 +44,6 @@ const POP_FLY_ROWS = 1.8;
 const FRAME_FACE_LIFT = 0.16;
 const IDLE_EMISSIVE = 0.06;
 const TOP_EMISSIVE = 0.24;
-/** makeBlock builds its edge wireframe at 0.6 opacity; keep that ratio when fading. */
-const EDGE_ALPHA = 0.6;
 const LABEL_H_FRAC = 0.42;
 
 function maxDepthOf(scene: CallstackScene): number {
@@ -72,7 +67,8 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
   const t = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
   const frameIn = easeOutCubic(enterT(env, 380));
-  const key = scene.id + "-stack3d";
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
   const areaY = contentY + band;
@@ -85,8 +81,6 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
   const baseY = stackBottom - unit * 0.6;
   const stackH = baseY - areaY;
   
-  const rect = { x: contentX, y: areaY, w: contentW, h: stackH + unit * 0.6 };
-
   // Pixel rows are authoritative and the slabs are mapped onto them. World literals
   // under a tilted camera put each frame at a different depth, so the 2D label row and
   // the slab it sits on could not line up.
@@ -100,14 +94,6 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
     h: rowH,
   });
 
-  /** Pixels-per-world-unit and the pixel origin on the z=`z` plane. */
-  const mappingAt = (camera: THREE.Camera, z: number) => {
-    const o = projectToRect(camera, new THREE.Vector3(0, 0, z), rect);
-    const ux = projectToRect(camera, new THREE.Vector3(1, 0, z), rect);
-    const uy = projectToRect(camera, new THREE.Vector3(0, 1, z), rect);
-    return { o, sx: ux.x - o.x, sy: o.y - uy.y };
-  };
-  
   const step = activeStep >= 0 ? scene.steps[activeStep] : null;
   const cur = stackAt(scene, activeStep);
   const prev = stackAt(scene, activeStep - 1);
@@ -144,64 +130,44 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
   });
   type LevelState = (typeof levelStates)[number];
 
-  const build = (): ThreeBundle<{ levels: LevelState[] }> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, rect.w / rect.h, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
-
-    const m = mappingAt(camera, FRAME_DEPTH / 2);
-    const toWorld = (px: number, py: number) => ({ x: (px - m.o.x) / m.sx, y: (m.o.y - py) / m.sy });
-    const idleFace = shade(THEME.panel, FRAME_FACE_LIFT);
-
-    const models = Array.from({ length: maxDepth }, () => {
-      const g = makeBlock(frameW / m.sx, rowH / m.sy, FRAME_DEPTH, idleFace, THEME.textDim);
-      s.add(g);
-      return g;
-    });
-
-    const update = (_elapsedMs: number, data: { levels: LevelState[] }) => {
-      const gIn = easeOutCubic(enterT(env, 600));
-      models.forEach((mesh, level) => {
-        const st = data.levels[level];
-        mesh.visible = !!st?.present && gIn > 0;
-        if (!st?.present) return;
-
-        const box = rowRect(level);
-        const c = toWorld(box.x + box.w / 2, box.y + box.h / 2 - st.liftPx);
-        mesh.position.set(c.x, c.y, 0);
-        mesh.scale.set(st.scale, st.scale, 1);
-
-        mesh.traverse((o) => {
-          const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
-          if (!mat) return;
-          mat.transparent = true;
-          mat.opacity = gIn * st.alpha * (o instanceof THREE.LineSegments ? EDGE_ALPHA : 0.95);
-          if (!(o instanceof THREE.Mesh)) return;
-          const pm = mat as THREE.MeshPhysicalMaterial;
-          // accentSoft is an rgba() string; setStyle drops the alpha and paints full accent.
-          const face = st.top ? accent : idleFace;
-          pm.color.setStyle(face);
-          pm.emissive.setStyle(face);
-          pm.emissiveIntensity = st.top ? TOP_EMISSIVE : IDLE_EMISSIVE;
-        });
-      });
-    };
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { levels: levelStates }, env);
-  if (!cam) return;
-
-  /** Centre of level `level`'s row — the same pixel rect the slab was mapped onto. */
+  /** Centre of level `level`'s row — the same pixel rect the slab used to be mapped onto. */
   const get2D = (level: number) => {
     const box = rowRect(level);
     return { x: box.x + box.w / 2, y: box.y + box.h / 2 - (levelStates[level]?.liftPx ?? 0) };
   };
+  const idleFace = shade(THEME.panel, FRAME_FACE_LIFT);
+
+  // Frame slabs, drawn directly in 2D with the exact face/emissive logic the
+  // removed three.js material used to carry (top = accent, idle = panel tint),
+  // breathing on the top frame so it doesn't go still once a push/pop settles.
+  levelStates.forEach((st, level) => {
+    if (!st.present) return;
+    const box = rowRect(level);
+    const p = get2D(level);
+    const breathe = st.top ? 0.75 + 0.4 * idle(env, 2000) : 1;
+    ctx.save();
+    ctx.globalAlpha = frameIn * leave * st.alpha;
+    ctx.translate(p.x, p.y);
+    ctx.scale(st.scale, st.scale);
+    ctx.translate(-p.x, -p.y);
+    applyElevation(ctx, unit, st.top ? "floating" : "raised");
+    if (st.top) {
+      ctx.shadowColor = accentGlow;
+      ctx.shadowBlur = unit * TOP_EMISSIVE * 2.5 * breathe;
+    }
+    roundRect(ctx, box.x, box.y - st.liftPx, box.w, box.h, unit * 0.3);
+    ctx.fillStyle = st.top ? accent : idleFace;
+    ctx.fill();
+    clearShadow(ctx);
+    roundRect(ctx, box.x, box.y - st.liftPx, box.w, box.h, unit * 0.3);
+    ctx.strokeStyle = THEME.textDim;
+    ctx.lineWidth = unit * 0.03;
+    ctx.stroke();
+    ctx.restore();
+  });
 
   ctx.save();
-  ctx.globalAlpha = frameIn;
+  ctx.globalAlpha = frameIn * leave;
   ctx.fillStyle = accent;
   ctx.fillRect(fx - unit * 0.4, baseY, (frameW + unit * 0.8) * frameIn, unit * 0.12);
   ctx.font = `500 ${unit * 0.55}px ${FONT_MONO}`;
@@ -262,7 +228,7 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
 
   const railX = fx - unit * (vertical ? 1.1 : 1.5);
   ctx.save();
-  ctx.globalAlpha = frameIn;
+  ctx.globalAlpha = frameIn * leave;
   for (let l = 1; l <= maxDepth; l++) {
     const p = get2D(l - 1);
     const ty = p.y;
@@ -281,7 +247,7 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
     const isTop = i === cur.length - 1;
     let alpha = 1;
     if (pushing && isTop) alpha = easeOutCubic(clamp01(t * 1.5));
-    drawFrameText(cur[i], i, alpha * frameIn, isTop);
+    drawFrameText(cur[i], i, alpha * frameIn * leave, isTop);
   }
   if (popping && prev.length > 0) {
     const topLevel = prev.length - 1;
@@ -291,7 +257,7 @@ export function paintCallstack(ctx: CanvasRenderingContext2D, scene: CallstackSc
       ctx.save();
       // The 3D slab already carries the fly-up through liftPx; the 2D row reads the
       // same offset in get2D, so no extra translate.
-      drawFrameText(prev[topLevel], topLevel, alpha * frameIn, true);
+      drawFrameText(prev[topLevel], topLevel, alpha * frameIn * leave, true);
       ctx.restore();
     }
   }
