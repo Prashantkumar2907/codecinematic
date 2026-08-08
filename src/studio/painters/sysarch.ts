@@ -6,6 +6,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -56,7 +57,9 @@ export function paintSysarch(ctx: CanvasRenderingContext2D, scene: SysarchScene,
   const totalBeats = offset + n;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeIdx = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.5;
   const areaY = contentY + band;
