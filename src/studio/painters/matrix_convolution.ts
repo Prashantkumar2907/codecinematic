@@ -220,7 +220,7 @@ export function paintMatrixConvolution(ctx: CanvasRenderingContext2D, scene: Con
       ctx.fill();
       ctx.shadowBlur = 0;
       roundRect(ctx, x, y, cellIn, cellIn, cellIn * 0.14);
-      ctx.strokeStyle = covered ? rgba(accent, 0.9 * breathe) : "rgba(148,163,184,0.3)";
+      ctx.strokeStyle = covered ? rgba(accent, 0.9 * breathe) : rgba(THEME.textDim, 0.3);
       ctx.lineWidth = unit * (covered ? 0.09 : 0.05);
       ctx.stroke();
       const val = inAt(r, c);
@@ -275,9 +275,13 @@ export function paintMatrixConvolution(ctx: CanvasRenderingContext2D, scene: Con
           ctx.save();
           ctx.globalAlpha = introIn * easeOutCubic(local);
           ctx.font = `800 ${fontPx * pop}px ${FONT_MONO}`;
-          ctx.fillStyle = "rgba(6,10,15,0.82)";
-          const tw = ctx.measureText(val).width;
-          roundRect(ctx, cx - tw / 2 - unit * 0.14, cy - fontPx * 0.62, tw + unit * 0.28, fontPx * 1.24, fontPx * 0.3);
+          ctx.fillStyle = rgba(THEME.bgBottom, 0.92);
+          // Sized to the cell itself, not just the product text's own tight
+          // bounds — a backing fit only to the product glyph left the input
+          // cell's own number (drawn at a different weight/size, same centre)
+          // peeking out from behind it, reading as a smeared double-image
+          // when the elementwise product happens to equal the input value.
+          roundRect(ctx, cx - cellIn * 0.42, cy - cellIn * 0.42, cellIn * 0.84, cellIn * 0.84, cellIn * 0.14);
           ctx.fill();
           ctx.fillStyle = secondary;
           ctx.textAlign = "center";
@@ -320,7 +324,7 @@ export function paintMatrixConvolution(ctx: CanvasRenderingContext2D, scene: Con
         if (ghostIn <= 0) continue;
         ctx.save();
         ctx.globalAlpha = 0.14 * introIn * easeOutCubic(ghostIn);
-        ctx.strokeStyle = "rgba(148,163,184,0.9)";
+        ctx.strokeStyle = rgba(THEME.textDim, 0.9);
         ctx.lineWidth = unit * 0.05;
         ctx.setLineDash([unit * 0.24, unit * 0.2]);
         roundRect(ctx, x, y, cellOut, cellOut, radiusOut);
