@@ -121,7 +121,7 @@ export function paintSheetMusic(ctx: CanvasRenderingContext2D, scene: SheetMusic
     // Five staff lines (+ start/end barlines).
     ctx.save();
     ctx.globalAlpha = isFuture ? ghostAlpha : introIn * easeOutCubic(rowIn);
-    ctx.strokeStyle = isFuture ? "rgba(148,163,184,0.7)" : THEME.textFaint;
+    ctx.strokeStyle = isFuture ? rgba(THEME.textDim, 0.7) : THEME.textFaint;
     ctx.lineWidth = Math.max(1, unit * 0.045);
     STAFF_LINE_POSITIONS.forEach((pos) => {
       const y = rowCenter - pos * halfSpace;
@@ -241,7 +241,7 @@ export function paintSheetMusic(ctx: CanvasRenderingContext2D, scene: SheetMusic
       const r = (isSam ? unit * 0.24 : unit * 0.15) * pulse;
       ctx.beginPath();
       ctx.arc(tx, talaY, r, 0, Math.PI * 2);
-      ctx.fillStyle = isCurrent ? accent : isSam ? rgba(accent, 0.7) : "rgba(148,163,184,0.45)";
+      ctx.fillStyle = isCurrent ? accent : isSam ? rgba(accent, 0.7) : rgba(THEME.textDim, 0.45);
       ctx.fill();
       if (isCurrent) {
         ctx.lineWidth = unit * 0.05;
@@ -282,7 +282,7 @@ function drawNote(
   if (Math.abs(note.pos) >= 5) {
     ctx.save();
     ctx.rotate(0.18);
-    ctx.strokeStyle = "rgba(148,163,184,0.6)";
+    ctx.strokeStyle = rgba(THEME.textDim, 0.6);
     ctx.lineWidth = halfSpace * 0.18;
     ctx.beginPath();
     ctx.moveTo(-headW * 0.95, 0);
