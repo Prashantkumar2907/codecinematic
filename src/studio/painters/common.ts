@@ -444,6 +444,84 @@ export function idle(env: { elapsedMs: number }, periodMs = 2400, phase = 0): nu
   return 0.5 + 0.5 * Math.sin((env.elapsedMs / periodMs) * Math.PI * 2 + phase);
 }
 
+/**
+ * The scene arc: enter → develop → emphasise → exit.
+ *
+ * `enterT` is absolute-time by design, so a painter built only on it finishes
+ * ~380ms in and holds for the rest of the scene. Measured across the library
+ * (`qa/MOTION.md`): 102 of 222 kind/aspect pairs score below 5 on occupancy and
+ * `steps` sits at 68% of its samples below the still threshold. These helpers
+ * give the other three phases somewhere to live.
+ *
+ * `ENTER_END` / `EXIT_START` are fractions of the scene's own length.
+ */
+export const ENTER_END = 0.15;
+export const EXIT_START = 0.9;
+
+export type ScenePhase = "enter" | "develop" | "emphasise" | "exit";
+
+type TimeEnv = { elapsedMs: number; durationMs?: number };
+
+function sceneP(env: TimeEnv): number {
+  const dur = env.durationMs ?? 0;
+  return dur > 0 ? clamp01(env.elapsedMs / dur) : 0;
+}
+
+export function phaseOf(env: TimeEnv): ScenePhase {
+  const p = sceneP(env);
+  if (p < ENTER_END) return "enter";
+  if (p >= EXIT_START) return "exit";
+  return "develop";
+}
+
+/**
+ * Item `i` of `n` revealed across the develop band, so a 12s card still has
+ * something arriving at second six. This is the piece `revealT` left to every
+ * call site: `revealT` delays ONE reveal, this spreads a whole set.
+ */
+export function developT(env: TimeEnv, i: number, n: number, overlap = 0.4): number {
+  if (n <= 0) return 1;
+  const span = EXIT_START - ENTER_END;
+  const slot = span / n;
+  const from = ENTER_END + i * slot;
+  const to = Math.min(EXIT_START, from + slot * (1 + overlap));
+  return easeOutCubic(revealT(env, from, to));
+}
+
+/**
+ * A 0→1→0 pulse inside beat `k`, for landing a visible change on EVERY narrated
+ * beat rather than only the first (rubric v2 section 7).
+ */
+export function beatPulse(
+  beats: { start: number; end: number }[],
+  k: number,
+  total: number,
+  p: number
+): number {
+  const t = beatT(beats, k, total, p);
+  if (t <= 0 || t >= 1) return 0;
+  return Math.sin(t * Math.PI);
+}
+
+/** Entrance with a wind-up. `anticipate` was in the toolkit and used by 0 painters. */
+export function anticipateT(env: TimeEnv, durMs = DUR.base, delayMs = 0): number {
+  return anticipate(enterT(env, durMs, delayMs));
+}
+
+/** Entrance with spring settle. `easeSpring` was used by 1 painter. */
+export function springT(env: TimeEnv, durMs = DUR.slow, delayMs = 0): number {
+  return easeSpring(enterT(env, durMs, delayMs));
+}
+
+/**
+ * 1 while the scene holds, easing to 0 across its final `durMs`. Since Phase 10
+ * replaced the crossfade with hard cuts, anything without this simply vanishes
+ * at the cut.
+ */
+export function departT(env: TimeEnv, durMs = DUR.base): number {
+  return easeInOutCubic(exitT(env, durMs));
+}
+
 export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
