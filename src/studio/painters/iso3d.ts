@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { introBeatCount, type Scene } from "../schema";
-import { THEME, FONT_SANS, easeOutCubic, enterT, clamp01, roundRect, drawSceneTitle, beatT, activeBeatIndex, flowDots, rgba } from "./common";
+import { THEME, FONT_SANS, easeOutCubic, enterT, clamp01, roundRect, drawSceneTitle, beatT, activeBeatIndex, flowDots, rgba, departT, STROKE } from "./common";
 import { render3D, projectToRect, studioLights, makeBlock, makeCylinder, makeDatabaseStack, makeServerRack, type ThreeBundle } from "./three3d";
 import { drawIcon } from "./icons";
 import type { PaintEnv } from "./index";
@@ -30,7 +30,7 @@ function stagePos(i: number, n: number, vertical: boolean, spread: number): THRE
  */
 export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical, h } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, secondary } = env.palette;
   const n = scene.stages.length;
   const offset = introBeatCount(scene);
@@ -38,6 +38,9 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeIdx = active - offset; // -1 during intro
   const key = scene.id;
+  const enter = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
@@ -45,7 +48,10 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
   const flowT = activeIdx >= 0 ? beatT(env.beats, offset + activeIdx, totalBeats, env.p) : 0;
   flowState.set(key, { revealed: activeIdx < 0 ? 0 : activeIdx + easeOutCubic(clamp01(flowT * 1.4)), activeIdx, flowT });
 
-  const rect = { x: contentX, y: contentY + band * 0.4, w: contentW, h: contentH - band * 0.4 };
+  // Bounded by safeBottom, not contentH: at 9:16 contentH runs under the
+  // burned-in caption band, which is where a bottom-row label used to land.
+  const areaBottom = Math.min(contentY + contentH, safeBottom) - unit * 0.3;
+  const rect = { x: contentX, y: contentY + band * 0.4, w: contentW, h: areaBottom - (contentY + band * 0.4) };
   const spread = vertical ? 2.7 : 3.8;
 
   const shapeColor = (shape?: string) => (shape === "database" || shape === "disk" ? secondary : accent);
@@ -102,7 +108,13 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
     return { scene: s, camera, update };
   };
 
+  ctx.save();
+  ctx.globalAlpha = enter * leave;
   const cam = render3D(ctx, key, rect, build, env.elapsedMs);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = enter * leave;
 
   // --- 2-D glowing connectors with animated flow between revealed stages ---
   if (cam) {
@@ -132,6 +144,7 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
       if (grow > 0.15) flowDots(ctx, [a, end], env, { count: 2, speedMs: 1500, r: unit * 0.16, color: accent });
     }
   }
+  ctx.restore();
 
   // Labels + icons projected from each stage's 3-D base (tracks the models).
   const drawLabel = (i: number, sx: number, sy: number) => {
@@ -139,17 +152,21 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
     const local = clamp01((flowState.get(key)?.revealed ?? 0) - i);
     if (local <= 0) return;
     ctx.save();
-    ctx.globalAlpha = easeOutCubic(local);
+    ctx.globalAlpha = easeOutCubic(local) * enter * leave;
     const isActive = i === activeIdx;
     ctx.font = `${isActive ? 800 : 600} ${unit * 0.82}px ${FONT_SANS}`;
     const tw = ctx.measureText(st.label).width;
     const padX = unit * 0.5;
     const chipW = tw + padX * 2, chipH = unit * 1.5;
+    // Backstop: the projected 3D base point can itself land close to
+    // safeBottom, and the chip is drawn extending DOWN from it — clamp so
+    // the chip's own bottom edge can never cross into the caption band.
+    sy = Math.min(sy, safeBottom - chipH);
     roundRect(ctx, sx - chipW / 2, sy, chipW, chipH, unit * 0.35);
     ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
     ctx.fill();
     ctx.strokeStyle = rgba(isActive ? accent : THEME.textDim, isActive ? 0.9 : 0.4);
-    ctx.lineWidth = isActive ? 2 : 1;
+    ctx.lineWidth = unit * (isActive ? STROKE.base : STROKE.hair);
     ctx.stroke();
     ctx.fillStyle = THEME.text;
     ctx.textAlign = "center";
@@ -174,12 +191,12 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
       const local = clamp01((flowState.get(key)?.revealed ?? 0) - i);
       if (local <= 0) return;
       ctx.save();
-      ctx.globalAlpha = easeOutCubic(local);
+      ctx.globalAlpha = easeOutCubic(local) * enter * leave;
       roundRect(ctx, cx - bw / 2, cy - bw / 2, bw, bw, unit * 0.4);
       ctx.fillStyle = rgba(shapeColor(st.shape).toString(), 0.12);
       ctx.fill();
       ctx.strokeStyle = shapeColor(st.shape).toString();
-      ctx.lineWidth = 2;
+      ctx.lineWidth = unit * STROKE.base;
       ctx.stroke();
       if (st.shape) drawIcon(ctx, st.shape, cx, cy - unit * 0.4, bw * 0.5, env, shapeColor(st.shape).toString());
       ctx.fillStyle = THEME.text;
@@ -191,5 +208,4 @@ export function paintIso3d(ctx: CanvasRenderingContext2D, scene: Iso3dScene, env
   }
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
-  void h;
 }
