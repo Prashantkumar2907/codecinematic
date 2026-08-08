@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -19,8 +18,8 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  departT,
 } from "./common";
-import { render3D, projectToRect, studioLights, type ThreeBundle, color3 } from "./three3d";
 import type { PaintEnv } from "./index";
 
 type ConstellationScene = Extract<Scene, { kind: "constellation" }>;
@@ -120,8 +119,6 @@ function convexHull(pts: { x: number; y: number }[]): { x: number; y: number }[]
   return lower.slice(0, -1).concat(upper.slice(0, -1));
 }
 
-type FieldContext = { pops: Record<string, number>; activeList: Record<string, boolean> };
-
 export function paintConstellation(ctx: CanvasRenderingContext2D, scene: ConstellationScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, w, contentX, contentY, contentW, safeBottom } = layout;
@@ -147,7 +144,8 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
   };
 
   const fieldIn = easeOutCubic(enterT(env, FIELD_IN_MS));
-  if (fieldIn <= 0) {
+  const leave = departT(env, 380);
+  if (fieldIn <= 0 || leave <= 0) {
     ctx.textAlign = "start";
     return;
   }
@@ -196,57 +194,19 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
   const scaleX = Math.min(fitX, uniform * FIELD_MAX_STRETCH);
   const scaleY = Math.min(fitY, uniform * FIELD_MAX_STRETCH);
 
-  // z is flat on purpose. Depth would push near stars outward under the
-  // frustum, so this pixel layout would only be exact after paying a
-  // worst-case perspective margin (measured: 9% of the field box) and the
-  // 2D connectors and glows would have to re-derive that same factor to line
-  // up with the 3D glyphs. The depth cue it bought was a <9% size wobble.
-  const worldOf = (p: Point) =>
-    new THREE.Vector3((p.x - dataCX) * scaleX, fieldCY - (p.y - dataCY) * scaleY, 0);
+  // z is flat on purpose: every star sits on the same plane, so the on-axis
+  // camera this file used to route through is an exact uniform pixel<->world
+  // scale — `projectPx` below is that scale applied directly, with no camera
+  // or projection math left to desync from the 2D chrome drawn on top of it.
+  const worldOf = (p: Point) => ({ x: (p.x - dataCX) * scaleX, y: fieldCY - (p.y - dataCY) * scaleY });
+  const projectPx = (wx: number, wy: number) => ({
+    x: rect.x + rect.w / 2 + wx * pxPerWorld,
+    y: rect.y + rect.h / 2 - wy * pxPerWorld,
+  });
 
   const p3ds = new Map(scene.points.map((p) => [p.id, worldOf(p)]));
   /** Per-star phase so the field twinkles out of lockstep without a clock read. */
   const phaseOf = (id: string) => hash01(id) * TAU;
-
-  const build = (): ThreeBundle<FieldContext> => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(CAM_FOV_DEG, 1, 0.1, 100);
-    camera.position.set(0, 0, CAM_DIST);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, env.palette.secondary);
-
-    const geo = new THREE.SphereGeometry(starWorldR, 32, 24);
-    const meshes = scene.points.map((p) => {
-      const mat = new THREE.MeshPhysicalMaterial({
-        color: color3(accent),
-        emissive: color3(accent),
-        emissiveIntensity: STAR_EMISSIVE_IDLE,
-        metalness: 0.1,
-        roughness: 0.4,
-        clearcoat: 0.3,
-        clearcoatRoughness: 0.3,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      const basePos = p3ds.get(p.id)!;
-      mesh.position.copy(basePos);
-      s.add(mesh);
-      return { id: p.id, mesh, basePos, phase: phaseOf(p.id) };
-    });
-
-    // Per-frame state arrives through `ctxData`; build() runs once and any value
-    // read out of this closure would be frozen at frame 0 forever.
-    const update = (elapsedMs: number, ctxData: FieldContext) => {
-      const { pops, activeList } = ctxData;
-      meshes.forEach((m) => {
-        m.mesh.scale.setScalar(Math.max(0.001, pops[m.id] ?? 0));
-        m.mesh.position.y = m.basePos.y + Math.sin(elapsedMs / BOB_MS + m.phase) * bobWorld;
-        const mat = m.mesh.material as THREE.MeshPhysicalMaterial;
-        mat.emissiveIntensity = (activeList[m.id] ?? false) ? STAR_EMISSIVE_ACTIVE : STAR_EMISSIVE_IDLE;
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
 
   const pops: Record<string, number> = {};
   const activeList: Record<string, boolean> = {};
@@ -275,17 +235,10 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
     }
   });
 
-  const cam = render3D(ctx, scene.id + "-const3d", rect, build, env.elapsedMs, { pops, activeList }, env);
-  if (!cam) {
-    ctx.textAlign = "start";
-    return;
-  }
-
   const posById = new Map<string, { x: number; y: number }>();
   scene.points.forEach((p) => {
-    const v = p3ds.get(p.id)!.clone();
-    v.y += Math.sin(env.elapsedMs / BOB_MS + phaseOf(p.id)) * bobWorld;
-    posById.set(p.id, projectToRect(cam, v, rect));
+    const v = p3ds.get(p.id)!;
+    posById.set(p.id, projectPx(v.x, v.y + Math.sin(env.elapsedMs / BOB_MS + phaseOf(p.id)) * bobWorld));
   });
 
   /** On-screen radius of a star's glyph, so lines can stop at its rim. Exact
@@ -300,7 +253,7 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
       const breathe = 0.06 + 0.03 * (0.5 + 0.5 * Math.sin(env.elapsedMs / 900));
       const fin = easeOutCubic(beatT(env.beats, finaleBeat, totalBeats, env.p));
       ctx.save();
-      ctx.globalAlpha = fin;
+      ctx.globalAlpha = fin * leave;
       ctx.beginPath();
       ctx.moveTo(hull[0].x, hull[0].y);
       for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i].x, hull[i].y);
@@ -337,7 +290,7 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
       const finalePulse = finaleActive ? 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(env.elapsedMs / 700 + i)) : 1;
       const idlePulse = !glowing ? 0.7 : 1;
       ctx.save();
-      ctx.globalAlpha = (glowing ? 1 : idlePulse) * finalePulse;
+      ctx.globalAlpha = (glowing ? 1 : idlePulse) * finalePulse * leave;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * (glowing ? 0.12 : 0.08);
       ctx.lineCap = "round";
@@ -352,7 +305,7 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
         const f = drawProg < 1 ? drawProg : (env.elapsedMs % SPARK_LOOP_MS) / SPARK_LOOP_MS;
         const sp = pointAlongPolyline([from, to], f);
         ctx.save();
-        ctx.globalAlpha = drawProg < 1 ? 1 : 0.9 * Math.sin(Math.PI * f);
+        ctx.globalAlpha = (drawProg < 1 ? 1 : 0.9 * Math.sin(Math.PI * f)) * leave;
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.9;
         ctx.fillStyle = THEME.text;
@@ -364,19 +317,40 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
     });
   });
 
-  // Core glow and label per star.
+  // Star bodies, glow and label. Drawn directly in 2D as a self-luminous
+  // radial-gradient disc — the field is flat (z=0), so this is an exact
+  // replacement for the removed emissive sphere, not an approximation of it.
   scene.points.forEach((point) => {
     const pos = posById.get(point.id)!;
     const arrive = arriveById.get(point.id) ?? 0;
     const litK = litStep.get(point.id);
     const lit = litK !== undefined && active >= offset + litK;
     const r = radiusPx(point.id);
+    if (r > 0.01) {
+      const activeStar = lit && active === offset + litK! && !finaleActive;
+      const emissive = !lit ? 0.28 : activeStar || finaleActive ? STAR_EMISSIVE_ACTIVE : STAR_EMISSIVE_IDLE;
+      ctx.save();
+      ctx.globalAlpha = arrive * leave;
+      if (lit) {
+        ctx.shadowColor = accentGlow;
+        ctx.shadowBlur = unit * (0.25 + 0.5 * emissive);
+      }
+      const grad = ctx.createRadialGradient(pos.x - r * 0.3, pos.y - r * 0.3, 0, pos.x, pos.y, r);
+      grad.addColorStop(0, rgba(THEME.text, 0.5 + 0.5 * emissive));
+      grad.addColorStop(0.5, rgba(accent, lit ? 0.6 + 0.4 * emissive : 0.35));
+      grad.addColorStop(1, lit ? accent : rgba(THEME.textDim, 0.5));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     if (lit) {
       const activeStar = active === offset + litK! && !finaleActive;
       if (activeStar || finaleActive) {
         ctx.save();
-        ctx.globalAlpha = arrive * 0.4;
+        ctx.globalAlpha = arrive * 0.4 * leave;
         ctx.shadowColor = accentGlow;
         ctx.shadowBlur = unit * 0.9;
         ctx.fillStyle = accent;
@@ -389,7 +363,7 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
 
     if (point.label) {
       ctx.save();
-      ctx.globalAlpha = arrive * (lit ? 0.9 : 0.55);
+      ctx.globalAlpha = arrive * (lit ? 0.9 : 0.55) * leave;
       const px = fitFontSize(ctx, point.label, {
         maxW: contentW * LABEL_MAX_W_FRAC,
         startPx: unit * 0.58,
@@ -420,7 +394,7 @@ export function paintConstellation(ctx: CanvasRenderingContext2D, scene: Constel
       const cx = w / 2;
       const cy = safeBottom - unit * FINALE_CHIP_UNITS;
       ctx.save();
-      ctx.globalAlpha = clamp01(sub(ft, 0.15, 0.25));
+      ctx.globalAlpha = clamp01(sub(ft, 0.15, 0.25)) * leave;
       const maxW = contentW * 0.9;
       const px = fitFontSize(ctx, label, {
         maxW: maxW - unit * 1.4,
