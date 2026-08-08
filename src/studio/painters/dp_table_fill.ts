@@ -7,6 +7,7 @@ import {
   easeOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -35,13 +36,15 @@ const MAX_CELL_UNIT = 3.0;
  */
 export function paintDpTableFill(ctx: CanvasRenderingContext2D, scene: DpScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
 
@@ -52,7 +55,7 @@ export function paintDpTableFill(ctx: CanvasRenderingContext2D, scene: DpScene, 
   const gutterT = hasColLabels ? unit * 1.4 : 0;
   const gap = unit * 0.28;
   const availW = contentW - gutterL;
-  const bottom = vertical ? Math.min(contentY + contentH, layout.h * 0.9) : contentY + contentH;
+  const bottom = Math.min(contentY + contentH, safeBottom) - unit * 0.6;
   const availH = bottom - contentY - band - gutterT;
   const cell = Math.max(
     unit * 0.8,
