@@ -38,7 +38,7 @@ const rackState = new Map<string, RackVS>();
 const CRASH = "#ef4444";
 const EMPTY_FACE = "#1b222c";
 const SHELL_FACE = "#12171f";
-const EDGE = "#eaf3ff";
+const EDGE = THEME.text;
 
 // World-unit rack geometry (shared by build + label/overlay projection).
 const BLADE_H = 0.34;
@@ -304,6 +304,12 @@ function drawOverlay(
   scene.racks.forEach((r, i) => {
     if (r.group) groups.set(r.group, [...(groups.get(r.group) ?? []), i]);
   });
+  // Each member's label must clear the group's boundary — the boundary is one
+  // shared screen-space envelope over the group, but a rack's own label point
+  // is projected independently, and camera perspective means the two don't
+  // stay in a fixed vertical relationship across different rack X positions
+  // (an off-center rack's label can end up projected inside the boundary).
+  const groupBoundaryBottom = new Map<number, number>();
   groups.forEach((members, name) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     members.forEach((ri) => {
@@ -333,12 +339,15 @@ function drawOverlay(
     ctx.textBaseline = "alphabetic";
     ctx.fillText(name, minX - pad + unit * 0.2, minY - pad - unit * 0.28);
     ctx.restore();
+    members.forEach((ri) => groupBoundaryBottom.set(ri, maxY + pad));
   });
 
   // Rack labels under each cabinet.
   scene.racks.forEach((r, ri) => {
     const p = projectToRect(cam, new THREE.Vector3(rackXAt(ri), -shellHeight(r.slots) / 2 - 0.15, RACK_D / 2), rect);
-    drawChip(ctx, r.label, p.x, p.y, unit, accent, false, introIn);
+    const boundaryY = groupBoundaryBottom.get(ri);
+    const py = boundaryY != null ? Math.max(p.y, boundaryY + unit * 0.3) : p.y;
+    drawChip(ctx, r.label, p.x, py, unit, accent, false, introIn);
   });
 
   // Persistent leader crown.
@@ -404,7 +413,7 @@ function drawChip(ctx: CanvasRenderingContext2D, text: string, x: number, y: num
   const chipH = unit * 1.15;
   const bx = x - chipW / 2;
   const by = y;
-  ctx.fillStyle = "rgba(10,16,22,0.82)";
+  ctx.fillStyle = rgba(THEME.bgBottom, 0.82);
   roundRect(ctx, bx, by, chipW, chipH, unit * 0.3);
   ctx.fill();
   ctx.strokeStyle = rgba(accent, active ? 0.95 : 0.45);
@@ -570,7 +579,7 @@ function drawFallback(
       roundRect(ctx, b.x, by, b.w, bh, unit * 0.14);
       ctx.fillStyle = s0 === "empty" ? rgba(EMPTY_FACE, 0.9) : rgba(face, s0 === "crashed" ? 0.28 : 0.2);
       ctx.fill();
-      ctx.strokeStyle = s0 === "empty" ? rgba("#94a3b8", 0.3) : rgba(face, 0.8);
+      ctx.strokeStyle = s0 === "empty" ? rgba(THEME.textDim, 0.3) : rgba(face, 0.8);
       if (s0 === "empty") ctx.setLineDash([unit * 0.2, unit * 0.18]);
       ctx.lineWidth = 1.2;
       ctx.stroke();
