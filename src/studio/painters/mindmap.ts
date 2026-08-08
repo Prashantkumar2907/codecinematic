@@ -16,6 +16,7 @@ import {
   activeBeatIndex,
   flowDots,
   rgba,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -41,6 +42,9 @@ export function paintMindmap(ctx: CanvasRenderingContext2D, scene: MindmapScene,
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
+
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.4;
 
@@ -206,6 +210,7 @@ export function paintMindmap(ctx: CanvasRenderingContext2D, scene: MindmapScene,
     const pts = branch(nd.parent.id!, nd.id!);
     const drawN = Math.max(1, Math.floor(SAMPLES * clamp01(ap * 1.15)));
     ctx.save();
+    ctx.globalAlpha = leave;
     ctx.strokeStyle = rgba(accent, 0.5);
     ctx.lineWidth = unit * 0.07;
     ctx.lineCap = "round";
@@ -220,11 +225,14 @@ export function paintMindmap(ctx: CanvasRenderingContext2D, scene: MindmapScene,
 
   // Continuous flow along branches from the centre once the map is settled.
   if (activeStep >= scene.steps.length - 1) {
+    ctx.save();
+    ctx.globalAlpha = leave;
     for (const nd of nodes) {
       if (!nd.parent || nd.parent.depth !== 0) continue;
       if (appearOf(nd.id!) < 1) continue;
       flowDots(ctx, branch(nd.parent.id!, nd.id!), env, { count: 1, speedMs: 2600, r: unit * 0.1, color: accent });
     }
+    ctx.restore();
   }
 
   // --- nodes -------------------------------------------------------------
@@ -238,7 +246,7 @@ export function paintMindmap(ctx: CanvasRenderingContext2D, scene: MindmapScene,
     const label = nd.data.label;
 
     ctx.save();
-    ctx.globalAlpha = clamp01(ap * 1.4);
+    ctx.globalAlpha = clamp01(ap * 1.4) * leave;
     const edge = tier(depth);
     const { px, lines, w: bw, h: bh } = boxes.get(nd.id!)!;
     const bx = p.x - bw / 2;
