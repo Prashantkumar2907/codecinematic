@@ -280,6 +280,13 @@ type ProbeWindow = Window & {
     fromMs?: number;
     toMs?: number;
   }) => Promise<boolean>;
+  __PROBE_BGDRIFT?: (a: {
+    aspect?: AspectName;
+    frames?: number;
+    fps?: number;
+    motifs?: number[];
+    subject?: string;
+  }) => Promise<Record<string, number[]>>;
 };
 
 export default function Probe() {
@@ -478,6 +485,45 @@ export default function Probe() {
         height: dims.height,
       };
     };
+    /** Background-only per-frame motion, at render-audit's 64x36 grey scale. */
+    win.__PROBE_BGDRIFT = async ({ aspect = "short", frames = 120, fps = 4, motifs = [0, 1, 2, 3], subject }) => {
+      const dims = ASPECTS[aspect];
+      const full = document.createElement("canvas");
+      full.width = dims.width;
+      full.height = dims.height;
+      const fctx = full.getContext("2d")!;
+      const small = document.createElement("canvas");
+      small.width = 64;
+      small.height = 36;
+      const sctx = small.getContext("2d", { willReadFrequently: true })!;
+      const palette = paletteForSubject(subject ?? "Coding");
+      const out: Record<string, number[]> = {};
+      for (const motif of motifs) {
+        let prev: Float64Array | null = null;
+        const diffs: number[] = [];
+        for (let i = 0; i < frames; i++) {
+          const ms = (i / fps) * 1000;
+          drawBackground(fctx, dims.width, dims.height, ms, palette, motif);
+          sctx.clearRect(0, 0, 64, 36);
+          sctx.drawImage(full, 0, 0, 64, 36);
+          const px = sctx.getImageData(0, 0, 64, 36).data;
+          const cur = new Float64Array(64 * 36);
+          for (let q = 0, j = 0; q < px.length; q += 4, j++) {
+            cur[j] = 0.299 * px[q] + 0.587 * px[q + 1] + 0.114 * px[q + 2];
+          }
+          if (prev) {
+            let sum = 0;
+            for (let j = 0; j < cur.length; j++) sum += Math.abs(cur[j] - prev[j]);
+            diffs.push(sum / cur.length);
+          }
+          prev = cur;
+        }
+        out[`motif${motif}`] = diffs;
+      }
+      win.__PROBE_DONE = true;
+      return out;
+    };
+
     win.__PROBE_FILMSTRIP = async ({ kind, sceneId, aspect = "short", cols = 4, rows = 4, cellW = DEFAULT_CELL_W, fromMs, toMs }) => {
       win.__PROBE_DONE = false;
       await ensureStudioFonts();

@@ -55,7 +55,10 @@ const GRID_H = 36;
  * A genuinely frozen frame is bit-identical — 0.000, not "small". So the
  * separator sits just above zero, and an earlier guess of 0.5 was badly wrong:
  * it swept up the 0.1-0.5 band, which is the karaoke caption advancing under a
- * still scene, and would have reported a healthy short as 73% dead. */
+ * still scene, and would have reported a healthy short as 73% dead.
+ *
+ * Kept at 0.05: background drift measures 0.0090 worst (`scripts/bg-drift.mjs`),
+ * 5.5x below this, so it cannot mask frozen content. Details in PROGRESS.md 19.a. */
 const STILL_DIFF = 0.05;
 /* A jump this large is a scene cut or a full-frame reveal, not in-between
  * motion: only ~2% of sampled gaps reach it, and the per-video maxima are

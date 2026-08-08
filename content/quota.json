@@ -1,15 +1,10 @@
 {
-  "date": "2026-08-01",
+  "date": "2026-08-08",
   "used": {
-    "gemini-3.1-flash-lite": 483,
-    "gemini-3.6-flash": 6,
-    "gemini-3.1-pro-preview": 2
+    "gemini-3.1-flash-lite": 3,
+    "gemini-3.6-flash": 5
   },
   "byKey": {
-    "free-1": 191,
-    "free-2": 182,
-    "free-4": 107,
-    "free-5": 9,
-    "billed-1": 2
+    "free-1": 8
   }
 }

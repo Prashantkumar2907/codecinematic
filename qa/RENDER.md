@@ -10,25 +10,10 @@ A/V skew is video length minus audio length, and a positive number is **expected
 
 | Frozen | Frozen s | Video s | Audio s | A/V skew | Cuts | s/cut | Median motion | Est s | actual/est | MB | File |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **96.4%** | 216.8 | 224.9 | 217.8 | +7.12 | 7 | 32.1 | 0.00 | 193.1 | 1.16 | 18 | `2026-07-28-04-28-long-scene-kind-tour-all-twenty-new-animations` |
-| **96.3%** | 216.8 | 225.2 | 217.8 | +7.39 | 7 | 32.1 | 0.00 | 193.1 | 1.17 | 17 | `2026-07-28-04-35-long-scene-kind-tour-all-twenty-new-animations` |
-| **16.4%** | 14.3 | 87.1 | 87.1 | +0.01 | 7 | 12.4 | 0.15 | 84.0 | 1.04 | 163 | `2026-07-26-12-04-short-the-mystery-of-the-seals-why-we-cannot-read-indus-script` |
-| **15.1%** | 10.0 | 66.1 | 66.1 | +0.00 | 4 | 16.5 | 0.15 | 61.1 | 1.08 | 124 | `2026-07-26-10-50-short-the-dancing-girl-paradox-what-bronze-metallurgy-reveals-abou` |
-| **3.7%** | 3.3 | 89.0 | 87.4 | +1.54 | 8 | 11.1 | 0.22 | 86.3 | 1.03 | 88 | `2026-07-28-05-05-short-the-prototype-chain-how-objects-find-their-methods` |
-| **1.7%** | 3.8 | 225.4 | 217.8 | +7.62 | 19 | 11.9 | 0.22 | 193.1 | 1.17 | 234 | `2026-07-28-05-00-long-scene-kind-tour-all-twenty-new-animations` |
-| **0.0%** | 0.0 | 88.8 | 87.4 | +1.44 | 8 | 11.1 | 0.22 | 86.3 | 1.03 | 86 | `2026-07-28-04-23-short-the-prototype-chain-how-objects-find-their-methods` |
+| **1.6%** | 3.5 | 220.4 | 218.4 | +1.94 | 15 | 14.7 | 0.20 | 193.1 | 1.14 | 222 | `2026-08-08-12-26-long-scene-kind-tour-all-twenty-new-animations` |
+| **0.0%** | 0.0 | 90.1 | 88.6 | +1.52 | 9 | 10.0 | 0.77 | 86.3 | 1.04 | 86 | `2026-08-08-12-16-short-the-prototype-chain-how-objects-find-their-methods` |
 
 ## Longest frozen stretches
 
-**2026-07-28-04-28-long-scene-kind-tour-all-twenty-new-animations** — 198.8s at 3s, 13.8s at 206s, 4.3s at 221s
-
-**2026-07-28-04-35-long-scene-kind-tour-all-twenty-new-animations** — 198.8s at 4s, 13.8s at 207s, 4.3s at 221s
-
-**2026-07-26-12-04-short-the-mystery-of-the-seals-why-we-cannot-read-indus-script** — 7.5s at 49s, 6.8s at 22s
-
-**2026-07-26-10-50-short-the-dancing-girl-paradox-what-bronze-metallurgy-reveals-abou** — 5.5s at 21s, 4.5s at 14s
-
-**2026-07-28-05-05-short-the-prototype-chain-how-objects-find-their-methods** — 3.3s at 72s
-
-**2026-07-28-05-00-long-scene-kind-tour-all-twenty-new-animations** — 3.8s at 42s
+**2026-08-08-12-26-long-scene-kind-tour-all-twenty-new-animations** — 3.5s at 41s
 
