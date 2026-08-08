@@ -7,6 +7,7 @@ import {
   FONT_MONO,
   easeOutCubic,
   enterT,
+  departT,
   shade,
   clamp01,
   roundRect,
@@ -16,6 +17,7 @@ import {
   beatT,
   activeBeatIndex,
   rgba,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -53,13 +55,16 @@ function hatchBlock(ctx: CanvasRenderingContext2D, x: number, y: number, w: numb
 
 export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const fade = introIn * leave;
   const key = scene.id + "-thr3d";
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
@@ -69,7 +74,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
   const trackX0 = contentX + labelW;
   const trackW = contentW - labelW;
   const laneAreaY = contentY + band;
-  const laneBottom = vertical ? Math.min(contentY + contentH, layout.h * 0.86) : contentY + contentH;
+  const laneBottom = Math.min(contentY + contentH, safeBottom) - unit * 0.3;
   const laneAreaH = laneBottom - laneAreaY;
   
   const laneGap = unit * (vertical ? 1.2 : 0.9);
@@ -209,7 +214,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     return { scene: s, camera, update };
   };
 
-  const ctxData = { gIn: introIn, aStep: activeStep, sBeatT: stepBeatT, clash: clashNow };
+  const ctxData = { gIn: fade, aStep: activeStep, sBeatT: stepBeatT, clash: clashNow };
   render3D(ctx, key, rect, build, env.elapsedMs, ctxData);
 
   const get2D = (start: number, len: number, lane: number) => pixelPos(start, len, lane);
@@ -224,7 +229,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     const cy = laneCenter(i);
 
     ctx.save();
-    ctx.globalAlpha = introIn * laneIn;
+    ctx.globalAlpha = fade * laneIn;
 
     const lbl = scene.lanes[i].label;
     const chipW = labelW - unit * 0.7;
@@ -233,7 +238,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     ctx.fillStyle = INK_FILL;
     ctx.fill();
     ctx.strokeStyle = THEME.panelBorder;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.stroke();
     const fontPx = fitFontSize(ctx, lbl, { maxW: chipW - unit * 0.5, startPx: unit * 0.7, minPx: unit * 0.42, weight: 700, family: FONT_MONO });
     ctx.font = `700 ${fontPx}px ${FONT_MONO}`;
@@ -267,7 +272,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     const isClash = clashNow.has(task.id);
 
     ctx.save();
-    ctx.globalAlpha = appear * introIn * (isCurrent ? 1 : PAST_ALPHA);
+    ctx.globalAlpha = appear * fade * (isCurrent ? 1 : PAST_ALPHA);
 
     // Active-reveal shimmer sweep (2D overlay part)
     if (isActiveReveal && task.kind !== "wait") {
@@ -301,7 +306,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
       const ringF = (stepBeatT * 2) % 1;
       const g = unit * (0.1 + 0.7 * easeOutCubic(ringF));
       ctx.save();
-      ctx.globalAlpha = 0.7 * (1 - ringF) * introIn;
+      ctx.globalAlpha = 0.7 * (1 - ringF) * fade;
       ctx.strokeStyle = THEME.danger;
       ctx.lineWidth = unit * 0.1;
       roundRect(ctx, x - g, y - g, w + g * 2, blockH + g * 2, unit * 0.2 + g);
@@ -325,7 +330,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
       const by = (p1.y + p2.y) / 2;
       const burst = 0.6 + 0.4 * Math.sin(env.elapsedMs / 120);
       ctx.save();
-      ctx.globalAlpha = introIn * burst;
+      ctx.globalAlpha = fade * burst;
       ctx.fillStyle = THEME.danger;
       ctx.shadowColor = rgba(THEME.danger, 0.7);
       ctx.shadowBlur = unit * 1.0;
@@ -349,7 +354,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
 
     const yEnd = myTop + (myBot - myTop) * drawT;
     ctx.save();
-    ctx.globalAlpha = introIn * (isCurrent ? 1 : 0.55);
+    ctx.globalAlpha = fade * (isCurrent ? 1 : 0.55);
     ctx.strokeStyle = THEME.warn;
     ctx.lineWidth = unit * 0.07;
     ctx.setLineDash([unit * 0.4, unit * 0.3]);
@@ -369,7 +374,7 @@ export function paintThreads(ctx: CanvasRenderingContext2D, scene: ThreadsScene,
     ctx.fillStyle = INK_FILL;
     ctx.fill();
     ctx.strokeStyle = rgba(THEME.warn, 0.6);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.stroke();
     ctx.fillStyle = THEME.warn;
     ctx.textAlign = "center";
