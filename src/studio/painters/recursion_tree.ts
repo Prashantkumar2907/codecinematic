@@ -7,6 +7,7 @@ import {
   easeOutBack,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -59,13 +60,15 @@ function quadPoints(p0: Pt, c: Pt, p1: Pt, n = 14): Pt[] {
  */
 export function paintRecursionTree(ctx: CanvasRenderingContext2D, scene: RecursionTreeScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical, h } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.steps.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent, { centered: true }) + unit * 0.5;
 
@@ -162,13 +165,17 @@ export function paintRecursionTree(ctx: CanvasRenderingContext2D, scene: Recursi
   };
 
   // ---- geometry: tree area + a call-stack panel alongside it -----------------
-  const panelW = vertical ? contentW : Math.min(contentW * 0.24, unit * 4.6);
-  const panelH = vertical ? Math.min(contentH * 0.2, unit * 3.0) : contentH - band;
   const treeX = contentX;
   const treeY = contentY + band;
+  // Bounded by safeBottom, not just contentH: at 16:9 contentH runs under the
+  // caption band, which is where the call-stack panel's bottom frame used to
+  // land (the panel is bottom-anchored within its own height).
+  const vAvailH = Math.min(contentY + contentH, safeBottom) - unit * 0.4 - treeY;
+  const panelW = vertical ? contentW : Math.min(contentW * 0.24, unit * 4.6);
+  const panelH = vertical ? Math.min(contentH * 0.2, unit * 3.0) : vAvailH;
   const treeW = vertical ? contentW : contentW - panelW - unit * 0.9;
-  let treeH = vertical ? contentH - band - panelH - unit * 1.1 : contentH - band;
-  if (vertical) treeH = Math.min(treeH, h * 0.88 - treeY);
+  let treeH = vertical ? contentH - band - panelH - unit * 1.1 : vAvailH;
+  if (vertical) treeH = Math.min(treeH, safeBottom - unit * 0.3 - treeY);
 
   const cols = maxCol + 1;
   const nodeW = Math.min((treeW / cols) * 0.82, unit * 4.0);
@@ -435,7 +442,7 @@ export function paintRecursionTree(ctx: CanvasRenderingContext2D, scene: Recursi
     ctx.fillStyle = THEME.textDim;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    const capY = vertical ? treeY + treeH + unit * 0.4 : contentY + contentH - unit * 0.15;
+    const capY = vertical ? treeY + treeH + unit * 0.4 : Math.min(contentY + contentH, safeBottom) - unit * 0.4;
     ctx.fillText(note, treeX + treeW / 2, capY);
     ctx.restore();
   }
