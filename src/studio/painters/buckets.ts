@@ -1,5 +1,3 @@
-import * as THREE from "three";
-import { render3D, projectToRect, studioLights, makeBlock, type ThreeBundle } from "./three3d";
 import { introBeatCount, type Scene } from "../schema";
 import {
   THEME,
@@ -20,25 +18,29 @@ import {
   stagger,
   STROKE,
   RADIUS,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
 type BucketsScene = Extract<Scene, { kind: "buckets" }>;
+type Pt = { x: number; y: number };
 
 const FILL_FRAC = 0.85;
 const FULL_EPS = 1e-9;
+const BUCKET_FILL = 0.7;
 
 export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene, env: PaintEnv) {
   const { layout } = env;
   const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
-  const { accent, accentGlow, secondary } = env.palette;
+  const { accent, accentGlow } = env.palette;
   const offset = introBeatCount(scene);
   const totalBeats = offset + scene.pours.length;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
-  const ghostIn = easeOutCubic(enterT(env, 400));
-  const key = scene.id + "-bkt3d";
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const ghostIn = easeOutCubic(enterT(env, 400)) * leave;
 
   const wholes =
     scene.buckets.every((b) => Number.isInteger(b.capacity)) && scene.pours.every((p) => Number.isInteger(p.amount));
@@ -82,148 +84,60 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
   const labelH = unit * (vertical ? 2.6 : 2.3);
   const areaTop = ay + topPad;
   const baseline = ay + ah - labelH;
-  const rect = { x: ax, y: areaTop - unit * 2, w: aw, h: baseline - areaTop + unit * 2 };
 
   const n = scene.buckets.length;
   const maxCap = Math.max(...scene.buckets.map((b) => b.capacity), 1e-9);
-
-  const spreadX = vertical ? 3.5 : 5.5;
-  const spreadY = vertical ? 4.5 : 3.5;
-  const bucketW3D = (spreadX * 2.0) / n * 0.7;
+  const maxContainerH = baseline - areaTop;
+  const colW = aw / n;
+  const bucketW = colW * BUCKET_FILL;
+  const bucketCx = (i: number) => ax + i * colW + colW / 2;
+  const containerH = (i: number) => clamp01(scene.buckets[i].capacity / maxCap) * maxContainerH * 0.58 + maxContainerH * 0.42;
+  const containerTop = (i: number) => baseline - containerH(i);
+  const fillAmt = (i: number) => clamp01(fills[i] / scene.buckets[i].capacity);
+  const liquidTop = (i: number) => baseline - containerH(i) * fillAmt(i);
 
   // Siblings enter on a stagger, not all on the same tick (rubric axis 3).
-  const ghostIns = scene.buckets.map((_, i) => easeOutCubic(enterT(env, 400, stagger(i, n))));
+  const ghostIns = scene.buckets.map((_, i) => easeOutCubic(enterT(env, 400, stagger(i, n))) * leave);
 
-  const build = (): ThreeBundle => {
-    const s = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(vertical ? 45 : 36, 1, 0.1, 100);
-    camera.position.set(0, 0, vertical ? 15 : 12);
-    camera.lookAt(0, 0, 0);
-    studioLights(s, accent, secondary);
+  const get2D = (i: number, isTop: boolean): Pt => ({ x: bucketCx(i), y: isTop ? containerTop(i) : liquidTop(i) });
+  const get2DBottom = (i: number): Pt => ({ x: bucketCx(i), y: baseline + unit * 0.3 });
 
-    const grid = new THREE.GridHelper(spreadX * 3, 10, new THREE.Color(accent), new THREE.Color(shade(THEME.textDim, -0.55)));
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.2;
-    grid.position.y = -spreadY / 2;
-    s.add(grid);
+  // Containers + liquid, drawn directly in 2D — the camera was already exactly
+  // on-axis, so nothing about the removed "glass block" needed a 3D projection
+  // to line up with these 2D overlays in the first place.
+  ctx.save();
+  scene.buckets.forEach((bucket, i) => {
+    const gIn = ghostIns[i];
+    if (gIn <= 0) return;
+    const isFilling = flowing && i === fillingIndex;
+    const full = fills[i] >= bucket.capacity - FULL_EPS && fills[i] > 0;
+    const cTop = containerTop(i);
+    const cx0 = bucketCx(i) - bucketW / 2;
 
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(spreadX * 4, spreadY * 4),
-      new THREE.ShadowMaterial({ opacity: 0.4 })
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -spreadY / 2;
-    shadowPlane.receiveShadow = true;
-    s.add(shadowPlane);
+    ctx.save();
+    ctx.globalAlpha = gIn;
+    roundRect(ctx, cx0, cTop, bucketW, baseline - cTop, unit * 0.25);
+    ctx.fillStyle = rgba(THEME.textDim, 0.05);
+    ctx.fill();
+    ctx.strokeStyle = rgba(isFilling ? accent : THEME.textDim, isFilling ? 0.8 : 0.4);
+    ctx.lineWidth = unit * STROKE.thin;
+    ctx.stroke();
 
-    const models: { container: THREE.Group, liquid: THREE.Group, bucket: any, i: number, maxH: number }[] = [];
-
-    scene.buckets.forEach((bucket, i) => {
-        const x = n === 1 ? 0 : (i / (n - 1) - 0.5) * spreadX * 2;
-        const bH = clamp01(bucket.capacity / maxCap) * spreadY * 0.58 + spreadY * 0.42;
-
-        // Container (glass-like). Opacity is set on the materials below, not
-        // baked into these hex strings: THREE.Color drops an rgba() alpha and
-        // logs a warning per call, which is where qa/buckets/console.log's
-        // "Alpha component ... will be ignored" spam came from.
-        const container = makeBlock(bucketW3D, bH, bucketW3D * 0.8, THEME.textDim, THEME.textDim);
-        container.position.set(x, -spreadY / 2 + bH / 2, 0);
-        container.children.forEach(c => {
-            if (c instanceof THREE.Mesh) {
-                const mat = c.material as THREE.MeshPhysicalMaterial;
-                mat.transparent = true;
-                mat.opacity = 0.05; // More transparent glass
-                mat.roughness = 0.1;
-                mat.metalness = 0.5;
-                mat.depthWrite = false; // Fix transparent z-fighting
-            }
-        });
-        s.add(container);
-
-        // Liquid inside
-        const liquid = makeBlock(bucketW3D * 0.95, bH * 0.98, bucketW3D * 0.75, accent, THEME.good);
-        // Anchor at bottom
-        liquid.position.set(x, -spreadY / 2 + 0.05, 0); 
-        s.add(liquid);
-
-        models.push({ container, liquid, bucket, i, maxH: bH });
-    });
-
-    const update = (elapsedMs: number, ctxData: { gIns: number[], fills: number[], fillingIndex: number, flowing: boolean }) => {
-      const { gIns, fills, fillingIndex, flowing } = ctxData;
-
-      models.forEach(({ container, liquid, i, maxH }) => {
-        const gIn = gIns[i];
-        const full = fills[i] >= scene.buckets[i].capacity - FULL_EPS && fills[i] > 0;
-        const isFilling = flowing && i === fillingIndex;
-        const fillAmt = clamp01(fills[i] / scene.buckets[i].capacity);
-
-        container.visible = gIn > 0;
-        // makeBlock() parents its edge LineSegments to the face Mesh, not this
-        // group (three3d.ts) — container.children is only ever [mesh], so the
-        // wall highlight below must descend one level to find the edges.
-        container.children.forEach(c => {
-            if (!(c instanceof THREE.Mesh)) return;
-            const mat = c.material as THREE.MeshPhysicalMaterial;
-            mat.transparent = true;
-            mat.opacity = 0.15 * gIn;
-            c.children.forEach(e => {
-                if (!(e instanceof THREE.LineSegments)) return;
-                const lineMat = e.material as THREE.LineBasicMaterial;
-                lineMat.color.setStyle(isFilling ? accent : THEME.textDim);
-                lineMat.opacity = isFilling ? 0.8 : 0.4;
-            });
-        });
-
-        if (fillAmt > 0) {
-            liquid.visible = true;
-            liquid.scale.set(1, fillAmt, 1);
-            // Since scaling happens from the center, we must shift the position up
-            // so the bottom remains anchored at the floor
-            const currentH = (maxH * 0.98) * fillAmt;
-            liquid.position.y = -spreadY / 2 + 0.05 + currentH / 2;
-            
-            // Wavy bob effect if filling
-            const bob = isFilling ? Math.sin(elapsedMs / 100) * 0.05 : 0;
-            liquid.position.y += bob;
-
-            liquid.children.forEach(c => {
-                if (c instanceof THREE.Mesh) {
-                    const mat = c.material as THREE.MeshPhysicalMaterial;
-                    mat.transparent = true;
-                    mat.opacity = gIn * 0.9;
-                    if (full) {
-                        mat.color.setStyle(THEME.good);
-                        mat.emissive.setStyle(THEME.good);
-                    } else {
-                        mat.color.setStyle(accent);
-                        mat.emissive.setStyle(accent);
-                    }
-                }
-            });
-        } else {
-            liquid.visible = false;
-        }
-      });
-    };
-
-    return { scene: s, camera, update };
-  };
-
-  const cam = render3D(ctx, key, rect, build, env.elapsedMs, { gIns: ghostIns, fills, fillingIndex, flowing });
-  if (!cam) return;
-
-  const get2D = (i: number, isTop: boolean) => {
-      const x = n === 1 ? 0 : (i / (n - 1) - 0.5) * spreadX * 2;
-      const bH = clamp01(scene.buckets[i].capacity / maxCap) * spreadY * 0.58 + spreadY * 0.42;
-      const fillAmt = clamp01(fills[i] / scene.buckets[i].capacity);
-      const y = isTop ? (-spreadY / 2 + bH) : (-spreadY / 2 + bH * fillAmt);
-      return projectToRect(cam, new THREE.Vector3(x, y, 0), rect);
-  };
-  const get2DBottom = (i: number) => {
-      const x = n === 1 ? 0 : (i / (n - 1) - 0.5) * spreadX * 2;
-      return projectToRect(cam, new THREE.Vector3(x, -spreadY / 2 - 0.2, 0), rect);
-  };
+    const fa = fillAmt(i);
+    if (fa > 0) {
+      const bob = isFilling ? unit * 0.05 * Math.sin(env.elapsedMs / 100) : 0;
+      const lTop = liquidTop(i) + bob;
+      ctx.save();
+      roundRect(ctx, cx0 + bucketW * 0.025, lTop, bucketW * 0.95, baseline + bob - lTop, unit * 0.2);
+      ctx.clip();
+      ctx.globalAlpha = gIn * 0.9;
+      ctx.fillStyle = full ? THEME.good : accent;
+      ctx.fillRect(cx0, lTop, bucketW, baseline + bob - lTop + unit * 0.3);
+      ctx.restore();
+    }
+    ctx.restore();
+  });
+  ctx.restore();
 
   // 2D overlays
   ctx.save();
@@ -283,7 +197,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
       // Offset slightly to represent edge of bucket
       const bw2D = contentW / n * 0.4;
       fromP.x += bw2D;
-      
+
       const midX = (fromP.x + toP.x) / 2;
       ctx.save();
       ctx.globalAlpha = ghostIn * 0.85;
@@ -296,9 +210,9 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
       ctx.moveTo(fromP.x, fromP.y);
       ctx.quadraticCurveTo(midX, fromP.y - unit * 0.15, toP.x, toP.y);
       ctx.stroke();
-      
+
       for (let d = 0; d < 3; d++) {
-        const f = ((env.elapsedMs / 600 + d / 3) % 1);
+        const f = (env.elapsedMs / 600 + d / 3) % 1;
         const dx = fromP.x + (toP.x - fromP.x) * f;
         const dy = fromP.y + (toP.y - fromP.y) * f * f;
         ctx.globalAlpha = ghostIn * Math.sin(Math.PI * f);
@@ -309,7 +223,7 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
       }
       ctx.restore();
     }
-    
+
     // Pour stream into the frontier bucket
     const sP = get2D(fillingIndex, false);
     ctx.save();
@@ -373,6 +287,6 @@ export function paintBuckets(ctx: CanvasRenderingContext2D, scene: BucketsScene,
   ctx.fillText(totalText, chipX + unit * 0.6 + lw, chipY + chipH * 0.68);
   ctx.textAlign = "start";
   ctx.restore();
-  
+
   ctx.restore();
 }
