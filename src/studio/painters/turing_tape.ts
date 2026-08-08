@@ -8,6 +8,7 @@ import {
   easeInOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -73,7 +74,9 @@ export function paintTuringTape(ctx: CanvasRenderingContext2D, scene: TapeScene,
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = Math.min(active - offset, scene.steps.length - 1);
   const stepT = activeStep >= 0 ? beatT(env.beats, offset + activeStep, totalBeats, env.p) : 0;
-  const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 380)) * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaY = contentY + band;
