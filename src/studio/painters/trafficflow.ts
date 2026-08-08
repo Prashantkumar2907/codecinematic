@@ -61,16 +61,16 @@ export function paintTrafficflow(ctx: CanvasRenderingContext2D, scene: Trafficfl
   const spreadX = isVert ? 3.0 : 5.0;
   const spreadZ = isVert ? 4.5 : 3.0;
 
-  // Positions in 3D
-  // LB is at one end
-  const lbPos = new THREE.Vector3(isVert ? 0 : -spreadX * 0.6, 0, isVert ? -spreadZ * 0.6 : 0);
+  // Positions in 3D. Servers always spread across X (the camera's fixed X=0,
+  // elevated viewing angle projects X-separation cleanly to distinct screen
+  // columns); the LB is pushed back along Z instead. Swapping which axis the
+  // server row uses (as horizontal mode previously did) compresses under
+  // this camera into a diagonal cascade where each block's label overlaps
+  // its neighbour's load bar — confirmed visually, not just theoretical.
+  const lbPos = new THREE.Vector3(0, 0, -spreadZ * 0.6);
   const serverPos = (i: number) => {
     const frac = numServers === 1 ? 0.5 : (i / (numServers - 1));
-    if (isVert) {
-      return new THREE.Vector3((frac - 0.5) * spreadX * 2, 0, spreadZ * 0.6);
-    } else {
-      return new THREE.Vector3(spreadX * 0.6, 0, (frac - 0.5) * spreadZ * 2);
-    }
+    return new THREE.Vector3((frac - 0.5) * spreadX * 2, 0, spreadZ * 0.6);
   };
 
   const build = (): ThreeBundle => {
@@ -139,7 +139,7 @@ export function paintTrafficflow(ctx: CanvasRenderingContext2D, scene: Trafficfl
         const srv = scene.servers[i];
         const isActive = actTarget === srv.id || (actIdx % numServers) === i;
         const isOverloaded = srv.status === "overloaded" || srv.load > 85;
-        const statusColor = isOverloaded ? "#ef4444" : srv.status === "drained" ? THEME.textDim : palette.accent;
+        const statusColor = isOverloaded ? THEME.danger : srv.status === "drained" ? THEME.textDim : palette.accent;
         
         const bob = Math.sin(elapsedMs / 1200 + i) * 0.05;
         b.position.y = serverPos(i).y + bob + (isActive ? 0.2 : 0);
@@ -185,7 +185,9 @@ export function paintTrafficflow(ctx: CanvasRenderingContext2D, scene: Trafficfl
   ctx.fillText("Load Balancer", lb2D.x, lb2D.y - unit * 0.6);
 
   ctx.font = `600 ${Math.round(layout.unit * 0.4)}px ${FONT_MONO}`;
-  ctx.fillStyle = palette.secondary;
+  // Sits on the LB block itself (whose face is palette.secondary) — matching
+  // that same color made the label nearly invisible; needs contrast instead.
+  ctx.fillStyle = THEME.text;
   ctx.fillText(`[${scene.algorithm ?? "round-robin"}]`, lb2D.x, lb2D.y + unit * 0.8);
 
   // Servers
@@ -193,7 +195,7 @@ export function paintTrafficflow(ctx: CanvasRenderingContext2D, scene: Trafficfl
     const s2D = get2D(serverPos(sIdx));
     const isActive = activeStep?.targetServer === server.id || (activeStepIdx % numServers) === sIdx;
     const isOverloaded = server.status === "overloaded" || server.load > 85;
-    const statusColor = isOverloaded ? "#ef4444" : server.status === "drained" ? THEME.textDim : palette.accent;
+    const statusColor = isOverloaded ? THEME.danger : server.status === "drained" ? THEME.textDim : palette.accent;
 
     if (isActive) {
       glowRing(ctx, s2D.x, s2D.y, unit * 1.5, statusColor, env);
