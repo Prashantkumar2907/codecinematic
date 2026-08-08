@@ -6,6 +6,7 @@ import {
   easeOutCubic,
   clamp01,
   enterT,
+  departT,
   idle,
   roundRect,
   drawSceneTitle,
@@ -14,6 +15,7 @@ import {
   flowDots,
   glowRing,
   rgba,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -21,7 +23,6 @@ type TrendScene = Extract<Scene, { kind: "trendgraph" }>;
 type Series = TrendScene["series"][number];
 
 const CURRENCY_RE = /^[₹$€£]$/;
-const CAPTION_SAFE_Y = 0.86;
 
 /** Series colour by its palette role. muted → the neutral slate used for reference lines. */
 function seriesColor(role: Series["role"], accent: string, secondary: string): string {
@@ -48,7 +49,7 @@ function fmtValue(value: number, unit: string | undefined, t: number): string {
  */
 export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene, env: PaintEnv) {
   const { layout } = env;
-  const { unit, contentX, contentY, contentW, contentH, vertical } = layout;
+  const { unit, contentX, contentY, contentW, contentH, vertical, safeBottom: layoutSafeBottom } = layout;
   const { accent, accentGlow, secondary } = env.palette;
 
   const offset = introBeatCount(scene);
@@ -60,7 +61,9 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
   const allIn = activeStep >= n - 1 && stepT >= 0.999;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.3;
-  const introIn = easeOutCubic(enterT(env, 420));
+  const leave = departT(env, 420);
+  if (leave <= 0) return;
+  const introIn = easeOutCubic(enterT(env, 420)) * leave;
 
   // Stable value axis over ALL points so the plot never rescales as data reveals.
   let yMin = Infinity;
@@ -85,7 +88,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
   // ---- geometry ----
   const legendH = unit * (vertical ? 1.5 : 1.3);
   const plotTop = contentY + band + legendH + unit * 0.5;
-  const safeBottom = vertical ? Math.min(contentY + contentH, layout.h * CAPTION_SAFE_Y) : contentY + contentH;
+  const safeBottom = Math.min(contentY + contentH, layoutSafeBottom) - unit * 0.3;
   const labelH = unit * 1.25;
   const baseY = safeBottom - labelH;
   const plotH = Math.max(unit, baseY - plotTop);
@@ -115,7 +118,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
   // ---- background gridlines + zero line ----
   ctx.save();
   ctx.globalAlpha = introIn;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = unit * STROKE.hair;
   const GRID_LINES = 3;
   for (let g = 0; g <= GRID_LINES; g++) {
     const gy = plotTop + (plotH * g) / GRID_LINES;
@@ -130,7 +133,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
   // Baseline (or the zero line when the range straddles 0 — critical for gaps that go negative).
   const axisY = zeroInside ? zeroY : baseY;
   ctx.strokeStyle = rgba(THEME.textDim, zeroInside ? 0.4 : 0.28);
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = unit * STROKE.thin;
   ctx.beginPath();
   ctx.moveTo(contentX, axisY);
   ctx.lineTo(contentX + contentW, axisY);
@@ -250,7 +253,7 @@ export function paintTrendgraph(ctx: CanvasRenderingContext2D, scene: TrendScene
       ctx.fillStyle = THEME.bgBottom;
       ctx.fill();
       ctx.strokeStyle = accent;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = unit * STROKE.thin;
       ctx.stroke();
       ctx.fillStyle = THEME.text;
       ctx.textAlign = "start";
