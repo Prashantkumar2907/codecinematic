@@ -6,12 +6,14 @@ import {
   easeOutCubic,
   easeInOutCubic,
   enterT,
+  departT,
   clamp01,
   roundRect,
   drawSceneTitle,
   beatT,
   activeBeatIndex,
   rgba,
+  STROKE,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -49,6 +51,9 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const activeStep = active - offset;
   const introIn = easeOutCubic(enterT(env, 380));
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
+  const showT = introIn * leave;
 
   const band = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const areaX = contentX;
@@ -135,7 +140,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
 
   // Ghost slot rail.
   ctx.save();
-  ctx.globalAlpha = 0.14 * introIn;
+  ctx.globalAlpha = 0.14 * showT;
   ctx.strokeStyle = rgba(THEME.textDim, 0.9);
   ctx.lineWidth = unit * 0.05;
   ctx.setLineDash([unit * 0.24, unit * 0.2]);
@@ -151,16 +156,16 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   // Source spawn point with idle pulse.
   const pulse = 0.5 + 0.5 * Math.sin(env.elapsedMs / 700);
   ctx.save();
-  ctx.globalAlpha = introIn * (0.25 + 0.25 * pulse);
+  ctx.globalAlpha = showT * (0.25 + 0.25 * pulse);
   ctx.strokeStyle = accent;
   ctx.lineWidth = unit * 0.06;
   ctx.beginPath();
   ctx.arc(source.x, source.y, unit * (0.7 + 0.4 * pulse), 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
-  drawDot(ctx, source, unit * 0.55, INK_FILL, accentGlow, introIn);
+  drawDot(ctx, source, unit * 0.55, INK_FILL, accentGlow, showT);
   ctx.save();
-  ctx.globalAlpha = introIn;
+  ctx.globalAlpha = showT;
   ctx.strokeStyle = accent;
   ctx.lineWidth = unit * 0.08;
   ctx.beginPath();
@@ -176,7 +181,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
     })();
     const half = serverSize / 2;
     ctx.save();
-    ctx.globalAlpha = introIn;
+    ctx.globalAlpha = showT;
     if (busy) {
       ctx.shadowColor = accentGlow;
       ctx.shadowBlur = unit * 0.9;
@@ -217,7 +222,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
     }
     const p = slotPos(rSlot);
     const bob = unit * 0.06 * Math.sin(env.elapsedMs / 500 + j);
-    drawDot(ctx, { x: p.x, y: p.y + bob }, dotR, accent, null, introIn);
+    drawDot(ctx, { x: p.x, y: p.y + bob }, dotR, accent, null, showT);
     drawn++;
   }
 
@@ -240,7 +245,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
       alpha = 1 - dp;
     }
     const fade = p > 0.7 ? THEME.textDim : accent;
-    drawDot(ctx, pos, dotR, fade, p <= 0.7 ? accentGlow : null, introIn * alpha);
+    drawDot(ctx, pos, dotR, fade, p <= 0.7 ? accentGlow : null, showT * alpha);
   }
 
   // Arriving dots flying source -> tail slot.
@@ -249,13 +254,13 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
     if (p <= 0 || p >= 1) continue;
     const target = slotPos(Math.min(queueBefore + a - headShift, capacity - 1));
     const pos = lerp(source, target, easeOutCubic(p));
-    drawDot(ctx, pos, dotR, accent, accentGlow, introIn);
+    drawDot(ctx, pos, dotR, accent, accentGlow, showT);
   }
 
   // Queue length chip.
   const chipText = `queue: ${queueCount}`;
   ctx.save();
-  ctx.globalAlpha = introIn;
+  ctx.globalAlpha = showT;
   ctx.font = `700 ${unit * 0.68}px ${FONT_MONO}`;
   const tw = ctx.measureText(chipText).width;
   const cx = vertical ? areaX + areaW - tw - unit * 1.2 : slot0.x + slotVec.x * (Math.min(capacity, 3) + 1);
@@ -264,7 +269,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   ctx.fillStyle = INK_FILL;
   ctx.fill();
   ctx.strokeStyle = rgba(accent, 0.6);
-  ctx.lineWidth = 1;
+  ctx.lineWidth = unit * STROKE.hair;
   ctx.stroke();
   ctx.fillStyle = THEME.text;
   ctx.textAlign = "start";
@@ -277,7 +282,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
     const ox = p.x + slotVec.x * 0.9;
     const oy = p.y + slotVec.y * 0.9;
     ctx.save();
-    ctx.globalAlpha = introIn;
+    ctx.globalAlpha = showT;
     ctx.font = `800 ${unit * 0.6}px ${FONT_MONO}`;
     const t = `+${overflow}`;
     const w = ctx.measureText(t).width + unit * 0.6;
@@ -297,7 +302,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
   // Note chip above the scene.
   if (note) {
     ctx.save();
-    ctx.globalAlpha = introIn;
+    ctx.globalAlpha = showT;
     ctx.font = `700 ${unit * 0.72}px ${FONT_SANS}`;
     const tw2 = ctx.measureText(note).width;
     const nx = areaX + areaW / 2;
@@ -306,7 +311,7 @@ export function paintQueueflow(ctx: CanvasRenderingContext2D, scene: QueueflowSc
     ctx.fillStyle = rgba(accent, 0.14);
     ctx.fill();
     ctx.strokeStyle = rgba(accent, 0.6);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = unit * STROKE.hair;
     ctx.stroke();
     ctx.fillStyle = THEME.text;
     ctx.textAlign = "center";
