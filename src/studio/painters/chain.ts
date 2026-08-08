@@ -25,6 +25,7 @@ import {
   beatT,
   beatWindow,
   activeBeatIndex,
+  departT,
 } from "./common";
 import type { PaintEnv } from "./index";
 
@@ -77,6 +78,8 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
   const totalBeats = offset + n;
   const active = activeBeatIndex(env.beats, totalBeats, env.p);
   const inTail = env.p >= beatWindow(env.beats, totalBeats - 1, totalBeats).end;
+  const leave = departT(env, 380);
+  if (leave <= 0) return;
 
   const titleBand = drawSceneTitle(ctx, scene.title, layout, env, accent) + unit * 0.4;
   const bandTop = contentY + titleBand;
@@ -253,7 +256,7 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
     const r = rects[i];
     ctx.save();
     applyCardTransform(i);
-    ctx.globalAlpha = GHOST_ALPHA * gi;
+    ctx.globalAlpha = GHOST_ALPHA * gi * leave;
     ctx.strokeStyle = accent;
     ctx.lineWidth = unit * STROKE.thin;
     roundRect(ctx, r.x, r.y, r.w, r.h, unit * RADIUS.md);
@@ -276,7 +279,7 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
     const alpha = Math.min(1, (lit ? 1 : active > offset + i ? PAST_ALPHA : 1) + 0.25 * sweep);
 
     ctx.save();
-    ctx.globalAlpha = appear * alpha;
+    ctx.globalAlpha = appear * alpha * leave;
     applyCardTransform(i);
 
     const breath = isLast && inTail ? idle(env, TAIL_BREATH_MS) : 0;
@@ -331,7 +334,7 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
     const progress = easeInOutCubic(sub(t, 0.04, 0.3));
 
     ctx.save();
-    ctx.globalAlpha = Math.min(1, (isCurrent ? 0.95 : 0.45) + 0.45 * sweepAt(k - 0.5));
+    ctx.globalAlpha = Math.min(1, (isCurrent ? 0.95 : 0.45) + 0.45 * sweepAt(k - 0.5)) * leave;
     ctx.strokeStyle = accent;
     ctx.fillStyle = accent;
     ctx.lineWidth = unit * STROKE.base;
@@ -348,7 +351,7 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
     const rt = sub(t, RING_FROM, RING_LEN);
     if (rt > 0 && rt < 1) {
       ctx.save();
-      ctx.globalAlpha = (1 - rt) * 0.8;
+      ctx.globalAlpha = (1 - rt) * 0.8 * leave;
       ctx.strokeStyle = accent;
       ctx.lineWidth = unit * STROKE.thin;
       ctx.shadowColor = accentGlow;
@@ -364,7 +367,7 @@ export function paintChain(ctx: CanvasRenderingContext2D, scene: ChainScene, env
       const a = { x: from.x + dx * DOT_INSET, y: from.y + dy * DOT_INSET };
       const b = { x: to.x - dx * DOT_INSET, y: to.y - dy * DOT_INSET };
       ctx.save();
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.55 * leave;
       flowDots(ctx, [a, b], { elapsedMs: env.elapsedMs + (n - k) * RELAY_MS }, {
         count: 1,
         speedMs: RELAY_MS * n,
